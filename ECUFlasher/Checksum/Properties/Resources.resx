@@ -1,0 +1,187 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="Mask_4Z7907551R_MultiRangeChecksumFunctionValue_0x8ABC40" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\4Z7907551R MultiRangeChecksumFunctionValue 0x8ABC40 MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_4Z7907551R_MultiRangeChecksumFunction_0x8ABAB4" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\4Z7907551R MultiRangeChecksumFunction 0x8ABAB4 MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551C_MultiPointChecksumFunction_0x86DA62" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551C MultiPointChecksumFunction 0x86DA62 MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551C_RollingChecksumRanges_0x86C094" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551C MultiPointChecksumRanges 0x86C0B4 MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551K_RollingChecksumValueInit_0x890742" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551K RollingChecksumValueInit 0x890742 MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551M_002_MainCheckSumFunctions_0x879C0C_Head" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MainCheckSumFunctions 0x879C0C Head Mask.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551M_002_MainCheckSumFunctions_0x879C0C_Tail" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MainCheckSumFunctions 0x879C0C Tail Mask.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551M_002_MultiPointChecksumCalculationFunction_0x87C532" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MultiPointChecksumCalculationFunction 0x87C532 MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551M_002_MultiPointChecksumFunction_0x87CA3E" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MultiPointChecksumFunction 0x87CA3E Mask.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551M_002_RollingChecksumRanges_0x87AB80" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MultiPointChecksumRanges 0x87AB80 MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Mask_8D0907551M_002_RollingChecksumSeedsFunction_0x87A94A" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 RollingChecksumSeedsFunction 0x87A94A MASK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_4Z7907551R_MultiRangeChecksumFunctionValue_0x8ABC40" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\4Z7907551R MultiRangeChecksumFunctionValue 0x8ABC40.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_4Z7907551R_MultiRangeChecksumFunction_0x8ABAB4" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\4Z7907551R MultiRangeChecksumFunction 0x8ABAB4.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551C_MultiPointChecksumFunction_0x86DA62" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551C MultiPointChecksumFunction 0x86DA62.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551C_RollingChecksumRanges_0x86C094" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551C MultiPointChecksumRanges 0x86C0B4.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551K_RollingChecksumValueInit_0x890742" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551K RollingChecksumValueInit 0x890742.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551M_002_MainCheckSumFunctions_0x879C0C_Head" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MainCheckSumFunctions 0x879C0C Head.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551M_002_MainCheckSumFunctions_0x879C0C_Tail" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MainCheckSumFunctions 0x879C0C Tail.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551M_002_MultiPointChecksumCalculationFunction_0x87C532" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MultiPointChecksumCalculationFunction 0x87C532.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551M_002_MultiPointChecksumFunction_0x87CA3E" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MultiPointChecksumFunction 0x87CA3E.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551M_002_RollingChecksumRanges_0x87AB80" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 MultiPointChecksumRanges 0x87AB80.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Pattern_8D0907551M_002_RollingChecksumSeedsFunction_0x87A94A" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\8D0907551M 002 RollingChecksumSeedsFunction 0x87A94A.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+</root>
