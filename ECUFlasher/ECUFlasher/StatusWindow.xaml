@@ -1,0 +1,45 @@
+﻿<!--
+Nefarious Motorsports ME7 ECU Flasher
+Copyright (C) 2017  Nefarious Motorsports Inc
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Contact by Email: tony@nefariousmotorsports.com
+-->
+    
+<UserControl x:Class="ECUFlasher.StatusWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+            xmlns:ECUFlasher="clr-namespace:ECUFlasher"
+            xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="300">
+    <Grid Margin="5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>        
+        <Menu Grid.Row="0" Margin="0,0,0,5">
+            <MenuItem Header="Status Window">
+                <MenuItem Command="{Binding Path=ClearStatusTextCommand}" Style="{StaticResource ReactiveCommandMenuItemStyle}"/>
+            </MenuItem>            
+        </Menu>
+        <TextBox Grid.Row="1" Text="{Binding Path=StatusText, Mode=OneWay}" IsReadOnly="True" AllowDrop="False" TextWrapping="WrapWithOverflow"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" BorderThickness="0"
+                         Shared:AutoScrollTextBox.AutoScrollTextBox="True"/>
+    </Grid>
+</UserControl>

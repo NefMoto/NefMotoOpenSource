@@ -1,0 +1,134 @@
+﻿<!--
+Nefarious Motorsports ME7 ECU Flasher
+Copyright (C) 2017  Nefarious Motorsports Inc
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Contact by Email: tony@nefariousmotorsports.com
+-->
+    
+<UserControl x:Class="ECUFlasher.KWP2000Interface_View"
+			 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+			 xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+			 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:ECUFlasher="clr-namespace:ECUFlasher"
+             xmlns:props="clr-namespace:ECUFlasher.Properties"
+             xmlns:Communication="clr-namespace:Communication;assembly=Communication"
+             xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+			 mc:Ignorable="d" 
+			 d:DesignHeight="300" d:DesignWidth="300">
+    <UserControl.Resources>
+
+        <ObjectDataProvider MethodName="GetValues" ObjectType="{x:Type sys:Enum}" x:Key="ConnectionMethodEnumValues">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="ECUFlasher:KWP2000Interface_ViewModel+ConnectionMethod"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+        
+        <Style x:Key="ConnectButtonStyle" TargetType="Button" BasedOn="{StaticResource ConnectionButtonsStyle}">
+            <Setter Property="Button.Command" Value="{Binding Path=DisconnectCommand}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Style.Triggers>                
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Path=CommInterface.ConnectionStatus}" Value="{x:Static Communication:CommunicationInterface+ConnectionStatusType.CommunicationTerminated}"/>
+                        <Condition Binding="{Binding ElementName=DesiredConnectionMethodComboBox, Path=SelectedItem}" Value="{x:Static ECUFlasher:KWP2000Interface_ViewModel+ConnectionMethod.FastInit}"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Button.Command" Value="{Binding Path=ConnectFastInitCommand}"/>
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Path=CommInterface.ConnectionStatus}" Value="{x:Static Communication:CommunicationInterface+ConnectionStatusType.CommunicationTerminated}"/>
+                        <Condition Binding="{Binding ElementName=DesiredConnectionMethodComboBox, Path=SelectedItem}" Value="{x:Static ECUFlasher:KWP2000Interface_ViewModel+ConnectionMethod.SlowInit}"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Button.Command" Value="{Binding Path=ConnectSlowInitCommand}"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>        
+        
+        <Style x:Key="ConnectionMethodComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}">
+            <Setter Property="IsEnabled" Value="false"/>
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate DataType="ECUFlasher:KWP2000Interface_ViewModel+ConnectionMethod">
+                        <TextBlock Text="{Binding Converter={StaticResource descriptionAttributeConverter}}"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=CommInterface.ConnectionStatus}" Value="{x:Static Communication:CommunicationInterface+ConnectionStatusType.CommunicationTerminated}">
+                    <Setter Property="IsEnabled" Value="true"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="BaudRateComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}"/>        
+
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" MinWidth="80"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <ComboBox Grid.Column="0" Grid.Row="0" Style="{StaticResource BaudRateComboBoxStyle}" ItemsSource="{Binding Path=AvailableBaudRates}" ToolTip="Desired Baud Rate"
+							SelectedItem="{Binding Path=DesiredBaudRate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <DataTemplate.Resources>
+                        <!--Apply this style to all text blocks, but only inside this data template-->
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="{Binding Mode=OneWay, StringFormat=\{0:D\} Baud}"/><!--Have to set the text here so that the style can replace it if we need to-->
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding}" Value="0">
+                                    <Setter Property="Text" Value="Unspecified Baud"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataTemplate.Resources>
+                    <TextBlock/>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+        <ComboBox Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource FTDIComboBoxStyle}" ItemsSource="{Binding Path=App.FTDIDevices}" 
+							SelectedItem="{Binding Path=App.SelectedDeviceInfo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock>
+					    <TextBlock.Text>
+						    <PriorityBinding FallbackValue="Unknown Device">
+							    <Binding Path="DescriptionProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>
+							    <Binding Path="IDProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>                        
+						    </PriorityBinding>
+					    </TextBlock.Text>
+                    </TextBlock>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Grid.Column="3" Grid.Row="0" Command="{Binding Path=App.RefreshDevicesCommand}" Style="{StaticResource ConnectionButtonsStyle}"/>
+        <Button Grid.Column="0" Grid.Row="1" Command="{Binding Path=DetectSupportedBaudRatesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}"/>
+        <ComboBox Grid.Column="1" Grid.Row="1" Name="DesiredConnectionMethodComboBox" Style="{StaticResource ConnectionMethodComboBoxStyle}" 
+							ItemsSource="{Binding Source={StaticResource ConnectionMethodEnumValues}}" ToolTip="Desired Connection Method"
+							SelectedItem="{Binding Path=DesiredConnectionMethod, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
+        <Button Grid.Column="2" Grid.Row="1" Style="{StaticResource ConnectButtonStyle}"/>
+        <Button Grid.Column="3" Grid.Row="1" Command="{Binding Path=App.CancelCurrentOperationCommand}" Style="{StaticResource ReactiveCommandButtonStyle}"/>        
+    </Grid>
+</UserControl>

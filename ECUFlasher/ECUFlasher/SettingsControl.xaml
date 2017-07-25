@@ -1,0 +1,120 @@
+﻿<ECUFlasher:BaseUserControl x:Class="ECUFlasher.SettingsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:ECUFlasher="clr-namespace:ECUFlasher"
+             xmlns:props="clr-namespace:ECUFlasher.Properties"
+             xmlns:Communication="clr-namespace:Communication;assembly=Communication"
+             xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="300"
+            DataContext="{Binding RelativeSource={RelativeSource Self}}">
+    <UserControl.Resources>
+        
+        <ObjectDataProvider MethodName="GetValues" ObjectType="{x:Type sys:Enum}" x:Key="AddressModeEnumValues">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="Communication:KWP2000AddressMode"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+
+        <Shared:HexConverter x:Key="hexConverter"/>
+
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">                
+        <StackPanel>
+            <StackPanel.Resources>
+                <Style TargetType="FrameworkElement" x:Key="BaseStyle">
+                    <Setter Property="Margin" Value="5"/>
+                    <Setter Property="VerticalAlignment" Value="Center"/>
+                </Style>
+                <Style TargetType="TextBox" BasedOn="{StaticResource BaseStyle}"/>
+                <Style TargetType="CheckBox" BasedOn="{StaticResource BaseStyle}"/>
+                <Style TargetType="ComboBox" BasedOn="{StaticResource BaseStyle}"/>
+            </StackPanel.Resources>
+            <DockPanel >
+                <Label>Connection Address</Label>
+                <TextBox Text="{Binding Path=App.ConnectAddress, Mode=TwoWay, Converter={StaticResource hexConverter}}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Connection Address Mode</Label>            
+                <ComboBox ItemsSource="{Binding Source={StaticResource AddressModeEnumValues}}"
+                    SelectedItem="{Binding Path=App.ConnectAddressMode, Mode=TwoWay}"/>
+            </DockPanel>        
+            <DockPanel >
+                <Label>Number of Connection Attempts</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.NumConnectionAttempts, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Fast Init Low High Time Offset MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.FastInitLowHighTimeOffsetMS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Slow Init Five Baud Bit Time Offset MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.SlowInitFiveBaudBitTimeOffsetMS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Time Between Slow Inits To Start KWP2000 MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.TimeBetweenSlowInitForKWP2000MS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Time After Slow Init Before Sending Start Communication Message MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.TimeAfterSlowInitBeforeStartCommMessageMS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>KWP1281 Tester Min Time Before Sending Byte Complement MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.KWP1281_TesterMinTimeToSendByteComplementMS, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>KWP1281 Tester Min Time Before Sending Response Message MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.KWP1281_TesterMinTimeToSendResponseMessageMS, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>KWP1281 Tester Min Time Before Sending Next Byte After Receiving Complement MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>Default P1 ECU Max Inter Byte Time MS</Label>
+                <TextBox Text="{Binding Path=DefaultP1ECUInterByteTimeMaxMS, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>Default P2 ECU Min Response Time MS</Label>
+                <TextBox Text="{Binding Path=DefaultP2ECUResponseTimeMinMS, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>Default P2 ECU Max Response Time MS</Label>
+                <TextBox Text="{Binding Path=DefaultP2ECUResponseTimeMaxMS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Default P3 Tester Min Response Time MS</Label>
+                <TextBox Text="{Binding Path=DefaultP3TesterResponseTimeMinMS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Default P3 Tester Max Response Time MS</Label>
+                <TextBox Text="{Binding Path=DefaultP3TesterResponseTimeMaxMS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>Default P4 Tester Min Inter Byte Time MS</Label>
+                <TextBox Text="{Binding Path=DefaultP4TesterInterByteTimeMinMS, Mode=TwoWay}"/>
+            </DockPanel>
+            <DockPanel >
+                <Label>P4 Tester Min Inter Byte Time When Connecting MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.P4TesterInterByteTimeMinMsWhenConnecting, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>Should Verify Cable In Dumb Mode</Label>
+                <CheckBox IsChecked="{Binding Path=App.KWP2000CommInterface.ShouldVerifyDumbMode, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>FTDI Device Read Time Out MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay}" />
+            </DockPanel>
+            <DockPanel >
+                <Label>FTDI Device Write Time Out MS</Label>
+                <TextBox Text="{Binding Path=App.KWP2000CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay}" />
+            </DockPanel>
+        </StackPanel>
+    </ScrollViewer>
+
+</ECUFlasher:BaseUserControl>
