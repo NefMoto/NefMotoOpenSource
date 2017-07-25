@@ -1,0 +1,264 @@
+
+;CommunicationFlags.1 means data is being transmitted
+;P2Message Timer ms word E1DC 
+
+$SEGMENTED
+
+NAME KWP2000DataLogByAddress
+
+KWP2000MessageFirstDataByteAddress_Address EQU 0x1112
+
+KWP2000NumDataBytesInMessage_Address EQU 0x3334
+
+DataLoggedVariablesBuffer_Address EQU 0x5556
+DataLoggedVariablesBuffer_Segment EQU 0x6666
+DataLoggedVariablesBuffer_Size EQU 257 ;257 is hardcoded into the data logger application code
+; 1 byte num variables per update, 1 byte current message buffer offset, 1 byte current variable, 1 byte num variables to read, 1 byte num variables, and then three bytes per variable
+DataLoggedVariablesBuffer_NumVariables EQU ((DataLoggedVariablesBuffer_Size - 5) / 3)
+
+CurrentKWP2000ServiceID_Address EQU 0x7778
+CommunicationFlags_Address EQU 0x8888
+
+;VariablesBufferSection SECTION DATA
+
+;VariablesBufferSection ENDS
+
+KWP2000DataLogByAddressHandlerSection SECTION CODE ;AT 0x0000
+
+;TODO - the size of the define variables function is hard coded into the data logging app
+
+; R12 - param - address of KWP2000 transmit buffer
+; R4 - retval - num bytes written to transmit buffer
+KWP2000DataLogByAddressDefineHandler PROC FAR
+	mov	[-R0], R11
+	mov	[-R0], R10
+	mov	[-R0], R6
+	mov	[-R0], R3
+
+	;get the address of the message buffer
+	mov		R4, KWP2000MessageFirstDataByteAddress_Address;Don't need a segment because the address in in IRAM.
+	add     R4, #1;skip the service ID
+
+	;get the number of data bytes in the message
+	movb	RL6, KWP2000NumDataBytesInMessage_Address;read the number of data bytes in the message. Don't need a segment because the address in in IRAM.
+	subb	RL6, #1;skip the service ID
+
+	;get the address of the data logging variables buffer
+	mov		R10, #DATA16 DataLoggedVariablesBuffer_Address
+	mov		R11, #DATA16 DataLoggedVariablesBuffer_Segment
+
+	mov		RH6, #0;num bytes written, and temp zero value
+
+	exts	R11, #2
+	movb	[R10], RH6;set num variables reads per update back to zero
+	movb	[R10+#1], RH6;set current message buffer offset back to zero
+	exts	R11, #2
+	movb	[R10+#2], RH6;set current read variable index back to zero	
+	movb	[R10+#3], RH6;set num variables to read back to zero
+	add		R10, #4; Don't need an addc because the address will not overflow the low 16 bits.
+	
+	jmpr    cc_UC, DefineVariablesStartLoop
+
+DefineVariablesLoopAgain:
+	movb    RL3, [R4+]; Don't need an addc because the address will not overflow the low 16 bits.
+
+	cmpb	RH6, #0;are we writing the first byte?
+	jmpr	cc_NZ, DoneClampingNumVariables
+	cmpb	RL3, #DATA8 (DataLoggedVariablesBuffer_NumVariables)
+	jmpr	cc_C, DoneClampingNumVariables	
+	movb	RL3, #DATA8 (DataLoggedVariablesBuffer_NumVariables)
+DoneClampingNumVariables:
+
+	;TODO - could use the segment as an immediate value for the EXTS
+	exts	R11, #1
+	movb	[R10], RL3
+
+	add     R10, #1; Don't need an addc because the address will not overflow the low 16 bits.
+	addb    RH6, #1
+
+DefineVariablesStartLoop:
+	cmpb    RH6, RL6
+	jmpr    cc_NZ, DefineVariablesLoopAgain
+
+	mov		R10, #0x0800
+	or		CommunicationFlags_Address, R10; Set bit 11 because we are sending a positive response
+		
+	;read the service ID and calculate response ID
+	movb   	RL6, CurrentKWP2000ServiceID_Address;read the current service ID. Don't need a segment because the address in in IRAM.	
+	orb		RL6, #0x40
+	movb	[R12], RL6;write the response service ID
+	
+	;include in the response how many variables were defined	
+	;TODO - could use the segment as an immediate value for the EXTS	
+	mov		R10, #DATA16 (DataLoggedVariablesBuffer_Address)
+	exts	R11, #1
+	movb	RL6, [R10+#4]
+	movb	[R12+#1], RL6
+
+	;number of bytes written
+	mov	R4, #2
+
+	mov	R3, [R0+]
+	mov	R6, [R0+]
+	mov	R10, [R0+]
+	mov	R11, [R0+]
+
+	rets
+KWP2000DataLogByAddressDefineHandler ENDP
+
+;BUG - this only appears to work when the reading variable index starts at zero
+
+; R12 - param - address of KWP2000 transmit buffer
+; R4 - retval - num bytes written to transmit buffer
+KWP2000DataLogByAddressReadHandler PROC FAR
+	mov	[-R0], R11
+	mov	[-R0], R10
+	mov	[-R0], R7
+	mov	[-R0], R6
+	mov	[-R0], R5
+	mov	[-R0], R3	
+
+	mov	[-R0], R12;record the starting address, so we can calculate how much we wrote
+
+;get the address of the data logging variables buffer
+	mov		R10, #DATA16 DataLoggedVariablesBuffer_Address
+	mov		R11, #DATA16 DataLoggedVariablesBuffer_Segment	
+
+	mov		R6, #0x4000
+	and		R6, CommunicationFlags_Address;check if this the first call to the message handling function
+	jmpr	cc_NZ, DoneHandlingFirstUpdate	
+
+	mov		R4, KWP2000MessageFirstDataByteAddress_Address;Don't need a segment because the address in in IRAM.	
+	movb	RH5, [R4+#1];read how many variables to read per update
+	mov		RL5, #0;used to reset the message buffer offset back to zero
+	movb	RH6, [R4+#2];read the starting variable index	
+	movb	RL6, [R4+#3];read the num variables to read	
+
+	exts	R11, #2
+	movb	[R10], RH5;store the number of variables to read per update
+	movb	[R10+#1], RL5;reset the current mesage buffer offset	
+	exts	R11, #2	
+	movb	[R10+#2], RH6;save the requested starting variable index
+	movb	[R10+#3], RL6;save the requested num variables to read
+
+	;write the response service ID
+	movb   	RL6, CurrentKWP2000ServiceID_Address;read the current service ID. Don't need a segment because the address in in IRAM.
+	orb		RL6, #0x40
+	movb	[R12], RL6;write the response service ID	
+
+DoneHandlingFirstUpdate:
+
+	add		R12, #1;add one for the response service ID
+
+	;TODO - could use the segment as an immediate value for the EXTS
+	exts	R11, #2
+	movb	RH5, [R10+];read the number of variable reads per update
+	movb	RL5, [R10+];read the current message buffer offset for the address we are writing to.
+	exts	R11, #3
+	movb	RH6, [R10+];read the current read variable index. Don't need an addc because the address will not overflow the low 16 bits.	
+	movb	RL6, [R10+];read the number of variables requested to read
+	movb	RL7, [R10+];read the number of defined variables. Don't need an addc because the address will not overflow the low 16 bits.
+
+	;RL7 is the reading end index for the entire request
+	;RL6 is the reading end index for the current update tick
+
+	;set the reading end index to the minimum of the total num variables or the requested num variables read
+	addb	RL6, RH6;compute end index, based on the num defined variables and the requested end index
+	cmpb	RL6, RL7
+	jmpr	cc_NC, DoneLimitingReadVariableEndIndex
+	movb	RL7, RL6
+DoneLimitingReadVariableEndIndex:
+
+	movb	RL6, RH6	
+	addb	RL6, RH5;set the end index for the read variables
+	cmpb	RL7, RL6
+	jmpr	cc_NC, DoneSettingEndIndex
+	movb	RL6, RL7;set the end index for the read variables, to the number of variables
+DoneSettingEndIndex:	
+
+	movbz	R5, RL5
+	add	   	R12, R5;add the current message buffer offset to the address we are writing to.
+
+	;offset variable to start reading at based on our current variable index. there are three bytes per variable, so add variable index three times
+	movbz	R4, RH6
+	add		R10, R4
+	shl		R4, #1	
+	add		R10, R4
+
+	jmpr	cc_UC, ReadVariablesLoopStart
+
+ReadVariablesLoopAgain:
+	
+	;TODO - if we store 4 bytes per variable instead of three, we would only need two mov instructions instead of three
+
+	exts	R11, #3		;Don't need an addc because the address will not overflow the low 16 bits.
+	movb	RL5, [R10+]
+	movb	RH4, [R10+]
+	movb	RL4, [R10+]
+	jbc		R5.7, ReadTwoBytes
+
+ReadOneByte:
+	exts	R5, #1
+	movb	RL3, [R4]
+	movb	[R12], RL3
+	add		R12, #1
+	jmpr	cc_UC, DoneReadingVariable
+
+ReadTwoBytes:
+	exts	R5, #2
+	movb	RL3, [R4+];read the two bytes separately in case we aren't on an even address
+	movb	RH3, [R4];read the two bytes separately in case we aren't on an even address
+	movb	[R12], RL3;have to store high and low byte separately because R12 may not be even
+	movb	[R12+#1], RH3;have to store high and low byte separately because R12 may not be even
+	add		R12, #2
+
+DoneReadingVariable:
+
+	addb	RH6, #1
+ReadVariablesLoopStart:
+	cmpb	RH6, RL6
+	jmpr	cc_C, ReadVariablesLoopAgain
+
+	mov		R4, R12
+	sub		R4, [R0+];R4 is how many bytes were written to the message buffer	
+
+	cmpb	RH6, RL7
+	jmpr	cc_NC, FinishedReadingAllVariables		
+
+	;get the address of the data logging variables buffer
+	mov		R10, #DATA16 DataLoggedVariablesBuffer_Address
+	;R11 is already correct
+
+	sub		R4, #1;ignore the response service ID when tracking the offset to beging writing at
+
+	exts	R11, #2
+	movb	[R10+#1], RL4;update the current mesage buffer offset	
+	movb	[R10+#2], RH6;update the current read variable index
+
+	mov		R10, #0x4000
+	or		CommunicationFlags_Address, R10; set bit 14 because we are not done handing the message
+
+	mov		R4, #0
+	jmpr	cc_UC, Finished
+
+FinishedReadingAllVariables:	
+	mov		R10, #0xBFFF
+	and		CommunicationFlags_Address, R10; clear bit 14 because we are done handing the message
+
+	mov		R10, #0x0800
+	or		CommunicationFlags_Address, R10; Set bit 11 because we are sending a positive response
+
+Finished:
+	mov	R3, [R0+]
+	mov	R5, [R0+]
+	mov	R6, [R0+]
+	mov	R7, [R0+]
+	mov	R10, [R0+]
+	mov	R11, [R0+]
+
+	rets
+KWP2000DataLogByAddressReadHandler ENDP
+
+KWP2000DataLogByAddressHandlerSection ENDS
+
+END

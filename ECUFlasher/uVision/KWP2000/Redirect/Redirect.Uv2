@@ -1,0 +1,136 @@
+### uVision2 Project, (C) Keil Software
+### Do not modify !
+
+Target (Target 1), 0x0002 // Tools: '166/167'
+
+Group (Source Group 1)
+
+File 1,2,<.\Redirect.a><Redirect.a>
+
+
+Options 1,0,0  // Target 'Target 1'
+ Device (C167CS-4RM)
+ Vendor (Infineon)
+ Cpu (IRAM(0xF200-0xFDFF) XRAM(0xE000-0xE7FF) XRAM2 (0xC000-0xD7FF) IROM(0-0x7FFF) ICAN(0xE800-0xEFFF) CLOCK(25000000) MOD167)
+ FlashUt ()
+ StupF ("LIB\START167.A66" ("C16x/ST10 Startup Code"))
+ FlashDR ()
+ DevID ()
+ Rgf (C167CS.H)
+ Mem ()
+ C ()
+ A ()
+ RL ()
+ OH ()
+ DBC_IFX ()
+ DBC_CMS ()
+ DBC_AMS ()
+ DBC_LMS ()
+ UseEnv=0
+ EnvBin ()
+ EnvInc ()
+ EnvLib ()
+ EnvReg ()
+ OrgReg ()
+ TgStat=16
+ OutDir (.\bin\)
+ OutName (Redirect)
+ GenApp=1
+ GenLib=0
+ GenHex=1
+ Debug=0
+ Browse=0
+ LstDir (.\)
+ HexSel=0
+ MG32K=0
+ TGMORE=0
+ RunUsr 0 0 <>
+ RunUsr 1 0 <>
+ BrunUsr 0 0 <>
+ BrunUsr 1 0 <>
+ CrunUsr 0 0 <>
+ CrunUsr 1 0 <>
+ SVCSID <>
+ Model=1
+ RTOS=0
+ nHold=6
+ iHold=65535
+ sHold=65535
+ bHold=65535
+ MOD167=1
+ MODV2=0
+ UseOnChipRom=0
+ UseOnchipXCAN=0
+ UseOnchipXRAM2=0
+ NearRam=0
+ NearRom=0
+ UseOnChipIROM2=0
+ ExtMem 0 0,3670016,32768
+ ExtMem 1 0,0,0
+ ExtMem 2 0,0,0
+ ExtMem 3 0,0,0
+ ExtMem 4 0,0,0
+ ExtMem 5 0,0,0
+ Optimize=6
+ SpeedSize=1
+ RegColor=0
+ Static=0
+ WarningLev=2
+ Alias=1
+ Order=0
+ UnsignedChar=0
+ NoDppSave=1
+ Float64=0
+ SaveUsr=0
+ Reorder=0
+ cMisc (MOD167)
+ Define ()
+ Undefine ()
+ INCC6 ()
+ EC166 { 2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
+ ECMISC ()
+ ECDEFINE ()
+ ECUNDEF ()
+ ECINC ()
+ MPL=1
+ CASE=0
+ aMisc (MOD167)
+ aSet ()
+ aReset ()
+ INCA6 ()
+ PropFld { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
+ IncBld=1
+ AlwaysBuild=0
+ GenAsm=0
+ AsmAsm=0
+ PublicsOnly=0
+ StopCode=3
+ CustArgs ()
+ LibMods ()
+ useLinkFile=0
+ LnkFile ()
+ LinkOnly=0
+ UseTargSet=1
+ DppUse=0
+ nDataSel=2
+ nConstSel=1
+ NearDataStr ()
+ NearConstStr ()
+ CinitTab ()
+ IntVectAddr ()
+ lWarnLev=2
+ lDisWarn ()
+ lAssign ()
+ lRegbank ()
+ lReserve ()
+ lMisc ()
+ lClasses ()
+ lSect ()
+  OPTDL (S166.DLL)()(D167.DLL)(-p167CS)(S166.DLL)()(T167.DLL)(-p167CS)
+  OPTDBG 44029,-1,()()()()()()()()()() (MONITOR\MON166.DLL)()()()
+ FLASH1 { 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
+ FLASH2 ()
+ FLASH3 ("" ())
+ FLASH4 ()
+EndOpt
+

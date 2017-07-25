@@ -1,0 +1,352 @@
+A166 MACRO ASSEMBLER  DATALOGBYADDRESS                                                    08/18/2012 19:31:32 PAGE     1
+
+
+MACRO ASSEMBLER A166 V5.30
+OBJECT MODULE PLACED IN .\bin\DataLogByAddress.obj
+ASSEMBLER INVOKED BY: C:\Keil\C166\BIN\A166.EXE DataLogByAddress.a SEGMENTED MOD167 SET(SMALL) OBJECT(.\bin\DataLogByAdd
+                      ress.obj) EP
+
+LOC      OBJ             LINE     SOURCE
+
+                            1     
+                            2     ;CommunicationFlags.1 means data is being transmitted
+                            3     ;P2Message Timer ms word E1DC 
+                            4     
+                            5     $SEGMENTED
+                            6     
+                            7     NAME KWP2000DataLogByAddress
+                            8     
+ 1112                       9     KWP2000MessageFirstDataByteAddress_Address EQU 0x1112
+                           10     
+ 3334                      11     KWP2000NumDataBytesInMessage_Address EQU 0x3334
+                           12     
+ 5556                      13     DataLoggedVariablesBuffer_Address EQU 0x5556
+ 6666                      14     DataLoggedVariablesBuffer_Segment EQU 0x6666
+ 0101                      15     DataLoggedVariablesBuffer_Size EQU 257 ;257 is hardcoded into the data logger applicat
+                                  ion code
+                           16     ; 1 byte num variables per update, 1 byte current message buffer offset, 1 byte curren
+                                  t variable, 1 byte num variables to read, 1 byte num variables, and then three bytes per variable
+ 0054                      17     DataLoggedVariablesBuffer_NumVariables EQU ((DataLoggedVariablesBuffer_Size - 5) / 3)
+                           18     
+ 7778                      19     CurrentKWP2000ServiceID_Address EQU 0x7778
+ 8888                      20     CommunicationFlags_Address EQU 0x8888
+                           21     
+                           22     ;VariablesBufferSection SECTION DATA
+                           23     
+                           24     ;VariablesBufferSection ENDS
+                           25     
+--------                   26     KWP2000DataLogByAddressHandlerSection SECTION CODE ;AT 0x0000
+                           27     
+                           28     ;TODO - the size of the define variables function is hard coded into the data logging 
+                                  app
+                           29     
+                           30     ; R12 - param - address of KWP2000 transmit buffer
+                           31     ; R4 - retval - num bytes written to transmit buffer
+                           32     KWP2000DataLogByAddressDefineHandler PROC FAR
+00000000 88B0              33             mov     [-R0], R11
+00000002 88A0              34             mov     [-R0], R10
+00000004 8860              35             mov     [-R0], R6
+00000006 8830              36             mov     [-R0], R3
+                           37     
+                           38             ;get the address of the message buffer
+00000008 F2F41211          39             mov             R4, KWP2000MessageFirstDataByteAddress_Address;Don't need a se
+                                  gment because the address in in IRAM.
+0000000C 0841              40             add     R4, #1;skip the service ID
+                           41     
+                           42             ;get the number of data bytes in the message
+0000000E F3FC3433          43             movb    RL6, KWP2000NumDataBytesInMessage_Address;read the number of data byte
+                                  s in the message. Don't need a segment because the address in in IRAM.
+00000012 29C1              44             subb    RL6, #1;skip the service ID
+                           45     
+                           46             ;get the address of the data logging variables buffer
+00000014 E6FA5655          47             mov             R10, #DATA16 DataLoggedVariablesBuffer_Address
+00000018 E6FB6666          48             mov             R11, #DATA16 DataLoggedVariablesBuffer_Segment
+                           49     
+0000001C E10D              50             mov             RH6, #0;num bytes written, and temp zero value
+                           51     
+0000001E DC1B              52             exts    R11, #2
+A166 MACRO ASSEMBLER  DATALOGBYADDRESS                                                    08/18/2012 19:31:32 PAGE     2
+
+00000020 B9DA              53             movb    [R10], RH6;set num variables reads per update back to zero
+00000022 E4DA0100          54             movb    [R10+#1], RH6;set current message buffer offset back to zero
+00000026 DC1B              55             exts    R11, #2
+00000028 E4DA0200          56             movb    [R10+#2], RH6;set current read variable index back to zero      
+0000002C E4DA0300          57             movb    [R10+#3], RH6;set num variables to read back to zero
+00000030 08A4              58             add             R10, #4; Don't need an addc because the address will not overf
+                                  low the low 16 bits.
+                           59             
+00000032 0D0C              60             jmpr    cc_UC, DefineVariablesStartLoop
+                           61     
+                           62     DefineVariablesLoopAgain:
+00000034 9964              63             movb    RL3, [R4+]; Don't need an addc because the address will not overflow t
+                                  he low 16 bits.
+                           64     
+00000036 49D0              65             cmpb    RH6, #0;are we writing the first byte?
+00000038 3D05              66             jmpr    cc_NZ, DoneClampingNumVariables
+0000003A 47F65400          67             cmpb    RL3, #DATA8 (DataLoggedVariablesBuffer_NumVariables)
+0000003E 8D02              68             jmpr    cc_C, DoneClampingNumVariables  
+00000040 E7F65400          69             movb    RL3, #DATA8 (DataLoggedVariablesBuffer_NumVariables)
+                           70     DoneClampingNumVariables:
+                           71     
+                           72             ;TODO - could use the segment as an immediate value for the EXTS
+00000044 DC0B              73             exts    R11, #1
+00000046 B96A              74             movb    [R10], RL3
+                           75     
+00000048 08A1              76             add     R10, #1; Don't need an addc because the address will not overflow the 
+                                  low 16 bits.
+0000004A 09D1              77             addb    RH6, #1
+                           78     
+                           79     DefineVariablesStartLoop:
+0000004C 41DC              80             cmpb    RH6, RL6
+0000004E 3DF2              81             jmpr    cc_NZ, DefineVariablesLoopAgain
+                           82     
+00000050 E6FA0008          83             mov             R10, #0x0800
+00000054 74FA8888          84             or              CommunicationFlags_Address, R10; Set bit 11 because we are sen
+                                  ding a positive response
+                           85                     
+                           86             ;read the service ID and calculate response ID
+00000058 F3FC7877          87             movb    RL6, CurrentKWP2000ServiceID_Address;read the current service ID. Don'
+                                  t need a segment because the address in in IRAM.  
+0000005C 77FC4000          88             orb             RL6, #0x40
+00000060 B9CC              89             movb    [R12], RL6;write the response service ID
+                           90             
+                           91             ;include in the response how many variables were defined        
+                           92             ;TODO - could use the segment as an immediate value for the EXTS        
+00000062 E6FA5655          93             mov             R10, #DATA16 (DataLoggedVariablesBuffer_Address)
+00000066 DC0B              94             exts    R11, #1
+00000068 F4CA0400          95             movb    RL6, [R10+#4]
+0000006C E4CC0100          96             movb    [R12+#1], RL6
+                           97     
+                           98             ;number of bytes written
+00000070 E024              99             mov     R4, #2
+                          100     
+00000072 9830             101             mov     R3, [R0+]
+00000074 9860             102             mov     R6, [R0+]
+00000076 98A0             103             mov     R10, [R0+]
+00000078 98B0             104             mov     R11, [R0+]
+                          105     
+0000007A DB00             106             rets
+                          107     KWP2000DataLogByAddressDefineHandler ENDP
+                          108     
+                          109     ;BUG - this only appears to work when the reading variable index starts at zero
+                          110     
+                          111     ; R12 - param - address of KWP2000 transmit buffer
+                          112     ; R4 - retval - num bytes written to transmit buffer
+                          113     KWP2000DataLogByAddressReadHandler PROC FAR
+A166 MACRO ASSEMBLER  DATALOGBYADDRESS                                                    08/18/2012 19:31:32 PAGE     3
+
+0000007C 88B0             114             mov     [-R0], R11
+0000007E 88A0             115             mov     [-R0], R10
+00000080 8870             116             mov     [-R0], R7
+00000082 8860             117             mov     [-R0], R6
+00000084 8850             118             mov     [-R0], R5
+00000086 8830             119             mov     [-R0], R3       
+                          120     
+00000088 88C0             121             mov     [-R0], R12;record the starting address, so we can calculate how much w
+                                  e wrote
+                          122     
+                          123     ;get the address of the data logging variables buffer
+0000008A E6FA5655         124             mov             R10, #DATA16 DataLoggedVariablesBuffer_Address
+0000008E E6FB6666         125             mov             R11, #DATA16 DataLoggedVariablesBuffer_Segment  
+                          126     
+00000092 E6F60040         127             mov             R6, #0x4000
+00000096 62F68888         128             and             R6, CommunicationFlags_Address;check if this the first call to
+                                   the message handling function
+0000009A 3D17             129             jmpr    cc_NZ, DoneHandlingFirstUpdate  
+                          130     
+0000009C F2F41211         131             mov             R4, KWP2000MessageFirstDataByteAddress_Address;Don't need a se
+                                  gment because the address in in IRAM.     
+000000A0 F4B40100         132             movb    RH5, [R4+#1];read how many variables to read per update
+000000A4 E10A             133             mov             RL5, #0;used to reset the message buffer offset back to zero
+000000A6 F4D40200         134             movb    RH6, [R4+#2];read the starting variable index   
+000000AA F4C40300         135             movb    RL6, [R4+#3];read the num variables to read     
+                          136     
+000000AE DC1B             137             exts    R11, #2
+000000B0 B9BA             138             movb    [R10], RH5;store the number of variables to read per update
+000000B2 E4AA0100         139             movb    [R10+#1], RL5;reset the current mesage buffer offset    
+000000B6 DC1B             140             exts    R11, #2 
+000000B8 E4DA0200         141             movb    [R10+#2], RH6;save the requested starting variable index
+000000BC E4CA0300         142             movb    [R10+#3], RL6;save the requested num variables to read
+                          143     
+                          144             ;write the response service ID
+000000C0 F3FC7877         145             movb    RL6, CurrentKWP2000ServiceID_Address;read the current service ID. Don'
+                                  t need a segment because the address in in IRAM.
+000000C4 77FC4000         146             orb             RL6, #0x40
+000000C8 B9CC             147             movb    [R12], RL6;write the response service ID        
+                          148     
+                          149     DoneHandlingFirstUpdate:
+                          150     
+000000CA 08C1             151             add             R12, #1;add one for the response service ID
+                          152     
+                          153             ;TODO - could use the segment as an immediate value for the EXTS
+000000CC DC1B             154             exts    R11, #2
+000000CE 99BA             155             movb    RH5, [R10+];read the number of variable reads per update
+000000D0 99AA             156             movb    RL5, [R10+];read the current message buffer offset for the address we 
+                                  are writing to.
+000000D2 DC2B             157             exts    R11, #3
+000000D4 99DA             158             movb    RH6, [R10+];read the current read variable index. Don't need an addc b
+                                  ecause the address will not overflow the low 16 bits.     
+000000D6 99CA             159             movb    RL6, [R10+];read the number of variables requested to read
+000000D8 99EA             160             movb    RL7, [R10+];read the number of defined variables. Don't need an addc b
+                                  ecause the address will not overflow the low 16 bits.
+                          161     
+                          162             ;RL7 is the reading end index for the entire request
+                          163             ;RL6 is the reading end index for the current update tick
+                          164     
+                          165             ;set the reading end index to the minimum of the total num variables or the re
+                                  quested num variables read
+000000DA 01CD             166             addb    RL6, RH6;compute end index, based on the num defined variables and the
+                                   requested end index
+000000DC 41CE             167             cmpb    RL6, RL7
+000000DE 9D01             168             jmpr    cc_NC, DoneLimitingReadVariableEndIndex
+000000E0 F1EC             169             movb    RL7, RL6
+                          170     DoneLimitingReadVariableEndIndex:
+A166 MACRO ASSEMBLER  DATALOGBYADDRESS                                                    08/18/2012 19:31:32 PAGE     4
+
+                          171     
+000000E2 F1CD             172             movb    RL6, RH6        
+000000E4 01CB             173             addb    RL6, RH5;set the end index for the read variables
+000000E6 41EC             174             cmpb    RL7, RL6
+000000E8 9D01             175             jmpr    cc_NC, DoneSettingEndIndex
+000000EA F1CE             176             movb    RL6, RL7;set the end index for the read variables, to the number of va
+                                  riables
+                          177     DoneSettingEndIndex:    
+                          178     
+000000EC C0A5             179             movbz   R5, RL5
+000000EE 00C5             180             add             R12, R5;add the current message buffer offset to the address w
+                                  e are writing to.
+                          181     
+                          182             ;offset variable to start reading at based on our current variable index. ther
+                                  e are three bytes per variable, so add variable index three times
+000000F0 C0D4             183             movbz   R4, RH6
+000000F2 00A4             184             add             R10, R4
+000000F4 5C14             185             shl             R4, #1  
+000000F6 00A4             186             add             R10, R4
+                          187     
+000000F8 0D13             188             jmpr    cc_UC, ReadVariablesLoopStart
+                          189     
+                          190     ReadVariablesLoopAgain:
+                          191             
+                          192             ;TODO - if we store 4 bytes per variable instead of three, we would only need 
+                                  two mov instructions instead of three
+                          193     
+000000FA DC2B             194             exts    R11, #3         ;Don't need an addc because the address will not overf
+                                  low the low 16 bits.
+000000FC 99AA             195             movb    RL5, [R10+]
+000000FE 999A             196             movb    RH4, [R10+]
+00000100 998A             197             movb    RL4, [R10+]
+00000102 AAF50570         198             jbc             R5.7, ReadTwoBytes
+                          199     
+                          200     ReadOneByte:
+00000106 DC05             201             exts    R5, #1
+00000108 A964             202             movb    RL3, [R4]
+0000010A B96C             203             movb    [R12], RL3
+0000010C 08C1             204             add             R12, #1
+0000010E 0D07             205             jmpr    cc_UC, DoneReadingVariable
+                          206     
+                          207     ReadTwoBytes:
+00000110 DC15             208             exts    R5, #2
+00000112 9964             209             movb    RL3, [R4+];read the two bytes separately in case we aren't on an even 
+                                  address
+00000114 A974             210             movb    RH3, [R4];read the two bytes separately in case we aren't on an even a
+                                  ddress
+00000116 B96C             211             movb    [R12], RL3;have to store high and low byte separately because R12 may 
+                                  not be even
+00000118 E47C0100         212             movb    [R12+#1], RH3;have to store high and low byte separately because R12 m
+                                  ay not be even
+0000011C 08C2             213             add             R12, #2
+                          214     
+                          215     DoneReadingVariable:
+                          216     
+0000011E 09D1             217             addb    RH6, #1
+                          218     ReadVariablesLoopStart:
+00000120 41DC             219             cmpb    RH6, RL6
+00000122 8DEB             220             jmpr    cc_C, ReadVariablesLoopAgain
+                          221     
+00000124 F04C             222             mov             R4, R12
+00000126 284C             223             sub             R4, [R0+];R4 is how many bytes were written to the message buf
+                                  fer       
+                          224     
+00000128 41DE             225             cmpb    RH6, RL7
+0000012A 9D0E             226             jmpr    cc_NC, FinishedReadingAllVariables              
+A166 MACRO ASSEMBLER  DATALOGBYADDRESS                                                    08/18/2012 19:31:32 PAGE     5
+
+                          227     
+                          228             ;get the address of the data logging variables buffer
+0000012C E6FA5655         229             mov             R10, #DATA16 DataLoggedVariablesBuffer_Address
+                          230             ;R11 is already correct
+                          231     
+00000130 2841             232             sub             R4, #1;ignore the response service ID when tracking the offset
+                                   to beging writing at
+                          233     
+00000132 DC1B             234             exts    R11, #2
+00000134 E48A0100         235             movb    [R10+#1], RL4;update the current mesage buffer offset   
+00000138 E4DA0200         236             movb    [R10+#2], RH6;update the current read variable index
+                          237     
+0000013C E6FA0040         238             mov             R10, #0x4000
+00000140 74FA8888         239             or              CommunicationFlags_Address, R10; set bit 14 because we are not
+                                   done handing the message
+                          240     
+00000144 E004             241             mov             R4, #0
+00000146 0D08             242             jmpr    cc_UC, Finished
+                          243     
+                          244     FinishedReadingAllVariables:    
+00000148 E6FAFFBF         245             mov             R10, #0xBFFF
+0000014C 64FA8888         246             and             CommunicationFlags_Address, R10; clear bit 14 because we are d
+                                  one handing the message
+                          247     
+00000150 E6FA0008         248             mov             R10, #0x0800
+00000154 74FA8888         249             or              CommunicationFlags_Address, R10; Set bit 11 because we are sen
+                                  ding a positive response
+                          250     
+                          251     Finished:
+00000158 9830             252             mov     R3, [R0+]
+0000015A 9850             253             mov     R5, [R0+]
+0000015C 9860             254             mov     R6, [R0+]
+0000015E 9870             255             mov     R7, [R0+]
+00000160 98A0             256             mov     R10, [R0+]
+00000162 98B0             257             mov     R11, [R0+]
+                          258     
+00000164 DB00             259             rets
+                          260     KWP2000DataLogByAddressReadHandler ENDP
+                          261     
+--------                  262     KWP2000DataLogByAddressHandlerSection ENDS
+                          263     
+                          264     END
+A166 MACRO ASSEMBLER  DATALOGBYADDRESS                                                    08/18/2012 19:31:32 PAGE     6
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                                     TYPE   VALUE             I  ATTRIBUTES
+
+COMMUNICATIONFLAGS_ADDRESS . . . . . . .    DATA16 8888H             A  
+CURRENTKWP2000SERVICEID_ADDRESS. . . . .    DATA16 7778H             A  
+DATALOGGEDVARIABLESBUFFER_ADDRESS. . . .    DATA16 5556H             A  
+DATALOGGEDVARIABLESBUFFER_NUMVARIABLES .    DATA8  54H               A  
+DATALOGGEDVARIABLESBUFFER_SEGMENT. . . .    DATA16 6666H             A  
+DATALOGGEDVARIABLESBUFFER_SIZE . . . . .    DATA16 101H              A  
+DEFINEVARIABLESLOOPAGAIN . . . . . . . .    NEAR   34H               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+DEFINEVARIABLESSTARTLOOP . . . . . . . .    NEAR   4CH               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+DONECLAMPINGNUMVARIABLES . . . . . . . .    NEAR   44H               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+DONEHANDLINGFIRSTUPDATE. . . . . . . . .    NEAR   CAH               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+DONELIMITINGREADVARIABLEENDINDEX . . . .    NEAR   E2H               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+DONEREADINGVARIABLE. . . . . . . . . . .    NEAR   11EH              R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+DONESETTINGENDINDEX. . . . . . . . . . .    NEAR   ECH               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+FINISHED . . . . . . . . . . . . . . . .    NEAR   158H              R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+FINISHEDREADINGALLVARIABLES. . . . . . .    NEAR   148H              R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+KWP2000DATALOGBYADDRESS. . . . . . . . .    ----   ----                 
+KWP2000DATALOGBYADDRESSDEFINEHANDLER . .    FAR    0H                R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+KWP2000DATALOGBYADDRESSHANDLERSECTION. .    ----   ----              R  SECTION
+KWP2000DATALOGBYADDRESSREADHANDLER . . .    FAR    7CH               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+KWP2000MESSAGEFIRSTDATABYTEADDRESS_ADDRESS  DATA16 1112H             A  
+KWP2000NUMDATABYTESINMESSAGE_ADDRESS . .    DATA16 3334H             A  
+READONEBYTE. . . . . . . . . . . . . . .    NEAR   106H              R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+READTWOBYTES . . . . . . . . . . . . . .    NEAR   110H              R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+READVARIABLESLOOPAGAIN . . . . . . . . .    NEAR   FAH               R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+READVARIABLESLOOPSTART . . . . . . . . .    NEAR   120H              R  SEC=KWP2000DATALOGBYADDRESSHANDLERSECTION
+
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

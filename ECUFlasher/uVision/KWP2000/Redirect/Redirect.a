@@ -1,0 +1,47 @@
+$SEGMENTED
+
+NAME KWP2000Redirection
+
+CurrentKWP2000ServiceID_Address EQU 0xDEAD
+
+KWP2000ServiceIDToFunctionIndexTable_Address EQU 0xDEAD
+KWP2000ServiceIDToFunctionIndexTable_Page EQU 0x3EF
+
+KWP2000FunctionTable_Address EQU 0xDEAD
+KWP2000FunctionTable_Page EQU 0x3EF
+
+
+RedirectKWP2000MessageHandlerSection SECTION CODE ;AT 0x0000
+
+; R4/R5 used as parameters to call into this indirect function
+; R12 - param - address of KWP2000 transmit buffer
+; R4 - retval - num bytes written to transmit buffer
+RedirectKWP2000MessageHandler PROC FAR
+	mov	[-R0], R11
+	mov	[-R0], R10
+
+	movb	RL5, CurrentKWP2000ServiceID_Address;read the current service ID. Don't need a segment because the address in in IRAM.
+	bmov	R5.6, R5.7;R5L is the service id with bit 7 shifter over to bit 6
+	and	R5,  #007Fh
+	
+	extp    #KWP2000ServiceIDToFunctionIndexTable_Page, #1
+	movb   	RL4, [R5 + #DATA16 KWP2000ServiceIDToFunctionIndexTable_Address]
+	movbz   R10, RL4
+	shl     R10, #2
+
+	add     R10, #DATA16 KWP2000FunctionTable_Address
+	extp    #KWP2000FunctionTable_Page, #2
+	mov     R4, [R10+]
+	mov     R5, [R10]
+
+	mov	R10, [R0+]
+	mov	R11, [R0+]
+
+	push    R5
+	push    R4
+	rets
+RedirectKWP2000MessageHandler ENDP
+
+RedirectKWP2000MessageHandlerSection ENDS
+
+END
