@@ -3,5 +3,4 @@
   MPW_NAME="WorkSpace"
   Project=".\DataLogging\DataLogging.Uv2",A,X
   Project=".\Redirect\Redirect.Uv2",X
-  Project=".\ReadWriteMemory\ReadWriteMemory.Uv2",X
 
