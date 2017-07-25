@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<MemoryLayout xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!--BaseAddress must be an even number and specified in decimal, hexadecimal is not currently supported. The BaseAddress comes from the ECU memory mapping.-->
+  <BaseAddress>8388608</BaseAddress>
+  <!--Size must be an even number and specified in decimal, hexidecimal is not currently supported. The Size comes from the memory chip datasheet.-->
+  <Size>262144</Size>
+  <!--SectorSizes must be an even number and specified in decimal, hexadecimal is not currently supported. The SectorSizes come from the memory chip datasheet. -->
+  <SectorSizes>
+    <unsignedInt>16384</unsignedInt>
+    <unsignedInt>8192</unsignedInt>
+    <unsignedInt>8192</unsignedInt>
+    <unsignedInt>32768</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>    
+  </SectorSizes>
+</MemoryLayout>
