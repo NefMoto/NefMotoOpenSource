@@ -745,12 +745,112 @@ namespace ECUFlasher
 
 				if (App.DisplayUserPrompt("Confirm Full Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
 				{
-					OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted);
+					OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, false);
 				}
 			}
 		}
 
-		private void OnWriteFlashCompleted(Operation operation, bool success)
+
+        public ReactiveCommand WriteDiffFlashCommand
+        {
+            get
+            {
+                if (_WriteDiffFlashCommand == null)
+                {
+                    _WriteDiffFlashCommand = new ReactiveCommand(this.OnWriteDiffFlash);
+                    _WriteDiffFlashCommand.Name = "Diff Write Flash";
+                    _WriteDiffFlashCommand.Description = "Write only changed sectors of ECU flash memory with the loaded file";
+
+                    if (App != null)
+                    {
+                        _WriteDiffFlashCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+                        _WriteDiffFlashCommand.AddWatchedProperty(App, "OperationInProgress");
+                        _WriteDiffFlashCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
+                        _WriteDiffFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
+                        _WriteDiffFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
+                    }
+
+                    _WriteDiffFlashCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
+                    {
+                        return CanExecuteWriteDiffFlashCommand(reasonsDisabled);
+                    };
+                }
+
+                return _WriteDiffFlashCommand;
+            }
+        }
+        private ReactiveCommand _WriteDiffFlashCommand;
+
+
+        private bool CanExecuteWriteDiffFlashCommand(List<string> reasonsDisabled)
+        {
+            if (App == null)
+            {
+                reasonsDisabled.Add("Internal program error");
+                return false;
+            }
+
+            bool result = true;
+
+            if (!IsMemoryLayoutOK)
+            {
+                reasonsDisabled.Add("Specified memory layout is not correct");
+                result = false;
+            }
+
+            if (!IsFlashFileOK)
+            {
+                reasonsDisabled.Add("Specified flash file is not correct");
+                result = false;
+            }
+
+            if (!App.CommInterface.IsConnected())
+            {
+                reasonsDisabled.Add("Not connected to ECU");
+                result = false;
+            }
+
+            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+            {
+                reasonsDisabled.Add("Not connected with KWP2000 protocol");
+                result = false;
+            }
+
+            if (App.OperationInProgress)
+            {
+                reasonsDisabled.Add("Another operation is in progress");
+                result = false;
+            }
+
+            return result;
+        }
+        private void OnWriteDiffFlash()
+        {
+            //done to trigger a reload of the memory layout and flash files and cause them to revalidate
+            FileNameToFlash = FileNameToFlash;
+            MemoryLayoutFileName = MemoryLayoutFileName;
+
+            if (WriteDiffFlashCommand.IsEnabled)
+            {
+                string confirmationMessage = "If you are ready to write, confirm the following things:";
+                confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
+                confirmationMessage += "\n2) The engine is not running.";
+                confirmationMessage += "\n3) Battery voltage is at least 12 volts.";
+                confirmationMessage += "\n4) It is OK the ECU adaptation channels will be reset to defaults";
+                confirmationMessage += "\n5) Flashing process can run uninterrupted until complete.";
+                confirmationMessage += "\n6) You agree to release Nefarious Motorsports Inc from all liability.";
+                confirmationMessage += "\n7) You agree to not use this tool commercially, as the nefmoto karma gods shall smite you if you do.";
+                confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent writing the flash memory.";
+                confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
+
+                if (App.DisplayUserPrompt("Confirm Diff Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+                {
+                    OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, true);
+                }
+            }
+        }
+        
+        private void OnWriteFlashCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
 			Dispatcher.Invoke((Action)(() => 
@@ -1011,13 +1111,13 @@ namespace ECUFlasher
 			}), null);
 		}
 
-		private void OnWriteExternalFlashStarted(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete)
+		private void OnWriteExternalFlashStarted(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete, bool diffWrite)
 		{
 			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
 
 			var settings = new WriteExternalFlashOperation.WriteExternalFlashSettings();
-			settings.CheckIfWriteRequired = false;
-			settings.OnlyWriteNonMatchingSectors = false;
+            settings.CheckIfWriteRequired = 
+			    settings.OnlyWriteNonMatchingSectors = diffWrite;
 			settings.VerifyWrittenData = true;
 			settings.EraseEntireFlashAtOnce = false;
 			settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;

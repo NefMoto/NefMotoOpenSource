@@ -46,8 +46,9 @@ Contact by Email: tony@nefariousmotorsports.com
             <MenuItem Header="Operations">
                 <MenuItem Command="{Binding Path=ReadEntireFlashCommand}"/>                
                 <MenuItem Command="{Binding Path=WriteEntireFlashCommand}"/>
+                <MenuItem Command="{Binding Path=WriteDiffFlashCommand}"/>
                 <MenuItem Command="{Binding Path=VerifyChecksumsCommand}"/>
-                <MenuItem Command="{Binding Path=CorrectChecksumsCommand}"/>
+                <MenuItem Command="{Binding Path=CorrectChecksumsCommand}" IsEnabled="false"/>
             </MenuItem>
         </Menu>
         <Grid DockPanel.Dock="Top">
@@ -73,15 +74,19 @@ Contact by Email: tony@nefariousmotorsports.com
             <Grid.RowDefinitions>
                 <RowDefinition/>
                 <RowDefinition/>
+                <RowDefinition/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition />
                 <ColumnDefinition />
+                <ColumnDefinition />
             </Grid.ColumnDefinitions>
             <Button Command="{Binding Path=ReadEntireFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="0"/>
-            <Button Command="{Binding Path=WriteEntireFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="1"/>            
-            <Button Command="{Binding Path=VerifyChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="0"/>
-            <Button Command="{Binding Path=CorrectChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="1"/>
+            <Button Command="{Binding Path=WriteEntireFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="1"/>
+            <!--<Button Command="{Binding Path=ReadDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="0" IsEnabled="true"/>-->
+            <Button Command="{Binding Path=WriteDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="1"/>
+            <Button Command="{Binding Path=VerifyChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="0"/>
+            <Button Command="{Binding Path=CorrectChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="1" IsEnabled="true"/>
         </Grid>
         <!--<Image DockPanel.Dock="Bottom" Source="{Binding Path=FlashMemoryImage.RawData, Converter={StaticResource byteArrayToBitmapConverter}}"/>-->
         <ECUFlasher:StatusWindow DataContext="{Binding Path=App}" DockPanel.Dock="Bottom"/>
