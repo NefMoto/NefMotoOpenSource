@@ -745,7 +745,7 @@ namespace ECUFlasher
 
 				if (App.DisplayUserPrompt("Confirm Full Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
 				{
-					OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, false);
+					OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, false, chkVerifyWrite.IsChecked.Value);
 				}
 			}
 		}
@@ -845,7 +845,7 @@ namespace ECUFlasher
 
                 if (App.DisplayUserPrompt("Confirm Diff Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
                 {
-                    OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, true);
+                    OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, true, chkVerifyWrite.IsChecked.Value);
                 }
             }
         }
@@ -1111,14 +1111,14 @@ namespace ECUFlasher
 			}), null);
 		}
 
-		private void OnWriteExternalFlashStarted(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete, bool diffWrite)
+		private void OnWriteExternalFlashStarted(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete, bool diffWrite, bool verify)
 		{
 			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
 
 			var settings = new WriteExternalFlashOperation.WriteExternalFlashSettings();
-            settings.CheckIfWriteRequired = 
-			    settings.OnlyWriteNonMatchingSectors = diffWrite;
-			settings.VerifyWrittenData = true;
+			settings.CheckIfWriteRequired = diffWrite;
+			settings.OnlyWriteNonMatchingSectors = diffWrite;
+			settings.VerifyWrittenData = verify;
 			settings.EraseEntireFlashAtOnce = false;
 			settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
 			settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;

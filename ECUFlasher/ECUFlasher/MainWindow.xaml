@@ -89,7 +89,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 <Separator/>
                 <MenuItem Command="{Binding Path=App.ClearLogFileCommand}"/>
             </MenuItem>
-            <MenuItem Header="_Licensing">
+            <MenuItem Header="_Licensing" Visibility="Collapsed">
                 <MenuItem Command="{Binding Path=App.ListInstalledLicensesCommand}"/>
                 <MenuItem Command="{Binding Path=App.ImportLicenseCommand}"/>
                 <MenuItem Command="{Binding Path=App.DoDevicesSupportLicensing}"/>
