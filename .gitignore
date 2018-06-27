@@ -260,3 +260,6 @@ paket-files/
 __pycache__/
 *.pyc
 /Compiled
+
+# vi swap files
+.*.swp

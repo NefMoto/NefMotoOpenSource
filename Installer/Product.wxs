@@ -33,6 +33,9 @@
          </Directory>
       </Directory>
     </Directory>
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="gpl-3.0.rtf" />
+    <UIRef Id="WixUI_InstallDir" />
   </Fragment>
 
   <Fragment>
