@@ -7,6 +7,7 @@
   <?define Communication_TargetDir=$(var.ECUFlasher.TargetDir)?>
   <?define Shared_TargetDir=$(var.ECUFlasher.TargetDir)?>
   <?define ApplicationShared_TargetDir=$(var.ECUFlasher.TargetDir)?>
+  <?define MemoryLayouts_TargetDir=..\MemoryLayouts\?>
   <Product Id="*"
     Name="$(var.ProductName)"
     Language="1033"
@@ -20,13 +21,16 @@
 
     <Feature Id="ProductFeature" Title="$(var.ProductName)" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="MemoryLayouts" />
     </Feature>
   </Product>
 
   <Fragment>
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
-	<Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+	<Directory Id="INSTALLFOLDER" Name="$(var.ProductName)">
+	    <Directory Id="MemoryLayoutsFolder" Name="MemoryLayouts" />
+         </Directory>
       </Directory>
     </Directory>
   </Fragment>
@@ -50,6 +54,17 @@
       </Component>
       <Component Id="ApplicationShared.dll" Guid="d42fabc7-0a7b-48b2-8104-3b8f85d8d525">
 	<File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.ApplicationShared_TargetDir)ApplicationShared.dll" />
+      </Component>
+    </ComponentGroup>
+    <ComponentGroup Id="MemoryLayouts" Directory="MemoryLayoutsFolder">
+      <Component Id="MemoryLayoutFiles" Guid="68F489B1-19DD-4A65-9018-358BBCD9F342">
+        <File Id="ME7_29F200.MemoryLayout.xml" Name="ME7 29F200.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F200.MemoryLayout.xml" />
+        <File Id="ME7_29F200BB.MemoryLayout.xml" Name="ME7 29F200BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F200BB.MemoryLayout.xml" />
+        <File Id="ME7_29F400.MemoryLayout.xml" Name="ME7 29F400.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F400.MemoryLayout.xml" />
+        <File Id="ME7_29F400BB.MemoryLayout.xml" Name="ME7 29F400BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F400BB.MemoryLayout.xml" />
+        <File Id="ME7_29F800.MemoryLayout.xml" Name="ME7 29F800.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F800.MemoryLayout.xml" />
+        <File Id="ME7_29F800BB.MemoryLayout.xml" Name="ME7 29F800BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F800BB.MemoryLayout.xml" />
+        <File Id="ME7_29F800BT.MemoryLayout.xml" Name="ME7 29F800BT.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F800BT.MemoryLayout.xml" />
       </Component>
     </ComponentGroup>
   </Fragment>
