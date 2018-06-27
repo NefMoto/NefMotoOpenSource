@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <?define ProductName="NefMotoECUFlasher"?>
+  <?define Version="!(bind.fileVersion.NefMotoECUFlasher.exe)"?>
+  <?define ECUFlasher_TargetDir=$(var.ECUFlasher.TargetDir)?>
+  <?define FTD2XX_NET_TargetDir=$(var.ECUFlasher.TargetDir)?>
+  <?define Communication_TargetDir=$(var.ECUFlasher.TargetDir)?>
+  <?define Shared_TargetDir=$(var.ECUFlasher.TargetDir)?>
+  <?define ApplicationShared_TargetDir=$(var.ECUFlasher.TargetDir)?>
+  <Product Id="*"
+    Name="$(var.ProductName)"
+    Language="1033"
+    Version="$(var.Version)"
+    Manufacturer="Nefmoto"
+    UpgradeCode="2d104af1-44d2-4686-b3e0-a860cb092af1">
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." />
+    <MediaTemplate />
+
+    <Feature Id="ProductFeature" Title="$(var.ProductName)" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+	<Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="$(var.ProductName).exe" Guid="d2e4f421-0c73-4562-9af9-4f10dd16f278">
+	<File Id="$(var.ProductName).exe" Name="$(var.ProductName).exe" Source="$(var.ECUFlasher_TargetDir)$(var.ProductName).exe" />
+      </Component>
+      <Component Id="$(var.ProductName).exe.config" Guid="5d029180-2042-4344-b43b-e5b0809e9887">
+	<File Id="$(var.ProductName).exe.config" Name="$(var.ProductName).exe.config" Source="$(var.ECUFlasher_TargetDir)$(var.ProductName).exe.config" />
+      </Component>
+      <Component Id="FTD2XX_NET.dll" Guid="21949804-55a9-4cf1-b856-ce5b72fd3f6d">
+	<File Id="FTD2XX_NET.dll" Name="FTD2XX_NET.dll" Source="$(var.FTD2XX_NET_TargetDir)FTD2XX_NET.dll" />
+      </Component>
+      <Component Id="Communication.dll" Guid="d4cf033c-6330-4e20-9130-f26ef46bbcc9">
+	<File Id="Communication.dll" Name="Communication.dll" Source="$(var.Communication_TargetDir)Communication.dll" />
+      </Component>
+      <Component Id="ECUShared.dll" Guid="1161e03f-3326-4297-b492-1d333630dbae">
+	<File Id="ECUShared.dll" Name="ECUShared.dll" Source="$(var.Shared_TargetDir)ECUShared.dll" />
+      </Component>
+      <Component Id="ApplicationShared.dll" Guid="d42fabc7-0a7b-48b2-8104-3b8f85d8d525">
+	<File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.ApplicationShared_TargetDir)ApplicationShared.dll" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+<!--
+  <UI>
+    <Property Id="DefaultUIFont">DlgFont8</Property>
+
+    <Dialog Id="InstallDlg" Width="370" Height="270" Title="[ProductName] [Setup]" NoMinimize="yes">
+      <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes">
+	<Text>{\DlgTitleFont}Ready to Install</Text>
+      </Control>
+      <Control Id="Install" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Text="Install">
+	<Publish Event="EndDialog" Value="Return" />
+      </Control>
+    </Dialog>
+
+    <TextStyle Id="DlgFont8" FaceName="Tahoma" Size="8" />
+    <TextStyle Id="DlgTitleFont" FaceName="Tahoma" Size="8" Bold="yes" />
+
+    <InstallUISequence>
+      <Show Dialog="InstallDlg" After="CostFinalize" />
+    </InstallUISequence>
+  </UI>
+  <Icon Id="$(var.ProductName).exe" SourceFile="$(var.ProductName).exe" />
+-->
+
+</Wix>
