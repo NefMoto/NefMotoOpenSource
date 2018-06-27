@@ -16,7 +16,14 @@
     UpgradeCode="2d104af1-44d2-4686-b3e0-a860cb092af1">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." />
+    <!-- https://stackoverflow.com/questions/26336332/force-uninstalling-before-installing-any-version-with-wix-installer -->
+    <MajorUpgrade
+      AllowDowngrades="no"
+      AllowSameVersionUpgrades="no"
+      IgnoreRemoveFailure="no"
+      DowngradeErrorMessage="loc.NewerVersionInstalled"
+      Schedule="afterInstallInitialize"/>
+
     <MediaTemplate />
 
     <Feature Id="ProductFeature" Title="$(var.ProductName)" Level="1">
