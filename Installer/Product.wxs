@@ -14,7 +14,7 @@
     Version="$(var.Version)"
     Manufacturer="Nefmoto"
     UpgradeCode="2d104af1-44d2-4686-b3e0-a860cb092af1">
-    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+    <Package Compressed="yes" InstallScope="perMachine" />
 
     <!-- https://stackoverflow.com/questions/26336332/force-uninstalling-before-installing-any-version-with-wix-installer -->
     <MajorUpgrade
@@ -24,7 +24,7 @@
       DowngradeErrorMessage="loc.NewerVersionInstalled"
       Schedule="afterInstallInitialize"/>
 
-    <MediaTemplate />
+    <MediaTemplate EmbedCab="yes" />
 
     <Feature Id="ProductFeature" Title="$(var.ProductName)" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
