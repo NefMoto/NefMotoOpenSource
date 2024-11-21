@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Contact by Email: tony@nefariousmotorsports.com
 -->
-    
+
 <Window x:Class="ECUFlasher.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -37,7 +37,7 @@ Contact by Email: tony@nefariousmotorsports.com
     Top="{Binding Source={x:Static props:Settings.Default}, Path=WindowTop, Mode=TwoWay}"    
     WindowState="{Binding Source={x:Static props:Settings.Default}, Path=WindowState, Mode=TwoWay}"
     
-    Background="{StaticResource BackgroundBrush}"
+    Background="{DynamicResource ErrorBackgroundBrush}"
     WindowStyle="SingleBorderWindow"
     ResizeMode="CanResize" 
     HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
@@ -65,7 +65,7 @@ Contact by Email: tony@nefariousmotorsports.com
         <DataTemplate DataType="{x:Type ECUFlasher:KWP2000Interface_ViewModel}">
             <ECUFlasher:KWP2000Interface_View/>
         </DataTemplate>
-        
+
         <DataTemplate DataType="{x:Type ECUFlasher:BootstrapInterface_ViewModel}">
             <ECUFlasher:BootstrapInterface_View/>
         </DataTemplate>
@@ -73,13 +73,17 @@ Contact by Email: tony@nefariousmotorsports.com
     </Window.Resources>
 
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="611*"/>
+            <ColumnDefinition Width="89*"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Menu Grid.Row="0">
+        <Menu Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,80" Grid.RowSpan="2">
             <Menu.Resources>
                 <Style TargetType="MenuItem" BasedOn="{StaticResource ReactiveCommandMenuItemStyle}"/>
             </Menu.Resources>
@@ -100,16 +104,16 @@ Contact by Email: tony@nefariousmotorsports.com
                 <MenuItem Command="{Binding Path=App.OpenParameterCommand}" CommandParameter="http://www.nefariousmotorsports.com" Header="Visit NefMoto.com" ToolTip="Visit NefMoto.com on the internet"/>
             </MenuItem>
         </Menu>
-        <DockPanel Grid.Row="1">
+        <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,454" Grid.RowSpan="2">
             <Image DockPanel.Dock="Left" Source=".\resources\app-banner.jpg" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" ClipToBounds="True" Width="225" Height="80"/>
             <ComboBox DockPanel.Dock="Left" Style="{StaticResource CommunicationProtocolComboBoxStyle}"
                       ItemsSource="{Binding Source={StaticResource CommunicationProtocolEnumValues}}" ToolTip="Desired communication protocol"
                       SelectedItem="{Binding Path=App.DesiredProtocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
             <ContentControl Content="{Binding Path=App.CommInterfaceViewModel}" DockPanel.Dock="Right" VerticalAlignment="Top"/>
         </DockPanel>
-        <TabControl Grid.Row="2" Background="{StaticResource BackgroundBrush}">
+        <TabControl Grid.Row="2" Background="{DynamicResource ErrorBackgroundBrush}" Grid.ColumnSpan="2">
             <TabItem Header="KWP2000 Info">
-                <ECUFlasher:ECUInfoControl/>
+                <ECUFlasher:ECUInfoControl Background="#FFE0A335" BorderBrush="#FF4E4E4E"/>
             </TabItem>
             <TabItem Header="KWP2000 Flashing">
                 <ECUFlasher:FlashingControl/>
@@ -140,7 +144,7 @@ Contact by Email: tony@nefariousmotorsports.com
                     <ECUFlasher:ChecksumControl/>
                 </TabItem>-->
         </TabControl>
-        <StatusBar Grid.Row="3" Margin="5">
+        <StatusBar Grid.Row="3" Margin="5,5,5,5" Grid.ColumnSpan="2">
             <StatusBar.Resources>
                 <DataTemplate DataType="{x:Type ECUFlasher:KWP2000Interface_ViewModel}">
                     <ECUFlasher:KWP2000Interface_View_Status/>
@@ -150,13 +154,13 @@ Contact by Email: tony@nefariousmotorsports.com
                     <ECUFlasher:BootstrapInterface_View_Status/>
                 </DataTemplate>
             </StatusBar.Resources>
-            <ContentControl Content="{Binding Path=App.CommInterfaceViewModel}"/>            
+            <ContentControl Content="{Binding Path=App.CommInterfaceViewModel}"/>
             <TextBlock>
-                    <TextBlock.Text>
-                        <PriorityBinding FallbackValue="Unknown Connection">
-                            <Binding Path="App.CommInterface.ConnectionStatus" Mode="OneWay"  Converter="{StaticResource descriptionAttributeConverter}" ValidatesOnExceptions="True" ValidatesOnDataErrors="True"/>                            
-                        </PriorityBinding>
-                    </TextBlock.Text>
+                <TextBlock.Text>
+                    <PriorityBinding FallbackValue="Unknown Connection">
+                        <Binding Path="App.CommInterface.ConnectionStatus" Mode="OneWay"  Converter="{StaticResource descriptionAttributeConverter}" ValidatesOnExceptions="True" ValidatesOnDataErrors="True"/>
+                    </PriorityBinding>
+                </TextBlock.Text>
             </TextBlock>
             <Separator/>
             <TextBlock>
@@ -172,23 +176,23 @@ Contact by Email: tony@nefariousmotorsports.com
                 </TextBlock.Style>
             </TextBlock>
             <StatusBarItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
-            <ProgressBar Value="{Binding Path=App.PercentOperationComplete, Mode=OneWay}">
-                <ProgressBar.Style>
-                    <Style TargetType="ProgressBar">
-                        <Setter Property="IsIndeterminate" Value="false"/>
-                        <Style.Triggers>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding Path=App.PercentOperationComplete, Mode=OneWay}" Value="-1"/>
-                                    <Condition Binding="{Binding Path=App.OperationInProgress, Mode=OneWay}" Value="true"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter Property="IsIndeterminate" Value="true"/>
-                            </MultiDataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ProgressBar.Style>
-            </ProgressBar>
-        </StatusBarItem>
-    </StatusBar>        
+                <ProgressBar Value="{Binding Path=App.PercentOperationComplete, Mode=OneWay}">
+                    <ProgressBar.Style>
+                        <Style TargetType="ProgressBar">
+                            <Setter Property="IsIndeterminate" Value="false"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Path=App.PercentOperationComplete, Mode=OneWay}" Value="-1"/>
+                                        <Condition Binding="{Binding Path=App.OperationInProgress, Mode=OneWay}" Value="true"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="IsIndeterminate" Value="true"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ProgressBar.Style>
+                </ProgressBar>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>

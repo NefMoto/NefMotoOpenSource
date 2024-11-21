@@ -54,6 +54,7 @@ using Communication;
 using Shared;
 using ApplicationShared;
 using FTD2XX_NET;
+using System.Security.Policy;
 
 namespace ECUFlasher
 {
@@ -618,7 +619,13 @@ namespace ECUFlasher
             {
                 if (_OpenParameterCommand == null)
                 {
-                    _OpenParameterCommand = new ReactiveCommand(delegate(object commandParam) { Process.Start((string)commandParam); });
+                    _OpenParameterCommand = new ReactiveCommand(delegate(object commandParam) {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = (string)commandParam,
+                            UseShellExecute = true // Required for .NET Core/.NET 5+
+                        });
+                    });
                 }
 
                 return _OpenParameterCommand;
