@@ -26,23 +26,18 @@ Contact by Email: tony@nefariousmotorsports.com
 #define CHECK_CABLE_IN_DUMB_MODE
 //#define SEND_START_COMM_AFTER_SLOW_INIT //EDC15 gets angry when you send a start communication message after doing a double slow init to start a KWP2000 session
 
+using FTD2XX_NET;
+using Shared;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Runtime.Remoting.Messaging;
-using System.Diagnostics;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Threading;
 using System.Xml.Serialization;
-
-using Shared;
-using FTD2XX_NET;
 
 namespace Communication
 {
-	public class TimingParameters : ICloneable
+    public class TimingParameters : ICloneable
 	{
         public long P1ECUInterByteTimeMaxMs;
         public long P2ECUResponseTimeMinMs;
@@ -875,63 +870,8 @@ namespace Communication
         protected int mNumConsecutiveUnsolicitedResponses = 0;
         protected int mNumConsecutiveSentMessagesWithoutResponses = 0;
 
-        private class ReceivedMessageEventHolder : EventHolder
-        {
-            public ReceivedMessageEventHolder(MulticastDelegate multiDel, KWP2000Message message)
-                : base(multiDel)
-            {
-                mMessage = message;
-            }
 
-            protected override void BeginInvoke(CommunicationInterface commInterface, Delegate del, AsyncCallback callback, object invokeParam)
-            {
-                if (del is MessageChangedDelegate)
-                {
-                    var receiveMessageDel = del as MessageChangedDelegate;
-                    var KwP2000CommInterface = commInterface as KWP2000Interface;
 
-#if DEBUG//cut down on work in non debug builds
-                    commInterface.LogProfileEventDispatch("Invoking: " + del.Target.ToString() + "." + del.Method.ToString() + " at " + DateTime.Now.ToString("hh:mm:ss.fff"));
-#endif
-                    receiveMessageDel.BeginInvoke(KwP2000CommInterface, mMessage, callback, invokeParam);
-                }
-            }
-
-            protected KWP2000Message mMessage;
-        }
-
-        private class FinishedReceivingResponsesEventHolder : EventHolder
-        {
-            public FinishedReceivingResponsesEventHolder(MulticastDelegate multiDel, KWP2000Message message, bool messageSent, bool receivedAnyReplies, bool waitedForAllReplies, uint numRetries)
-                : base(multiDel)
-            {
-                mMessage = message;
-                mMessageSent = messageSent;
-                mReceivedAnyReplies = receivedAnyReplies;
-                mWaitedForAllReplies = waitedForAllReplies;
-                mNumRetries = numRetries;
-            }
-
-            protected override void BeginInvoke(CommunicationInterface commInterface, Delegate del, AsyncCallback callback, object invokeParam)
-            {
-                if (del is MessageSendFinishedDelegate)
-                {
-                    var finishedDel = del as MessageSendFinishedDelegate;
-                    var KwP2000CommInterface = commInterface as KWP2000Interface;
-
-#if DEBUG//cut down on work in non debug builds
-                    commInterface.LogProfileEventDispatch("Invoking: " + del.Target.ToString() + "." + del.Method.ToString() + " at " + DateTime.Now.ToString("hh:mm:ss.fff"));
-#endif
-                    finishedDel.BeginInvoke(KwP2000CommInterface, mMessage, mMessageSent, mReceivedAnyReplies, mWaitedForAllReplies, mNumRetries, callback, invokeParam);
-                }
-            }
-
-            protected KWP2000Message mMessage;
-            protected bool mMessageSent;
-            protected bool mReceivedAnyReplies;
-            protected bool mWaitedForAllReplies;
-            protected uint mNumRetries;
-        }
         
 		protected Stopwatch mP1ECUResponseInterByteTimeOut;
 		protected Stopwatch mP2ECUResponseTimeOut;

@@ -1,22 +1,20 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27703.2035
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34723.18
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{4AF7BCCB-A6E0-4543-853A-ABBADC3C862D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shared", "Shared\Shared.csproj", "{4AF7BCCB-A6E0-4543-853A-ABBADC3C862D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Communication", "Communication\Communication.csproj", "{5E2416AA-BF43-4754-B1CF-913080C1B104}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Communication", "Communication\Communication.csproj", "{5E2416AA-BF43-4754-B1CF-913080C1B104}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ECUFlasher", "ECUFlasher\ECUFlasher.csproj", "{D342D285-AC8C-40B2-8A85-83CFB9C1CE2A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ECUFlasher", "ECUFlasher\ECUFlasher.csproj", "{D342D285-AC8C-40B2-8A85-83CFB9C1CE2A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libs", "Libs", "{D5966760-5B3C-49E7-AF91-09DBDBD7EF8D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FTD2XX_NET", "FTD2XX_NET\FTD2XX_NET.csproj", "{8966A890-1A9B-42E4-B0B6-181627310D7E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FTD2XX_NET", "FTD2XX_NET\FTD2XX_NET.csproj", "{8966A890-1A9B-42E4-B0B6-181627310D7E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Checksum", "Checksum\Checksum.csproj", "{7D8C0D8C-A7B5-446F-AD38-08E24D72C882}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Checksum", "Checksum\Checksum.csproj", "{7D8C0D8C-A7B5-446F-AD38-08E24D72C882}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApplicationShared", "ApplicationShared\ApplicationShared.csproj", "{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}"
-EndProject
-Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "Installer", "Installer\Installer.wixproj", "{3A9FFB8D-401C-4C18-97E7-34B6E94CCA88}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ApplicationShared", "ApplicationShared\ApplicationShared.csproj", "{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -74,12 +72,6 @@ Global
 		{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}.Release|x86.ActiveCfg = Release|x86
 		{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}.Release|x86.Build.0 = Release|x86
-		{3A9FFB8D-401C-4C18-97E7-34B6E94CCA88}.Debug|Any CPU.ActiveCfg = Debug|x86
-		{3A9FFB8D-401C-4C18-97E7-34B6E94CCA88}.Debug|x86.ActiveCfg = Debug|x86
-		{3A9FFB8D-401C-4C18-97E7-34B6E94CCA88}.Debug|x86.Build.0 = Debug|x86
-		{3A9FFB8D-401C-4C18-97E7-34B6E94CCA88}.Release|Any CPU.ActiveCfg = Release|x86
-		{3A9FFB8D-401C-4C18-97E7-34B6E94CCA88}.Release|x86.ActiveCfg = Release|x86
-		{3A9FFB8D-401C-4C18-97E7-34B6E94CCA88}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

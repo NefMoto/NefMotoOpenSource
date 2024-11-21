@@ -19,21 +19,11 @@ Contact by Email: tony@nefariousmotorsports.com
 */
 
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Runtime.Remoting.Messaging;
 using System.Diagnostics;
-using System.ComponentModel;
-using System.Xml.Serialization;
-
-using Shared;
 
 namespace Communication
 {
-	public delegate void MessageChangedDelegate(KWP2000Interface commInterface, KWP2000Message message);
+    public delegate void MessageChangedDelegate(KWP2000Interface commInterface, KWP2000Message message);
 	public delegate void MessageSendFinishedDelegate(KWP2000Interface commInterface, KWP2000Message message, bool sentProperly, bool receivedAnyReplies, bool waitedForAllReplies, uint numRetries);
 
 	public class KWP2000Message

@@ -19,11 +19,10 @@ Contact by Email: tony@nefariousmotorsports.com
 */
 
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Globalization;
+using System.Collections.Generic;
 
 namespace Shared
 {
@@ -47,73 +46,41 @@ namespace Shared
 			Undefined
 		};
 
+
         public static UInt32 GetDataTypeSize(DataType type)
-		{
-			switch (type)
+        {
+            // A dictionary mapping each DataType to its corresponding size.
+            var dataTypeSizes = new Dictionary<DataType, UInt32>
 			{
-				case DataType.Int8:				
-					{
-						return 1;
-					}
-				case DataType.UInt8:
-					{
-						return 1;
-					}
-				case DataType.Int16:
-					{
-						return 2;
-					}
-				case DataType.UInt16:
-					{
-						return 2;
-					}
-				case DataType.Int32:
-					{
-						return 4;
-					}
-				case DataType.UInt32:
-					{
-						return 4;
-					}
-			}
+				{ DataType.Int8, 1 },
+				{ DataType.UInt8, 1 },
+				{ DataType.Int16, 2 },
+				{ DataType.UInt16, 2 },
+				{ DataType.Int32, 4 },
+				{ DataType.UInt32, 4 }
+			};
 
-			Debug.Assert(false);
-			return 0;
-		}
+            if (dataTypeSizes.TryGetValue(type, out var size))
+            {
+                return size;
+            }
 
-		public static float ClampedScale(float value, float scale, float min, float max)
-		{
+            Debug.Assert(false, "Unknown DataType");
+            return 0;
+        }
+
+        public static float ClampedScale(float value, float scale, float min, float max)
+        {
 			float result = value * scale;
+			return result < min ? min : result > max ? max : result;
+        }
 
-			if (result > max)
-			{
-				result = max;
-			}
-
-			else if (result < min)
-			{
-				result = min;
-			}
-
-			return result;
-		}
-
-		public static float ClampedOffset(float value, float offset, float min, float max)
+        public static float ClampedOffset(float value, float offset, float min, float max)
 		{
 			float result = value + offset;
-
-			if (result > max)
-			{
-				result = max;
-			}
-
-			else if (result < min)
-			{
-				result = min;
-			}
-
-			return result;
-		}
+            return result < min ? min : result > max ? max : result;
+        }
+    
 
 		//TODO: could probably replace read/write raw value functions with the BitConverter class, except BitConverter doesn't support UInt8
 
