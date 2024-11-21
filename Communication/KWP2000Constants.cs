@@ -18,20 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: tony@nefariousmotorsports.com
 */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Runtime.Remoting.Messaging;
-using System.Diagnostics;
 using System.ComponentModel;
-using System.Xml.Serialization;
-using Shared;
 
 namespace Communication
 {
-	//Tested on 8D0907551 T and A
+    //Tested on 8D0907551 T and A
     //10400 baud - works - actually 10417, standard session only accepts this rate
     //38400 baud - works
     //57600 baud - works - setzi says not on 32mhz ecus
@@ -63,23 +54,23 @@ namespace Communication
     //99200 baud - works
     //100800 baud - 127 - works
     //128 - invalid format
-	//105600 - 129 - works
-	//108800 - 130 - works - setzi says only for 24mhz ecus
-	//131 to 134 - invalid format
-	//124800 baud - 135 - works
-	//136 to 142 - invalid format
-	//150400 baud - 143 - works
-	//144 to 147 - invalid format
-	//166400 baud - 148 - works
-	//149 to 153 - invalid format
-	//185600 baud - 154 - works
+    //105600 - 129 - works
+    //108800 - 130 - works - setzi says only for 24mhz ecus
+    //131 to 134 - invalid format
+    //124800 baud - 135 - works
+    //136 to 142 - invalid format
+    //150400 baud - 143 - works
+    //144 to 147 - invalid format
+    //166400 baud - 148 - works
+    //149 to 153 - invalid format
+    //185600 baud - 154 - works
     //188800 baud - 155 - works
-	//156 to 166 - invalid format
-	//249600 baud - 167 - works
-	//168 to 255 - invalid format
+    //156 to 166 - invalid format
+    //249600 baud - 167 - works
+    //168 to 255 - invalid format
     //260000 baud - invalid format - any rate above 0x2FFFF == 196607 the ecu sets to 0x3F7A0 == 260000
 
-	//Only includes common baud rates supported by all VAG ECUs
+    //Only includes common baud rates supported by all VAG ECUs
     public enum KWP2000BaudRates : uint
     {
         BAUD_UNSPECIFIED = 0,

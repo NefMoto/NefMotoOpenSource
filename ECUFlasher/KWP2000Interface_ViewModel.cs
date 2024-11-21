@@ -22,14 +22,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 using System.ComponentModel;
-using System.Windows.Threading;
 
 using Shared;
-using ApplicationShared;
 using Communication;
-using FTD2XX_NET;
 
 namespace ECUFlasher
 {

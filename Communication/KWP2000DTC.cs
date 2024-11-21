@@ -18,17 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: tony@nefariousmotorsports.com
 */
 
+using Shared;
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Runtime.Remoting.Messaging;
-using System.Diagnostics;
-using System.ComponentModel;
-using System.Xml.Serialization;
-
-using Shared;
 
 namespace Communication
 {

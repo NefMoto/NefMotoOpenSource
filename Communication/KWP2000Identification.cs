@@ -20,20 +20,14 @@ Contact by Email: tony@nefariousmotorsports.com
 
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Runtime.Remoting.Messaging;
-using System.Diagnostics;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Text;
 using System.Xml.Serialization;
-
-using Shared;
 
 namespace Communication
 {
-	public struct KWP2000FlashStatus
+    public struct KWP2000FlashStatus
 	{
 		[Flags]
 		public enum FlashConsistency : byte

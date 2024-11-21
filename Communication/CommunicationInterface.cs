@@ -20,17 +20,15 @@ Contact by Email: tony@nefariousmotorsports.com
 
 //#define PROFILE_EVENT_DISPATCH
 
+using FTD2XX_NET;
+using Shared;
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Runtime.Remoting.Messaging;
-using System.Diagnostics;
 using System.ComponentModel;
-using System.Xml.Serialization;
-using Shared;
-using FTD2XX_NET;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using static Communication.ValidateStartAndEndAddressesWithRequestUploadDownloadAction;
 
 namespace Communication
 {
@@ -435,33 +433,7 @@ namespace Communication
             }
         }
 
-        private class ConnectionStatusEventHolder : EventHolder
-        {
-            public ConnectionStatusEventHolder(MulticastDelegate multiDel, ConnectionStatusType status, bool willReconnect)
-                : base(multiDel)
-            {
-                mStatus = status;
-                mWillReconnect = willReconnect;
-            }
-
-            protected override void BeginInvoke(CommunicationInterface commInterface, Delegate del, AsyncCallback callback, object invokeParam)
-            {
-                if (del is ConnectionStatusChangedDelegate)
-                {
-                    var statusChangedDel = del as ConnectionStatusChangedDelegate;
-                    var KwP2000CommInterface = commInterface as KWP2000Interface;
-
-#if DEBUG//cut down on work in non debug builds
-                    commInterface.DisplayStatusMessage("Invoking: " + del.Target.ToString() + "." + del.Method.ToString() + " at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
-#endif
-                    statusChangedDel.BeginInvoke(KwP2000CommInterface, mStatus, mWillReconnect, callback, invokeParam);
-                }
-            }
-
-            protected ConnectionStatusType mStatus;
-            protected bool mWillReconnect;
-        }
-
+      
         protected abstract uint GetConnectionAttemptsRemaining();
 
         public abstract Protocol CurrentProtocol
@@ -633,7 +605,7 @@ namespace Communication
         }
 
         private bool mIsTriggeringQueuedEvent = false;
-        private void TriggerNextQueuedEvent()
+        private async void TriggerNextQueuedEvent()
         {
             LogProfileEventDispatch("Start TriggerNextQueuedEvent");
 
@@ -701,8 +673,9 @@ namespace Communication
                         if (invocationList != null)
                         {
                             LogProfileEventDispatch("Start TriggerNextQueuedEvent, BeginInvoke");
-
-                            eventHolder.BeginInvoke(this, invocationList, this.QueuedEventHandlerComplete, null);
+                            
+                            await eventHolder.BeginInvokeAsync(this, invocationList, null);
+                            //eventHolder.BeginInvoke(this, invocationList, this.QueuedEventHandlerComplete, null);
 
                             LogProfileEventDispatch("Start TriggerNextQueuedEvent, BeginInvoke Finished");
                         }
@@ -718,83 +691,32 @@ namespace Communication
             LogProfileEventDispatch("End TriggerNextQueuedEvent");
         }
 
-        protected void QueuedEventHandlerComplete(IAsyncResult ar)
-        {            
+        protected async Task QueuedEventHandlerComplete(Task ar)
+        {
             LogProfileEventDispatch("Start QueuedEventHandlerComplete");
 
             try
             {
-                var result = ar as AsyncResult;
-
-                if (!result.EndInvokeCalled)
+                if (ar != null)
                 {
-					Debug.Assert(result.AsyncDelegate != null);
-
-                    object[] param = { ar };
-                    result.AsyncDelegate.GetType().InvokeMember("EndInvoke", System.Reflection.BindingFlags.InvokeMethod, null, result.AsyncDelegate, param);
+                    await ar.ConfigureAwait(false);
+                }
+                else
+                {
+                    Debug.Fail("The provided async result is null.");
                 }
             }
             catch (Exception e)
             {
-                //Note: exceptions thrown by EndInvoke are coming from the async delegate code
-                //Exceptions thrown inside the delegate are rethrown when the return value is received with EndInvoke
-                Debug.Fail("Event handler EndInvoke threw an exception: " + e.Message);
+                Debug.Fail("Event handler threw an exception: " + e.Message);
+                throw;
             }
-
-			if (Interlocked.Decrement(ref mNumQueuedEventHandlersInProgress) == 0)
-			{
-				//prevent recursion using BeginInvoke
-				var triggerNextEvent = (ThreadStart)delegate { TriggerNextQueuedEvent(); };
-				triggerNextEvent.BeginInvoke(null, null);
-			}
+            if (Interlocked.Decrement(ref mNumQueuedEventHandlersInProgress) == 0)
+            {
+                await Task.Run(() => TriggerNextQueuedEvent());
+            }
 
             LogProfileEventDispatch("End QueuedEventHandlerComplete");
-        }
-
-        protected abstract class EventHolder
-        {
-            protected abstract void BeginInvoke(CommunicationInterface commInterface, Delegate del, AsyncCallback callback, object invokeParam);
-
-            public bool BeginInvoke(CommunicationInterface commInterface, Delegate[] dels, AsyncCallback callback, object invokeParam)
-            {
-                commInterface.LogProfileEventDispatch("EventHolder BeginInvoke");
-
-                bool invokedAny = false;
-
-                if ((dels != null) && (dels.Length > 0))
-                {
-                    foreach (Delegate del in dels)
-                    {
-                        BeginInvoke(commInterface, del, callback, invokeParam);
-                        invokedAny = true;
-                    }
-                }
-
-                commInterface.LogProfileEventDispatch("EventHolder BeginInvoke Finished");
-
-                return invokedAny;
-            }
-
-            public Delegate[] GetInvocationList()
-            {
-                if (mDelegate != null)
-                {
-                    return mDelegate.GetInvocationList();
-                }
-
-                return null;
-            }
-
-            public Type GetDelegateType()
-            {
-                return mDelegate.GetType();
-            }
-
-            protected EventHolder(MulticastDelegate multiDel)
-            {
-                mDelegate = multiDel;
-            }
-            private MulticastDelegate mDelegate;//storing a reference to the delegate will allow us to keep an immutable copy of it
         }
 
         protected void ClearQueuedEvents()
@@ -811,40 +733,75 @@ namespace Communication
 
         protected Thread mSendReceiveThread = null;
 
+        private CancellationTokenSource _cancellationTokenSource;
+
         protected void StartSendReceiveThread(ThreadStart threadStart)
         {
-            Debug.Assert(mSendReceiveThread == null);
-            if (mSendReceiveThread == null)
+            // Ensure the thread is not already running
+            if (mSendReceiveThread == null || !mSendReceiveThread.IsAlive)
             {
                 DisplayStatusMessage("Starting send receive thread.", StatusMessageType.LOG);
-                mSendReceiveThread = new Thread(threadStart);
-                mSendReceiveThread.Name = "Send Receive Thread";
-                mSendReceiveThread.IsBackground = true;
-                mSendReceiveThread.Priority = ThreadPriority.AboveNormal;
+
+                // Create a new cancellation token source
+                _cancellationTokenSource = new CancellationTokenSource();
+                var token = _cancellationTokenSource.Token;
+
+                // Start the new thread with the cancellation token
+                mSendReceiveThread = new Thread(() => StartSendReceiveTask(threadStart, token))
+                {
+                    Name = "Send Receive Thread",
+                    IsBackground = true,
+                    Priority = ThreadPriority.AboveNormal
+                };
                 mSendReceiveThread.Start();
+            }
+        }
+
+        private void StartSendReceiveTask(ThreadStart threadStart, CancellationToken token)
+        {
+            try
+            {
+                // Ensure the original thread task is invoked
+                threadStart.Invoke();
+
+                // Optionally, monitor cancellation requests while the thread is running
+                while (!token.IsCancellationRequested)
+                {
+                    // If your thread involves continuous work, check for cancellation here
+                    Thread.Sleep(100);  // Sleep or handle task logic
+                }
+            }
+            catch (Exception ex)
+            {
+                DisplayStatusMessage("Error in send/receive thread: " + ex.Message, StatusMessageType.LOG);
+            }
+            finally
+            {
+                DisplayStatusMessage("Send/Receive thread completed or canceled.", StatusMessageType.LOG);
             }
         }
 
         protected void KillSendReceiveThread()
         {
-            if ((mSendReceiveThread != null) && (mSendReceiveThread.IsAlive))
+            if (mSendReceiveThread != null && mSendReceiveThread.IsAlive)
             {
-                DisplayStatusMessage("Aborting send receive thread.", StatusMessageType.LOG);
-                mSendReceiveThread.Abort();
+                DisplayStatusMessage("Requesting cancellation of send receive thread.", StatusMessageType.LOG);
+
+                // Cancel the task/thread via the cancellation token
+                _cancellationTokenSource?.Cancel();
+
+                // Optionally, wait for the thread to finish (this will give it a chance to clean up)
+                mSendReceiveThread.Join();
             }
+
+            // Clean up resources
             mSendReceiveThread = null;
+            _cancellationTokenSource?.Dispose();
         }
 
         protected bool IsSendReceiveThreadRunning()
         {
-            bool result = false;
-
-            if (mSendReceiveThread != null)
-            {
-                result = mSendReceiveThread.IsAlive;
-            }
-
-            return result;
+            return mSendReceiveThread != null && mSendReceiveThread.IsAlive;
         }
     }
 }
