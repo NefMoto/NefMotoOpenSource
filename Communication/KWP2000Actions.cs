@@ -38,8 +38,8 @@ namespace Communication
     {
         public KWP2000Action(KWP2000Interface commInterface)
             : base(commInterface)
-        {            
-        }       
+        {
+        }
 
         public override bool Start()
         {
@@ -84,7 +84,7 @@ namespace Communication
         }
 
         private void ReceivedMessageHandler(KWP2000Interface commInterface, KWP2000Message message)
-        {            
+        {
             lock (this)//lock to ensure we don't accidentally get other callbacks while handling this one
             {
                 if (!IsComplete)//always need to check this in case we are getting callbacks after we complete
@@ -119,7 +119,7 @@ namespace Communication
             bool handled = false;
 
             switch (message.mServiceID)
-            {   
+            {
                 case (byte)KWP2000ServiceID.StartCommunicationPositiveResponse:
                 {
                     handled = true;
@@ -138,8 +138,8 @@ namespace Communication
 				case (byte)KWP2000ServiceID.NegativeResponse:
                 {
                     if (message.DataLength >= 2)
-                    {                    
-                        if (message.mData[1] == (byte)KWP2000ResponseCode.RequestCorrectlyReceived_ResponsePending)                        
+                    {
+                        if (message.mData[1] == (byte)KWP2000ResponseCode.RequestCorrectlyReceived_ResponsePending)
                         {
                             handled = true;
                         }
@@ -158,7 +158,7 @@ namespace Communication
                     }
 
                     break;
-                }                
+                }
             }
 
             return handled;
@@ -168,9 +168,9 @@ namespace Communication
         {
             if (!IsComplete)
             {
-                KWP2000CommInterface.ReceivedMessageEvent -= this.ReceivedMessageHandler;                
+                KWP2000CommInterface.ReceivedMessageEvent -= this.ReceivedMessageHandler;
 
-                base.ActionCompletedInternal(success, communicationError);                
+                base.ActionCompletedInternal(success, communicationError);
             }
         }
 
@@ -210,7 +210,7 @@ namespace Communication
 			return message;
 		}
 
-        protected KWP2000Interface KWP2000CommInterface 
+        protected KWP2000Interface KWP2000CommInterface
         {
             get
             {
@@ -272,7 +272,7 @@ namespace Communication
 							//If we aren't connected, use default baud rate.
 							if (!CommInterface.IsConnectionOpen() || (mSessionType == KWP2000DiagnosticSessionType.StandardSession))
 							{
-								targetBaudRate = (uint)KWP2000BaudRates.BAUD_DEFAULT;								
+								targetBaudRate = (uint)KWP2000BaudRates.BAUD_DEFAULT;
 							}
 							else
 							{
@@ -299,7 +299,7 @@ namespace Communication
 
         public void SendStartDiagnosticSessionMessageData(KWP2000DiagnosticSessionType sessionType, uint baudRate)
         {
-            byte[] messageData = null;           
+            byte[] messageData = null;
 
             //Must always send baud rate byte unless using a standard session. ECU starting programming session doesn't check if it receives it or not before using it
             Debug.Assert((sessionType != KWP2000DiagnosticSessionType.StandardSession) || (baudRate == (uint)KWP2000BaudRates.BAUD_DEFAULT) || (baudRate == (uint)KWP2000BaudRates.BAUD_UNSPECIFIED));
@@ -319,7 +319,7 @@ namespace Communication
 
 				DisplayStatusMessage("Starting " + sessionType + " diagnostic session with " + baudRate + " baud rate.", StatusMessageType.LOG);
             }
-            
+
             SendMessage((byte)KWP2000ServiceID.StartDiagnosticSession, messageData);
         }
 
@@ -334,7 +334,7 @@ namespace Communication
                 if (KWP2000Interface.IsPositiveResponseToRequest((byte)KWP2000ServiceID.StartDiagnosticSession, message))
                 {
                     bool sessionTypeOK = true;
-                    
+
                     if (message.DataLength > 0)
                     {
                         handled = true;
@@ -348,7 +348,7 @@ namespace Communication
                         {
                             newBaudRate = CalculateBaudRateFromByte(message.mData[1]);
 
-                            DisplayStatusMessage("ECU requesting specific baud rate: " + newBaudRate, StatusMessageType.LOG);                            
+                            DisplayStatusMessage("ECU requesting specific baud rate: " + newBaudRate, StatusMessageType.LOG);
 
                             if (message.DataLength >= 3)
                             {
@@ -407,11 +407,11 @@ namespace Communication
 				else if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.StartDiagnosticSession, message))
 				{
 				    if (message.DataLength >= 2)
-				    {       
+				    {
 				        if (message.mData[1] == (byte)KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested)
 				        {
 				            DisplayStatusMessage("Start diagnostic session failed, ECU reports security access is required.", StatusMessageType.USER);
-                            
+
 				            ActionCompleted(false);
 				            handled = true;
 				        }
@@ -446,9 +446,9 @@ namespace Communication
 									{
 										mMessageFormatState = MessageFormatState.NoBaudRate;
 
-										SendStartDiagnosticSessionMessageData(mSessionType, (uint)KWP2000BaudRates.BAUD_UNSPECIFIED);										
+										SendStartDiagnosticSessionMessageData(mSessionType, (uint)KWP2000BaudRates.BAUD_UNSPECIFIED);
 									}
-                                    
+
                                     handled = true;
                                     break;
                                 }
@@ -466,7 +466,7 @@ namespace Communication
                                     }
 
                                     break;
-                                }                                
+                                }
                             }
 
 							if (!giveUpAndTryToUseCurrentSession)
@@ -512,7 +512,7 @@ namespace Communication
 
                     ActionCompleted(true);
                 }
-                
+
                 if (!handled)
                 {
                     DisplayStatusMessage("Failed to start diagnostic session.", StatusMessageType.USER);
@@ -612,14 +612,14 @@ namespace Communication
         protected KWP2000DiagnosticSessionType mSessionType;
         protected IEnumerable<uint> mBaudRates;
 		protected IEnumerator<uint> mCurrentBaudRate;
-    };	
+    };
 
     public class StopDiagnosticSessionAction : KWP2000Action
     {
         public StopDiagnosticSessionAction(KWP2000Interface commInterface)
             : base(commInterface)
         {
-        
+
 		}
 
         public override bool Start()
@@ -695,9 +695,9 @@ namespace Communication
                 ActionCompleted(true);
                 handled = true;
             }
-                        
+
             if (!handled)
-            {                 
+            {
                 ActionCompleted(false);
             }
 
@@ -876,7 +876,7 @@ namespace Communication
                     DisplayStatusMessage("Skipping communication timing negotiation.", StatusMessageType.LOG);
                     ActionCompleted(true);
                 }
-                
+
                 started = true;
             }
 
@@ -911,7 +911,7 @@ namespace Communication
                         {
                             DisplayStatusMessage("Setting communication timing to defaults.", StatusMessageType.LOG);
 
-                            mState = NegotiationState.SET_TO_DEFAULTS;                            
+                            mState = NegotiationState.SET_TO_DEFAULTS;
                             SendMessage((byte)KWP2000ServiceID.AccessTimingParameters, AccessTimingParameters.CreateMessageData(AccessTimingParameters.TimingParameterIdentifier.SetToDefaults));
                         }
                         else
@@ -926,7 +926,7 @@ namespace Communication
                         AccessTimingParameters.GetTimingParamsFromData(message.mData, mCurrentTimingParams);
 
                         DisplayStatusMessage("Read timing limits: " + mCurrentTimingParams.ToString(), StatusMessageType.DEV);
-                        
+
                         mCurrentTimingParams.EnforceTimingIntervalRequirements();
 
                         DisplayStatusMessage("Requesting timing limits: " + mCurrentTimingParams.ToString(), StatusMessageType.DEV);
@@ -1032,7 +1032,7 @@ namespace Communication
             bool started = false;
 
             FailedBecauseOfPersistentData = false;
-                        
+
             if (base.Start())
             {
                 KWP2000MessageHelpers.SendRequestEraseFlashMessage(KWP2000CommInterface, mStartAddress, mEndAddress, mFlashToolCode);
@@ -1084,7 +1084,7 @@ namespace Communication
                     handled = true;
                 }
                 else if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.StartRoutineByLocalIdentifier, message))
-                {   
+                {
                     if (message.DataLength >= 2)
                     {
                         if ((message.mData[1] == (byte)KWP2000ResponseCode.GeneralReject)
@@ -1092,7 +1092,7 @@ namespace Communication
                             || (message.mData[1] == (byte)KWP2000ResponseCode.ImproperDownloadType))
                         {
                             DisplayStatusMessage("Erase flash memory routine did not start or complete correctly.", StatusMessageType.USER);
-                                                        
+
                             ActionCompleted(false);
 
                             handled = true;
@@ -1167,7 +1167,7 @@ namespace Communication
 
                             handled = true;
                         }
-                        else if ((message.mData[1] == (byte)KWP2000ResponseCode.GeneralReject) 
+                        else if ((message.mData[1] == (byte)KWP2000ResponseCode.GeneralReject)
                             ||(message.mData[1] == (byte)KWP2000ResponseCode.DownloadNotAccepted))
                         {
                             DisplayStatusMessage("Erase flash memory routine did not start or complete correctly.", StatusMessageType.USER);
@@ -1177,7 +1177,7 @@ namespace Communication
                             ActionCompleted(false);
 
                             handled = true;
-                        }                        
+                        }
                     }
                 }
 
@@ -1189,7 +1189,7 @@ namespace Communication
             }
 
             return handled;
-        }       
+        }
 
         protected uint mStartAddress;
         protected uint mEndAddress;
@@ -1223,7 +1223,7 @@ namespace Communication
                 DisplayStatusMessage("Assuming checksum is: 0x" + mChecksum.ToString("X4"), StatusMessageType.DEV);
 
                 KWP2000MessageHelpers.SendValidateFlashChecksumMessage(KWP2000CommInterface, mStartAddress, mEndAddress, mChecksum);
-                
+
                 started = true;
             }
 
@@ -1365,7 +1365,7 @@ namespace Communication
 
             return handled;
         }
-                        
+
         protected ushort CalculateChecksum(byte[] data)
         {
             uint[] tempBuffer = new uint[256];
@@ -1466,7 +1466,7 @@ namespace Communication
     //                 if (message.mData[0] == (byte)KWP2000VAGLocalIdentifierRoutine.ValidateFlashChecksum)
     //                 {
     //                     HandleValidateChecksumResponse(true);
-                        
+
     //                     handled = true;
     //                 }
     //                 else
@@ -1486,7 +1486,7 @@ namespace Communication
     //                     }
     //                     else if (message.mData[1] == (byte)KWP2000ResponseCode.BlockTransferDataChecksumError)
     //                     {
-    //                         HandleValidateChecksumResponse(true);                             
+    //                         HandleValidateChecksumResponse(true);
     //                     }
     //                     else
     //                     {
@@ -1574,7 +1574,7 @@ namespace Communication
     //                    DisplayStatusMessage("Flash end address is invalid.", StatusMessageType.LOG);
     //                    ActionCompleted(false);
     //                }
-                    
+
     //                break;
     //            }
     //            case ValidationState.BeforeStart:
@@ -1591,7 +1591,7 @@ namespace Communication
     //                    DisplayStatusMessage("Flash start address isn't the lowest address.", StatusMessageType.LOG);
     //                    ActionCompleted(false);
     //                }
-                    
+
     //                break;
     //            }
     //            case ValidationState.AfterEnd:
@@ -1609,7 +1609,7 @@ namespace Communication
     //                    DisplayStatusMessage("Flash end address isn't the highest address.", StatusMessageType.LOG);
     //                    ActionCompleted(false);
     //                }
-                    
+
     //                break;
     //            }
     //            default:
@@ -1685,7 +1685,7 @@ namespace Communication
             if (!handled)
             {
                 if (KWP2000Interface.IsResponseToRequest(mMemoryTestServiceID, message))
-                {                    
+                {
                     if (KWP2000Interface.IsPositiveResponseToRequest(mMemoryTestServiceID, message))
                     {
                         HandleResponse(true, 0);
@@ -1778,11 +1778,11 @@ namespace Communication
                                 }
 
                                 handled = true;
-                            }                                                        
+                            }
                         }
-                    }                    
+                    }
                 }
-                                
+
                 if (!handled)
                 {
                     DisplayStatusMessage("Validating flash start and end addresses failed. Received unhandled response.", StatusMessageType.USER);
@@ -1821,7 +1821,7 @@ namespace Communication
                         KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mStartAddress, size, dataFormat);
                     }
                     break;
-                }               
+                }
                 case ValidationState.BeforeStart:
                 {
 					if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
@@ -1845,7 +1845,7 @@ namespace Communication
                         KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mStartAddress, size + 2, dataFormat);
                     }
                     break;
-                }                
+                }
                 default:
                 {
                     Debug.Fail("Unknown state");
@@ -1871,7 +1871,7 @@ namespace Communication
                             mState = ValidationState.AfterEnd;
                         }
 
-                        DisplayStatusMessage("Flash start and end addresses are valid.", StatusMessageType.LOG);                        
+                        DisplayStatusMessage("Flash start and end addresses are valid.", StatusMessageType.LOG);
                     }
                     else
                     {
@@ -1895,7 +1895,7 @@ namespace Communication
                     }
 
                     break;
-                }                
+                }
                 case ValidationState.BeforeStart:
                 {
                     if (!didRequestWork)
@@ -1904,7 +1904,7 @@ namespace Communication
                             || (failureResponseCode == (byte)KWP2000ResponseCode.CanNotDownloadToSpecifiedAddress))
                         {
                             mState = ValidationState.AfterEnd;
-                            DisplayStatusMessage("Flash start address is the lowest address.", StatusMessageType.LOG);                            
+                            DisplayStatusMessage("Flash start address is the lowest address.", StatusMessageType.LOG);
                         }
                         else
                         {
@@ -2130,7 +2130,7 @@ namespace Communication
 
                     handled = true;
                 }
-                else 
+                else
                 {
 					byte responseCode;
 					if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.ReadMemoryByAddress, message, out responseCode))
@@ -2401,18 +2401,18 @@ namespace Communication
 			mRequestSeed = settings.RequestSeed;
             Debug.Assert(mRequestSeed % 2 == 1, "Request seed must be odd");
 			mRequestSeed += (byte)(1 - (mRequestSeed % 2));//if the seed is even, add one
-            
+
 			mSendKey = (byte)(mRequestSeed + 1);
 
             mRequestSeedNumLoops = DEFAULT_NUM_LOOPS;
 
             mExternalRAMKeyTable = new uint[64]{0x0A221289, 0x144890A1, 0x24212491, 0x290A0285, 0x42145091, 0x504822C1, 0x0A24C4C1, 0x14252229,
 			        0x24250525, 0x2510A491, 0x28488863, 0x29148885, 0x422184A5, 0x49128521, 0x50844A85, 0x620CC211,
-			        0x124452A9, 0x18932251, 0x2424A459, 0x29149521, 0x42352621, 0x4A512289, 0x52A48911, 0x11891475, 
+			        0x124452A9, 0x18932251, 0x2424A459, 0x29149521, 0x42352621, 0x4A512289, 0x52A48911, 0x11891475,
 			        0x22346523, 0x4A3118D1, 0x64497111, 0x0AE34529, 0x15398989, 0x22324A67, 0x2D12B489, 0x132A4A75,
-			        0x19B13469, 0x25D2C453, 0x4949349B, 0x524E9259, 0x1964CA6B, 0x24F5249B, 0x28979175, 0x352A5959, 
+			        0x19B13469, 0x25D2C453, 0x4949349B, 0x524E9259, 0x1964CA6B, 0x24F5249B, 0x28979175, 0x352A5959,
 			        0x3A391749, 0x51D44EA9, 0x564A4F25, 0x6AD52649, 0x76493925, 0x25DE52C9, 0x332E9333, 0x68D64997,
-			        0x494947FB, 0x33749ACF, 0x5AD55B5D, 0x7F272A4F, 0x35BD5B75, 0x3F5AD55D, 0x5B5B6DAD, 0x6B5DAD6B, 
+			        0x494947FB, 0x33749ACF, 0x5AD55B5D, 0x7F272A4F, 0x35BD5B75, 0x3F5AD55D, 0x5B5B6DAD, 0x6B5DAD6B,
 			        0x75B57AD5, 0x5DBAD56F, 0x6DBF6AAD, 0x75775EB5, 0x5AEDFED5, 0x6B5F7DD5, 0x6F757B6B, 0x5FBD5DBD};
 
             mInternalROMKeyTable = new uint[5] { 0x75775EB5, 0x5AEDFED5, 0x6B5F7DD5, 0x6F757B6B, 0x5FBD5DBD };
@@ -2458,7 +2458,7 @@ namespace Communication
 					tempData = new byte[1];
 					tempData[0] = mRequestSeed;
 				}
-                
+
                 SendMessage((byte)KWP2000ServiceID.SecurityAccess, tempData);
 
                 DisplayStatusMessage("Requesting security access.", StatusMessageType.USER);
@@ -2546,7 +2546,7 @@ namespace Communication
                     {
                         if (message.mData[1] == (byte)KWP2000ResponseCode.InvalidKey)
                         {
-                            DisplayStatusMessage("Security access denied due to invalid key.", StatusMessageType.USER);                            
+                            DisplayStatusMessage("Security access denied due to invalid key.", StatusMessageType.USER);
                         }
                         else if (message.mData[1] == (byte)KWP2000ResponseCode.ServiceNotSupported)
                         {
@@ -2630,7 +2630,7 @@ namespace Communication
 
             Debug.Assert(mSecurityKeyIndex < mExternalRAMKeyTable.Length);
             byte securityKeyIndex = (byte)Math.Min(mSecurityKeyIndex, mExternalRAMKeyTable.Length - 1);
-            
+
 			uint seed = (uint)(seedArray[0] << 24) + (uint)(seedArray[1] << 16) + (uint)(seedArray[2] << 8) + (uint)seedArray[3];
 
 			for (int i = 0; i < mRequestSeedNumLoops; i++)
@@ -2651,7 +2651,7 @@ namespace Communication
 			sendKey[1] = (byte)((seed >> 16) & 0xFF);
 			sendKey[2] = (byte)((seed >> 8) & 0xFF);
 			sendKey[3] = (byte)((seed) & 0xFF);
-						
+
 			return sendKey;
 		}
         */
@@ -2761,7 +2761,7 @@ namespace Communication
             if (base.Start())
             {
 				if ((mOperationType == (byte)KWP2000ServiceID.RequestDownload) || (mOperationType == (byte)KWP2000ServiceID.RequestUpload))
-                {   
+                {
                     uint endAddress = mAddress + mSize - 1;
 
 					if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
@@ -2901,7 +2901,7 @@ namespace Communication
                                 }
 
                                 handled = true;
-                                ActionCompleted(false);                                
+                                ActionCompleted(false);
                             }
                         }
                     }
@@ -3110,7 +3110,7 @@ namespace Communication
                         HandlePositiveResponseMessage();
 
                         handled = true;
-                    }                    
+                    }
                 }
                 else if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.TransferData, message))
                 {
@@ -3296,7 +3296,7 @@ namespace Communication
 
             if (uncompressedSize > 0)
             {
-                encryptedData = new byte[uncompressedSize];                
+                encryptedData = new byte[uncompressedSize];
                 Array.Copy(RawData, mDataIndex, encryptedData, 0, uncompressedSize);//using array copy to handle 64bit indexes
                 DecryptEncryptByteBuffer(mDataFormat, encryptedData, 0, (uint)encryptedData.LongLength, ref encryptionIndex);
             }
@@ -3320,7 +3320,7 @@ namespace Communication
             }
 
             Debug.Assert(maxDataLength > 0, "max block size is too small");
-                        
+
             uint newTransmitIndex = mDataIndex;
             byte remainingDataLength = maxDataLength;
 
@@ -3345,7 +3345,7 @@ namespace Communication
             if (compressedDataSize > 0)
             {
                 Debug.Assert(compressedDataSize <= maxDataLength);
-                
+
                 //the first message must start with 0x1A, 0x01
                 if (isFirstDataMessage)
                 {
@@ -3386,7 +3386,7 @@ namespace Communication
             Debug.Assert(data.LongLength > 0, "message data is empty");
             Debug.Assert(currentDataIndex % 2 == 0, "must be even");
 
-            //const uint MAX_NUM_BYTE_REPEATS = 0x3FFF;            
+            //const uint MAX_NUM_BYTE_REPEATS = 0x3FFF;
             const uint MAX_NUM_BYTE_REPEATS = 0x1000;//0x1000 seems to work, but 0x2000 doesn't, no idea why...
             const uint NUM_REPEATING_BYTES_FOR_RLE = 4;
             const uint NUM_HEADER_BYTES = 2;
@@ -3447,7 +3447,7 @@ namespace Communication
                     Debug.Assert(numRepeatedBytes <= MAX_NUM_BYTE_REPEATS, "too many repeats");
 
                     if (numRepeatedBytes > 0)
-                    {   
+                    {
                         UInt16 repeatMode = (UInt16)RepeatMode.REPEATING;
                         UInt16 secondWord = (UInt16)(((repeatMode & 0x03) << 14) | (0x3FFF & numRepeatedBytes));//repeats, num bytes
 
@@ -3718,7 +3718,7 @@ namespace Communication
         protected ushort mBoschCompressionMode;
         protected uint mEncryptionIndex;
         protected uint mNextEncryptionIndex;
-        
+
         protected byte mMaxBlockSize;
         protected byte mDataFormat;
         protected ushort mRoutineNotCompleteRetryCount;
@@ -3726,7 +3726,7 @@ namespace Communication
         protected NotifyBytesWrittenDelegate mBytesWrittenHandler;
 
         protected uint mDataIndex;
-        protected uint mCurrentMessageNumBytes;        
+        protected uint mCurrentMessageNumBytes;
     };
 
     public class ReadDiagnosticTroubleCodesByStatusAction : KWP2000Action
@@ -3829,7 +3829,7 @@ namespace Communication
             return handled;
         }
 
-        protected override void ResponsesFinishedHandler(KWP2000Interface commInterface, KWP2000Message message, bool sentProperly, bool receivedAnyReplies, bool waitedForAllReplies, uint numRetries)        
+        protected override void ResponsesFinishedHandler(KWP2000Interface commInterface, KWP2000Message message, bool sentProperly, bool receivedAnyReplies, bool waitedForAllReplies, uint numRetries)
         {
             if (message.mServiceID == (byte)KWP2000ServiceID.ReadDiagnosticTroubleCodesByStatus)
             {
@@ -3843,7 +3843,7 @@ namespace Communication
         private Queue<KWP2000DTCInfo> mDTCs;
     }
 
-    public class ClearDiagnosticInformationAction : KWP2000Action    
+    public class ClearDiagnosticInformationAction : KWP2000Action
     {
         public ClearDiagnosticInformationAction(KWP2000Interface commInterface, ushort group)
             : base(commInterface)
@@ -3879,7 +3879,7 @@ namespace Communication
                     if (message.DataLength == 2)
                     {
                         if ((message.mData[0] == (mGroup >> 8)) && (message.mData[1] == (mGroup & 0xFF)))
-                        {   
+                        {
                             ActionCompleted(true);
                         }
                         else
@@ -3961,7 +3961,7 @@ namespace Communication
             {
                 ActionCompleted(false);
             }
-            
+
             return handled;
         }
 
@@ -4010,5 +4010,5 @@ namespace Communication
         }
 
         private ushort mCommonIdentifier;
-    }	
+    }
 }
