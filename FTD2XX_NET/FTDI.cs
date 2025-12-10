@@ -547,10 +547,12 @@ namespace FTD2XX_NET
                         {
                             devicelist[i] = new FT_DEVICE_INFO_NODE();
                             ftStatus = detail(i, ref devicelist[i].Flags, ref devicelist[i].Type, ref devicelist[i].ID, ref devicelist[i].LocId, serialnumber, description, ref devicelist[i].ftHandle);
-                            devicelist[i].SerialNumber = Encoding.ASCII.GetString(serialnumber);
-                            devicelist[i].Description = Encoding.ASCII.GetString(description);
-                            devicelist[i].SerialNumber = devicelist[i].SerialNumber.Substring(0, devicelist[i].SerialNumber.IndexOf("\0"));
-                            devicelist[i].Description = devicelist[i].Description.Substring(0, devicelist[i].Description.IndexOf("\0"));
+                            devicelist[i].SerialNumber = Encoding.ASCII.GetString(serialnumber).Split('\0')[0];
+                            devicelist[i].Description = Encoding.ASCII.GetString(description).Split('\0')[0];
+                            if (string.IsNullOrWhiteSpace(devicelist[i].Description))
+                            {
+                                devicelist[i].Description = devicelist[i].Type.ToString() + (string.IsNullOrWhiteSpace(devicelist[i].SerialNumber) ? "" : " (" + devicelist[i].SerialNumber + ")");
+                            }
                         }
                     }
                     return ftStatus;
