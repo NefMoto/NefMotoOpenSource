@@ -124,7 +124,7 @@ Contact by Email: tony@nefariousmotorsports.com
             </ComboBox.ItemTemplate>
         </ComboBox>
         <Button Grid.Column="3" Grid.Row="0" Command="{Binding Path=App.RefreshDevicesCommand}" Style="{StaticResource ConnectionButtonsStyle}"/>
-        <Button Grid.Column="0" Grid.Row="1" Command="{Binding Path=DetectSupportedBaudRatesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}"/>
+        <Button Grid.Column="0" Grid.Row="1" Command="{Binding Path=DetectSupportedBaudRatesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Visibility="Collapsed"/>
         <ComboBox Grid.Column="1" Grid.Row="1" Name="DesiredConnectionMethodComboBox" Style="{StaticResource ConnectionMethodComboBoxStyle}"
 							ItemsSource="{Binding Source={StaticResource ConnectionMethodEnumValues}}" ToolTip="Desired Connection Method"
 							SelectedItem="{Binding Path=DesiredConnectionMethod, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
