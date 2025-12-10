@@ -87,7 +87,7 @@ namespace Shared
             get { return mRawData; }
             set { mRawData = value; }
         }
-        private byte[] mRawData;		
+        private byte[] mRawData;
 
 		public bool WriteRawFloatValueByType(double value, DataUtils.DataType destType, uint address)
 		{
@@ -95,7 +95,7 @@ namespace Shared
 
 			if (address >= StartAddress)
 			{
-				result = DataUtils.WriteRawFloatValueByType(value, destType, RawData, address - StartAddress);				
+				result = DataUtils.WriteRawFloatValueByType(value, destType, RawData, address - StartAddress);
 			}
 
 			return result;
@@ -120,7 +120,7 @@ namespace Shared
 
 			if (address >= StartAddress)
 			{
-				result = DataUtils.WriteRawIntValueByType(value, destType, RawData, address - StartAddress);				
+				result = DataUtils.WriteRawIntValueByType(value, destType, RawData, address - StartAddress);
 			}
 
 			return result;
@@ -161,7 +161,7 @@ namespace Shared
 			{
 				RawData = null;
 			}
-		}		
+		}
 
 		public bool SaveToFile(string fileName)
 		{

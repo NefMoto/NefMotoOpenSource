@@ -94,5 +94,5 @@ namespace ECUFlasher
                 FailedToStartConnectingEvent();
             }
         }
-    }    
+    }
 }

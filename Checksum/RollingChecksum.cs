@@ -44,7 +44,7 @@ namespace Checksum
 		{
 			mUseChaining = true;
 			mInitAddressRange = new AddressRange(startAddress, numBytes);
-		}		
+		}
 
 		public void AddAddressRange(IEnumerable<AddressRange> addressRanges, uint checksumAddress)
 		{
@@ -55,7 +55,7 @@ namespace Checksum
 		public override bool LoadChecksum()
 		{
 			bool result = true;
-			
+
 			mRangeChecksums.Clear();
 
 			if ((mMemory != null) && (mMemory.Size > 0))
@@ -65,7 +65,7 @@ namespace Checksum
 					uint checksum;
 					result &= mMemory.ReadRawIntValueByType(out checksum, DataUtils.DataType.UInt32, checksumAddress);
 					mRangeChecksums.Add(~checksum);//checksums are stored inverted
-				}				
+				}
 			}
 
 			return result;
@@ -73,10 +73,10 @@ namespace Checksum
 		public override bool UpdateChecksum(bool outputMessage)
 		{
 			bool result = true;
-			
+
 			mRangeChecksums.Clear();
 
-			uint calculatedChecksum = 0xFFFFFFFF;			
+			uint calculatedChecksum = 0xFFFFFFFF;
 
 			if (mUseChaining)
 			{
@@ -92,10 +92,10 @@ namespace Checksum
 
 				foreach (var range in ranges)
 				{
-					result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);									
+					result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);
 				}
 
-				mRangeChecksums.Add(calculatedChecksum);	
+				mRangeChecksums.Add(calculatedChecksum);
 
 				if (!result)
 				{
@@ -130,19 +130,19 @@ namespace Checksum
 				if (!mUseChaining)
 				{
 					calculatedChecksum = 0xFFFFFFFF;
-				}				
+				}
 
 				foreach (var range in ranges)
 				{
-					result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);					
+					result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);
 				}
-				
+
 				if (!result || (calculatedChecksum != checksumIter.Current))
 				{
 					return false;
-				}				
+				}
 			}
-			
+
 			return result;
 		}
 		public override bool CommitChecksum()
@@ -164,13 +164,13 @@ namespace Checksum
 				{
 					checksumIter.MoveNext();
 
-					uint checksum = ~checksumIter.Current;//checksums are stored inverted						
-					result &= mMemory.WriteRawIntValueByType(checksum, DataUtils.DataType.UInt32, checksumAddress);					
+					uint checksum = ~checksumIter.Current;//checksums are stored inverted
+					result &= mMemory.WriteRawIntValueByType(checksum, DataUtils.DataType.UInt32, checksumAddress);
 				}
 			}
 
 			return result;
-		}		
+		}
 
 		private uint mSeedAddress;
 

@@ -28,7 +28,7 @@ namespace Shared
 	public enum StatusMessageType
 	{
 		USER,
-		LOG, 
+		LOG,
         DEV,
 		DEV_USER
 	};

@@ -61,7 +61,7 @@ namespace ECUFlasher
 
 		internal string GetApplicationName()
 		{
-			string appName = ECUFlasher.Properties.Resources.ApplicationName + " " + Assembly.GetExecutingAssembly().GetName().Version.ToString();			
+			string appName = ECUFlasher.Properties.Resources.ApplicationName + " " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
 #if DEBUG
 			appName = "DEBUG " + appName + " DEBUG";
 #endif
@@ -95,7 +95,7 @@ namespace ECUFlasher
                 mFTDILibrary = new FTDI(delegate(string message) { this.DisplayStatusMessage("FTDI Error: " + message, StatusMessageType.USER); },
                                         delegate(string message) { this.DisplayStatusMessage("FTDI Warning: " + message, StatusMessageType.LOG); });
 
-                FTDIDevices = new ObservableCollection<FTDIDeviceInfo>();                
+                FTDIDevices = new ObservableCollection<FTDIDeviceInfo>();
 
                 //get the last used device
                 SelectedDeviceInfo = ECUFlasher.Properties.Settings.Default.FTDIUSBDevice;
@@ -116,10 +116,10 @@ namespace ECUFlasher
             {
                 DisplayStatusMessage("Exception thrown while opening application: " + e.ToString(), StatusMessageType.LOG);
             }
-            
+
             InitializeComponent();
         }
-                
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -240,7 +240,7 @@ namespace ECUFlasher
                     mStatusTextBuilder.AppendLine(message);
                     OnPropertyChanged(new PropertyChangedEventArgs("StatusText"));
                 }
-            }            
+            }
         }
 
         public string StatusText
@@ -350,8 +350,8 @@ namespace ECUFlasher
         {
             if (message != null)
             {
-#if DEBUG      
-                Debug.Print(message); 
+#if DEBUG
+                Debug.Print(message);
 #else
                 if ((messageType != StatusMessageType.DEV) && (messageType != StatusMessageType.DEV_USER))
 #endif
@@ -373,10 +373,10 @@ namespace ECUFlasher
                     }
 
                     DisplayApplicationStatusMessage(message, messageType);
-                }     
+                }
             }
         }
-        
+
         private void CreateLogFile()
         {
             try
@@ -400,7 +400,7 @@ namespace ECUFlasher
                         TruncateLogFile();
                     }
                 }
-                
+
             }
             catch
             {
@@ -461,8 +461,8 @@ namespace ECUFlasher
 
 				timer.Stop();
             }
-        }		
-		        
+        }
+
         public bool OperationInProgress
         {
             get { return _OperationInProgress; }
@@ -536,7 +536,7 @@ namespace ECUFlasher
         private float mPercentComplete;
 
         #region OpenLogFileCommand
-        public ReactiveCommand OpenLogFileCommand 
+        public ReactiveCommand OpenLogFileCommand
         {
             get
             {
@@ -548,13 +548,13 @@ namespace ECUFlasher
                 }
 
                 return _OpenLogFileCommand;
-            }            
+            }
         }
         private ReactiveCommand _OpenLogFileCommand;
         #endregion
 
         #region OpenLogFileLocationCommand
-        public ReactiveCommand OpenLogFileLocationCommand 
+        public ReactiveCommand OpenLogFileLocationCommand
         {
             get
             {
@@ -594,7 +594,7 @@ namespace ECUFlasher
             lock (mLogFileName)
             {
                 File.Delete(mLogFileName);
-                mLogFileSize = 0;                
+                mLogFileSize = 0;
             }
         }
         #endregion
@@ -672,7 +672,7 @@ namespace ECUFlasher
         #endregion
 
         #region RefreshDevicesCommand
-        public ReactiveCommand RefreshDevicesCommand 
+        public ReactiveCommand RefreshDevicesCommand
         {
             get
             {
@@ -701,7 +701,7 @@ namespace ECUFlasher
             }
         }
         private ReactiveCommand _RefreshDevicesCommand;
-        
+
         private void OnRefreshDevices()
         {
             RefreshDevices();
@@ -754,7 +754,7 @@ namespace ECUFlasher
         private ReactiveCommand _SaveDeviceInfoCommand;
 
         private void OnSaveDeviceInfo()
-        {          
+        {
             string deviceSaveLocation = ECUFlasher.Properties.Settings.Default.SaveDeviceInfoLocation;
 
             if (string.IsNullOrEmpty(deviceSaveLocation))
@@ -792,8 +792,8 @@ namespace ECUFlasher
                 {
 					DisplayStatusMessage("Encountered exception while saving device info to file: " + e.Message, StatusMessageType.USER);
                     successfullySavedInfo = false;
-                }                
-                
+                }
+
                 if (!String.IsNullOrEmpty(dialog.FileName))
                 {
                     DirectoryInfo dirInfo = Directory.GetParent(dialog.FileName);
@@ -897,7 +897,7 @@ namespace ECUFlasher
                     {
                         CommInterface.SelectedDeviceInfo = _SelectedDeviceInfo;
                     }
-                    
+
                     string error = null;
 
                     if (_SelectedDeviceInfo == null)
@@ -938,7 +938,7 @@ namespace ECUFlasher
                 if ((CommInterfaceViewModel == null) || (CommInterfaceViewModel.CommInterface == null) || (CommInterfaceViewModel.CommInterface.CurrentProtocol != value))
                 {
                     CommunicationInterface_ViewModel newViewModel = null;
-                                        
+
                     switch (value)
                     {
                         case CommunicationInterface.Protocol.KWP2000:
@@ -960,7 +960,7 @@ namespace ECUFlasher
                     if (CommInterface != null)
                     {
                         CommInterface.SelectedDeviceInfo = SelectedDeviceInfo;
-                        CommInterfaceViewModel.FailedToStartConnectingEvent += OnFailedToStartConnecting;                        
+                        CommInterfaceViewModel.FailedToStartConnectingEvent += OnFailedToStartConnecting;
                     }
 
                     OnPropertyChanged(new PropertyChangedEventArgs("DesiredProtocol"));
@@ -1005,7 +1005,7 @@ namespace ECUFlasher
             //if we failed to connect, then maybe the FTDI device isn't valid
             RefreshDevices();
         }
-                
+
         private void PreventSleepMode()
         {
             DisplayStatusMessage("Disabling Windows sleep mode.", StatusMessageType.LOG);
@@ -1072,6 +1072,6 @@ namespace ECUFlasher
         }
 
         private FTDI mFTDILibrary;
-        public ObservableCollection<FTDIDeviceInfo> FTDIDevices { get; private set; }        
+        public ObservableCollection<FTDIDeviceInfo> FTDIDevices { get; private set; }
     }
 }

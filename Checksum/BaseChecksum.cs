@@ -70,11 +70,11 @@ namespace Checksum
 				result = true;
 
 				for (uint addr = startAddr; addr < startAddr + numBytes; addr += DataUtils.GetDataTypeSize(readingType))
-				{			
+				{
 					uint temp = 0;
 
 					result &= mMemory.ReadRawIntValueByType(out temp, readingType, addr);
-					
+
 					checksum += temp;
 				}
 			}
@@ -84,23 +84,23 @@ namespace Checksum
 
 		protected bool CalculateRollingChecksumForRange(uint startAddr, uint numBytes, uint seedAddr, ref uint checksum)
 		{
-			bool result = false;			
+			bool result = false;
 
 			if ((startAddr >= 0) && (numBytes > 0) && (mMemory != null) && (numBytes < mMemory.Size) && (seedAddr < mMemory.EndAddress))
 			{
 				result = true;
 
 				for (uint index = startAddr; index < startAddr + numBytes; index++)
-				{	
+				{
 					uint currentByte = 0;
 					result &= mMemory.ReadRawIntValueByType(out currentByte, DataUtils.DataType.UInt8, index);
-					
+
 					uint seed = 0;
 					result &= mMemory.ReadRawIntValueByType(out seed, DataUtils.DataType.UInt32, seedAddr + ((currentByte ^ (checksum & 0xFF)) << 2));
-					
-					checksum >>= 8;			
-					checksum ^= seed;			
-				}				
+
+					checksum >>= 8;
+					checksum ^= seed;
+				}
 			}
 
 			return result;

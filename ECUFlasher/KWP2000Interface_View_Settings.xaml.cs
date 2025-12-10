@@ -46,5 +46,5 @@ namespace ECUFlasher
         {
             InitializeComponent();
         }
-    }        
+    }
 }

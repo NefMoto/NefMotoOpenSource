@@ -172,8 +172,8 @@ namespace Communication
 	//}
 
     public enum KWP2000ConnectionMethod : uint
-    {        
-        SlowInit = 0,     
+    {
+        SlowInit = 0,
         FastInit
     };
 
@@ -322,7 +322,7 @@ UnknownEDC15ResponseCode = 0x13,
 		[Description("ECU Identification Data Table")]
         ECUIdentificationDataTable = 0x80,//supported//gets a table containing identification options 82 to BF
 		[Description("ECU Identification Scaling Table")]
-        ECUIdentificationScalingTable = 0x81,//supported		
+        ECUIdentificationScalingTable = 0x81,//supported
         vehicleManufacturerSpecific = 0x86,//not supported//Extended ECU identification number, serial number? SCA insertion requires this field
 		[Description("Vehicle Manufacturer Spare Part Number")]
         vehicleManufacturerSparePartNumber = 0x87,
@@ -335,7 +335,7 @@ UnknownEDC15ResponseCode = 0x13,
 		[Description("ECU Manufacturing Date")]
         ECUManufacturingDate = 0x8B,
 		[Description("ECU Serial Number")]
-        ECUSerialNumber = 0x8C,		
+        ECUSerialNumber = 0x8C,
         systemSupplierSpecific1 = 0x8D,
         systemSupplierSpecific2 = 0x8E,
         systemSupplierSpecific3 = 0x8F,

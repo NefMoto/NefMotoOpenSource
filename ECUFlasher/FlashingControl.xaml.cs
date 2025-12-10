@@ -57,15 +57,15 @@ namespace ECUFlasher
 		{
 			FlashMemoryImage = new MemoryImage();
 			FlashMemoryLayout = null;
-			
+
 			IsFlashFileOK = false;
 			IsMemoryLayoutOK = false;
-			
+
 			FileNameToFlash = "";
 			MemoryLayoutFileName = "";
 
 			InitializeComponent();
-			
+
 			MemoryLayoutFileName = Properties.Settings.Default.MemoryLayoutFile;
 			FileNameToFlash = Properties.Settings.Default.FlashFile;
 		}
@@ -87,7 +87,7 @@ namespace ECUFlasher
 				else if ((flashLayout != null) && (flashLayout.Validate()) && (flashImage.Size != flashLayout.EndAddress - flashLayout.BaseAddress))
 				{
 					error = "File to flash size does not match memory layout size";
-				}				
+				}
 			}
 			else
 			{
@@ -152,7 +152,7 @@ namespace ECUFlasher
 			}
 		}
 		private string mFileNameToFlash;
-		
+
 		private void LoadMemoryLayoutFile()
 		{
 			if (FlashMemoryLayout != null)
@@ -230,7 +230,7 @@ namespace ECUFlasher
 				OnPropertyChanged(new PropertyChangedEventArgs("IsFlashFileOK"));
 			}
 		}
-		private bool mIsFlashFileOK;        
+		private bool mIsFlashFileOK;
 
 		public bool IsMemoryLayoutOK
 		{
@@ -293,7 +293,7 @@ namespace ECUFlasher
 			if (!String.IsNullOrEmpty(FileNameToFlash))
 			{
 				DirectoryInfo dirInfo = Directory.GetParent(FileNameToFlash);
-				
+
 				if(dirInfo != null)
 				{
 					dialog.InitialDirectory = dirInfo.FullName;
@@ -376,7 +376,7 @@ namespace ECUFlasher
 
 			if (dialog.ShowDialog() == true)
 			{
-				MemoryLayoutFileName = dialog.FileName;                
+				MemoryLayoutFileName = dialog.FileName;
 			}
 		}
 
@@ -464,7 +464,7 @@ namespace ECUFlasher
 							reasonsDisabled.Add("Specified flash file is not correct");
 							result = false;
 						}
-						
+
 						return result;
 					};
 				}
@@ -490,7 +490,7 @@ namespace ECUFlasher
 		private void OnVerifyChecksumsCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				App.PercentOperationComplete = 100.0f;
 				App.OperationInProgress = false;
@@ -635,7 +635,7 @@ namespace ECUFlasher
 		private void OnCheckIfFlashMatches()
 		{
 			//done to trigger a reload of the memory layout and flash files and cause them to revalidate
-			FileNameToFlash = FileNameToFlash;            
+			FileNameToFlash = FileNameToFlash;
 			MemoryLayoutFileName = MemoryLayoutFileName;
 
 			if (CheckIfFlashMatchesCommand.IsEnabled)
@@ -644,7 +644,7 @@ namespace ECUFlasher
 				confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
 				confirmationMessage += "\n2) The engine is not running.";
 				confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
-				
+
 				if (App.DisplayUserPrompt("Confirm Check if Flash Matches", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
 				{
 					CheckIfFlashMatches();
@@ -682,7 +682,7 @@ namespace ECUFlasher
 		}
 		private ReactiveCommand _WriteEntireFlashCommand;
 
-			
+
 		private bool CanExecuteWriteEntireFlashCommand(List<string> reasonsDisabled)
 		{
 			if (App == null)
@@ -740,7 +740,7 @@ namespace ECUFlasher
 				confirmationMessage += "\n4) It is OK the ECU adaptation channels will be reset to defaults";
 				confirmationMessage += "\n5) Flashing process can run uninterrupted until complete.";
 				confirmationMessage += "\n6) You agree to release Nefarious Motorsports Inc from all liability.";
-				confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent writing the flash memory.";                
+				confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent writing the flash memory.";
 				confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
 
 				if (App.DisplayUserPrompt("Confirm Full Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
@@ -849,11 +849,11 @@ namespace ECUFlasher
                 }
             }
         }
-        
+
         private void OnWriteFlashCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				var writeOperation = (WriteExternalFlashOperation)operation;
 
@@ -864,7 +864,7 @@ namespace ECUFlasher
 					var flashingTime = operation.OperationElapsedTime;
 					statusMessage += "\nFlashing time was " + flashingTime.Hours.ToString("D2") + ":" + flashingTime.Minutes.ToString("D2") + ":" + flashingTime.Seconds.ToString("D2") + ".";
 				}
-			
+
 				App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
 
 				App.PercentOperationComplete = 100.0f;
@@ -943,7 +943,7 @@ namespace ECUFlasher
 
 		private void OnReadEntireFlash()
 		{
-			//done to trigger a reload of the memory layout and cause it to revalidate            
+			//done to trigger a reload of the memory layout and cause it to revalidate
 			MemoryLayoutFileName = MemoryLayoutFileName;
 
 			if (ReadEntireFlashCommand.IsEnabled)
@@ -958,16 +958,16 @@ namespace ECUFlasher
 				{
 					App.OperationInProgress = true;
 					App.PercentOperationComplete = 0.0f;
-					
+
 					OnReadExternalFlashStarted(false, false, false, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted);
 				}
 			}
-		}		
+		}
 
 		private void OnReadFlashCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				var readFlashOperation = operation as ReadExternalFlashOperation;
 
@@ -1073,7 +1073,7 @@ namespace ECUFlasher
 		private void CheckIfFlashMatchesOperationCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				var matchOperation = (DoesFlashChecksumMatchOperation)operation;
 
@@ -1129,7 +1129,7 @@ namespace ECUFlasher
 			App.CurrentOperation = new WriteExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
 			App.CurrentOperation.CompletedOperationEvent += onOperationComplete;
 
-			App.OperationInProgress = true;                
+			App.OperationInProgress = true;
 			App.PercentOperationComplete = 0.0f;
 
 			App.DisplayStatusMessage("Writing ECU flash memory.", StatusMessageType.USER);
@@ -1144,7 +1144,7 @@ namespace ECUFlasher
 			string statusMesage = "";
 
 			if (success)
-			{				
+			{
 				int numSectors = writeOperation.NumSectors;
 				int numSuccessfullyFlashedSectors = writeOperation.NumSuccessfullyFlashedSectors;
 
@@ -1179,7 +1179,7 @@ namespace ECUFlasher
 					readImage[x] = 0xFF;
 				}
 			}
-			
+
 			var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(readImage, flashLayout);
 
 			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
@@ -1194,7 +1194,7 @@ namespace ECUFlasher
 
 			App.CurrentOperation = new ReadExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
 			App.CurrentOperation.CompletedOperationEvent += operationCompletedDel;
-			
+
 			App.DisplayStatusMessage("Reading ECU flash memory.", StatusMessageType.USER);
 
 			App.CurrentOperation.Start();
@@ -1202,7 +1202,7 @@ namespace ECUFlasher
 
 		private bool OnReadExternalFlashCompleted(Operation operation, bool success, out MemoryImage readMemory)
 		{
-			readMemory = null;            
+			readMemory = null;
 
 			if (success)
 			{
@@ -1215,14 +1215,14 @@ namespace ECUFlasher
 					readSectorData.Add(sector.RawData);
 				}
 
-				if (!MemoryUtils.CombineMemorySectorsIntoImage(readSectorData, FlashMemoryLayout, out readMemory))                
+				if (!MemoryUtils.CombineMemorySectorsIntoImage(readSectorData, FlashMemoryLayout, out readMemory))
 				{
 					App.DisplayStatusMessage("Failed to combine memory sectors into one memory image", StatusMessageType.USER);
 					success = false;
 				}
 			}
 
-			return success; 
+			return success;
 		}
 
 		public MemoryImage FlashMemoryImage

@@ -118,7 +118,7 @@ namespace ECUFlasher
 				try
 				{
 					using (var fileStream = new FileStream(actualFileName, FileMode.Create, FileAccess.Write))
-					{						
+					{
 						var dtcsFile = new DTCsFile();
 
 						foreach(var dtc in ECUDTCs)
@@ -295,7 +295,7 @@ namespace ECUFlasher
 			string confirmationMessage = "Are you sure you want to clear diagnostic information?";
 			confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
 
-			if(App.DisplayUserPrompt("Confirm Clear Diagnostic Information", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)			
+			if(App.DisplayUserPrompt("Confirm Clear Diagnostic Information", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
 			{
 				ClearDiagnosticInformation();
 			}
@@ -476,7 +476,7 @@ namespace ECUFlasher
 			{
 				if (_AvailableReadInfoSessionTypes == null)
 				{
-					_AvailableReadInfoSessionTypes = new ReadOnlyCollection<KWP2000DiagnosticSessionType>( new List<KWP2000DiagnosticSessionType>() 
+					_AvailableReadInfoSessionTypes = new ReadOnlyCollection<KWP2000DiagnosticSessionType>( new List<KWP2000DiagnosticSessionType>()
 						{ KWP2000DiagnosticSessionType.StandardSession, KWP2000DiagnosticSessionType.ProgrammingSession } );
 				}
 
@@ -575,7 +575,7 @@ namespace ECUFlasher
 			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
 
 			App.CurrentOperation = new ReadAllECUIdentificationOptionsOperation(App.CommInterface as KWP2000Interface, KWP2000CommViewModel.DesiredBaudRates, sessionType);
-			App.CurrentOperation.CompletedOperationEvent += this.ReadAllECUIdentificationInfoCompleted;			
+			App.CurrentOperation.CompletedOperationEvent += this.ReadAllECUIdentificationInfoCompleted;
 
 			App.CurrentOperation.Start();
 		}
@@ -583,7 +583,7 @@ namespace ECUFlasher
 		private void ReadAllECUIdentificationInfoCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				operation.CompletedOperationEvent -= this.ReadAllECUIdentificationInfoCompleted;
 
@@ -658,7 +658,7 @@ namespace ECUFlasher
 			else
 			{
 				App.DisplayStatusMessage("No ECU info read.", StatusMessageType.USER);
-			}			
+			}
 		}
 
 		private void ReadAllDTCs()
@@ -671,23 +671,23 @@ namespace ECUFlasher
 			ECUDTCs.Clear();
 
 			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
-			
+
 			App.CurrentOperation = new ReadDiagnosticTroubleCodesOperation(App.CommInterface as KWP2000Interface, KWP2000CommViewModel.DesiredBaudRates);
 			App.CurrentOperation.CompletedOperationEvent += this.ReadAllDTCsCompleted;
-			
+
 			App.CurrentOperation.Start();
 		}
 
 		private void ReadAllDTCsCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				operation.CompletedOperationEvent -= this.ReadAllDTCsCompleted;
 
 				if (success)
 				{
-					var readDTCOperation = operation as ReadDiagnosticTroubleCodesOperation;				
+					var readDTCOperation = operation as ReadDiagnosticTroubleCodesOperation;
 
 					App.DisplayStatusMessage("Read " + readDTCOperation.DTCsRead.Count() + " of " + readDTCOperation.ExpectedNumDTCs + " DTCs.", StatusMessageType.USER);
 
@@ -753,7 +753,7 @@ namespace ECUFlasher
 		private void ClearDiagnosticInformationCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				if (success)
 				{

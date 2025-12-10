@@ -31,8 +31,8 @@ namespace Shared
         public event PercentCompleteDelegate PercentCompletedEvent;
 
         public Operation()
-        {   
-            IsRunning = false;         
+        {
+            IsRunning = false;
         }
 
         public void Start()
@@ -63,7 +63,7 @@ namespace Shared
         {
             if (IsRunning)
             {
-                OperationCompleted(false);                
+                OperationCompleted(false);
             }
         }
 
@@ -117,7 +117,7 @@ namespace Shared
                 }
             }
         }
-        
+
         private DateTime mOperationStartTime;
         private DateTime mOperationEndTime;
     };

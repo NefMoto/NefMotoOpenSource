@@ -30,19 +30,19 @@ namespace Shared
 	{
 		public enum DataType
 		{
-            [Description("Int8")] 
+            [Description("Int8")]
 			Int8,
-            [Description("UInt8")] 
+            [Description("UInt8")]
 			UInt8,
-            [Description("Int16")] 
+            [Description("Int16")]
 			Int16,
-            [Description("UInt16")] 
+            [Description("UInt16")]
 			UInt16,
-            [Description("Int32")] 
+            [Description("Int32")]
 			Int32,
-            [Description("UInt32")] 
+            [Description("UInt32")]
 			UInt32,
-            [Description("Undefined")] 
+            [Description("Undefined")]
 			Undefined
 		};
 
@@ -80,7 +80,7 @@ namespace Shared
 			float result = value + offset;
             return result < min ? min : result > max ? max : result;
         }
-    
+
 
 		//TODO: could probably replace read/write raw value functions with the BitConverter class, except BitConverter doesn't support UInt8
 

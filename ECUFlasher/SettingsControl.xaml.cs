@@ -236,6 +236,6 @@ namespace ECUFlasher
                 }
             }
         }
-        private long _DefaultP4TesterInterByteTimeMinMS;        
+        private long _DefaultP4TesterInterByteTimeMinMS;
     }
 }

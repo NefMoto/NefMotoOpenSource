@@ -28,7 +28,7 @@ using System.IO;
 using Shared;
 
 namespace ECUFlasher
-{    
+{
     class ME7LoggerMeasurmentEntry
     {
         public string VariableID;
@@ -53,7 +53,7 @@ namespace ECUFlasher
     {
 		public static readonly string FILE_TYPE = "ME7Logger ECU Definition";
         public static readonly string FILE_EXT = ".ecu";
-		public static readonly string FILE_FILTER = FILE_TYPE + " (*" + FILE_EXT + ")|*" + FILE_EXT;        
+		public static readonly string FILE_FILTER = FILE_TYPE + " (*" + FILE_EXT + ")|*" + FILE_EXT;
 
         public string Version { get; private set; }
         public Dictionary<string, string> Identification { get; private set; }
@@ -159,7 +159,7 @@ namespace ECUFlasher
 
                 result = false;
             }
-            
+
             return result;
         }
 
@@ -402,7 +402,7 @@ namespace ECUFlasher
                 if (measurementTokens.ContainsKey("VariableID"))
                 {
                     entry.VariableID = measurementTokens["VariableID"];
-                }                
+                }
 
                 if (measurementTokens.ContainsKey("Name"))
                 {

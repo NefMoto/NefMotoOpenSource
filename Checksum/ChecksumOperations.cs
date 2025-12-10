@@ -67,7 +67,7 @@ namespace Checksum
 					}
 				}
 				else
-				{					
+				{
 					result = false;
 				}
 
@@ -79,8 +79,8 @@ namespace Checksum
 				else
 				{
 					result = false;
-				}				
-				
+				}
+
 				IEnumerable<Checksum.MultipointChecksum> detectedMultiPointChecksums;
 				if (Checksum.ChecksumDetection.DetectMultiPointChecksums(imageToCheck, out baseAddress, out detectedMultiPointChecksums))
 				{
@@ -95,8 +95,8 @@ namespace Checksum
 			return result;
 		}
 
-		protected byte[] ImageToCheck { get; private set; }        
-	}   
+		protected byte[] ImageToCheck { get; private set; }
+	}
 
 	public class ValidateChecksumsOperation : ChecksumOperation
 	{

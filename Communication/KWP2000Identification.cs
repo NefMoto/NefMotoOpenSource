@@ -149,7 +149,7 @@ namespace Communication
 							unsignedNumber |= data[x + offset];
 						}
 
-						int numDigits = NumScalingBytes * 2;									
+						int numDigits = NumScalingBytes * 2;
 						valueString = "0x" + unsignedNumber.ToString("X" + numDigits);
 
 						break;
@@ -252,7 +252,7 @@ namespace Communication
 						//according to ANSI/IEEE Std 754 - 1985 standard
 
 						Debug.Assert((NumScalingBytes == 4) || (NumScalingBytes == 8));
-									
+
 						if(NumScalingBytes == 4)
 						{
 							var value = BitConverter.ToSingle(data, offset);
@@ -334,7 +334,7 @@ namespace Communication
 	public class KWP2000ScalingTableRecord
 	{
 		public KWP2000ScalingTableRecord()
-		{			
+		{
 		}
 
 		public KWP2000ScalingTableRecord(byte[] recordData)
@@ -342,7 +342,7 @@ namespace Communication
 			RecordData = recordData;
 		}
 
-		public byte[] RecordData 
+		public byte[] RecordData
 		{
 			get
 			{
@@ -460,7 +460,7 @@ namespace Communication
 
 			return result;
 		}
-				
+
 		private enum State
 		{
 			Offset,
@@ -484,7 +484,7 @@ namespace Communication
 			{
 				return _ScalingTableData;
 			}
-			
+
 			set
 			{
 				if (_ScalingTableData != value)
@@ -575,7 +575,7 @@ namespace Communication
 						{
 							var recordData = new byte[sizeOfRecord];
 							Buffer.BlockCopy(tableData, indexOfOffset, recordData, 0, sizeOfRecord);
-							
+
 							var record = new KWP2000ScalingTableRecord(recordData);
 							records.Add(record);
 						}
@@ -631,7 +631,7 @@ namespace Communication
 		public bool GetIdentificationOptionValue(byte identOption, out KWP2000IdentificationOptionValue optionValue)
 		{
 			optionValue = null;
-			
+
 			KWP2000ScalingTableRecord scalingRecord;
 			if (ScalingTable.GetScalingRecordForIdentificationOption(identOption, out scalingRecord))
 			{
@@ -647,7 +647,7 @@ namespace Communication
 	public class KWP2000IdentificationOptionValue
 	{
 		public byte[] ValueData { get; set; }
-		public byte[] ScalingData 
+		public byte[] ScalingData
 		{
 			get
 			{

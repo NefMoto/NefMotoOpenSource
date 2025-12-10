@@ -31,7 +31,7 @@ namespace ECUFlasher
     public class IsConnectionOpenConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {            
+        {
             CommunicationInterface.ConnectionStatusType connectionStatus = (CommunicationInterface.ConnectionStatusType)value;
             bool unsetIfTrue = ((parameter != null) && (parameter is string) && ((string)parameter == "UnsetIfTrue"));
 
@@ -58,7 +58,7 @@ namespace ECUFlasher
     public class IsConnectionNotOpenConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {            
+        {
             CommunicationInterface.ConnectionStatusType connectionStatus = (CommunicationInterface.ConnectionStatusType)value;
             bool unsetIfTrue = ((parameter != null) && (parameter is string) && ((string)parameter == "UnsetIfTrue"));
 

@@ -37,7 +37,7 @@ namespace Shared
 
 		public MemoryLayout()
 			: this(0, 0, new List<uint>())
-		{				
+		{
 		}
 
 		public MemoryLayout(uint baseAddress, uint size, List<uint> sectorSizes)
@@ -95,7 +95,7 @@ namespace Shared
                 return BaseAddress + Size;
 			}
 		}
-		
+
 		private bool ValidateSectorSizes()
 		{
 			string error = null;
@@ -146,7 +146,7 @@ namespace Shared
 			return isValid;
 		}
 
-		public string Error 
+		public string Error
 		{
 			get
 			{
@@ -166,10 +166,10 @@ namespace Shared
 			}
 		}
 
-		public string this[string columnName] 
+		public string this[string columnName]
 		{
 			get
-			{				
+			{
 				string error = null;
 
 				if (mPropertyErrors.ContainsKey(columnName))
@@ -190,7 +190,7 @@ namespace Shared
 		}
 
         public List<uint> SectorSizes { get; set; }
-        
+
 		[NonSerialized]
 		private Dictionary<string, string> mPropertyErrors;
 	}
@@ -272,7 +272,7 @@ namespace Shared
             if ((stream != null) && (stream.Length > 0))
             {
                 var rawData = new byte[stream.Length];
-                                
+
                 int readLength = stream.Read(rawData, 0, (int)stream.Length);
 
                 if (readLength == stream.Length)

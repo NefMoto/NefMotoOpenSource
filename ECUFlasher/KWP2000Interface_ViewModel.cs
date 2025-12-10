@@ -162,7 +162,7 @@ namespace ECUFlasher
 		private uint _DesiredBaudRate;
 
 		public List<uint> DesiredBaudRates { get; private set; }
-		
+
         public ConnectionMethod DesiredConnectionMethod
         {
             get { return _DesiredConnectionMethod; }

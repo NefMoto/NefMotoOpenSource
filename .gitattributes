@@ -1,0 +1,70 @@
+# Set default behavior to automatically normalize line endings.
+* text=auto
+
+# Explicitly declare text files you want to always be normalized and converted
+# to native line endings on checkout.
+*.cs text diff=csharp
+*.csproj text
+*.sln text
+*.xaml text
+*.xaml.cs text
+*.xml text
+*.config text
+*.json text
+*.md text
+*.txt text
+*.rtf text
+*.wxs text
+*.wixproj text
+*.ini text
+*.py text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sh text eol=lf
+
+# Denote all files that are truly binary and should not be modified.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.bin binary
+*.a binary
+*.lib binary
+*.obj binary
+*.pdb binary
+*.zip binary
+*.7z binary
+*.gz binary
+*.tar binary
+*.rar binary
+*.jar binary
+*.war binary
+*.ear binary
+*.class binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+# Assembly files
+*.a66 binary
+*.equ binary
+
+# Driver and firmware binary files
+**/Drivers/*.bin binary
+**/Minimon/*.bin binary
+**/Resources/*.bin binary

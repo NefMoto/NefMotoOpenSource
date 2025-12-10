@@ -26,7 +26,7 @@ using System.Text;
 
 namespace Checksum
 {
-    [Serializable]	
+    [Serializable]
     public class ChecksumLayout : IDataErrorInfo
     {
         public ChecksumLayout()
@@ -66,7 +66,7 @@ namespace Checksum
             this["RollingChecksumSeedAddress"] = (RollingChecksumSeedAddress % 2 != 0) ? "RollingChecksumSeedAddress must be an even number" : null;
             this["RollingChecksumBlocksStartAddress"] = (RollingChecksumBlocksStartAddress % 2 != 0) ? "RollingChecksumBlocksStartAddress must be an even number" : null;
             this["RollingChecksumAddressRanges"] = (RollingChecksumAddressRanges.Count > 0) ? "RollingChecksumAddressRanges must have at least one entry" : null;
-            
+
             return (Error == null);
         }
 
@@ -133,6 +133,6 @@ namespace Checksum
 
         public uint RollingChecksumSeedAddress { get; set; }
         public uint RollingChecksumBlocksStartAddress { get; set; }
-        public List<RollingChecksumAddressRange> RollingChecksumAddressRanges { get; set; }        
+        public List<RollingChecksumAddressRange> RollingChecksumAddressRanges { get; set; }
     }
 }

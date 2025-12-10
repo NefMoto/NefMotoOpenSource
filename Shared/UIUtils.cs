@@ -45,7 +45,7 @@ namespace Shared
 		public static string SwitchToLongExtension(string fileName, string shortExt, string longExt)
 		{
 			var convertedFileName = fileName;
-			
+
 			if (!fileName.EndsWith(longExt, StringComparison.OrdinalIgnoreCase) && fileName.EndsWith(shortExt, StringComparison.OrdinalIgnoreCase))
 			{
 				convertedFileName = fileName.Replace(shortExt, longExt);
@@ -127,7 +127,7 @@ namespace Shared
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {            
+        {
             try
             {
                 var converter = new TimeSpanConverter();
@@ -148,11 +148,11 @@ namespace Shared
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {            
+        {
             if (value != null)
             {
                 if (value is string)
-                {                    
+                {
                     var valueString = value as string;
                     return DataUtils.ReadHexString(valueString);
                 }
@@ -299,7 +299,7 @@ namespace Shared
 			foreach (var tuple in Converters)
 			{
 				result = tuple.Converter.Convert(result, tuple.TargetType, tuple.ConverterParam, culture);
-				
+
 				if (result == Binding.DoNothing)
 				{
 					// If the converter returns 'DoNothing' then the binding operation should terminate.
@@ -326,7 +326,7 @@ namespace Shared
 		{
 			Path = path;
 		}
-		
+
 		public string Path
 		{
 			get;
@@ -366,7 +366,7 @@ namespace Shared
 					var binding = new Binding(Path);
 					binding.Mode = BindingMode.OneTime;
 					binding.Converter = ValueConverterGroup;
-					
+
 					var bindingExp = binding.ProvideValue(serviceProvider) as BindingExpression;
 					defaultConverter.SourceBinding = bindingExp;
 
@@ -377,7 +377,7 @@ namespace Shared
 			return DependencyProperty.UnsetValue;
 		}
 	}
-	
+
 	public class DefaultValueFromBindingConverter : IValueConverter
 	{
 		public BindingExpression SourceBinding
@@ -540,8 +540,8 @@ namespace Shared
 			set;
 		}
 	}
-    
-    /*    
+
+    /*
     [ValueConversion(typeof(Boolean), typeof(Boolean))]
     public class BooleanNotConverter : IValueConverter
     {
@@ -673,14 +673,14 @@ namespace Shared
 
             if (collection != null)
             {
-                collection.CollectionChanged += this.CollectionChangedEventHandler;                
+                collection.CollectionChanged += this.CollectionChangedEventHandler;
             }
 
             WatchedCollections.Add(new WatchedEntry(owner, propertyName, collection));
 
             AddWatchedProperty(owner, propertyName);
         }
-               
+
         private void PropertyChangedEventHandler(object sender, PropertyChangedEventArgs e)
         {
             if ((PropertyChangedCallback != null) && !mIsInCallback)
@@ -690,7 +690,7 @@ namespace Shared
                 foreach (WatchedEntry entry in WatchedProperties)
                 {
                     if ( (sender == entry.Owner) && (entry.PropertyName == e.PropertyName) )
-                    {                        
+                    {
                         PropertyChangedCallback();
 
                         UpdateWatchedCollectionsFromPropertyChange((INotifyPropertyChanged)entry.Owner, entry.PropertyName);
@@ -788,7 +788,7 @@ namespace Shared
             : this(delegate(object param) { if (execute != null) { execute(); } }, canExecute, propertyWatcher)
         {
         }
-        
+
         public void AddWatchedProperty(INotifyPropertyChanged owner, string propertyName)
         {
             if (PropertyWatcher == null)
@@ -836,7 +836,7 @@ namespace Shared
 
                 mIsInCanExecuteMethod = false;
             }
-            
+
             return IsEnabled;
         }
         private bool mIsInCanExecuteMethod = false;
@@ -862,14 +862,14 @@ namespace Shared
             }
         }
         private ObservableCollection<string> mReasonsDisabled;
-       
+
         public event EventHandler CanExecuteChanged;
         public event PropertyChangedEventHandler PropertyChanged;
 
         public CommandExecuteDelegate ExecuteMethod;
         public CanExecuteDelegate CanExecuteMethod;
 
-        public bool IsEnabled 
+        public bool IsEnabled
         {
             get { return mIsEnabled; }
             private set
@@ -883,7 +883,7 @@ namespace Shared
         }
         private bool mIsEnabled;
 
-        public string Name 
+        public string Name
         {
             get { return mName; }
             set
@@ -897,7 +897,7 @@ namespace Shared
         }
         private string mName;
 
-        public string Description 
+        public string Description
         {
             get { return mDescription; }
             set
@@ -1361,7 +1361,7 @@ namespace Shared
         {
             if (textBox != null)
             {
-                textBox.ScrollToEnd();                
+                textBox.ScrollToEnd();
             }
         }
     }

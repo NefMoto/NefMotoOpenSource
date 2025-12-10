@@ -33,7 +33,7 @@ namespace Shared
         public abstract byte[] ConvertFrom(double val, DataUtils.DataType dataType);
 
         public abstract double ConvertTo(byte[] rawData, DataUtils.DataType dataType);
-        
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(string propertyName)
         {

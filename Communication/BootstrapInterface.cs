@@ -54,7 +54,7 @@ namespace Communication
             C_WRITE_WORD_SEQENCE	=	0x0CE,	//Write Word Sequence
             C_CALL_MEMTOOL_DRIVER	=	0x0CF,	//Call memtool driver routine
             C_AUTOBAUD		        =	0x0D0,	//Call autobaud routine
-            C_SETPROTECTION  	    =	0x0D1,	//Call security function 
+            C_SETPROTECTION  	    =	0x0D1,	//Call security function
 
             //---------------------  MiniMon Acknowledges --------------------
 
@@ -149,7 +149,7 @@ namespace Communication
                     setupStatus |= mFTDIDevice.SetFlowControl(FTDI.FT_FLOW_CONTROL.FT_FLOW_NONE, 0, 0);
                     setupStatus |= mFTDIDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
 
-                    //setupStatus |= mFTDIDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)                        
+                    //setupStatus |= mFTDIDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
                     setupStatus |= mFTDIDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
                     setupStatus |= mFTDIDevice.SetDTR(true);//enable receive for self powered devices
                     setupStatus |= mFTDIDevice.SetRTS(false);//set low to tell device we are ready to send
@@ -329,7 +329,7 @@ namespace Communication
                     DisplayStatusMessage("Failed to receive bootstrap loader started status message.", StatusMessageType.USER);
                 }
             }
-            
+
             return false;
         }
 
@@ -394,7 +394,7 @@ namespace Communication
             {
                 return false;
             }
-            
+
             byte[] miniMonProgram = {};
 
             if (!UploadMiniMonProgram(miniMonProgram))
@@ -429,7 +429,7 @@ namespace Communication
             byte[] functionFinishedAck;
             if(!ReceiveBytes(1, out functionFinishedAck))
             {
-                return false;    
+                return false;
             }
 
             result = functionFinishedAck[0];
@@ -587,7 +587,7 @@ namespace Communication
             {
                 return false;
             }
-                        
+
             if (!ReceiveBytes((uint)numBytes, out data))
             {
                 return false;
@@ -656,7 +656,7 @@ namespace Communication
             {
                 return false;
             }
-                        
+
             if (!MiniMon_WasFunctionRequestSuccessful())
             {
                 return false;
@@ -792,9 +792,9 @@ namespace Communication
                     while ((ConnectionStatus == ConnectionStatusType.Disconnected) && (mNumConnectionAttemptsRemaining > 0))
                     {
                         mNumConnectionAttemptsRemaining--;
-                        
+
                         ConnectionStatus = ConnectionStatusType.ConnectionPending;
-                        
+
                         bool connected = StartMiniMon();
 
                         if (!connected)
@@ -856,7 +856,7 @@ namespace Communication
                     }
                     else if (_ConnectionStatus == ConnectionStatusType.Disconnected)
                     {
-                        //we can reset the communication now and not wait for the next 
+                        //we can reset the communication now and not wait for the next
                         //connection attempt because we were never connected
                         shouldReset = !wasConnected;
                     }

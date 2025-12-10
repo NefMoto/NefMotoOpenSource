@@ -40,7 +40,7 @@ namespace Communication
 
 		public KWP2000Operation(KWP2000Interface commInterface)
             : base(commInterface)
-		{	
+		{
             mShouldAutoNegotiateTiming = false;
             mShouldAutoStartDiagnosticSession = false;
             mDesiredDiagnosticSessionType = (uint)KWP2000DiagnosticSessionType.InternalUndefined;
@@ -319,7 +319,7 @@ namespace Communication
             mShouldAutoNegotiateSecurity = true;
 
 			mSecuritySettings = settings;
-        }        
+        }
 
         private enum State
         {
@@ -330,7 +330,7 @@ namespace Communication
             StartDiagnosticSession,
             NegotiateTiming,
             NegotiateSecurity,
-            Finished            
+            Finished
         }
 
         protected KWP2000Interface KWP2000CommInterface
@@ -385,14 +385,14 @@ namespace Communication
                 if ((mActionArray != null) && (mCurrentActionIndex < mActionArray.Length))
                 {
                     nextAction = mActionArray[mCurrentActionIndex];
-                }                
+                }
             }
 
             return nextAction;
 		}
 
 		protected KWP2000Action[] mActionArray;
-		private int mCurrentActionIndex;		
+		private int mCurrentActionIndex;
 	}
 
 	public class ReadMemoryOperation : KWP2000SequencialOperation
@@ -434,7 +434,7 @@ namespace Communication
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
 			mActionArray = new KWP2000Action[1];
-			mActionArray[0] = new WriteMemoryAction(commInterface, startAddress, maxBlockSize, dataToWrite, null);			
+			mActionArray[0] = new WriteMemoryAction(commInterface, startAddress, maxBlockSize, dataToWrite, null);
 		}
 	};
 
@@ -444,7 +444,7 @@ namespace Communication
 		public static readonly UInt32 SERIAL_EEPROM_START_ADDR = 0x600000;
 
 		public ReadEntireSerialEEPROMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
-			: base(commInterface, baudRates, SERIAL_EEPROM_START_ADDR, SERIAL_EEPROM_SIZE, 16)			
+			: base(commInterface, baudRates, SERIAL_EEPROM_START_ADDR, SERIAL_EEPROM_SIZE, 16)
 		{
 		}
 	};
@@ -515,7 +515,7 @@ namespace Communication
 
 			base.OnActionCompleted(action, success);
 		}
-		
+
 		protected ReadMemoryAction mReadRAMAction;
 		protected ReadMemoryAction mReadSerialEEPROMAction;
 		protected WriteMemoryAction mWriteRAMAction;
@@ -525,7 +525,7 @@ namespace Communication
 	public class ReadEntireExternalRAMOperation : ReadMemoryOperation
 	{
 		public ReadEntireExternalRAMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
-			: base(commInterface, baudRates, 0x380000, 0x8000, DEFAULT_MAX_BLOCK_SIZE)			
+			: base(commInterface, baudRates, 0x380000, 0x8000, DEFAULT_MAX_BLOCK_SIZE)
 		{
 		}
 	};
@@ -548,7 +548,7 @@ namespace Communication
             const uint ADDRESS_TO_CHANGE = 0xE048;
             //why are we setting 8 bytes, shouldn't it just be 4 bytes?
 			mOriginalMemoryContents = new byte[]{ 0xF6, 0x25, 0x06, 0x02, 0xF6, 0x25, 0x06, 0x02 };
-            
+
             //TODO: validate flash start and end addresses
 
 			mActionArray = new KWP2000Action[4];
@@ -557,7 +557,7 @@ namespace Communication
 			mActionArray[1] = new WriteMemoryAction(commInterface, ADDRESS_TO_CHANGE, DEFAULT_MAX_BLOCK_SIZE, mOriginalMemoryContents, null);
             mReadFlashMemoryAction = new ReadMemoryAction(commInterface, mStartAddress, size, DEFAULT_MAX_BLOCK_SIZE, this.BytesReadHandler);
 			mActionArray[2] = mReadFlashMemoryAction;
-			mActionArray[3] = new WriteMemoryAction(commInterface, ADDRESS_TO_CHANGE, DEFAULT_MAX_BLOCK_SIZE, mOriginalMemoryContents, null);			
+			mActionArray[3] = new WriteMemoryAction(commInterface, ADDRESS_TO_CHANGE, DEFAULT_MAX_BLOCK_SIZE, mOriginalMemoryContents, null);
 		}
 
         private bool BytesReadHandler(uint numRead, uint totalRead, uint totalToRead, ReadMemoryAction runningAction)
@@ -586,8 +586,8 @@ namespace Communication
 			{
 				mExternalFlashMemory = new MemoryImage(mReadFlashMemoryAction.ReadData, mStartAddress);
 			}
-			
-			return base.OnOperationCompleted(success);			
+
+			return base.OnOperationCompleted(success);
 		}
 
 		public MemoryImage mExternalFlashMemory;
@@ -597,7 +597,7 @@ namespace Communication
 		protected UInt32 mStartAddress;
         protected PercentCompleteDelegate mPercentCompleteDel;
 	};
-    
+
     public class ReadExternalFlashOperation : KWP2000Operation
     {
 		public class ReadExternalFlashSettings
@@ -668,7 +668,7 @@ namespace Communication
         {
             get { return mFlashBlockList; }
         }
-        
+
         protected override CommunicationAction NextAction()
         {
             var nextAction = base.NextAction();
@@ -939,7 +939,7 @@ namespace Communication
 
                     if (success)
                     {
-                        var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;                        
+                        var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
 
                         if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
                         {
@@ -988,7 +988,7 @@ namespace Communication
 					}
 
 					success = validationCompleted && layoutIsValid;
-					
+
                     if (!success)
                     {
 						var promptResult = UserPromptResult.CANCEL;
@@ -1038,7 +1038,7 @@ namespace Communication
                     mState = ReadingState.CompleteFailedReadWithChecksumCalculation;
                     success = true;
                 }
-            }            
+            }
 
             mMyLastStartedAction = null;
 
@@ -1078,7 +1078,7 @@ namespace Communication
         private uint mTotalBytesValidated;
         private TransferDataAction.CompressionType mCompressionType;
         private TransferDataAction.EncryptionType mEncryptionType;
-		
+
         private bool mCurrentSectorRequiresRead;
     };
 
@@ -1108,9 +1108,9 @@ namespace Communication
 			ShouldVerifyFlashedSectors = writeSettings.VerifyWrittenData;
 
 			mTotalBytesToFlash = 0;
-			mTotalBytesValidated = 0;			
+			mTotalBytesValidated = 0;
 
-			mFlashBlockList = new List<FlashBlock>();		
+			mFlashBlockList = new List<FlashBlock>();
 
 			foreach (var image in sectorImages)
             {
@@ -1131,7 +1131,7 @@ namespace Communication
 				mTotalBytesToFlash += image.Size;
             }
 
-            mCurrentBlock = mFlashBlockList.First();			
+            mCurrentBlock = mFlashBlockList.First();
 
 			bool shouldValidateMemoryLayout = true;
 
@@ -1158,7 +1158,7 @@ namespace Communication
 
             mTotalBytesValidated = 0;
             mValidatedEraseMode = true;
-            mState = FlashingState.StartBlock;            
+            mState = FlashingState.StartBlock;
 
             foreach (var block in mFlashBlockList)
             {
@@ -1176,7 +1176,7 @@ namespace Communication
 		public bool OnlyFlashRequiredSectors { get; private set; }
 		public bool ShouldCheckIfFlashRequired { get; private set; }
 		public bool ShouldVerifyFlashedSectors { get; private set; }
-		
+
         public int NumSectors { get { return mFlashBlockList.Count; } }
         public int NumSuccessfullyFlashedSectors
         {
@@ -1398,7 +1398,7 @@ namespace Communication
 
                 mMyLastStartedAction = nextAction;
             }
-            
+
             return nextAction;
         }
 
@@ -1436,7 +1436,7 @@ namespace Communication
                             RestartFlashingProcessAndEraseEntireFlashAtOnce();
                             success = true;
                         }
-                    
+
                         mValidatedEraseMode = true;
                         Debug.Assert(mState != FlashingState.CheckIfFirstBlockAccidentallyErased);
                     }
@@ -1528,7 +1528,7 @@ namespace Communication
 							}
 							else
 							{
-								CommInterface.DisplayStatusMessage("The memory sector was NOT erased properly, will continue and attempt to write memory sector.", StatusMessageType.USER);								
+								CommInterface.DisplayStatusMessage("The memory sector was NOT erased properly, will continue and attempt to write memory sector.", StatusMessageType.USER);
 							}
 						}
 						else
@@ -1619,7 +1619,7 @@ namespace Communication
 							{
 								CommInterface.DisplayStatusMessage("A previous flash programming attempt was not completed. Transfering invalid data to force the previous incomplete operation to fail.", StatusMessageType.USER);
 
-								WasFailureCausedByPreviousIncompleteDownload = true;                            
+								WasFailureCausedByPreviousIncompleteDownload = true;
 								mState = FlashingState.TransferDataToFailTransfer;
 								success = true;
 							}
@@ -1677,11 +1677,11 @@ namespace Communication
                             if (WasFailureCausedByPreviousIncompleteDownload)
                             {
                                 CommInterface.DisplayStatusMessage("Finished causing previous flash programming attempt to fail. Retrying flash programming.", StatusMessageType.USER);
-                            
+
                                 WasFailureCausedByPreviousIncompleteDownload = false;
 
                                 //start flashing from the first incomplete block
-                                mState = FlashingState.StartBlock;                            
+                                mState = FlashingState.StartBlock;
                             }
                             else
                             {
@@ -1726,7 +1726,7 @@ namespace Communication
 							else
 							{
 								mState = FlashingState.FinishedBlock;
-								
+
 								mCurrentBlock.mFlashComplete = true;
 							}
                         }
@@ -1744,7 +1744,7 @@ namespace Communication
                         //}
                     }
                 }
-                #endregion            
+                #endregion
                 #region ValidateStartAndEndAddresses
                 else if (action is ValidateStartAndEndAddressesWithRequestUploadDownloadAction)
                 {
@@ -1854,17 +1854,17 @@ namespace Communication
                     {
                         //update the stats
                         mTotalBytesValidated += mCurrentBlock.mMemoryImage.Size;
-                        OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToFlash) * 100.0f);                        
+                        OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToFlash) * 100.0f);
 
                         if (!mEraseEntireFlashAtOnce && !mValidatedEraseMode && mCurrentBlock.mWasErased && (mCurrentBlock != mFlashBlockList.First()))
                         {
 							mState = FlashingState.CheckIfFirstBlockAccidentallyErased;
-                        }                    
+                        }
                     }
                 }
                 #endregion
             }
-            
+
             if (!success && !action.CompletedWithoutCommunicationError)
             {
                 if (HandleCommunicationErrorPrompt())
@@ -1880,7 +1880,7 @@ namespace Communication
             if(!mWaitingToReconnect)
             {
                 base.OnActionCompleted(action, success);
-            }            
+            }
 		}
 
         bool mWaitingToReconnect = false;
@@ -1895,7 +1895,7 @@ namespace Communication
                 mUserPromptedToContinueAfterCommunicationFailure = true;
 
                 UserPromptResult promptResult = CommInterface.DisplayUserPrompt("Communication Error", "A communication error was encountered while flashing. Press Cancel to abort, or OK to continue after reconnecting.", UserPromptType.OK_CANCEL);
-                
+
                 if (promptResult == UserPromptResult.OK)
                 {
                     mWaitingToReconnect = true;
@@ -1917,7 +1917,7 @@ namespace Communication
         }
 
         protected override void OnConnectionChanged(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
-        {            
+        {
             if(mWaitingToReconnect)
             {
                 if (status == CommunicationInterface.ConnectionStatusType.Connected)
@@ -1938,19 +1938,19 @@ namespace Communication
                                 CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
                             }
                         }
-                        
+
                         if(!mWaitingToReconnect)
                         {
                             OperationCompleted(success);
                         }
                     }
-                }               
+                }
             }
             else if (status == CommunicationInterface.ConnectionStatusType.Disconnected)
             {
                 HandleCommunicationErrorPrompt();
             }
-            
+
             base.OnConnectionChanged(commInterface, status, willReconnect);
 
             if (mWaitingToReconnect && (status == CommunicationInterface.ConnectionStatusType.Disconnected))
@@ -1981,7 +1981,7 @@ namespace Communication
             EraseFlash,
 			VerifyErase,
             RequestDownload,
-            TransferDataToFailTransfer,            
+            TransferDataToFailTransfer,
             TransferData,
             ExitTransfer,
             ExitPreviousFailedTransfer,
@@ -1999,7 +1999,7 @@ namespace Communication
             public int mNumFlashAttempts;
             public uint mNumBytesFlashed;
         }
-        
+
         private CommunicationAction mMyLastStartedAction;
         private FlashingState mState;
         private List<FlashBlock> mFlashBlockList;
@@ -2019,7 +2019,7 @@ namespace Communication
 	public delegate void MemoryRegionsRead(IEnumerable<TaggedMemoryImage> regionsRead);
 
 	public interface ITrackedMemoryRegionsOperation
-	{		
+	{
 		event MemoryRegionsRead RegionsRead;
 
 		void AddMemoryRegion(uint startAddress, uint numBytes, object userTag);
@@ -2047,7 +2047,7 @@ namespace Communication
                 ReferenceCount = 1;
             }
         }
-        
+
 		public SynchronizeRAMRegionsOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, bool readRegionsInBlocks)
 			: base(commInterface)
 		{
@@ -2056,7 +2056,7 @@ namespace Communication
 
 			mRegionsPendingRead = new List<SynchronizedMemoryRegion>();
 			mNewlyReadRegions = new List<SynchronizedMemoryRegion>();
-			
+
             mReadRegionsInBlocks = readRegionsInBlocks;
 			mMode = SynchronizationMode.READ;
 
@@ -2093,7 +2093,7 @@ namespace Communication
 				mSynchronizedRegions.Add(new SynchronizedMemoryRegion(numBytes, startAddress, userTag));
                 mRegionIterator = null;
                 mAreRegionsSorted = false;
-            }            
+            }
         }
 
         public void RemoveMemoryRegion(object userTag)
@@ -2118,7 +2118,7 @@ namespace Communication
             {
                 mRegionIterator = mSynchronizedRegions.GetEnumerator();
             }
-        }       
+        }
 
         public void RemoveAllMemoryRegions()
         {
@@ -2131,19 +2131,19 @@ namespace Communication
         {
             if (!mAreRegionsSorted)
             {
-                mSynchronizedRegions.Sort(delegate(SynchronizedMemoryRegion x, SynchronizedMemoryRegion y) 
-				{ 
+                mSynchronizedRegions.Sort(delegate(SynchronizedMemoryRegion x, SynchronizedMemoryRegion y)
+				{
 					if (x.StartAddress < y.StartAddress)
 					{
-						return -1; 
-					}
-					
-					if (x.StartAddress > y.StartAddress) 
-					{
-						return 1; 
+						return -1;
 					}
 
-					return 0; 
+					if (x.StartAddress > y.StartAddress)
+					{
+						return 1;
+					}
+
+					return 0;
 				});
 
                 mRegionIterator = mSynchronizedRegions.GetEnumerator();
@@ -2171,7 +2171,7 @@ namespace Communication
 			var currentTime = DateTime.Now;
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("NextAction started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("NextAction started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             var nextAction = base.NextAction();
 
@@ -2235,14 +2235,14 @@ namespace Communication
                     mReadAction.SetStartAddressAndNumBytes(addressToRead, numBytesToRead);
                     nextAction = mReadAction;
 
-                    CommInterface.DisplayStatusMessage("Reading address 0x" + addressToRead.ToString("X") + " with 0x" + numBytesToRead.ToString("X") + " bytes.", StatusMessageType.LOG);					
+                    CommInterface.DisplayStatusMessage("Reading address 0x" + addressToRead.ToString("X") + " with 0x" + numBytesToRead.ToString("X") + " bytes.", StatusMessageType.LOG);
                 }
 
                 mMyLastStartedAction = nextAction;
             }
-			
+
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("NextAction finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("NextAction finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
 			return nextAction;
 		}
@@ -2250,7 +2250,7 @@ namespace Communication
         protected override void OnActionStarted(CommunicationAction action)
 		{
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionStarted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("OnActionStarted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
 			base.OnActionStarted(action);
 
@@ -2264,10 +2264,10 @@ namespace Communication
 
 					if (regionsReadCopy != null)
 					{
-						//update newly read regions				
+						//update newly read regions
 						foreach (var curRegion in mNewlyReadRegions)
 						{
-							Buffer.BlockCopy(mLastReadMemoryImage.RawData, (int)(curRegion.StartAddress - mLastReadMemoryImage.StartAddress), curRegion.RawData, 0, (int)curRegion.Size);							
+							Buffer.BlockCopy(mLastReadMemoryImage.RawData, (int)(curRegion.StartAddress - mLastReadMemoryImage.StartAddress), curRegion.RawData, 0, (int)curRegion.Size);
 						}
 
 						regionsReadCopy(mNewlyReadRegions.Cast<TaggedMemoryImage>());
@@ -2279,14 +2279,14 @@ namespace Communication
             }
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionStarted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("OnActionStarted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
 		}
 
 		protected override void OnActionCompleted(CommunicationAction action, bool success)
 		{
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionCompleted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("OnActionCompleted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             //ignore actions not started by this code
             if (action == mMyLastStartedAction)
@@ -2331,16 +2331,16 @@ namespace Communication
                     }
                 }
             }
-            
+
             mMyLastStartedAction = null;
-			
+
 			base.OnActionCompleted(action, success);
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionCompleted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
-#endif            
-		}		
-		
+			CommInterface.DisplayStatusMessage("OnActionCompleted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
+#endif
+		}
+
 		private bool MoveToNextRegion()
 		{
             SortRegions();
@@ -2366,12 +2366,12 @@ namespace Communication
 
 		private SynchronizedMemoryRegion mCurrentRegion;
 		private List<SynchronizedMemoryRegion> mRegionsPendingRead;
-		private List<SynchronizedMemoryRegion> mNewlyReadRegions;		
+		private List<SynchronizedMemoryRegion> mNewlyReadRegions;
 
 		private ReadMemoryAction mReadAction;
 		private SynchronizationMode mMode;
         private bool mReadRegionsInBlocks;
-		
+
 		private MemoryImage mLastReadMemoryImage;
 		private DateTime mLastReadStartTime;
 
@@ -2382,7 +2382,7 @@ namespace Communication
 		{
 			READ,
 			FINISHED
-		};		
+		};
 	};
 
     public class ReadAllECUIdentificationOptionsOperation : KWP2000Operation
@@ -2500,11 +2500,11 @@ namespace Communication
 
 			base.OnActionCompleted(action, success);
 		}
-        
+
 		private enum State
 		{
 			ReadScalingTable,
-			ReadIdentificationOptions,			
+			ReadIdentificationOptions,
 			Finished
 		}
 
@@ -2548,10 +2548,10 @@ namespace Communication
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.StandardSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-            
+
             mActionArray = new KWP2000Action[1];
-            mActionArray[0] = new ClearDiagnosticInformationAction(commInterface, 0x0000);            
-        }        
+            mActionArray[0] = new ClearDiagnosticInformationAction(commInterface, 0x0000);
+        }
     };
 
     public class DoesFlashChecksumMatchOperation : KWP2000SequencialOperation
@@ -2622,7 +2622,7 @@ namespace Communication
         {
             mLastLocalIdentifier = 0xFF;
 
-            base.ResetOperation();            
+            base.ResetOperation();
         }
 
         protected override CommunicationAction NextAction()
@@ -2710,13 +2710,13 @@ namespace Communication
         private ushort mLastCommonIdentifier;
         private CommunicationAction mMyLastStartedAction;
     }
-	
+
 	public class RelocateMessageHandlingTableOperation : KWP2000Operation
-	{		
+	{
 		public RelocateMessageHandlingTableOperation(KWP2000Interface commInterface, List<uint> baudRates)
 			: base(commInterface)
 		{
-			EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);			
+			EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
 
 			mRedirectFunctionData = Communication.Properties.Resources.KWP2000RedirectionFunction;
 
@@ -2747,7 +2747,7 @@ namespace Communication
 			}
 		}
 		private bool _ShouldRelocateMessageHandlingTable;
-		
+
 		protected override CommunicationAction NextAction()
 		{
 			var nextAction = base.NextAction();
@@ -2808,7 +2808,7 @@ namespace Communication
 							nextAction = new WriteMemoryAction(KWP2000CommInterface, targetAddress, DEFAULT_MAX_BLOCK_SIZE, relocatedData, null);
 						}
 						else
-						{							
+						{
 							CommInterface.DisplayStatusMessage("Failed to write new KWP2000 message handling configuration because there is not enough empty RAM.", StatusMessageType.USER);
 							OperationCompleted(false);
 						}
@@ -2848,7 +2848,7 @@ namespace Communication
 
 			return nextAction;
 		}
-				
+
 		private byte[] GetRelocatedData(uint targetAddress)
 		{
 			Debug.Assert(targetAddress % 2 == 0);//this function assumes an even start address
@@ -2893,7 +2893,7 @@ namespace Communication
 			mNewFunctionTableAddress += (mNewFunctionTableAddress % 2);//make sure address is even
 
 			uint redirectFunctionAddress = mNewFunctionTableAddress + (uint)newFunctionTableData.Length;
-			redirectFunctionAddress += (redirectFunctionAddress % 2);//make sure address is even						
+			redirectFunctionAddress += (redirectFunctionAddress % 2);//make sure address is even
 
 			//make all entries point at the redirect function by default
 			{
@@ -2916,7 +2916,7 @@ namespace Communication
 				var originalIndexTablePointerPage = (UInt16)((mOriginalIndexTableAddress >> 14) & 0x03FF);
 
 				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x06) == 0xDEAD);
-				BitConverter.GetBytes(mCurrentServiceIDAddress).CopyTo(patchedRedirectFunctionData, 0x06);				
+				BitConverter.GetBytes(mCurrentServiceIDAddress).CopyTo(patchedRedirectFunctionData, 0x06);
 
 				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x12) == 0x03EF);
 				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x16) == 0xDEAD);
@@ -3076,8 +3076,8 @@ namespace Communication
 					{
 						//setzi62's notes:
 						//The message handler table pointer is stored at a fixed address, which only depends on the bootrom version, for 05.XX it is at 0xE228, for 06.xx it is at 0xE226.
-						//At 0xE1B2 is the pointer to the header decoding function for bootrom 05.xx And at 0xE1B0 is the pointer for bootrom version 06.xx 
-						//The header decoding function is included in the bootrom and has a fixed address for all ecus with the same bootrom version. 
+						//At 0xE1B2 is the pointer to the header decoding function for bootrom 05.xx And at 0xE1B0 is the pointer for bootrom version 06.xx
+						//The header decoding function is included in the bootrom and has a fixed address for all ecus with the same bootrom version.
 						//By reading at 0xE1B0 and 0xE1B2 I can determine the used bootrom version of the ecu.
 
 						success &= (action is ReadMemoryAction);
@@ -3103,14 +3103,14 @@ namespace Communication
 							{
 								//bootrom 06.xx
 
-								mCommunicationFlagsAddress = 0xE074;								
+								mCommunicationFlagsAddress = 0xE074;
 								mCurrentMessageNumDataBytesAddress = 0xE1C8;
 								mCurrentMessageFirstDataByteAddress = 0xE1CC;
 								mCurrentServiceIDAddress = 0xE1CE;
 								mEnabledServiceIDsTableAddress = 0xE20E;
-								mIndexAndFunctionTablePointerAddress = 0xE226;								
+								mIndexAndFunctionTablePointerAddress = 0xE226;
 							}
-							else 
+							else
 							{
 								CommInterface.DisplayStatusMessage("Unable to determine ME7 boot rom version from KWP2000 address data: 0x" + BitConverter.ToUInt32(readAction.ReadData, 0).ToString("X"), StatusMessageType.USER);
 								success = false;
@@ -3245,7 +3245,7 @@ namespace Communication
 		}
 
 		private enum RelocateState
-		{	
+		{
 			LocateHandlerIndexAndFunctionTablePointers,
 			ReadHandlerIndexAndFunctionTablePointers,
 			ReadCurrentEnabledServiceIDsTable,
@@ -3253,7 +3253,7 @@ namespace Communication
 			WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM,
 			WriteNewEnabledServiceIDsTable,
 			ChangeHandlerIndexAndFunctionTablePointers,
-			Finished			
+			Finished
 		}
 
 		protected virtual List<byte> GetRelocatedServiceIDs()
@@ -3277,7 +3277,7 @@ namespace Communication
 
 		private uint mOriginalIndexTableAddress;
 		private uint mOriginalFunctionTableAddress;
-		
+
 		protected UInt16 mCurrentServiceIDAddress;
 		protected UInt16 mCurrentMessageFirstDataByteAddress;
 		protected UInt16 mCurrentMessageNumDataBytesAddress;
@@ -3292,7 +3292,7 @@ namespace Communication
 		private uint mNewFunctionTableAddress;
 		private byte mNewFunctionTableNumEntries;
 		private byte mNewFunctionTableMaxEntries;
-		
+
 		private byte[] mRedirectFunctionData;
-	}	
+	}
 }

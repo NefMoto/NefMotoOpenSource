@@ -17,31 +17,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Contact by Email: tony@nefariousmotorsports.com
 -->
-    
+
 <ECUFlasher:BaseUserControl x:Class="ECUFlasher.ECUInfoControl"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
     xmlns:ECUFlasher="clr-namespace:ECUFlasher"
     xmlns:props="clr-namespace:ECUFlasher.Properties"
     xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
     xmlns:Communication="clr-namespace:Communication;assembly=Communication"
-    mc:Ignorable="d" 
+    mc:Ignorable="d"
     d:DesignHeight="300" d:DesignWidth="300"
     Background="{StaticResource BackgroundBrush}"
     BorderBrush="{StaticResource BackgroundBrush}"
     DataContext="{Binding RelativeSource={RelativeSource Self}}">
-    
+
     <ECUFlasher:BaseUserControl.Resources>
 
         <Style TargetType="MenuItem" BasedOn="{StaticResource ReactiveCommandMenuItemStyle}"/>
-        
+
         <Style TargetType="Button" BasedOn="{StaticResource ReactiveCommandButtonStyle}"/>
 
         <Style TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}"/>
-        
+
         <!--TODO: need to play with marging and padding to be able to see the border-->
         <Style TargetType="Border">
             <Setter Property="Padding" Value="5"/>
@@ -57,7 +57,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 <!-- Background of selected item when not focused -->
                 <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="{StaticResource HighlightColor}" />
             </Style.Resources>
-            
+
             <Setter Property="Padding" Value="5"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         </Style>
@@ -100,7 +100,7 @@ Contact by Email: tony@nefariousmotorsports.com
 
                 <!--need to pull the styled types into the data template-->
                 <Style TargetType="Border" BasedOn="{StaticResource {x:Type Border}}"/>
-                
+
                 <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                     <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
                 </Style>
@@ -114,19 +114,19 @@ Contact by Email: tony@nefariousmotorsports.com
                         <TextBlock Text="{Binding Path=IdentOption, Converter={StaticResource identOptionNameConverter}}"/>
                     </StackPanel>
                     <TextBlock Text="{Binding}"/><!--Converts via the ToString method for display-->
-                </StackPanel>                
+                </StackPanel>
             </Border>
         </DataTemplate>
 
     </ECUFlasher:BaseUserControl.Resources>
-    
-    <Grid>        
+
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="3*" MinHeight="100"/>
             <RowDefinition Height="5"/>
             <RowDefinition Height="100" MinHeight="100"/>
         </Grid.RowDefinitions>
-        
+
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -150,7 +150,7 @@ Contact by Email: tony@nefariousmotorsports.com
             </DockPanel>
 
             <GridSplitter Grid.Column="1" Width="5" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" VerticalAlignment="Stretch"/>
-            
+
             <DockPanel Grid.Column="0">
                 <WrapPanel DockPanel.Dock="Top">
                     <Label Content="Read Info Session Type:"/>
@@ -172,6 +172,6 @@ Contact by Email: tony@nefariousmotorsports.com
         <GridSplitter Grid.Row="1" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" Height="5" HorizontalAlignment="Stretch"/>
 
         <ECUFlasher:StatusWindow Grid.Row="2" DataContext="{Binding Path=App}"/>
-        
+
     </Grid>
 </ECUFlasher:BaseUserControl>

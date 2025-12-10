@@ -32,8 +32,8 @@ namespace Checksum
 	public class MultiRangeChecksum : BaseChecksum
 	{
 		public MultiRangeChecksum(uint checksumLocation)
-		{			
-			ChecksumLocation = checksumLocation;		
+		{
+			ChecksumLocation = checksumLocation;
 			mChecksum = 0;
 			mInverseChecksum = 0;
 
@@ -148,10 +148,10 @@ namespace Checksum
 
 			return result;
 		}
-		
+
 		public uint ChecksumLocation { get; set; }
-		
-		protected List<AddressRange> mAddressRanges;		
+
+		protected List<AddressRange> mAddressRanges;
 		protected uint mChecksum;
 		protected uint mInverseChecksum;
 	}

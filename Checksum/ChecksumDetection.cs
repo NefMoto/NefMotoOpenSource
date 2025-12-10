@@ -150,10 +150,10 @@ namespace Checksum
 				return -1;
 			}
 
-			detectedChecksum = new MainChecksum((MainChecksumRangesPage << 14) + MainChecksumRangesAddress, (MainChecksumValuesPage << 14) + MainChecksumValuesAddress, MainChecksumNumRanges);			
+			detectedChecksum = new MainChecksum((MainChecksumRangesPage << 14) + MainChecksumRangesAddress, (MainChecksumValuesPage << 14) + MainChecksumValuesAddress, MainChecksumNumRanges);
 
 			return mainchecksumFunctionLocationStart;
-		}		
+		}
 
 		public static bool DetectMultiPointChecksums(byte[] data, out uint baseAddress, out IEnumerable<MultipointChecksum> multiPointChecksumBlocks)
 		{
@@ -311,7 +311,7 @@ namespace Checksum
 				multipointChecksums.Add(new Checksum.MultipointChecksum((uint)(multipointChecksumsAddress + (Checksum.MultipointChecksum.GetChecksumBlockSize() * x))));
 			}
 
-			multiPointChecksumBlocks = multipointChecksums;			
+			multiPointChecksumBlocks = multipointChecksums;
 
 			return true;
 		}
@@ -1217,25 +1217,25 @@ namespace Checksum
 					instruction = C166Instructions.CMPB;
 					return true;
 				}
-				case 0x84://MOV [Rw], mem 			
+				case 0x84://MOV [Rw], mem
 				{
 					numBytesForInstruction = 4;
 					instruction = C166Instructions.MOV;
 					return true;
 				}
-				case 0x88://MOV [-Rw], Rw 	
+				case 0x88://MOV [-Rw], Rw
 				{
 					numBytesForInstruction = 2;
 					instruction = C166Instructions.MOV;
 					return true;
 				}
-				case 0x94://MOV mem, [Rw] 
+				case 0x94://MOV mem, [Rw]
 				{
 					numBytesForInstruction = 4;
 					instruction = C166Instructions.MOV;
 					return true;
 				}
-				case 0x98://MOV Rw, [Rw+] 	
+				case 0x98://MOV Rw, [Rw+]
 				{
 					numBytesForInstruction = 2;
 					instruction = C166Instructions.MOV;
@@ -1259,19 +1259,19 @@ namespace Checksum
 					instruction = C166Instructions.MOV;
 					return true;
 				}
-				case 0xC8://MOV [Rw], [Rw] 
+				case 0xC8://MOV [Rw], [Rw]
 				{
 					numBytesForInstruction = 2;
 					instruction = C166Instructions.MOV;
 					return true;
 				}
-				case 0xD4://MOV Rw, [Rw + #data16]	
+				case 0xD4://MOV Rw, [Rw + #data16]
 				{
 					numBytesForInstruction = 4;
 					instruction = C166Instructions.MOV;
 					return true;
 				}
-				case 0xD8://MOV [Rw+], [Rw] 	
+				case 0xD8://MOV [Rw+], [Rw]
 				{
 					numBytesForInstruction = 2;
 					instruction = C166Instructions.MOV;
@@ -1961,7 +1961,7 @@ namespace Checksum
 				case 0x24://SUB mem, reg / 24 RR MM MM / 4
 				{
 					operand1 = (uint)(data[offset + 2] | (data[offset + 3] << 8));
-					operand2 = 0;//register					
+					operand2 = 0;//register
 					numBytes = 4;
 					return true;
 				}
@@ -2041,7 +2041,7 @@ namespace Checksum
 				case 0x04://ADD mem, reg / 04 RR MM MM / 4
 				{
 					operand1 = (uint)(data[offset + 2] | (data[offset + 3] << 8));
-					operand2 = 0;//register					
+					operand2 = 0;//register
 					numBytes = 4;
 					return true;
 				}
@@ -2121,7 +2121,7 @@ namespace Checksum
 				case 0x14://ADDC mem, reg / 14 RR MM MM / 4
 				{
 					operand1 = (uint)(data[offset + 2] | (data[offset + 3] << 8));
-					operand2 = 0;//register					
+					operand2 = 0;//register
 					numBytes = 4;
 					return true;
 				}

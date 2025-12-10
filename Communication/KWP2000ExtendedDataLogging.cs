@@ -459,7 +459,7 @@ namespace Communication
             var currentTime = DateTime.Now;
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("NextAction started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("NextAction started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             var nextAction = base.NextAction();
 
@@ -514,7 +514,7 @@ namespace Communication
             }
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("NextAction finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("NextAction finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             return nextAction;
         }
@@ -522,7 +522,7 @@ namespace Communication
         protected override void OnActionStarted(CommunicationAction action)
         {
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionStarted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("OnActionStarted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             base.OnActionStarted(action);
 
@@ -560,14 +560,14 @@ namespace Communication
             }
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionStarted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("OnActionStarted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
         }
 
         protected override void OnActionCompleted(CommunicationAction action, bool success)
         {
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionCompleted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("OnActionCompleted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             //ignore actions not started by this code
             if (action == mMyLastStartedAction)
@@ -627,7 +627,7 @@ namespace Communication
             base.OnActionCompleted(action, success);
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionCompleted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);	
+			CommInterface.DisplayStatusMessage("OnActionCompleted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
         }
 
@@ -648,5 +648,5 @@ namespace Communication
         private DateTime mLastReadStartTime;
 
         private CommunicationAction mMyLastStartedAction;
-    }	
+    }
 }

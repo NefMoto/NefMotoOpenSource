@@ -38,7 +38,7 @@ namespace Checksum
 			mChecksum = 0;
 			mInvChecksum = 0;
 		}
-	
+
 	    //for serialization
         public MultipointChecksum()
             : this(0)
@@ -65,7 +65,7 @@ namespace Checksum
 				result &= mMemory.ReadRawIntValueByType(out mStartAddress, DataUtils.DataType.UInt32, Location);
 				result &= mMemory.ReadRawIntValueByType(out mEndAddress, DataUtils.DataType.UInt32, Location + dataTypeSize);
 				result &= mMemory.ReadRawIntValueByType(out mChecksum, DataUtils.DataType.UInt32, Location + (dataTypeSize * 2));
-				result &= mMemory.ReadRawIntValueByType(out mInvChecksum, DataUtils.DataType.UInt32, Location + (dataTypeSize * 3));							
+				result &= mMemory.ReadRawIntValueByType(out mInvChecksum, DataUtils.DataType.UInt32, Location + (dataTypeSize * 3));
 			}
 
 			return result;
@@ -140,7 +140,7 @@ namespace Checksum
 				{
 					DisplayStatusMessage("Multipoint checksum OK.", StatusMessageType.LOG);
 				}
-			}		
+			}
 
 			return result;
 		}
@@ -159,7 +159,7 @@ namespace Checksum
 		{
 			startAddress = mStartAddress;
 			endAddress = mEndAddress;
-		}	
+		}
 
         public uint Location { get; set; }
 

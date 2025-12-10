@@ -66,9 +66,9 @@ namespace ECUFlasher
 
     [XmlType("MemoryVariableDefinition")]
     public class MemoryVariableDefinition_Serialized : VariableDefinitionBase_Serialized
-    {        
+    {
         public string Address { get; set; }
-        public DataUtils.DataType DataType { get; set; }        
+        public DataUtils.DataType DataType { get; set; }
     }
 
     [XmlInclude(typeof(ReadMemoryVariable_Serialized))]
@@ -173,7 +173,7 @@ namespace ECUFlasher
 
 		[XmlArray]
 		[XmlArrayItem(ElementName = "MemoryVariableLogEntryItem", Type = typeof(MemoryVariable_LogEntryItem))]
-		public List<BaseVariable_LogEntryItem> EntryItems 
+		public List<BaseVariable_LogEntryItem> EntryItems
 		{
 			get
 			{
@@ -191,7 +191,7 @@ namespace ECUFlasher
 		}
 		private List<BaseVariable_LogEntryItem> _EntryItems;
     }
-    
+
 	[XmlInclude(typeof(MemoryVariable_LogEntryItem))]
 	[XmlType("VariableLogEntryItem")]
 	public abstract class BaseVariable_LogEntryItem
@@ -277,7 +277,7 @@ namespace ECUFlasher
 				var serializedMemDataOut = serializedDataOut as MemoryVariable_LogEntryItem;
 				serializedMemDataOut.RawData = RawData;
 			}
-		}		
+		}
 	}
 
 	[XmlType("VariableDefinitionsFile")]
@@ -308,13 +308,13 @@ namespace ECUFlasher
         [XmlArray]
         [XmlArrayItem(ElementName = "MemoryVariableDefinition", Type = typeof(MemoryVariableDefinition_Serialized))]
         public List<VariableDefinitionBase_Serialized> VariableDefinitions { get; set; }
-        
+
         [XmlArray]
         [XmlArrayItem(ElementName = "ReadMemoryVariable", Type = typeof(ReadMemoryVariable_Serialized))]
         public List<ReadVariableBase_Serialized> ReadVariables { get; set; }
 
         [XmlArray]
-		[XmlArrayItem(ElementName = "MemoryVariableLogEntry", Type = typeof(MemoryVariableLogEntry_Serialized))]		
+		[XmlArrayItem(ElementName = "MemoryVariableLogEntry", Type = typeof(MemoryVariableLogEntry_Serialized))]
 		[XmlArrayItem(ElementName = "MultiVariableLogEntry", Type = typeof(MultiVariableLogEntry_Serialized))]
         public List<BaseLogEntry_Serialized> LogEntries { get; set; }
     }
@@ -334,7 +334,7 @@ namespace ECUFlasher
         }
 
         //VariableID is authoritative over VariableDefinition
-        public string VariableID 
+        public string VariableID
         {
             get { return _VariableID; }
             set
@@ -377,13 +377,13 @@ namespace ECUFlasher
                 if (_VariableDefinition != value)
                 {
                     if (_VariableDefinition != null)
-                    {   
+                    {
                         _VariableDefinition.IsDisposingEvent -= this.VaribleDefinitionIsDisposing;
                         _VariableDefinition.VariableIDChangedEvent -= this.VariableDefinitionIDChanged;
                         _VariableDefinition.PropertyChanged -= this.VariableDefinitionPropertyChanged;
                         _VariableDefinition.ValueConversionChangedEvent -= this.VariableDefinitionValueConversionChanged;
-                    }                    
-                    
+                    }
+
                     _VariableDefinition = value;
 
                     if (VariableDefinitionChangedEvent != null)
@@ -434,8 +434,8 @@ namespace ECUFlasher
             Debug.Assert(VariableID == oldValue);
 
             VariableDefinition = null;
-        }        
-                
+        }
+
         public double Value
         {
             get { return _Value; }
@@ -481,10 +481,10 @@ namespace ECUFlasher
                 PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
             }
         }
-        
+
         public virtual bool LoadSerialized(ReadVariableBase_Serialized serializedData)
         {
-            VariableID = serializedData.VariableID;            
+            VariableID = serializedData.VariableID;
 
             return true;
         }
@@ -498,7 +498,7 @@ namespace ECUFlasher
 
         protected virtual void SaveSerializedInteral(ReadVariableBase_Serialized serializedDataOut)
         {
-            serializedDataOut.VariableID = VariableID;            
+            serializedDataOut.VariableID = VariableID;
         }
 
         public bool BindToVariableDefinition(Dictionary<string, VariableDefinitionBase_ViewModel> variableDefinitionMap)
@@ -541,7 +541,7 @@ namespace ECUFlasher
             set
             {
                 if(_VariableDefinition != value)
-                {                    
+                {
                     base.VariableDefinition = value;
 
                     if (MemoryRegionChangedEvent != null)
@@ -648,7 +648,7 @@ namespace ECUFlasher
             if(memoryRegionChanged)
             {
                 if (MemoryRegionChangedEvent != null)
-                {                    
+                {
                     MemoryRegionChangedEvent(this, VariableID);
                 }
             }
@@ -839,7 +839,7 @@ namespace ECUFlasher
             VariableID = serializedData.VariableID;
             Name = serializedData.Name;
             Units = serializedData.Units;
-            Description = serializedData.Description;            
+            Description = serializedData.Description;
             ValueConverter = serializedData.ValueConverter;
 
             return true;
@@ -905,7 +905,7 @@ namespace ECUFlasher
                     NotifyPropertyChanged("EndAddress");
                 }
             }
-        }        
+        }
         protected UInt32 _StartAddress;
 
         public UInt32 NumBytes
@@ -1024,7 +1024,7 @@ namespace ECUFlasher
             Debug.Assert(variable.VariableID == newValue);
 
             RemoveReadVariableFromMap(variable, oldValue);
-            
+
             AddReadVariableToMap(variable);
 
             variable.BindToVariableDefinition(mVariableDefinitionsMap);
@@ -1090,7 +1090,7 @@ namespace ECUFlasher
         }
 
         private bool RemoveReadVariableFromMap(ReadVariableBase_ViewModel variable, string variableID)
-        {            
+        {
             bool result = false;
 
             if (variableID != null)
@@ -1134,7 +1134,7 @@ namespace ECUFlasher
                     mVariableDefinitionsMap = new Dictionary<string, VariableDefinitionBase_ViewModel>();
 
                     //using the property setter to trigger a change notification
-                    VariableDefinitions = new ObservableCollection<VariableDefinitionBase_ViewModel>();                    
+                    VariableDefinitions = new ObservableCollection<VariableDefinitionBase_ViewModel>();
                 }
 
                 return _VariableDefinitions;
@@ -1159,7 +1159,7 @@ namespace ECUFlasher
                             variable.Dispose();
                         }
 
-                        mVariableDefinitionsMap.Clear();                       
+                        mVariableDefinitionsMap.Clear();
                     }
 
                     _VariableDefinitions = value;
@@ -1300,7 +1300,7 @@ namespace ECUFlasher
         private bool AddVariableDefinitionToMap(VariableDefinitionBase_ViewModel variable)
         {
             bool variableIsInMap = false;
-            
+
             if (variable.VariableID != null)
             {
                 if (!mVariableDefinitionsMap.ContainsKey(variable.VariableID))
@@ -1357,10 +1357,10 @@ namespace ECUFlasher
             var variable = new MemoryVariableDefinition_ViewModel();
             variable.Name = "New Variable";
             variable.VariableID = null;
-            
+
             VariableDefinitions.Add(variable);
         }
-                
+
         public ICommand RemoveVariableDefinitionCommand
         {
             get
@@ -1405,7 +1405,7 @@ namespace ECUFlasher
         {
             if (variable != null)
             {
-                VariableDefinitions.Remove(variable);               
+                VariableDefinitions.Remove(variable);
             }
         }
 
@@ -1467,7 +1467,7 @@ namespace ECUFlasher
                     _RemoveReadVariableCommand.Name = "Remove Read Variable";
                     _RemoveReadVariableCommand.Description = "Remove selected read variables";
                     _RemoveReadVariableCommand.ExecuteMethod = delegate(object param)
-                    {                        
+                    {
                         if (param is IEnumerable)
                         {
                             var collection = param as IEnumerable;
@@ -1604,7 +1604,7 @@ namespace ECUFlasher
 
                      if (App != null)
                     {
-                        _StopReadingCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");                        
+                        _StopReadingCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
                     }
 
                     _StopReadingCommand.AddWatchedProperty(this, "IsReadingVariables");
@@ -1731,7 +1731,7 @@ namespace ECUFlasher
 
 			if (loggingType == DataLoggingOperationType.MultipleValueExtendedRAMDataLogging)
 			{
-				App.CurrentOperation = new ExtendedDataLoggingOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates);            
+				App.CurrentOperation = new ExtendedDataLoggingOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates);
 			}
 			else
 			{
@@ -1743,8 +1743,8 @@ namespace ECUFlasher
 				}
 
 				App.CurrentOperation = new SynchronizeRAMRegionsOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, readVariablesInBlocks);
-			}			
-			
+			}
+
 			var syncOperation = App.CurrentOperation as ITrackedMemoryRegionsOperation;
 			syncOperation.MaxReadsPerSecond = MaxSamplesPerSecond;
 			syncOperation.MaxVariableReadsPerTick = MaxVariableReadsPerTick;
@@ -1796,7 +1796,7 @@ namespace ECUFlasher
 					pendingVariableUpdates.Add(newLogEntry);
 				}
 
-				//update running average for samples per second				
+				//update running average for samples per second
 				{
 					numVariableSamplesRead++;
 					runningAverageTotalSeconds += (curTime - lastReadTime).TotalSeconds;
@@ -1896,7 +1896,7 @@ namespace ECUFlasher
         private void OnSynchronizeRAMVariablesOperationCompleted(Operation operation, bool success)
         {
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				operation.CompletedOperationEvent -= this.OnSynchronizeRAMVariablesOperationCompleted;
 
@@ -1927,7 +1927,7 @@ namespace ECUFlasher
                 if (_LogEntries == null)
                 {
                     //using property setter to trigger change notification
-					LogEntries = new ObservableCollection<VariableLogEntry>();                    
+					LogEntries = new ObservableCollection<VariableLogEntry>();
                 }
 
                 return _LogEntries;
@@ -1960,7 +1960,7 @@ namespace ECUFlasher
 					NumLogEntryItems = entryItemCount;
 
                     RecalculateLogTimes();
-                    
+
                     OnPropertyChanged(new PropertyChangedEventArgs("LogEntries"));
                 }
             }
@@ -2052,7 +2052,7 @@ namespace ECUFlasher
                 LogEndTime = LogStartTime;
             }
         }
-        
+
         public TimeSpan LogTimeSpan
         {
             get { return _LogTimeSpan; }
@@ -2098,7 +2098,7 @@ namespace ECUFlasher
                     _LogEndTime = value;
                     OnPropertyChanged(new PropertyChangedEventArgs("LogEndTime"));
 
-                    LogTimeSpan = LogEndTime - LogStartTime;                    
+                    LogTimeSpan = LogEndTime - LogStartTime;
                 }
             }
         }
@@ -2135,9 +2135,9 @@ namespace ECUFlasher
             }
         }
         private TimeSpan _LogCurrentTime;
-        
+
         public ICommand StartRecordingCommand
-        {   
+        {
             get
             {
                 if (_StartRecordingCommand == null)
@@ -2145,14 +2145,14 @@ namespace ECUFlasher
                     _StartRecordingCommand = new ReactiveCommand(this.OnStartRecording);
                     _StartRecordingCommand.Name = "Start Recording";
                     _StartRecordingCommand.Description = "Start recording variables to a new log";
-                    
+
                     _StartRecordingCommand.AddWatchedProperty(this, "IsReadingVariables");
                     _StartRecordingCommand.AddWatchedProperty(this, "IsRecordingVariables");
 
                     _StartRecordingCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
                     {
                         bool result = true;
-                        
+
                         if (!IsReadingVariables)
                         {
                             reasonsDisabled.Add("Not currently reading variables");
@@ -2172,7 +2172,7 @@ namespace ECUFlasher
                 return _StartRecordingCommand;
             }
         }
-        private ReactiveCommand _StartRecordingCommand;        
+        private ReactiveCommand _StartRecordingCommand;
 
         public ICommand StopRecordingCommand
         {
@@ -2183,7 +2183,7 @@ namespace ECUFlasher
                     _StopRecordingCommand = new ReactiveCommand(this.OnStopRecording);
                     _StopRecordingCommand.Name = "Stop Recording";
                     _StopRecordingCommand.Description = "Stop recording variables to the log";
-                    
+
                     _StopRecordingCommand.AddWatchedProperty(this, "IsReadingVariables");
                     _StopRecordingCommand.AddWatchedProperty(this, "IsRecordingVariables");
 
@@ -2240,7 +2240,7 @@ namespace ECUFlasher
                         }
 
                         if(App.CurrentOperation != null)
-                        {                            
+                        {
 							var syncOperation = App.CurrentOperation as ITrackedMemoryRegionsOperation;
 
                             foreach (var variable in ReadVariables.OfType<ReadMemoryVariable_ViewModel>())
@@ -2266,7 +2266,7 @@ namespace ECUFlasher
                         }
 
                         if(App.CurrentOperation != null)
-                        {                            
+                        {
 							var syncOperation = App.CurrentOperation as ITrackedMemoryRegionsOperation;
                             syncOperation.RemoveAllMemoryRegions();
                         }
@@ -2276,12 +2276,12 @@ namespace ECUFlasher
 
                     OnPropertyChanged(new PropertyChangedEventArgs("IsReadingVariables"));
                 }
-            }  
+            }
         }
         private bool? _IsReadingVariables = null;
 
         private void ReadVariable_MemoryRegionChanged_SyncOperationUpdate(ReadVariableBase_ViewModel readVariable, string oldVariableID)
-        {            
+        {
 			var syncOperation = App.CurrentOperation as ITrackedMemoryRegionsOperation;
 
             if (oldVariableID != null)
@@ -2291,7 +2291,7 @@ namespace ECUFlasher
 
             if(readVariable.VariableDefinition is MemoryVariableDefinition_ViewModel)
             {
-                var updatedMemVarDefinition = readVariable.VariableDefinition as MemoryVariableDefinition_ViewModel;                                
+                var updatedMemVarDefinition = readVariable.VariableDefinition as MemoryVariableDefinition_ViewModel;
 
                 syncOperation.AddMemoryRegion(updatedMemVarDefinition.StartAddress, updatedMemVarDefinition.NumBytes, updatedMemVarDefinition.VariableID);
             }
@@ -2303,9 +2303,9 @@ namespace ECUFlasher
             {
                 //TODO: is there a memory leak from not unsubscribing from the collection changed event on the old VariableDefinitions?
                 ReadVariables.CollectionChanged += this.ReadVariables_CollectionChanged_SyncOperationUpdate;
-                
+
 				var syncOperation = App.CurrentOperation as ITrackedMemoryRegionsOperation;
-                syncOperation.RemoveAllMemoryRegions();                
+                syncOperation.RemoveAllMemoryRegions();
 
                 //TODO: is there a memory leak from not unsubscribing from the property changed event on the old variable definitions?
 
@@ -2324,7 +2324,7 @@ namespace ECUFlasher
         }
 
         private void ReadVariables_CollectionChanged_SyncOperationUpdate(object sender, NotifyCollectionChangedEventArgs e)
-        {            
+        {
 			var syncOperation = App.CurrentOperation as ITrackedMemoryRegionsOperation;
 
             if(e.Action == NotifyCollectionChangedAction.Reset)
@@ -2353,7 +2353,7 @@ namespace ECUFlasher
                         var memVarDefinition = variable.VariableDefinition as MemoryVariableDefinition_ViewModel;
 
                         syncOperation.AddMemoryRegion(memVarDefinition.StartAddress, memVarDefinition.NumBytes, memVarDefinition.VariableID);
-                    
+
                         variable.MemoryRegionChangedEvent += this.ReadVariable_MemoryRegionChanged_SyncOperationUpdate;
                     }
                 }
@@ -2376,7 +2376,7 @@ namespace ECUFlasher
             {
                 if (_IsRecordingVariables != value)
                 {
-                    _IsRecordingVariables = value;                    
+                    _IsRecordingVariables = value;
 
                     OnPropertyChanged(new PropertyChangedEventArgs("IsRecordingVariables"));
                 }
@@ -2424,7 +2424,7 @@ namespace ECUFlasher
         private void OnStartRecording()
         {
             if (!IsRecordingVariables)
-            {                
+            {
                 App.DisplayStatusMessage("Starting variable recording.", StatusMessageType.USER);
 
                 LogEntries.Clear();
@@ -2434,14 +2434,14 @@ namespace ECUFlasher
                 App.DisplayStatusMessage("Started variable recording.", StatusMessageType.USER);
             }
         }
-        
+
         private void OnStopRecording()
         {
             if (IsRecordingVariables)
             {
                 App.DisplayStatusMessage("Stopping variable recording.", StatusMessageType.USER);
 
-                IsRecordingVariables = false;   
+                IsRecordingVariables = false;
 
                 App.DisplayStatusMessage("Stopped variable recording.", StatusMessageType.USER);
             }
@@ -2462,7 +2462,7 @@ namespace ECUFlasher
                     _SaveLogFileCommand.Description = "Save recorded variables to log file";
 
                     _SaveLogFileCommand.AddWatchedCollection(this, "LogEntries", LogEntries);
-                    
+
                     _SaveLogFileCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
                     {
                         bool result = true;
@@ -2477,7 +2477,7 @@ namespace ECUFlasher
                     };
                 }
 
-                return _SaveLogFileCommand; 
+                return _SaveLogFileCommand;
             }
         }
         private ReactiveCommand _SaveLogFileCommand;
@@ -2494,11 +2494,11 @@ namespace ECUFlasher
             if (dialog.ShowDialog() == true)
             {
                 //replace .xml with .Log.xml
-				var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, LOG_FILE_SHORT_EXT, LOG_FILE_EXT);                
+				var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, LOG_FILE_SHORT_EXT, LOG_FILE_EXT);
 
                 SaveLogFile(actualFileName);
             }
-        }        
+        }
 
         private void SaveLogFile(string logFileName)
         {
@@ -2671,7 +2671,7 @@ namespace ECUFlasher
                 ReadVariables.Clear();
                 LogEntries = null;
 
-                LogFile logFile = null;                
+                LogFile logFile = null;
 
                 var worker = new BackgroundWorker();
 
@@ -2684,7 +2684,7 @@ namespace ECUFlasher
                         using (var fStream = new FileStream(logFileName, FileMode.Open, FileAccess.Read))
                         {
                             var xmlFormat = new XmlSerializer(typeof(LogFile));
-                            logFile = (LogFile)xmlFormat.Deserialize(fStream);                            
+                            logFile = (LogFile)xmlFormat.Deserialize(fStream);
                         }
                     }
                     catch (Exception ex)
@@ -2693,16 +2693,16 @@ namespace ECUFlasher
                     }
 
                     if (logFile != null)
-                    {                        
+                    {
                         //TODO: need to use a factory, or serialized objects with static create methods to support multiple types
                         foreach (var variableData in logFile.VariableDefinitions)
                         {
-                            Dispatcher.Invoke((Action)(() => 
+                            Dispatcher.Invoke((Action)(() =>
                             {
                                 var newDefinition = new MemoryVariableDefinition_ViewModel();
                                 newDefinition.LoadSerialized(variableData);
                                 VariableDefinitions.Add(newDefinition);
-                            
+
                             }), null);
 
                             Thread.Sleep(1);//yield
@@ -2710,9 +2710,9 @@ namespace ECUFlasher
 
                         //TODO: need to use a factory, or serialized objects with static create methods to support multiple types
                         foreach (var variableData in logFile.ReadVariables)
-                        {   
-                            Dispatcher.Invoke((Action)(() => 
-                            { 
+                        {
+                            Dispatcher.Invoke((Action)(() =>
+                            {
                                 var readVariable = new ReadMemoryVariable_ViewModel();
                                 readVariable.LoadSerialized(variableData);
                                 readVariable.BindToVariableDefinition(mVariableDefinitionsMap);
@@ -2737,7 +2737,7 @@ namespace ECUFlasher
                         }
 
                         //set this way to only trigger one change notification for the whole list
-                        Dispatcher.Invoke((Action)(() => 
+                        Dispatcher.Invoke((Action)(() =>
                         {
 #if DEBUG
                             foreach (var logEntry in newLogEntries)
@@ -2759,7 +2759,7 @@ namespace ECUFlasher
 									}
 								}
                             }
-#endif                      
+#endif
                             LogEntries = newLogEntries;
                         }), null);
                     }
@@ -2834,7 +2834,7 @@ namespace ECUFlasher
                 LogEntries.Clear();//variables and log entries no longer match so we need to clear them
 
                 bool loadedME7LoggerFile = false;
-                
+
                 var loadWorker = new BackgroundWorker();
 
                 loadWorker.DoWork += (object sender, DoWorkEventArgs e) =>
@@ -2855,7 +2855,7 @@ namespace ECUFlasher
                         foreach (var measurementEntry in ME7LoggerFile.Measurements)
                         {
                             var variableData = new MemoryVariableDefinition_Serialized();
-                            variableData.VariableID = measurementEntry.VariableID;                            
+                            variableData.VariableID = measurementEntry.VariableID;
 
                             if(string.IsNullOrEmpty(measurementEntry.Name))
                             {
@@ -2908,7 +2908,7 @@ namespace ECUFlasher
                                     measurementEntry.Offset = 0;
                                     measurementEntry.ScaleFactor = 1.0 / measurementEntry.BitMask;
                                 }
-                                
+
                                 variableData.ValueConverter = new ScaleOffsetMemoryVariableValueConverter(measurementEntry.ScaleFactor, measurementEntry.Offset * -1.0f, measurementEntry.BitMask);
 
                                 Dispatcher.Invoke((Action)(() =>
@@ -2959,7 +2959,7 @@ namespace ECUFlasher
                 LogEntries.Clear();//variables and log entries no longer match so we need to clear them
 
                 VariableDefinitionsFile variableDefinitionsFile = null;
-                
+
                 var loadWorker = new BackgroundWorker();
 
                 loadWorker.DoWork += (object sender, DoWorkEventArgs e) =>
@@ -2971,7 +2971,7 @@ namespace ECUFlasher
                         using (var fStream = new FileStream(variableDefinitionsFileName, FileMode.Open, FileAccess.Read))
                         {
                             var xmlFormat = new XmlSerializer(typeof(VariableDefinitionsFile));
-                            variableDefinitionsFile = (VariableDefinitionsFile)xmlFormat.Deserialize(fStream);                            
+                            variableDefinitionsFile = (VariableDefinitionsFile)xmlFormat.Deserialize(fStream);
                         }
                     }
                     catch (Exception ex)
@@ -2994,11 +2994,11 @@ namespace ECUFlasher
 
                             Thread.Sleep(1);//yield
                         }
-                    }                    
+                    }
                 };
 
                 loadWorker.RunWorkerCompleted += (object sender, RunWorkerCompletedEventArgs e) =>
-                {   
+                {
                     EnableUserInput();
 
                     if (variableDefinitionsFile != null)
@@ -3007,7 +3007,7 @@ namespace ECUFlasher
                     }
                 };
 
-                loadWorker.RunWorkerAsync();                
+                loadWorker.RunWorkerAsync();
             }
             else
             {
@@ -3297,7 +3297,7 @@ namespace ECUFlasher
                     {
                         readVariablesFile.ReadVariables.Add(variable.SaveSerialized());
                     }
-                    
+
                     try
                     {
                         using (var fileStream = File.Open(readVariablesFileName, FileMode.Create, FileAccess.Write))
@@ -3397,7 +3397,7 @@ namespace ECUFlasher
 
                     _SkipBackCommand.AddWatchedProperty(this, "IsReadingVariables");
                     _SkipBackCommand.AddWatchedProperty(this, "LogCurrentTime");
-                    
+
                     _SkipBackCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
                     {
                         bool result = true;
@@ -3422,7 +3422,7 @@ namespace ECUFlasher
             }
         }
         private ReactiveCommand _SkipBackCommand;
-        
+
         public ICommand PauseLogCommand
         {
             get
@@ -3434,9 +3434,9 @@ namespace ECUFlasher
                     _PauseLogCommand.Description = "Pause log playback";
 
                     _PauseLogCommand.AddWatchedProperty(this, "IsLogPlaying");
-                    
+
                     _PauseLogCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
-                    {                        
+                    {
                         bool result = true;
 
                         if (!IsLogPlaying)
@@ -3444,7 +3444,7 @@ namespace ECUFlasher
                             reasonsDisabled.Add("Log playback is not running");
                             result = false;
                         }
-                        
+
                         return result;
                     };
                 }
@@ -3470,7 +3470,7 @@ namespace ECUFlasher
                     _PlayLogCommand.AddWatchedCollection(this, "LogEntries", LogEntries);
 
                     _PlayLogCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
-                    {                        
+                    {
                         bool result = true;
 
 						if (IsReadingVariables)
@@ -3520,7 +3520,7 @@ namespace ECUFlasher
         public void StartPlaying()
         {
             if (!IsLogPlaying && (LogCurrentTime < LogTimeSpan))
-            {                
+            {
                 IsLogPlaying = true;
 
                 App.DisplayStatusMessage("Starting variable log playback.", StatusMessageType.USER);
@@ -3680,12 +3680,12 @@ namespace ECUFlasher
             var variable = filterEventArgs.Item as VariableDefinitionBase_ViewModel;
             filterEventArgs.Accepted = true;
 
-            CollectionViewSourcePropertyWatcher.GetProperty(filterSender as DependencyObject).AddUniqueChangedPropertyWatcher(variable, 
+            CollectionViewSourcePropertyWatcher.GetProperty(filterSender as DependencyObject).AddUniqueChangedPropertyWatcher(variable,
 				delegate(object propertyChangedSender, PropertyChangedEventArgs propertyChangedEventArgs)
 				{
 					if (propertyChangedEventArgs.PropertyName == "Name")
 					{
-						var filterSource = filterSender as CollectionViewSource;					
+						var filterSource = filterSender as CollectionViewSource;
 
 						var oldCurrentItem = filterSource.View.CurrentItem;
 
@@ -3701,7 +3701,7 @@ namespace ECUFlasher
 							filterSource.View.Refresh();
 
 							//This causes problems with the caret being reset when editing the current item
-							//trigger the object to be re-filtered by re-adding it							
+							//trigger the object to be re-filtered by re-adding it
 							//var collection = filterSource.Source as IList<VariableDefinitionBase_ViewModel>;
 							//collection.Remove(variable);
 							//collection.Add(variable);

@@ -35,7 +35,7 @@ namespace Checksum
 			AddressLocation = addressLocation;
 			ChecksumLocation = checksumLocation;
 			NumRanges = numRanges;
-			
+
 			mChecksum = 0;
 			mInvChecksum = 0;
 		}
@@ -45,7 +45,7 @@ namespace Checksum
             : this(0, 0, 0)
         {
         }
-				
+
 		public override bool LoadChecksum()
 		{
 			bool result = false;
@@ -63,7 +63,7 @@ namespace Checksum
 					uint currentAddress = AddressLocation + (dataTypeSize * 2 * x);
 
 					result &= mMemory.ReadRawIntValueByType(out mStartAddresses[x], DataUtils.DataType.UInt32, currentAddress);
-					result &= mMemory.ReadRawIntValueByType(out mEndAddresses[x], DataUtils.DataType.UInt32, currentAddress + dataTypeSize);					
+					result &= mMemory.ReadRawIntValueByType(out mEndAddresses[x], DataUtils.DataType.UInt32, currentAddress + dataTypeSize);
 				}
 			}
 
@@ -99,7 +99,7 @@ namespace Checksum
 			{
 				DisplayStatusMessage("Main checksum failed to update", StatusMessageType.LOG);
 			}
-			
+
 			return result;
 		}
 
@@ -132,7 +132,7 @@ namespace Checksum
 				{
 					DisplayStatusMessage("Main checksum OK", StatusMessageType.LOG);
 				}
-			}			
+			}
 
 			return result;
 		}
@@ -148,11 +148,11 @@ namespace Checksum
 			}
 
 			return result;
-		}				
+		}
 
 		public uint AddressLocation { get; set; }
         public uint ChecksumLocation { get; set; }
-		public uint NumRanges 
+		public uint NumRanges
 		{
 			get
 			{
@@ -180,7 +180,7 @@ namespace Checksum
 		private uint _NumRanges;
 
 		protected uint[] mStartAddresses;
-		protected uint[] mEndAddresses;		
+		protected uint[] mEndAddresses;
 		protected uint mChecksum;
 		protected uint mInvChecksum;
 	}
