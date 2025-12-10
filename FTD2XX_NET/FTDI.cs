@@ -145,7 +145,7 @@ namespace FTD2XX_NET
                 pFT_EE_Read = GetProcAddress(hFTD2XXDLL, "FT_EE_Read");
                 pFT_EE_Program = GetProcAddress(hFTD2XXDLL, "FT_EE_Program");
             }
-            
+
             if (hFTDChipIDDLL == IntPtr.Zero)
             {
                 hFTDChipIDDLL = LoadLibrary("FTCHIPID.DLL");
@@ -348,7 +348,7 @@ namespace FTD2XX_NET
             }
             return ftStatus;
         }
-        
+
         private void DisplayErrorMessage(string message)
         {
             if(mDisplayErrorMessage != null)
@@ -435,7 +435,7 @@ namespace FTD2XX_NET
                     return;
             }
         }
-       
+
         [DllImport("kernel32.dll")]
         private static extern bool FreeLibrary(IntPtr hModule);
         public FT_STATUS GetCOMPort(out string ComPortName)
@@ -2580,12 +2580,12 @@ namespace FTD2XX_NET
         public FT_STATUS GetChipIDFromCurrentDevice(out uint chipID)
         {
             chipID = 0;
-            
+
             FT_STATUS ft_status = FT_STATUS.FT_OTHER_ERROR;
             if (hFTDChipIDDLL != IntPtr.Zero)
             {
                 if (pFT_GetChipIDFromHandle != IntPtr.Zero)
-                {                    
+                {
                     if (ftHandle != IntPtr.Zero)
                     {
                         tFT_GetChipIDFromHandle delegateForFunctionPointer = (tFT_GetChipIDFromHandle)Marshal.GetDelegateForFunctionPointer(pFT_GetChipIDFromHandle, typeof(tFT_GetChipIDFromHandle));
@@ -2611,7 +2611,7 @@ namespace FTD2XX_NET
                 if (pFT_GetChipIDFromDeviceIndex != IntPtr.Zero)
                 {
                     tFT_GetChipIDFromDeviceIndex delegateForFunctionPointer = (tFT_GetChipIDFromDeviceIndex)Marshal.GetDelegateForFunctionPointer(pFT_GetChipIDFromDeviceIndex, typeof(tFT_GetChipIDFromDeviceIndex));
-                    
+
                     ft_status = delegateForFunctionPointer(deviceIndex, ref chipID);
                 }
                 else
@@ -2644,7 +2644,7 @@ namespace FTD2XX_NET
 
                 if (status == FTDI.FT_STATUS.FT_OK)
                 {
-                    deviceList.AddRange(rawDeviceList);                    
+                    deviceList.AddRange(rawDeviceList);
                 }
             }
 
@@ -2706,11 +2706,11 @@ namespace FTD2XX_NET
             [XmlIgnore]
             [NonSerialized]
             public IntPtr ftHandle;
-            public uint ID;/*The device ID is encoded in a DWORD - the most significant word contains the vendor ID, and the least significant word contains the product ID. 
+            public uint ID;/*The device ID is encoded in a DWORD - the most significant word contains the vendor ID, and the least significant word contains the product ID.
                             * So the returned ID 0x04036001 corresponds to the device ID VID_0403&PID_6001. This is not the ChipID.*/
             public uint LocId;
             public string SerialNumber;
-            public FTDI.FT_DEVICE Type;           
+            public FTDI.FT_DEVICE Type;
         }
 
         public class FT_DRIVE_CURRENT
@@ -2947,7 +2947,7 @@ namespace FTD2XX_NET
             FTID_BUFFER_SIZE_TOO_SMALL = 20,
             FTID_PASSED_NULL_POINTER = 21,
             FTID_INVALID_LANGUAGE_CODE = 22,
-            FTID_INVALID_RHANDLE = 23,            
+            FTID_INVALID_RHANDLE = 23,
         }
 
         public class FT_STOP_BITS
@@ -3215,4 +3215,3 @@ namespace FTD2XX_NET
         private delegate FTDI.FT_STATUS tFT_GetChipIDFromDeviceIndex(uint deviceIndex, ref uint lpdwChipIDBuffer);
     }
 }
-
