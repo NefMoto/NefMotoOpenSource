@@ -1759,6 +1759,7 @@ namespace ECUFlasher
 			double numVariableSamplesRead = 0.0;
 
 			var pendingVariableUpdates = new List<VariableLogEntry>();
+			var pendingVariableUpdatesLock = new object();
 
 			syncOperation.RegionsRead += delegate(IEnumerable<TaggedMemoryImage> regionsRead)
 			{
@@ -1790,7 +1791,7 @@ namespace ECUFlasher
 					newLogEntry.EntryItems.Add(logEntryItem);
 				}
 
-				lock (pendingVariableUpdates)
+				lock (pendingVariableUpdatesLock)
 				{
 					pendingVariableUpdates.Add(newLogEntry);
 				}
@@ -1826,13 +1827,18 @@ namespace ECUFlasher
 					applyPendingTimer.Stop();
 				}
 
-				var oldPendingVariableUpdate = pendingVariableUpdates;
+				List<VariableLogEntry> oldPendingVariableUpdate;
 
-				lock (pendingVariableUpdates)
+				lock (pendingVariableUpdatesLock)
 				{
 					if (pendingVariableUpdates.Any())
 					{
-						pendingVariableUpdates = new List<VariableLogEntry>();
+						oldPendingVariableUpdate = new List<VariableLogEntry>(pendingVariableUpdates);
+						pendingVariableUpdates.Clear();
+					}
+					else
+					{
+						oldPendingVariableUpdate = new List<VariableLogEntry>();
 					}
 				}
 

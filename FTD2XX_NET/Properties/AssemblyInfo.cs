@@ -12,4 +12,5 @@ using System.Runtime.InteropServices;
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("d76379d9-e6a6-4973-a7cb-343bda2fa7ef")]
 
-[assembly: SuppressIldasmAttribute()]
+// SuppressIldasmAttribute is obsolete in .NET 6.0+ and has no effect
+// [assembly: SuppressIldasmAttribute()]

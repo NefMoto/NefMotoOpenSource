@@ -110,6 +110,21 @@ namespace Communication
             return base.Equals(obj);
         }
 
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + P1ECUInterByteTimeMaxMs.GetHashCode();
+                hash = hash * 31 + P2ECUResponseTimeMinMs.GetHashCode();
+                hash = hash * 31 + P2ECUResponseTimeMaxMs.GetHashCode();
+                hash = hash * 31 + P3TesterResponseTimeMinMs.GetHashCode();
+                hash = hash * 31 + P3TesterResponseTimeMaxMs.GetHashCode();
+                hash = hash * 31 + P4TesterInterByteTimeMinMs.GetHashCode();
+                return hash;
+            }
+        }
+
         public object Clone()
         {
             TimingParameters clonedParams = new TimingParameters();

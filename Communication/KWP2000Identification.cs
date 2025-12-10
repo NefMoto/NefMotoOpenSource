@@ -774,5 +774,28 @@ namespace Communication
 
 			return base.Equals(obj);
 		}
+
+		public override int GetHashCode()
+		{
+			unchecked
+			{
+				int hash = 17;
+				if (ValueData != null)
+				{
+					foreach (byte b in ValueData)
+					{
+						hash = hash * 31 + b;
+					}
+				}
+				if (ScalingData != null)
+				{
+					foreach (byte b in ScalingData)
+					{
+						hash = hash * 31 + b;
+					}
+				}
+				return hash;
+			}
+		}
 	}
 }

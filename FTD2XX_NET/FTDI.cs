@@ -2760,9 +2760,11 @@ namespace FTD2XX_NET
             {
             }
 
+#pragma warning disable SYSLIB0051 // Type or member is obsolete - required for binary serialization compatibility
             protected FT_EXCEPTION(SerializationInfo info, StreamingContext context) : base(info, context)
             {
             }
+#pragma warning restore SYSLIB0051
 
             public FT_EXCEPTION(string message, Exception inner) : base(message, inner)
             {
