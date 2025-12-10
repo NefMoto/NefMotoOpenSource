@@ -18,7 +18,7 @@ namespace Communication
             mNumRetries = numRetries;
         }
 
-        protected override async Task BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected override void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
         {
             if (del is MessageSendFinishedDelegate finishedDel)
             {
@@ -27,10 +27,10 @@ namespace Communication
 #if DEBUG
                     commInterface.LogProfileEventDispatch($"Invoking: {del.Target}.{del.Method} at {DateTime.Now:hh:mm:ss.fff}");
 #endif
-                    try
+                    // Fire-and-forget: use Task.Run but don't await
+                    Task.Run(() =>
                     {
-                        // Execute the delegate asynchronously
-                        await Task.Run(() =>
+                        try
                         {
                             finishedDel.Invoke(
                                 kwp2000CommInterface,
@@ -40,12 +40,12 @@ namespace Communication
                                 mWaitedForAllReplies,
                                 mNumRetries
                             );
-                        }).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        commInterface.LogProfileEventDispatch($"Error during delegate invocation: {ex.Message}");
-                    }
+                        }
+                        catch (Exception ex)
+                        {
+                            commInterface.LogProfileEventDispatch($"Error during delegate invocation: {ex.Message}");
+                        }
+                    });
                 }
                 else
                 {

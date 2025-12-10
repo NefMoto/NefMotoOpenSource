@@ -55,7 +55,7 @@ namespace Communication
             if (IsComplete)
             {
                 if (CommInterface.IsConnected())
-                {   
+                {
                     IsComplete = false;
                     CompletedSuccessfully = false;
                     CompletedWithoutCommunicationError = true;
@@ -104,7 +104,7 @@ namespace Communication
         public bool IsComplete { get; private set; }
         public bool CompletedWithoutCommunicationError { get; private set; }//true if the action completed on it's own, false if the action completed because messages failed to be sent or received
         public bool CompletedSuccessfully { get; private set; }
-        
+
         protected CommunicationInterface CommInterface { get; set; }
         public event CompletedActionDelegate ActionCompletedEvent;
 
@@ -205,7 +205,7 @@ namespace Communication
 					{
 						AbortCurrentAction();
 					}
-				}				
+				}
 			}
 			catch
 			{
@@ -246,7 +246,7 @@ namespace Communication
 
                     action.ActionCompletedEvent -= this.ActionCompletedHandler;
 
-                    OnActionCompleted(action, success);                    
+                    OnActionCompleted(action, success);
                 }
             }
         }
@@ -318,9 +318,9 @@ namespace Communication
         public enum Protocol
         {
             [Description("Boot Mode")]
-            BootMode,            
+            BootMode,
             [Description("KWP2000")]
-            KWP2000            
+            KWP2000
         }
 
         public CommunicationInterface()
@@ -329,7 +329,7 @@ namespace Communication
             mConsumeTransmitEcho = true;
 
             mQueuedEvents = new Queue<EventHolder>();
-            mQueuedEventTriggerMutex = new Object();            
+            mQueuedEventTriggerMutex = new Object();
         }
 
         public delegate void ConnectionStatusChangedDelegate(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect);
@@ -397,11 +397,11 @@ namespace Communication
             set
             {
                 if (_ConnectionStatus != value)
-                {                    
+                {
                     _ConnectionStatus = value;
 
                     if (_ConnectionStatus == ConnectionStatusType.ConnectionPending)
-                    {                 
+                    {
                         DisplayStatusMessage("Connecting...", StatusMessageType.USER);
                     }
                     else if (_ConnectionStatus == ConnectionStatusType.Connected)
@@ -420,7 +420,7 @@ namespace Communication
                     OnPropertyChanged(new PropertyChangedEventArgs("ConnectionStatus"));
 
                     OnConnectionStatusChanged();
-                }                
+                }
             }
         }
         protected ConnectionStatusType _ConnectionStatus = ConnectionStatusType.CommunicationTerminated;
@@ -433,7 +433,7 @@ namespace Communication
             }
         }
 
-      
+
         protected abstract uint GetConnectionAttemptsRemaining();
 
         public abstract Protocol CurrentProtocol
@@ -462,7 +462,7 @@ namespace Communication
 
         protected FTD2XX_NET.FTDI mFTDIDevice = null;
         protected bool mConsumeTransmitEcho = true;
-        
+
         protected bool OpenFTDIDevice(FTDI.FT_DEVICE_INFO_NODE deviceToOpen)
         {
             bool connected = false;
@@ -605,7 +605,7 @@ namespace Communication
         }
 
         private bool mIsTriggeringQueuedEvent = false;
-        private async void TriggerNextQueuedEvent()
+        private void TriggerNextQueuedEvent()
         {
             LogProfileEventDispatch("Start TriggerNextQueuedEvent");
 
@@ -658,7 +658,7 @@ namespace Communication
                             if (invocationList != null)
                             {
 								//it is OK to have more than one delegate in the invocation list, specifically for the connection changed events there may be multiple disconnection event listeners
-                                Debug.Assert(invocationList.Length > 0);//debug test to make sure nothing weird is happening                                
+                                Debug.Assert(invocationList.Length > 0);//debug test to make sure nothing weird is happening
 
                                 for (int x = 0; x < invocationList.Length; x++)
                                 {
@@ -673,9 +673,12 @@ namespace Communication
                         if (invocationList != null)
                         {
                             LogProfileEventDispatch("Start TriggerNextQueuedEvent, BeginInvoke");
-                            
-                            await eventHolder.BeginInvokeAsync(this, invocationList, null);
-                            //eventHolder.BeginInvoke(this, invocationList, this.QueuedEventHandlerComplete, null);
+
+                            // Fire-and-forget: don't await, use continuation like old BeginInvoke callback
+                            eventHolder.BeginInvokeAsync(this, invocationList, null).ContinueWith((task) =>
+                            {
+                                QueuedEventHandlerComplete(task);
+                            }, TaskContinuationOptions.None);
 
                             LogProfileEventDispatch("Start TriggerNextQueuedEvent, BeginInvoke Finished");
                         }
@@ -691,29 +694,26 @@ namespace Communication
             LogProfileEventDispatch("End TriggerNextQueuedEvent");
         }
 
-        protected async Task QueuedEventHandlerComplete(Task ar)
+        protected void QueuedEventHandlerComplete(Task ar)
         {
             LogProfileEventDispatch("Start QueuedEventHandlerComplete");
 
             try
             {
-                if (ar != null)
+                if (ar != null && ar.IsFaulted)
                 {
-                    await ar.ConfigureAwait(false);
-                }
-                else
-                {
-                    Debug.Fail("The provided async result is null.");
+                    Debug.Fail("Event handler threw an exception: " + ar.Exception?.GetBaseException()?.Message);
                 }
             }
             catch (Exception e)
             {
-                Debug.Fail("Event handler threw an exception: " + e.Message);
-                throw;
+                Debug.Fail("Error processing event handler completion: " + e.Message);
             }
+
             if (Interlocked.Decrement(ref mNumQueuedEventHandlersInProgress) == 0)
             {
-                await Task.Run(() => TriggerNextQueuedEvent());
+                // Prevent recursion using ThreadPool (like old BeginInvoke pattern)
+                ThreadPool.QueueUserWorkItem(_ => TriggerNextQueuedEvent());
             }
 
             LogProfileEventDispatch("End QueuedEventHandlerComplete");

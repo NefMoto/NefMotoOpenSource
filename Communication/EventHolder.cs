@@ -9,7 +9,8 @@ namespace Communication
     public abstract class EventHolder
     {
         // Asynchronous method for invoking delegates
-        public async Task<bool> BeginInvokeAsync(CommunicationInterface commInterface, Delegate[] dels, object invokeParam)
+        // Returns immediately (fire-and-forget) like old BeginInvoke - doesn't wait for handlers
+        public Task<bool> BeginInvokeAsync(CommunicationInterface commInterface, Delegate[] dels, object invokeParam)
         {
             commInterface.LogProfileEventDispatch("EventHolder BeginInvoke");
 
@@ -17,33 +18,35 @@ namespace Communication
 
             if (dels != null && dels.Length > 0)
             {
-                // Create a list of tasks for each delegate invocation
-                var tasks = new List<Task>();
-
                 foreach (Delegate del in dels)
                 {
-                    // Asynchronously invoke the delegate
-                    tasks.Add(BeginInvokeDelegateAsync(commInterface, del, invokeParam));
+                    // Fire-and-forget: invoke delegate asynchronously, don't wait
+                    BeginInvokeDelegateAsync(commInterface, del, invokeParam);
                     invokedAny = true;
                 }
-
-                // Await all tasks to complete
-                await Task.WhenAll(tasks);
             }
 
             commInterface.LogProfileEventDispatch("EventHolder BeginInvoke Finished");
 
-            return invokedAny;
+            // Return completed task immediately - we don't wait for handlers (fire-and-forget)
+            return Task.FromResult(invokedAny);
         }
 
-        // Refactor for individual delegate invocation
+        // Invoke delegate asynchronously (fire-and-forget)
         // Derived classes should override this method to handle their specific delegate signatures
-        // This base implementation will fail for delegates that don't take exactly one parameter
-        protected virtual async Task BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected virtual void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
         {
-            await Task.Run(() =>
+            // Use Task.Run for async execution - fire-and-forget (don't await)
+            Task.Run(() =>
             {
-                del?.DynamicInvoke(invokeParam); // Invoke the delegate
+                try
+                {
+                    del?.DynamicInvoke(invokeParam); // Invoke the delegate
+                }
+                catch (Exception ex)
+                {
+                    commInterface.LogProfileEventDispatch($"Error invoking delegate: {ex.Message}");
+                }
             });
         }
 

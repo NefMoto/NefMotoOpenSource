@@ -17,7 +17,7 @@ namespace Communication
             mWillReconnect = willReconnect;
         }
 
-        protected override async Task BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected override void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
         {
             if (del is ConnectionStatusChangedDelegate statusChangedDel)
             {
@@ -29,10 +29,18 @@ namespace Communication
                     StatusMessageType.DEV);
 #endif
 
-                await Task.Run(() =>
+                // Fire-and-forget: use Task.Run but don't await
+                Task.Run(() =>
                 {
-                    statusChangedDel?.Invoke(kwp2000CommInterface, mStatus, mWillReconnect);
-                }).ConfigureAwait(false);
+                    try
+                    {
+                        statusChangedDel?.Invoke(kwp2000CommInterface, mStatus, mWillReconnect);
+                    }
+                    catch (Exception ex)
+                    {
+                        commInterface.LogProfileEventDispatch($"Error during delegate invocation: {ex.Message}");
+                    }
+                });
             }
         }
 
