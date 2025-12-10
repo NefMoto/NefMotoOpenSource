@@ -266,7 +266,14 @@ namespace Communication
 
 						uint targetBaudRate = mCurrentBaudRate.Current;
 
-						if (targetBaudRate == (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
+						//Standard sessions must use BAUD_DEFAULT or BAUD_UNSPECIFIED in the message
+						//Don't change physical baud rate - just use BAUD_UNSPECIFIED in message to satisfy assertion
+						if (mSessionType == KWP2000DiagnosticSessionType.StandardSession && targetBaudRate != (uint)KWP2000BaudRates.BAUD_DEFAULT && targetBaudRate != (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
+						{
+							targetBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
+							mMessageFormatState = MessageFormatState.NoBaudRate;
+						}
+						else if (targetBaudRate == (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
 						{
 							//Standard sessions have to be started with 10400 baud or no baud.
 							//If we aren't connected, use default baud rate.
