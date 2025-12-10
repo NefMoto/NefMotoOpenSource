@@ -26,20 +26,20 @@ Contact by Email: tony@nefariousmotorsports.com
     xmlns:props="clr-namespace:ECUFlasher.Properties"
     xmlns:Communication="clr-namespace:Communication;assembly=Communication"
     xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
-        
+
     DataContext="{Binding RelativeSource={RelativeSource Self}}"
-        
+
     Height="{Binding Source={x:Static props:Settings.Default}, Path=WindowHeight, Mode=TwoWay}"
     Width="{Binding Source={x:Static props:Settings.Default}, Path=WindowWidth, Mode=TwoWay}"
     MinWidth="700"
     MinHeight="450"
     Left="{Binding Source={x:Static props:Settings.Default}, Path=WindowLeft, Mode=TwoWay}"
-    Top="{Binding Source={x:Static props:Settings.Default}, Path=WindowTop, Mode=TwoWay}"    
+    Top="{Binding Source={x:Static props:Settings.Default}, Path=WindowTop, Mode=TwoWay}"
     WindowState="{Binding Source={x:Static props:Settings.Default}, Path=WindowState, Mode=TwoWay}"
-    
-    Background="{DynamicResource ErrorBackgroundBrush}"
+
+    Background="{DynamicResource BackgroundBrush}"
     WindowStyle="SingleBorderWindow"
-    ResizeMode="CanResize" 
+    ResizeMode="CanResize"
     HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
     AllowDrop="True"
     >
@@ -83,7 +83,7 @@ Contact by Email: tony@nefariousmotorsports.com
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Menu Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,80" Grid.RowSpan="2">
+        <Menu Grid.Row="0" Grid.ColumnSpan="2">
             <Menu.Resources>
                 <Style TargetType="MenuItem" BasedOn="{StaticResource ReactiveCommandMenuItemStyle}"/>
             </Menu.Resources>
@@ -104,16 +104,16 @@ Contact by Email: tony@nefariousmotorsports.com
                 <MenuItem Command="{Binding Path=App.OpenParameterCommand}" CommandParameter="http://www.nefariousmotorsports.com" Header="Visit NefMoto.com" ToolTip="Visit NefMoto.com on the internet"/>
             </MenuItem>
         </Menu>
-        <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,454" Grid.RowSpan="2">
+        <DockPanel Grid.Row="1" Grid.ColumnSpan="2">
             <Image DockPanel.Dock="Left" Source=".\resources\app-banner.jpg" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" ClipToBounds="True" Width="225" Height="80"/>
             <ComboBox DockPanel.Dock="Left" Style="{StaticResource CommunicationProtocolComboBoxStyle}"
                       ItemsSource="{Binding Source={StaticResource CommunicationProtocolEnumValues}}" ToolTip="Desired communication protocol"
                       SelectedItem="{Binding Path=App.DesiredProtocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
             <ContentControl Content="{Binding Path=App.CommInterfaceViewModel}" DockPanel.Dock="Right" VerticalAlignment="Top"/>
         </DockPanel>
-        <TabControl Grid.Row="2" Background="{DynamicResource ErrorBackgroundBrush}" Grid.ColumnSpan="2">
+        <TabControl Grid.Row="2" Background="{DynamicResource BackgroundBrush}" Grid.ColumnSpan="2">
             <TabItem Header="KWP2000 Info">
-                <ECUFlasher:ECUInfoControl Background="#FFE0A335" BorderBrush="#FF4E4E4E"/>
+                <ECUFlasher:ECUInfoControl/>
             </TabItem>
             <TabItem Header="KWP2000 Flashing">
                 <ECUFlasher:FlashingControl/>
