@@ -37,6 +37,8 @@ namespace Communication
         }
 
         // Refactor for individual delegate invocation
+        // Derived classes should override this method to handle their specific delegate signatures
+        // This base implementation will fail for delegates that don't take exactly one parameter
         protected virtual async Task BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
         {
             await Task.Run(() =>

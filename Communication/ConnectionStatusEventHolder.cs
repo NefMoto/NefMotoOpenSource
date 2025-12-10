@@ -17,7 +17,7 @@ namespace Communication
             mWillReconnect = willReconnect;
         }
 
-        public async Task BeginInvokeAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected override async Task BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
         {
             if (del is ConnectionStatusChangedDelegate statusChangedDel)
             {
@@ -29,13 +29,11 @@ namespace Communication
                     StatusMessageType.DEV);
 #endif
 
-
                 await Task.Run(() =>
                 {
                     statusChangedDel?.Invoke(kwp2000CommInterface, mStatus, mWillReconnect);
                 }).ConfigureAwait(false);
             }
-        
         }
 
         protected ConnectionStatusType mStatus;

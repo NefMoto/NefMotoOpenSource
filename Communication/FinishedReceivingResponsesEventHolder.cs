@@ -18,7 +18,7 @@ namespace Communication
             mNumRetries = numRetries;
         }
 
-        public async Task BeginInvokeAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected override async Task BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
         {
             if (del is MessageSendFinishedDelegate finishedDel)
             {
@@ -54,7 +54,7 @@ namespace Communication
             }
             else
             {
-                commInterface.LogProfileEventDispatch("Delegate type mismatch in BeginInvokeAsync.");
+                commInterface.LogProfileEventDispatch("Delegate type mismatch in BeginInvokeDelegateAsync.");
             }
         }
 
