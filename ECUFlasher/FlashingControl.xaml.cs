@@ -57,15 +57,15 @@ namespace ECUFlasher
 		{
 			FlashMemoryImage = new MemoryImage();
 			FlashMemoryLayout = null;
-			
+
 			IsFlashFileOK = false;
 			IsMemoryLayoutOK = false;
-			
+
 			FileNameToFlash = "";
 			MemoryLayoutFileName = "";
 
 			InitializeComponent();
-			
+
 			MemoryLayoutFileName = Properties.Settings.Default.MemoryLayoutFile;
 			FileNameToFlash = Properties.Settings.Default.FlashFile;
 		}
@@ -87,7 +87,7 @@ namespace ECUFlasher
 				else if ((flashLayout != null) && (flashLayout.Validate()) && (flashImage.Size != flashLayout.EndAddress - flashLayout.BaseAddress))
 				{
 					error = "File to flash size does not match memory layout size";
-				}				
+				}
 			}
 			else
 			{
@@ -152,7 +152,7 @@ namespace ECUFlasher
 			}
 		}
 		private string mFileNameToFlash;
-		
+
 		private void LoadMemoryLayoutFile()
 		{
 			if (FlashMemoryLayout != null)
@@ -230,7 +230,7 @@ namespace ECUFlasher
 				OnPropertyChanged(new PropertyChangedEventArgs("IsFlashFileOK"));
 			}
 		}
-		private bool mIsFlashFileOK;        
+		private bool mIsFlashFileOK;
 
 		public bool IsMemoryLayoutOK
 		{
@@ -293,7 +293,7 @@ namespace ECUFlasher
 			if (!String.IsNullOrEmpty(FileNameToFlash))
 			{
 				DirectoryInfo dirInfo = Directory.GetParent(FileNameToFlash);
-				
+
 				if(dirInfo != null)
 				{
 					dialog.InitialDirectory = dirInfo.FullName;
@@ -376,7 +376,7 @@ namespace ECUFlasher
 
 			if (dialog.ShowDialog() == true)
 			{
-				MemoryLayoutFileName = dialog.FileName;                
+				MemoryLayoutFileName = dialog.FileName;
 			}
 		}
 
@@ -464,7 +464,7 @@ namespace ECUFlasher
 							reasonsDisabled.Add("Specified flash file is not correct");
 							result = false;
 						}
-						
+
 						return result;
 					};
 				}
@@ -490,7 +490,7 @@ namespace ECUFlasher
 		private void OnVerifyChecksumsCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				App.PercentOperationComplete = 100.0f;
 				App.OperationInProgress = false;
@@ -611,11 +611,11 @@ namespace ECUFlasher
 							result = false;
 						}
 
-						if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+						if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 && App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
 						{
-							reasonsDisabled.Add("Not connected with KWP2000 protocol");
+							reasonsDisabled.Add("Not connected with KWP2000 or Boot Mode protocol");
 							result = false;
-						}
+			}
 
 						if (App.OperationInProgress)
 						{
@@ -635,7 +635,7 @@ namespace ECUFlasher
 		private void OnCheckIfFlashMatches()
 		{
 			//done to trigger a reload of the memory layout and flash files and cause them to revalidate
-			FileNameToFlash = FileNameToFlash;            
+			FileNameToFlash = FileNameToFlash;
 			MemoryLayoutFileName = MemoryLayoutFileName;
 
 			if (CheckIfFlashMatchesCommand.IsEnabled)
@@ -644,7 +644,7 @@ namespace ECUFlasher
 				confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
 				confirmationMessage += "\n2) The engine is not running.";
 				confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
-				
+
 				if (App.DisplayUserPrompt("Confirm Check if Flash Matches", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
 				{
 					CheckIfFlashMatches();
@@ -682,7 +682,7 @@ namespace ECUFlasher
 		}
 		private ReactiveCommand _WriteEntireFlashCommand;
 
-			
+
 		private bool CanExecuteWriteEntireFlashCommand(List<string> reasonsDisabled)
 		{
 			if (App == null)
@@ -711,9 +711,9 @@ namespace ECUFlasher
 				result = false;
 			}
 
-			if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+			if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 && App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
 			{
-				reasonsDisabled.Add("Not connected with KWP2000 protocol");
+				reasonsDisabled.Add("Not connected with KWP2000 or Boot Mode protocol");
 				result = false;
 			}
 
@@ -740,7 +740,7 @@ namespace ECUFlasher
 				confirmationMessage += "\n4) It is OK the ECU adaptation channels will be reset to defaults";
 				confirmationMessage += "\n5) Flashing process can run uninterrupted until complete.";
 				confirmationMessage += "\n6) You agree to release Nefarious Motorsports Inc from all liability.";
-				confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent writing the flash memory.";                
+				confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent writing the flash memory.";
 				confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
 
 				if (App.DisplayUserPrompt("Confirm Full Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
@@ -810,10 +810,11 @@ namespace ECUFlasher
                 result = false;
             }
 
-            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 &&
+		App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
             {
-                reasonsDisabled.Add("Not connected with KWP2000 protocol");
-                result = false;
+		reasonsDisabled.Add("Not connected with KWP2000 or Boot Mode protocol");
+		result = false;
             }
 
             if (App.OperationInProgress)
@@ -849,11 +850,11 @@ namespace ECUFlasher
                 }
             }
         }
-        
+
         private void OnWriteFlashCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				var writeOperation = (WriteExternalFlashOperation)operation;
 
@@ -864,7 +865,7 @@ namespace ECUFlasher
 					var flashingTime = operation.OperationElapsedTime;
 					statusMessage += "\nFlashing time was " + flashingTime.Hours.ToString("D2") + ":" + flashingTime.Minutes.ToString("D2") + ":" + flashingTime.Seconds.ToString("D2") + ".";
 				}
-			
+
 				App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
 
 				App.PercentOperationComplete = 100.0f;
@@ -926,9 +927,9 @@ namespace ECUFlasher
 				result = false;
 			}
 
-			if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+			if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 && App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
 			{
-				reasonsDisabled.Add("Not connected with KWP2000 protocol");
+				reasonsDisabled.Add("Not connected with KWP2000 or Boot Mode protocol");
 				result = false;
 			}
 
@@ -943,7 +944,7 @@ namespace ECUFlasher
 
 		private void OnReadEntireFlash()
 		{
-			//done to trigger a reload of the memory layout and cause it to revalidate            
+			//done to trigger a reload of the memory layout and cause it to revalidate
 			MemoryLayoutFileName = MemoryLayoutFileName;
 
 			if (ReadEntireFlashCommand.IsEnabled)
@@ -958,16 +959,16 @@ namespace ECUFlasher
 				{
 					App.OperationInProgress = true;
 					App.PercentOperationComplete = 0.0f;
-					
+
 					OnReadExternalFlashStarted(false, false, false, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted);
 				}
 			}
-		}		
+		}
 
 		private void OnReadFlashCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				var readFlashOperation = operation as ReadExternalFlashOperation;
 
@@ -1052,28 +1053,73 @@ namespace ECUFlasher
 
 		private void CheckIfFlashMatches()
 		{
-			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+			if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+			{
+				// Boot mode - read flash and compare directly
+				var bootstrapCommViewModel = App.CommInterfaceViewModel as BootstrapInterface_ViewModel;
+				var bootstrapInterface = bootstrapCommViewModel.BootstrapCommInterface;
 
-			var settings = new DoesFlashChecksumMatchOperation.DoesFlashChecksumMatchSettings();
-			settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
-			settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
-			settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+				App.OperationInProgress = true;
+				App.PercentOperationComplete = -1.0f;
+				App.DisplayStatusMessage("Checking if flash matches flash file via boot mode.", StatusMessageType.USER);
 
-			App.CurrentOperation = new DoesFlashChecksumMatchOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, FlashMemoryLayout.BaseAddress, FlashMemoryImage.RawData);
-			App.CurrentOperation.CompletedOperationEvent += this.CheckIfFlashMatchesOperationCompleted;
+				// Read flash and compare asynchronously
+				System.Threading.Tasks.Task.Run(() =>
+				{
+					byte[] flashData;
+					bool readSuccess = bootstrapInterface.ReadFlashBlock(FlashMemoryLayout.BaseAddress, (uint)FlashMemoryImage.RawData.Length, out flashData);
 
-			App.OperationInProgress = true;
-			App.PercentOperationComplete = -1.0f;
+					// Update UI on UI thread
+					Dispatcher.Invoke((Action)(() =>
+					{
+						if (readSuccess && flashData != null)
+						{
+							bool matches = flashData.Length == FlashMemoryImage.RawData.Length &&
+							               flashData.SequenceEqual(FlashMemoryImage.RawData);
 
-			App.DisplayStatusMessage("Checking if flash matches flash file.", StatusMessageType.USER);
+							App.OperationInProgress = false;
+							App.PercentOperationComplete = 100.0f;
 
-			App.CurrentOperation.Start();
+							string matchMessage = matches ? "Flash memory matches flash file." : "Flash memory does not match flash file.";
+							App.DisplayStatusMessage("Checking if flash matches succeeded.\n" + matchMessage, StatusMessageType.USER);
+							App.DisplayUserPrompt("Checking If Flash Matches Complete", "Checking if flash matches succeeded.\n" + matchMessage, UserPromptType.OK);
+						}
+						else
+						{
+							App.OperationInProgress = false;
+							App.PercentOperationComplete = 100.0f;
+							App.DisplayStatusMessage("Checking if flash matches failed - could not read flash", StatusMessageType.USER);
+							App.DisplayUserPrompt("Checking If Flash Matches Complete", "Checking if flash matches failed.", UserPromptType.OK);
+						}
+					}), null);
+				});
+			}
+			else
+			{
+				// KWP2000 operation
+				var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+
+				var settings = new DoesFlashChecksumMatchOperation.DoesFlashChecksumMatchSettings();
+				settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
+				settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
+				settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+
+				App.CurrentOperation = new DoesFlashChecksumMatchOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, FlashMemoryLayout.BaseAddress, FlashMemoryImage.RawData);
+				App.CurrentOperation.CompletedOperationEvent += this.CheckIfFlashMatchesOperationCompleted;
+
+				App.OperationInProgress = true;
+				App.PercentOperationComplete = -1.0f;
+
+				App.DisplayStatusMessage("Checking if flash matches flash file.", StatusMessageType.USER);
+
+				App.CurrentOperation.Start();
+			}
 		}
 
 		private void CheckIfFlashMatchesOperationCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
-			Dispatcher.Invoke((Action)(() => 
+			Dispatcher.Invoke((Action)(() =>
 			{
 				var matchOperation = (DoesFlashChecksumMatchOperation)operation;
 
@@ -1113,23 +1159,42 @@ namespace ECUFlasher
 
 		private void OnWriteExternalFlashStarted(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete, bool diffWrite, bool verify)
 		{
-			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
-
-			var settings = new WriteExternalFlashOperation.WriteExternalFlashSettings();
-			settings.CheckIfWriteRequired = diffWrite;
-			settings.OnlyWriteNonMatchingSectors = diffWrite;
-			settings.VerifyWrittenData = verify;
-			settings.EraseEntireFlashAtOnce = false;
-			settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
-			settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
-			settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
-
 			var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(flashMemoryImage, flashMemoryLayout);
 
-			App.CurrentOperation = new WriteExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
+			if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+			{
+				// Boot mode flash operation
+				var bootstrapCommViewModel = App.CommInterfaceViewModel as BootstrapInterface_ViewModel;
+				var bootstrapInterface = bootstrapCommViewModel.BootstrapCommInterface;
+
+				var settings = new BootModeFlashSettings();
+				settings.CheckIfWriteRequired = diffWrite;
+				settings.OnlyWriteNonMatchingSectors = diffWrite;
+				settings.VerifyWrittenData = verify;
+				settings.EraseSectorsBeforeWrite = true;
+
+				App.CurrentOperation = new WriteExternalFlashBootModeOperation(bootstrapInterface, settings, sectorImages);
+			}
+			else
+			{
+				// KWP2000 flash operation
+				var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+
+				var settings = new WriteExternalFlashOperation.WriteExternalFlashSettings();
+				settings.CheckIfWriteRequired = diffWrite;
+				settings.OnlyWriteNonMatchingSectors = diffWrite;
+				settings.VerifyWrittenData = verify;
+				settings.EraseEntireFlashAtOnce = false;
+				settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
+				settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
+				settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+
+				App.CurrentOperation = new WriteExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
+			}
+
 			App.CurrentOperation.CompletedOperationEvent += onOperationComplete;
 
-			App.OperationInProgress = true;                
+			App.OperationInProgress = true;
 			App.PercentOperationComplete = 0.0f;
 
 			App.DisplayStatusMessage("Writing ECU flash memory.", StatusMessageType.USER);
@@ -1139,26 +1204,46 @@ namespace ECUFlasher
 
 		private string OnWriteExternalFlashCompleted(Operation operation, bool success)
 		{
-			var writeOperation = (WriteExternalFlashOperation)operation;
-
 			string statusMesage = "";
 
-			if (success)
-			{				
-				int numSectors = writeOperation.NumSectors;
-				int numSuccessfullyFlashedSectors = writeOperation.NumSuccessfullyFlashedSectors;
-
-				statusMesage = "Writing ECU flash memory succeeded. Wrote " + numSuccessfullyFlashedSectors + " of " + numSectors + " sectors in flash memory.";
-			}
-			else
+			if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
 			{
-				if (writeOperation.WasFailureCausedByPreviousIncompleteDownload)
+				// Boot mode operation
+				var writeOperation = operation as WriteExternalFlashBootModeOperation;
+
+				if (success)
 				{
-					statusMesage = "Writing ECU flash memory failed because a previous programming operation was incomplete. Please reconnect and retry.";
+					// Boot mode operations don't expose sector counts the same way
+					// We can use TotalBytesFlashed if needed
+					statusMesage = "Writing ECU flash memory via boot mode succeeded.";
 				}
 				else
 				{
-					statusMesage = "Writing ECU flash memory failed.";
+					statusMesage = "Writing ECU flash memory via boot mode failed.";
+				}
+			}
+			else
+			{
+				// KWP2000 operation
+				var writeOperation = (WriteExternalFlashOperation)operation;
+
+				if (success)
+				{
+					int numSectors = writeOperation.NumSectors;
+					int numSuccessfullyFlashedSectors = writeOperation.NumSuccessfullyFlashedSectors;
+
+					statusMesage = "Writing ECU flash memory succeeded. Wrote " + numSuccessfullyFlashedSectors + " of " + numSectors + " sectors in flash memory.";
+				}
+				else
+				{
+					if (writeOperation.WasFailureCausedByPreviousIncompleteDownload)
+					{
+						statusMesage = "Writing ECU flash memory failed because a previous programming operation was incomplete. Please reconnect and retry.";
+					}
+					else
+					{
+						statusMesage = "Writing ECU flash memory failed.";
+					}
 				}
 			}
 
@@ -1179,50 +1264,125 @@ namespace ECUFlasher
 					readImage[x] = 0xFF;
 				}
 			}
-			
+
 			var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(readImage, flashLayout);
 
-			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+			if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+			{
+				// Boot mode read operation - use direct read for now
+				// TODO: Create ReadExternalFlashBootModeOperation for consistency
+				var bootstrapCommViewModel = App.CommInterfaceViewModel as BootstrapInterface_ViewModel;
+				var bootstrapInterface = bootstrapCommViewModel.BootstrapCommInterface;
 
-			var settings = new ReadExternalFlashOperation.ReadExternalFlashSettings();
-			settings.CheckIfSectorReadRequired = checkIfReadRequired;
-			settings.OnlyReadNonMatchingSectors = onlyReadRequiredSectors;
-			settings.VerifyReadData = shouldVerifyReadData;
-			settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
-			settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
-			settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+				App.DisplayStatusMessage("Reading ECU flash memory via boot mode.", StatusMessageType.USER);
+				App.OperationInProgress = true;
+				App.PercentOperationComplete = 0.0f;
 
-			App.CurrentOperation = new ReadExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
-			App.CurrentOperation.CompletedOperationEvent += operationCompletedDel;
-			
-			App.DisplayStatusMessage("Reading ECU flash memory.", StatusMessageType.USER);
+				// Read flash asynchronously using boot mode interface
+				System.Threading.Tasks.Task.Run(() =>
+				{
+					byte[] flashData;
+					bool success = bootstrapInterface.ReadFlashBlock(flashLayout.BaseAddress, (uint)flashLayout.Size, out flashData);
 
-			App.CurrentOperation.Start();
+					// Update UI on UI thread
+					Dispatcher.Invoke((Action)(() =>
+					{
+						if (success && flashData != null)
+						{
+							var readMemory = new MemoryImage(flashData, flashLayout.BaseAddress);
+							App.PercentOperationComplete = 100.0f;
+
+							// Create a simple operation wrapper for the callback
+							var dummyOperation = new SimpleReadOperation(readMemory);
+							operationCompletedDel(dummyOperation, true);
+						}
+						else
+						{
+							App.PercentOperationComplete = 100.0f;
+							var dummyOperation = new SimpleReadOperation(null);
+							operationCompletedDel(dummyOperation, false);
+						}
+
+						App.OperationInProgress = false;
+					}), null);
+				});
+			}
+			else
+			{
+				// KWP2000 read operation
+				var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+
+				var settings = new ReadExternalFlashOperation.ReadExternalFlashSettings();
+				settings.CheckIfSectorReadRequired = checkIfReadRequired;
+				settings.OnlyReadNonMatchingSectors = onlyReadRequiredSectors;
+				settings.VerifyReadData = shouldVerifyReadData;
+				settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
+				settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
+				settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+
+				App.CurrentOperation = new ReadExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
+				App.CurrentOperation.CompletedOperationEvent += operationCompletedDel;
+
+				App.DisplayStatusMessage("Reading ECU flash memory.", StatusMessageType.USER);
+
+				App.CurrentOperation.Start();
+			}
+		}
+
+		// Simple operation wrapper for boot mode read callback
+		private class SimpleReadOperation : Operation
+		{
+			public SimpleReadOperation(MemoryImage readData)
+			{
+				mReadData = readData;
+			}
+
+			public MemoryImage ReadData { get { return mReadData; } }
+
+			private MemoryImage mReadData;
 		}
 
 		private bool OnReadExternalFlashCompleted(Operation operation, bool success, out MemoryImage readMemory)
 		{
-			readMemory = null;            
+			readMemory = null;
 
 			if (success)
 			{
-				var readFlashOperation = (ReadExternalFlashOperation)operation;
-
-				//we only want the data out of the memory images read, since we already know which memory layout is being used
-				var readSectorData = new List<byte[]>();
-				foreach (var sector in readFlashOperation.FlashBlockList)
+				if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
 				{
-					readSectorData.Add(sector.RawData);
+					// Boot mode read - data is already in a MemoryImage
+					var simpleReadOp = operation as SimpleReadOperation;
+					if (simpleReadOp != null && simpleReadOp.ReadData != null)
+					{
+						readMemory = simpleReadOp.ReadData;
+					}
+					else
+					{
+						App.DisplayStatusMessage("Failed to read flash memory via boot mode", StatusMessageType.USER);
+						success = false;
+					}
 				}
-
-				if (!MemoryUtils.CombineMemorySectorsIntoImage(readSectorData, FlashMemoryLayout, out readMemory))                
+				else
 				{
-					App.DisplayStatusMessage("Failed to combine memory sectors into one memory image", StatusMessageType.USER);
-					success = false;
+					// KWP2000 read operation
+					var readFlashOperation = (ReadExternalFlashOperation)operation;
+
+					//we only want the data out of the memory images read, since we already know which memory layout is being used
+					var readSectorData = new List<byte[]>();
+					foreach (var sector in readFlashOperation.FlashBlockList)
+					{
+						readSectorData.Add(sector.RawData);
+					}
+
+					if (!MemoryUtils.CombineMemorySectorsIntoImage(readSectorData, FlashMemoryLayout, out readMemory))
+					{
+						App.DisplayStatusMessage("Failed to combine memory sectors into one memory image", StatusMessageType.USER);
+						success = false;
+					}
 				}
 			}
 
-			return success; 
+			return success;
 		}
 
 		public MemoryImage FlashMemoryImage
@@ -1262,4 +1422,3 @@ namespace ECUFlasher
 		private MemoryLayout _FlashMemoryLayout;
 	}
 }
-
