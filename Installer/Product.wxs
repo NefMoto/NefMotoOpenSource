@@ -1,69 +1,127 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <?define ProductName="NefMotoECUFlasher"?>
-  <?define Version="!(bind.fileVersion.NefMotoECUFlasher.exe)"?>
-  <?define ECUFlasher_TargetDir=$(var.ECUFlasher.TargetDir)?>
-  <?define FTD2XX_NET_TargetDir=$(var.ECUFlasher.TargetDir)?>
-  <?define Communication_TargetDir=$(var.ECUFlasher.TargetDir)?>
-  <?define Shared_TargetDir=$(var.ECUFlasher.TargetDir)?>
-  <?define ApplicationShared_TargetDir=$(var.ECUFlasher.TargetDir)?>
-  <?define MemoryLayouts_TargetDir=..\MemoryLayouts\?>
-  <Product Id="*"
-    Name="$(var.ProductName)"
+  <?define Version=$(env.VERSION)?>
+  <?define BaseVersion=$(env.BASE_VERSION)?>
+  <?define TargetDir=$(env.ECUFlasher_TargetDir)?>
+  <?define MemoryLayouts_TargetDir=MemoryLayouts\?>
+  <Package Id="NefMotoECUFlasher"
+    Name="$(var.ProductName) $(var.Version)"
     Language="1033"
-    Version="$(var.Version)"
+    Version="$(var.BaseVersion)"
     Manufacturer="Nefmoto"
-    UpgradeCode="2d104af1-44d2-4686-b3e0-a860cb092af1">
-    <Package Compressed="yes" InstallScope="perMachine" />
-
-    <!-- https://stackoverflow.com/questions/26336332/force-uninstalling-before-installing-any-version-with-wix-installer -->
-    <MajorUpgrade
-      AllowDowngrades="no"
-      AllowSameVersionUpgrades="no"
-      IgnoreRemoveFailure="no"
-      DowngradeErrorMessage="loc.NewerVersionInstalled"
-      Schedule="afterInstallInitialize"/>
-
+    UpgradeCode="2d104af1-44d2-4686-b3e0-a860cb092af1"
+    Compressed="yes">
     <MediaTemplate EmbedCab="yes" />
 
-    <Feature Id="ProductFeature" Title="$(var.ProductName)" Level="1">
+    <Feature Id="ProductFeature" Title="$(var.ProductName) $(var.Version)" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentGroupRef Id="MemoryLayouts" />
+      <ComponentGroupRef Id="ApplicationShortcuts" />
     </Feature>
-  </Product>
+
+    <Property Id="ARPINSTALLLOCATION" Value="INSTALLFOLDER" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="ProductVersionDisplay" Value="$(var.Version)" />
+    <WixVariable Id="WixUILicenseRtf" Value="Installer\gpl-3.0.rtf" />
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="0" />
+  </Package>
 
   <Fragment>
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFilesFolder">
-	<Directory Id="INSTALLFOLDER" Name="$(var.ProductName)">
-	    <Directory Id="MemoryLayoutsFolder" Name="MemoryLayouts" />
-         </Directory>
-      </Directory>
-    </Directory>
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <WixVariable Id="WixUILicenseRtf" Value="gpl-3.0.rtf" />
-    <UIRef Id="WixUI_InstallDir" />
+    <ComponentGroup Id="ApplicationShortcuts" Directory="ApplicationProgramsFolder">
+      <Component Id="ApplicationProgramsFolder" Guid="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Nefmoto\$(var.ProductName)" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
   </Fragment>
 
   <Fragment>
+    <!-- Upgrade configuration: Find and remove any existing versions (allows upgrades and downgrades) -->
+    <Upgrade Id="2d104af1-44d2-4686-b3e0-a860cb092af1">
+      <UpgradeVersion Minimum="0.0.0.0" IncludeMinimum="yes" Property="PREVIOUSVERSIONSINSTALLED" />
+    </Upgrade>
+  </Fragment>
+
+  <Fragment>
+    <!-- Check for .NET 8 Runtime -->
+    <Property Id="DOTNET8RUNTIME">
+      <RegistrySearch Id="DotNet8Runtime"
+        Root="HKLM"
+        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
+        Name="Version"
+        Type="raw" />
+    </Property>
+    <Property Id="DOTNET8RUNTIME86">
+      <RegistrySearch Id="DotNet8Runtime86"
+        Root="HKLM"
+        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x86\sharedhost"
+        Name="Version"
+        Type="raw" />
+    </Property>
+    <!-- Also check for .NET 8.0 specifically -->
+    <Property Id="DOTNET80">
+      <RegistrySearch Id="DotNet80"
+        Root="HKLM"
+        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\8.0.0"
+        Name="Version"
+        Type="raw" />
+    </Property>
+    <Property Id="DOTNET8086">
+      <RegistrySearch Id="DotNet8086"
+        Root="HKLM"
+        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x86\8.0.0"
+        Name="Version"
+        Type="raw" />
+    </Property>
+  </Fragment>
+
+  <Fragment>
+    <InstallExecuteSequence>
+      <RemoveExistingProducts Before="InstallInitialize" />
+      <FindRelatedProducts Before="LaunchConditions" />
+    </InstallExecuteSequence>
+  </Fragment>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)">
+        <Directory Id="MemoryLayoutsFolder" Name="MemoryLayouts" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="$(var.ProductName)" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+  </Fragment>
+
+  <Fragment>
+    <Icon Id="AppIcon" SourceFile="$(var.TargetDir)$(var.ProductName).exe" />
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="$(var.ProductName).exe" Guid="d2e4f421-0c73-4562-9af9-4f10dd16f278">
-	<File Id="$(var.ProductName).exe" Name="$(var.ProductName).exe" Source="$(var.ECUFlasher_TargetDir)$(var.ProductName).exe" />
+        <File Id="$(var.ProductName).exe" Name="$(var.ProductName).exe" Source="$(var.TargetDir)$(var.ProductName).exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="$(var.ProductName)" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="$(var.ProductName)" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+        </File>
       </Component>
       <Component Id="$(var.ProductName).exe.config" Guid="5d029180-2042-4344-b43b-e5b0809e9887">
-	<File Id="$(var.ProductName).exe.config" Name="$(var.ProductName).exe.config" Source="$(var.ECUFlasher_TargetDir)$(var.ProductName).exe.config" />
+        <File Id="$(var.ProductName).exe.config" Name="$(var.ProductName).exe.config" Source="ECUFlasher\app.config" />
+      </Component>
+      <Component Id="$(var.ProductName).dll" Guid="1a2b3c4d-5e6f-7890-abcd-ef1234567890">
+        <File Id="$(var.ProductName).dll" Name="$(var.ProductName).dll" Source="$(var.TargetDir)$(var.ProductName).dll" />
       </Component>
       <Component Id="FTD2XX_NET.dll" Guid="21949804-55a9-4cf1-b856-ce5b72fd3f6d">
-	<File Id="FTD2XX_NET.dll" Name="FTD2XX_NET.dll" Source="$(var.FTD2XX_NET_TargetDir)FTD2XX_NET.dll" />
+        <File Id="FTD2XX_NET.dll" Name="FTD2XX_NET.dll" Source="$(var.TargetDir)FTD2XX_NET.dll" />
       </Component>
       <Component Id="Communication.dll" Guid="d4cf033c-6330-4e20-9130-f26ef46bbcc9">
-	<File Id="Communication.dll" Name="Communication.dll" Source="$(var.Communication_TargetDir)Communication.dll" />
+        <File Id="Communication.dll" Name="Communication.dll" Source="$(var.TargetDir)Communication.dll" />
       </Component>
       <Component Id="ECUShared.dll" Guid="1161e03f-3326-4297-b492-1d333630dbae">
-	<File Id="ECUShared.dll" Name="ECUShared.dll" Source="$(var.Shared_TargetDir)ECUShared.dll" />
+        <File Id="ECUShared.dll" Name="ECUShared.dll" Source="$(var.TargetDir)ECUShared.dll" />
       </Component>
       <Component Id="ApplicationShared.dll" Guid="d42fabc7-0a7b-48b2-8104-3b8f85d8d525">
-	<File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.ApplicationShared_TargetDir)ApplicationShared.dll" />
+        <File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.TargetDir)ApplicationShared.dll" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="MemoryLayouts" Directory="MemoryLayoutsFolder">

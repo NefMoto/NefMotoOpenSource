@@ -48,8 +48,10 @@ artifacts/
 *_i.c
 *_p.c
 *_i.h
+*.exe
 *.ilk
 *.meta
+*.msi
 *.obj
 *.pch
 *.pdb
