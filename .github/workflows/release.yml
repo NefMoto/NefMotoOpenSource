@@ -91,7 +91,7 @@ jobs:
         Write-Host "Full path: $fullPath"
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: ${{ steps.find_msi.outputs.msi_path }}
         tag_name: ${{ steps.release.outputs.tag }}
