@@ -23,28 +23,30 @@ jobs:
 
     - name: Determine tag and release type
       id: release
-      shell: pwsh
+      shell: bash
       run: |
-        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-          $tag = "${{ inputs.tag }}"
-        } elseif ("${{ github.event_name }}" -eq "push") {
-          $tag = "${{ github.ref_name }}"
-        } else {
-          $tag = git describe --tags --exact-match HEAD 2>$null
-          if (-not $tag) {
-            Write-Error "Could not determine tag from ref: ${{ github.ref }}"
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          tag="${{ inputs.tag }}"
+        elif [ "${{ github.event_name }}" = "push" ]; then
+          tag="${{ github.ref_name }}"
+        else
+          tag=$(git describe --tags --exact-match HEAD 2>/dev/null)
+          if [ -z "$tag" ]; then
+            echo "Error: Could not determine tag from ref: ${{ github.ref }}"
             exit 1
-          }
-        }
+          fi
+        fi
 
-        if ($tag -match '-\w+') {
-          $isPrerelease = "true"
-        } else {
-          $isPrerelease = "false"
-        }
+        # Check if tag contains a hyphen followed by letters/numbers (e.g., -rc1, -beta, -alpha, etc.)
+        # This matches pre-release tags like v1.9.4.4-rc2, v1.0.0-beta, etc.
+        if echo "$tag" | grep -qE -- '-[a-zA-Z0-9]+'; then
+          isPrerelease="true"
+        else
+          isPrerelease="false"
+        fi
 
-        echo "tag=$tag" >> $env:GITHUB_OUTPUT
-        echo "prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+        echo "tag=$tag" >> $GITHUB_OUTPUT
+        echo "prerelease=$isPrerelease" >> $GITHUB_OUTPUT
         echo "Building for tag: $tag (prerelease: $isPrerelease)"
 
     - name: Setup .NET
@@ -87,8 +89,71 @@ jobs:
         $fullPath = $msi.FullName
         $relativePath = $fullPath -replace [regex]::Escape($workspace), '' -replace '^\\', '' -replace '\\', '/'
         echo "msi_path=$relativePath" >> $env:GITHUB_OUTPUT
+        echo "msi_name=$($msi.Name)" >> $env:GITHUB_OUTPUT
         Write-Host "Found MSI: $($msi.Name) at $relativePath"
         Write-Host "Full path: $fullPath"
+
+    - name: Generate release notes with MSI link
+      id: release_notes
+      shell: bash
+      run: |
+        tag="${{ steps.release.outputs.tag }}"
+        msiName="${{ steps.find_msi.outputs.msi_name }}"
+        msiUrl="https://github.com/${{ github.repository }}/releases/download/${tag}/${msiName}"
+        token="${{ secrets.GITHUB_TOKEN }}"
+        repo="${{ github.repository }}"
+
+        # Generate standard release notes using GitHub API
+        response=$(curl -s -w "\n%{http_code}" \
+          -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${token}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -H "Content-Type: application/json" \
+          -d "{\"tag_name\":\"${tag}\",\"target_commitish\":\"HEAD\"}" \
+          "https://api.github.com/repos/${repo}/releases/generate-notes")
+
+        httpCode=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | sed '$d')
+
+        if [ "$httpCode" = "200" ]; then
+          # Extract body from JSON response
+          if command -v jq &> /dev/null; then
+            releaseBody=$(echo "$body" | jq -r '.body')
+          else
+            # Fallback: try to extract body field manually
+            releaseBody=$(echo "$body" | grep -o '"body":"[^"]*"' | sed 's/"body":"\(.*\)"/\1/' | sed 's/\\n/\n/g')
+            if [ -z "$releaseBody" ]; then
+              echo "Warning: Could not parse JSON response, using fallback"
+              releaseBody=""
+            fi
+          fi
+
+          if [ -z "$releaseBody" ]; then
+            echo "Warning: Empty response body, using fallback"
+            releaseBody="## What's Changed"$'\n'$'\n'"Release ${tag}"
+          else
+            echo "Successfully generated release notes"
+          fi
+        else
+          if [ "$httpCode" = "403" ]; then
+            echo "Warning: Permission denied (403). Token may not have 'repo' scope."
+          else
+            echo "Warning: Failed to generate release notes (HTTP $httpCode)"
+          fi
+          # Fallback if API call fails
+          releaseBody="## What's Changed"$'\n'$'\n'"Release ${tag}"
+        fi
+
+        # Append MSI download link
+        releaseBody="${releaseBody}"$'\n'$'\n'"## Downloads"$'\n'$'\n'"📦 [Download Installer](${msiUrl}) (${msiName})"
+
+        # Use multiline output format
+        {
+          echo "body<<EOF"
+          echo "$releaseBody"
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
@@ -97,6 +162,6 @@ jobs:
         tag_name: ${{ steps.release.outputs.tag }}
         prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
         draft: false
-        generate_release_notes: true
+        body: ${{ steps.release_notes.outputs.body }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
