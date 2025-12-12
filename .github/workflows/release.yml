@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g., v1.1.1.1 or v1.1.1.1-rc1)'
+        required: true
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        fetch-depth: 0  # Fetch all history for git describe
+
+    - name: Determine tag and release type
+      id: release
+      shell: pwsh
+      run: |
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          $tag = "${{ inputs.tag }}"
+        } elseif ("${{ github.event_name }}" -eq "push") {
+          $tag = "${{ github.ref_name }}"
+        } else {
+          $tag = git describe --tags --exact-match HEAD 2>$null
+          if (-not $tag) {
+            Write-Error "Could not determine tag from ref: ${{ github.ref }}"
+            exit 1
+          }
+        }
+
+        if ($tag -match '-\w+') {
+          $isPrerelease = "true"
+        } else {
+          $isPrerelease = "false"
+        }
+
+        echo "tag=$tag" >> $env:GITHUB_OUTPUT
+        echo "prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+        echo "Building for tag: $tag (prerelease: $isPrerelease)"
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install WiX Toolset
+      run: |
+        dotnet tool install --global wix --version 6.0.2
+        wix extension add WixToolset.UI.wixext --global
+      shell: pwsh
+
+    - name: Build Release
+      run: make release
+      shell: bash
+
+    - name: Build installer
+      env:
+        VERSION: ${{ steps.release.outputs.tag }}
+      run: make installer
+      shell: bash
+
+    - name: Find MSI file
+      id: find_msi
+      shell: pwsh
+      run: |
+        $msi = Get-ChildItem -Path "Installer/bin/Release" -Filter "NefMotoECUFlasher-*.msi" | Select-Object -First 1
+        if (-not $msi) {
+          Write-Error "MSI file not found in Installer/bin/Release"
+          exit 1
+        }
+        # Get relative path using forward slashes (works on Windows too)
+        $workspace = $env:GITHUB_WORKSPACE
+        $fullPath = $msi.FullName
+        $relativePath = $fullPath -replace [regex]::Escape($workspace), '' -replace '^\\', '' -replace '\\', '/'
+        echo "msi_path=$relativePath" >> $env:GITHUB_OUTPUT
+        Write-Host "Found MSI: $($msi.Name) at $relativePath"
+        Write-Host "Full path: $fullPath"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{ steps.find_msi.outputs.msi_path }}
+        tag_name: ${{ steps.release.outputs.tag }}
+        prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
+        draft: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
