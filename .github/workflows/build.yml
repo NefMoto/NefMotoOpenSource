@@ -58,7 +58,7 @@ jobs:
       shell: bash
 
     - name: Upload MSI artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: NefMotoECUFlasher-installer
         path: Installer/bin/Release/NefMotoECUFlasher-*.msi
