@@ -59,14 +59,29 @@ namespace ECUFlasher
             return applicationDirectory;
         }
 
-		internal string GetApplicationName()
-		{
-			string appName = ECUFlasher.Properties.Resources.ApplicationName + " " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
-#if DEBUG
-			appName = "DEBUG " + appName + " DEBUG";
-#endif
-			return appName;
-		}
+        internal string GetApplicationName()
+        {
+            string appName = ECUFlasher.Properties.Resources.ApplicationName + " " + GetFullVersion();
+            return appName;
+        }
+
+        internal string GetFullVersion()
+        {
+            var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+            var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            return !string.IsNullOrWhiteSpace(version)
+                ? version.Trim()
+                : "AssemblyInformationalVersion is not set";
+        }
+
+        internal string GetVersion()
+        {
+            var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+            var version = assembly.GetName().Version?.ToString();
+            return !string.IsNullOrWhiteSpace(version)
+                ? version.Trim()
+                : "AssemblyVersion is not set";
+        }
 
         static App()
         {
@@ -619,6 +634,50 @@ namespace ECUFlasher
             }
         }
         private ReactiveCommand _OpenParameterCommand;
+        #endregion
+
+        #region ShowAboutDialogCommand
+        public ReactiveCommand ShowAboutDialogCommand
+        {
+            get
+            {
+                if (_ShowAboutDialogCommand == null)
+                {
+                    _ShowAboutDialogCommand = new ReactiveCommand(delegate() {
+                        var aboutDialog = new AboutDialog
+                        {
+                            Owner = Application.Current.MainWindow
+                        };
+                        aboutDialog.ShowDialog();
+                    });
+                    _ShowAboutDialogCommand.Name = "About";
+                    _ShowAboutDialogCommand.Description = "Show information about NefMotoECUFlasher";
+                }
+
+                return _ShowAboutDialogCommand;
+            }
+        }
+        private ReactiveCommand _ShowAboutDialogCommand;
+        #endregion
+
+        #region ExitCommand
+        public ReactiveCommand ExitCommand
+        {
+            get
+            {
+                if (_ExitCommand == null)
+                {
+                    _ExitCommand = new ReactiveCommand(delegate() {
+                        Application.Current.Shutdown();
+                    });
+                    _ExitCommand.Name = "Exit";
+                    _ExitCommand.Description = "Exit the application";
+                }
+
+                return _ExitCommand;
+            }
+        }
+        private ReactiveCommand _ExitCommand;
         #endregion
 
         #region CancelCurrentOperationCommand

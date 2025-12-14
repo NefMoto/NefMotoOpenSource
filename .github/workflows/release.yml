@@ -62,7 +62,7 @@ jobs:
     - name: Install WiX Toolset
       run: |
         dotnet tool install --global wix --version 6.0.2
-        wix extension add WixToolset.UI.wixext --global
+        wix extension add WixToolset.UI.wixext WixToolset.NetFx.wixext --global
       shell: pwsh
 
     - name: Build Release

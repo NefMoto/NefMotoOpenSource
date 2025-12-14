@@ -32,7 +32,6 @@
     <PublisherName>Nefarious Motorsports</PublisherName>
     <OpenBrowserOnPublish>false</OpenBrowserOnPublish>
     <ApplicationRevision>3</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <CreateDesktopShortcut>true</CreateDesktopShortcut>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -99,6 +98,15 @@
   </PropertyGroup>
   <PropertyGroup>
     <RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <FullVersion Condition="'$(FullVersion)' == ''">$(FULL_VERSION)</FullVersion>
+    <BaseVersion>$([System.Text.RegularExpressions.Regex]::Match($(FullVersion), '(\d+\.\d+(\.\d+)?(\.\d+)?)'))</BaseVersion>
+    <AssemblyVersion>$(BaseVersion)</AssemblyVersion>
+    <FileVersion>$(BaseVersion)</FileVersion>
+    <InformationalVersion>$(FullVersion)</InformationalVersion>
+    <!-- FULL_VERSION is the full version string, already including the source hash -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Update="System.Core">

@@ -1,31 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <?define ProductName="NefMotoECUFlasher"?>
-  <?define Version=$(env.VERSION)?>
-  <?define BaseVersion=$(env.BASE_VERSION)?>
+  <?define FullVersion=$(env.FULL_VERSION)?>
   <?define TargetDir=$(env.ECUFlasher_TargetDir)?>
   <?define MemoryLayouts_TargetDir=MemoryLayouts\?>
   <Package Id="NefMotoECUFlasher"
-    Name="$(var.ProductName) $(var.Version)"
+    Name="$(var.ProductName) $(var.FullVersion)"
     Language="1033"
-    Version="$(var.BaseVersion)"
+    Version="!(bind.fileVersion.$(var.ProductName).exe)"
     Manufacturer="Nefmoto"
     UpgradeCode="2d104af1-44d2-4686-b3e0-a860cb092af1"
     Compressed="yes">
     <MediaTemplate EmbedCab="yes" />
 
-    <Feature Id="ProductFeature" Title="$(var.ProductName) $(var.Version)" Level="1">
+    <Feature Id="ProductFeature" Title="$(var.ProductName)" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentGroupRef Id="MemoryLayouts" />
       <ComponentGroupRef Id="ApplicationShortcuts" />
+      <ComponentGroupRef Id="DesktopShortcut" />
     </Feature>
 
     <Property Id="ARPINSTALLLOCATION" Value="INSTALLFOLDER" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <Property Id="ProductVersionDisplay" Value="$(var.Version)" />
+    <Property Id="ProductVersionDisplay" Value="$(var.FullVersion)" />
     <WixVariable Id="WixUILicenseRtf" Value="Installer\gpl-3.0.rtf" />
     <ui:WixUI Id="WixUI_InstallDir" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="0" />
+
+    <!-- MajorUpgrade configuration: Handles upgrades and downgrades (must be in Package element) -->
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed. Please uninstall it first."
+      AllowSameVersionUpgrades="yes"
+      Schedule="afterInstallInitialize" />
+
+    <!-- Launch conditions: Check for .NET 8 -->
+    <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX64" />
+    <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX86" />
+    <Launch
+      Condition="Installed OR DOTNET8STATUS=&quot;0&quot; OR DOTNET8STATUS86=&quot;0&quot;"
+      Message="This application requires .NET 8.0 Runtime. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0" />
   </Package>
 
   <Fragment>
@@ -38,50 +53,21 @@
   </Fragment>
 
   <Fragment>
-    <!-- Upgrade configuration: Find and remove any existing versions (allows upgrades and downgrades) -->
-    <Upgrade Id="2d104af1-44d2-4686-b3e0-a860cb092af1">
-      <UpgradeVersion Minimum="0.0.0.0" IncludeMinimum="yes" Property="PREVIOUSVERSIONSINSTALLED" />
-    </Upgrade>
-  </Fragment>
+    <netfx:DotNetCompatibilityCheck
+      Id="Net8CheckX64"
+      Property="DOTNET8STATUS"
+      RuntimeType="desktop"
+      Version="8.0.0"
+      Platform="x64"
+      RollForward="latestMajor" />
 
-  <Fragment>
-    <!-- Check for .NET 8 Runtime -->
-    <Property Id="DOTNET8RUNTIME">
-      <RegistrySearch Id="DotNet8Runtime"
-        Root="HKLM"
-        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
-        Name="Version"
-        Type="raw" />
-    </Property>
-    <Property Id="DOTNET8RUNTIME86">
-      <RegistrySearch Id="DotNet8Runtime86"
-        Root="HKLM"
-        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x86\sharedhost"
-        Name="Version"
-        Type="raw" />
-    </Property>
-    <!-- Also check for .NET 8.0 specifically -->
-    <Property Id="DOTNET80">
-      <RegistrySearch Id="DotNet80"
-        Root="HKLM"
-        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\8.0.0"
-        Name="Version"
-        Type="raw" />
-    </Property>
-    <Property Id="DOTNET8086">
-      <RegistrySearch Id="DotNet8086"
-        Root="HKLM"
-        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x86\8.0.0"
-        Name="Version"
-        Type="raw" />
-    </Property>
-  </Fragment>
-
-  <Fragment>
-    <InstallExecuteSequence>
-      <RemoveExistingProducts Before="InstallInitialize" />
-      <FindRelatedProducts Before="LaunchConditions" />
-    </InstallExecuteSequence>
+    <netfx:DotNetCompatibilityCheck
+      Id="Net8CheckX86"
+      Property="DOTNET8STATUS86"
+      RuntimeType="desktop"
+      Version="8.0.0"
+      Platform="x86"
+      RollForward="latestMajor" />
   </Fragment>
 
   <Fragment>
@@ -97,31 +83,47 @@
   </Fragment>
 
   <Fragment>
+    <!-- Desktop shortcut component -->
+    <ComponentGroup Id="DesktopShortcut" Directory="DesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="f1e2d3c4-b5a6-9780-cdef-123456789abc">
+        <Shortcut Id="DesktopShortcut" Name="$(var.ProductName)" Target="[INSTALLFOLDER]$(var.ProductName).exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+        <RegistryValue Root="HKCU" Key="Software\Nefmoto\$(var.ProductName)" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Product components in the installation folder -->
+  <Fragment>
     <Icon Id="AppIcon" SourceFile="$(var.TargetDir)$(var.ProductName).exe" />
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="$(var.ProductName).exe" Guid="d2e4f421-0c73-4562-9af9-4f10dd16f278">
         <File Id="$(var.ProductName).exe" Name="$(var.ProductName).exe" Source="$(var.TargetDir)$(var.ProductName).exe" KeyPath="yes">
           <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="$(var.ProductName)" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
-          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="$(var.ProductName)" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
         </File>
       </Component>
       <Component Id="$(var.ProductName).exe.config" Guid="5d029180-2042-4344-b43b-e5b0809e9887">
-        <File Id="$(var.ProductName).exe.config" Name="$(var.ProductName).exe.config" Source="ECUFlasher\app.config" />
+        <File Id="$(var.ProductName).exe.config" Name="$(var.ProductName).exe.config" Source="ECUFlasher\app.config" KeyPath="yes" />
       </Component>
       <Component Id="$(var.ProductName).dll" Guid="1a2b3c4d-5e6f-7890-abcd-ef1234567890">
-        <File Id="$(var.ProductName).dll" Name="$(var.ProductName).dll" Source="$(var.TargetDir)$(var.ProductName).dll" />
+        <File Id="$(var.ProductName).dll" Name="$(var.ProductName).dll" Source="$(var.TargetDir)$(var.ProductName).dll" KeyPath="yes" />
+      </Component>
+      <Component Id="$(var.ProductName).runtimeconfig.json" Guid="b3c4d5e6-f7a8-9012-bcde-f12345678901">
+        <File Id="$(var.ProductName).runtimeconfig.json" Name="$(var.ProductName).runtimeconfig.json" Source="$(var.TargetDir)NefMotoECUFlasher.runtimeconfig.json" KeyPath="yes" />
+      </Component>
+      <Component Id="$(var.ProductName).deps.json" Guid="c4d5e6f7-a8b9-0123-cdef-123456789012">
+        <File Id="$(var.ProductName).deps.json" Name="$(var.ProductName).deps.json" Source="$(var.TargetDir)NefMotoECUFlasher.deps.json" KeyPath="yes" />
       </Component>
       <Component Id="FTD2XX_NET.dll" Guid="21949804-55a9-4cf1-b856-ce5b72fd3f6d">
-        <File Id="FTD2XX_NET.dll" Name="FTD2XX_NET.dll" Source="$(var.TargetDir)FTD2XX_NET.dll" />
+        <File Id="FTD2XX_NET.dll" Name="FTD2XX_NET.dll" Source="$(var.TargetDir)FTD2XX_NET.dll" KeyPath="yes" />
       </Component>
       <Component Id="Communication.dll" Guid="d4cf033c-6330-4e20-9130-f26ef46bbcc9">
-        <File Id="Communication.dll" Name="Communication.dll" Source="$(var.TargetDir)Communication.dll" />
+        <File Id="Communication.dll" Name="Communication.dll" Source="$(var.TargetDir)Communication.dll" KeyPath="yes" />
       </Component>
       <Component Id="ECUShared.dll" Guid="1161e03f-3326-4297-b492-1d333630dbae">
-        <File Id="ECUShared.dll" Name="ECUShared.dll" Source="$(var.TargetDir)ECUShared.dll" />
+        <File Id="ECUShared.dll" Name="ECUShared.dll" Source="$(var.TargetDir)ECUShared.dll" KeyPath="yes" />
       </Component>
       <Component Id="ApplicationShared.dll" Guid="d42fabc7-0a7b-48b2-8104-3b8f85d8d525">
-        <File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.TargetDir)ApplicationShared.dll" />
+        <File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.TargetDir)ApplicationShared.dll" KeyPath="yes" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="MemoryLayouts" Directory="MemoryLayoutsFolder">
