@@ -8,12 +8,12 @@ If you're using bash (Cygwin, MSYS, Git Bash, WSL, or any Unix system), use the 
 
 ```bash
 # Build Debug (default)
-make debug
+make
 
 # Build Release
-make Release
+make release
 
-# Build installer
+# Build Release and installer
 make installer
 
 # Clean build artifacts
@@ -22,13 +22,15 @@ make clean
 
 ## Windows
 
-
-```cmd
-# Build Debug (default)
+```bat
+REM Build Debug (default)
 build.bat
 
-# Build installer
-# FIXME: can't yet!
+REM Build Release
+build.bat release
+
+REM Build Release and installer
+build.bat installer
 ```
 
 ## Prerequisites
@@ -36,3 +38,5 @@ build.bat
 - **.NET SDK** (preferred) or **Visual Studio** with MSBuild
 - **WiX Toolset v6.0+** (for installer builds)
   - `dotnet tool install --global wix --version 6.0.2`
+- **WiX UI and NetFX extensions**
+  - `wix extension add WixToolset.UI.wixext WixToolset.NetFx.wixext --global`
