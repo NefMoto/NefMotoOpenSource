@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,7 +10,7 @@ namespace Communication
     {
         // Asynchronous method for invoking delegates
         // Returns immediately (fire-and-forget) like old BeginInvoke - doesn't wait for handlers
-        public Task<bool> BeginInvokeAsync(CommunicationInterface commInterface, Delegate[] dels, object invokeParam)
+        public Task<bool> BeginInvokeAsync(CommunicationInterface commInterface, Delegate[] dels, object invokeParam, Action onHandlerComplete)
         {
             commInterface.LogProfileEventDispatch("EventHolder BeginInvoke");
 
@@ -21,7 +21,7 @@ namespace Communication
                 foreach (Delegate del in dels)
                 {
                     // Fire-and-forget: invoke delegate asynchronously, don't wait
-                    BeginInvokeDelegateAsync(commInterface, del, invokeParam);
+                    BeginInvokeDelegateAsync(commInterface, del, invokeParam, onHandlerComplete);
                     invokedAny = true;
                 }
             }
@@ -34,7 +34,7 @@ namespace Communication
 
         // Invoke delegate asynchronously (fire-and-forget)
         // Derived classes should override this method to handle their specific delegate signatures
-        protected virtual void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected virtual void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam, Action onHandlerComplete)
         {
             // Use Task.Run for async execution - fire-and-forget (don't await)
             Task.Run(() =>
@@ -46,6 +46,11 @@ namespace Communication
                 catch (Exception ex)
                 {
                     commInterface.LogProfileEventDispatch($"Error invoking delegate: {ex.Message}");
+                }
+                finally
+                {
+                    // Call completion callback for each handler
+                    onHandlerComplete?.Invoke();
                 }
             });
         }

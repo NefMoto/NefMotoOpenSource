@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,7 +18,7 @@ namespace Communication
             mNumRetries = numRetries;
         }
 
-        protected override void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected override void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam, Action onHandlerComplete)
         {
             if (del is MessageSendFinishedDelegate finishedDel)
             {
@@ -45,16 +45,22 @@ namespace Communication
                         {
                             commInterface.LogProfileEventDispatch($"Error during delegate invocation: {ex.Message}");
                         }
+                        finally
+                        {
+                            onHandlerComplete?.Invoke();
+                        }
                     });
                 }
                 else
                 {
                     commInterface.LogProfileEventDispatch("Invalid communication interface type.");
+                    onHandlerComplete?.Invoke();
                 }
             }
             else
             {
                 commInterface.LogProfileEventDispatch("Delegate type mismatch in BeginInvokeDelegateAsync.");
+                onHandlerComplete?.Invoke();
             }
         }
 

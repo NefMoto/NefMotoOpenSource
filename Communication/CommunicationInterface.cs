@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -164,7 +164,10 @@ namespace Communication
 
         protected override bool CanOperationStart()
         {
-            return base.CanOperationStart() && CommInterface.IsConnected();
+            bool baseCanStart = base.CanOperationStart();
+            bool isConnected = CommInterface.IsConnected();
+            bool result = baseCanStart && isConnected;
+            return result;
         }
 
         protected virtual void ResetOperation()
@@ -674,10 +677,18 @@ namespace Communication
                         {
                             LogProfileEventDispatch("Start TriggerNextQueuedEvent, BeginInvoke");
 
-                            // Fire-and-forget: don't await, use continuation like old BeginInvoke callback
-                            eventHolder.BeginInvokeAsync(this, invocationList, null).ContinueWith((task) =>
+                            // Create a completion callback that will be called for each handler
+                            // This ensures the counter is decremented once per handler, not once per event
+                            Action onHandlerComplete = () =>
                             {
-                                QueuedEventHandlerComplete(task);
+                                QueuedEventHandlerComplete(null);
+                            };
+
+                            // Fire-and-forget: don't await, use continuation like old BeginInvoke callback
+                            eventHolder.BeginInvokeAsync(this, invocationList, null, onHandlerComplete).ContinueWith((task) =>
+                            {
+                                // This continuation is called when BeginInvokeAsync returns (immediately),
+                                // but the actual handler completion is tracked via onHandlerComplete above
                             }, TaskContinuationOptions.None);
 
                             LogProfileEventDispatch("Start TriggerNextQueuedEvent, BeginInvoke Finished");
@@ -724,6 +735,15 @@ namespace Communication
             lock (mQueuedEvents)
             {
                 mQueuedEvents.Clear();
+            }
+
+            // Reset the handler counter since any handlers in progress are now abandoned
+            // This prevents the counter from being stuck > 0 after disconnect, which would
+            // prevent future events from being processed
+            lock (mQueuedEventTriggerMutex)
+            {
+                Interlocked.Exchange(ref mNumQueuedEventHandlersInProgress, 0);
+                mIsTriggeringQueuedEvent = false;
             }
         }
 

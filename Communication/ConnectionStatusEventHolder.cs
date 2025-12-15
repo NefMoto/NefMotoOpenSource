@@ -1,4 +1,4 @@
-﻿using Shared;
+using Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +17,7 @@ namespace Communication
             mWillReconnect = willReconnect;
         }
 
-        protected override void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam)
+        protected override void BeginInvokeDelegateAsync(CommunicationInterface commInterface, Delegate del, object invokeParam, Action onHandlerComplete)
         {
             if (del is ConnectionStatusChangedDelegate statusChangedDel)
             {
@@ -40,7 +40,15 @@ namespace Communication
                     {
                         commInterface.LogProfileEventDispatch($"Error during delegate invocation: {ex.Message}");
                     }
+                    finally
+                    {
+                        onHandlerComplete?.Invoke();
+                    }
                 });
+            }
+            else
+            {
+                onHandlerComplete?.Invoke();
             }
         }
 
