@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 using Shared;
 
@@ -128,7 +129,7 @@ namespace Checksum
 				OperationCompleted(success);
 			});
 
-			asyncDel.BeginInvoke(null, null);
+			Task.Run(() => asyncDel());
 		}
 
 		public static bool ValidateChecksums(byte[] imageToCheck, out bool areChecksumsCorrect, out uint numChecksums, out uint numIncorrectChecksums)
@@ -192,7 +193,7 @@ namespace Checksum
 				OperationCompleted(success);
 			});
 
-			asyncDel.BeginInvoke(null, null);
+			Task.Run(() => asyncDel());
 		}
 
 		public static bool CorrectChecksums(byte[] imageToCheck, out uint numChecksums, out uint numCorrectedChecksums)
