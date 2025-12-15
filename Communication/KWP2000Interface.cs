@@ -2100,9 +2100,14 @@ namespace Communication
                     {
                         if (messageBlock.mBlockData != null)
                         {
-                            foreach (char curChar in messageBlock.mBlockData)
+                            foreach (byte curByte in messageBlock.mBlockData)
                             {
-                                ASCIIData += curChar;
+                                // Stop processing at null termination
+                                if (curByte == 0)
+                                {
+                                    break;
+                                }
+                                ASCIIData += (char)curByte;
                             }
                         }
                     }
