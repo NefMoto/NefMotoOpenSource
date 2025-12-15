@@ -25,21 +25,21 @@
     <Property Id="ARPINSTALLLOCATION" Value="INSTALLFOLDER" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <Property Id="ProductVersionDisplay" Value="$(var.FullVersion)" />
+    <Property Id="REINSTALLMODE" Value="amus" />
     <WixVariable Id="WixUILicenseRtf" Value="Installer\gpl-3.0.rtf" />
     <ui:WixUI Id="WixUI_InstallDir" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="0" />
 
     <!-- MajorUpgrade configuration: Handles upgrades and downgrades (must be in Package element) -->
     <MajorUpgrade
-      DowngradeErrorMessage="A newer version of [ProductName] is already installed. Please uninstall it first."
-      AllowSameVersionUpgrades="yes"
+      AllowDowngrades="yes"
       Schedule="afterInstallInitialize" />
 
     <!-- Launch conditions: Check for .NET 8 -->
     <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX64" />
     <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX86" />
     <Launch
-      Condition="Installed OR DOTNET8STATUS=&quot;0&quot; OR DOTNET8STATUS86=&quot;0&quot;"
+      Condition="NOT Installed AND DOTNET8STATUS=&quot;0&quot; AND DOTNET8STATUS86=&quot;0&quot;"
       Message="This application requires .NET 8.0 Runtime. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0" />
   </Package>
 
