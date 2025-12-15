@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -74,6 +74,15 @@ Contact by Email: tony@nefariousmotorsports.com
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
         </Style>
 
+        <Style TargetType="GridSplitter">
+            <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+        </Style>
+
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+        </Style>
+
+
         <DataTemplate DataType="{x:Type Shared:ScaleOffsetMemoryVariableValueConverter}">
             <DataTemplate.Resources>
 
@@ -95,11 +104,11 @@ Contact by Email: tony@nefariousmotorsports.com
                     <RowDefinition></RowDefinition>
                     <RowDefinition></RowDefinition>
                 </Grid.RowDefinitions>
-                <Label Grid.Row="0" Grid.Column="0">Scale:</Label>
+                <Label Grid.Row="0" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Scale:</Label>
                 <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Path=Scale, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-                <Label Grid.Row="1" Grid.Column="0">Offset:</Label>
+                <Label Grid.Row="1" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Offset:</Label>
                 <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Path=Offset, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-                <Label Grid.Row="2" Grid.Column="0">Bit Mask:</Label>
+                <Label Grid.Row="2" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Bit Mask:</Label>
                 <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Path=BitMask, Converter={StaticResource hexConverter}, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
             </Grid>
         </DataTemplate>
@@ -155,6 +164,9 @@ Contact by Email: tony@nefariousmotorsports.com
                 <Style TargetType="TextBox" BasedOn="{StaticResource ValidationTextBoxStyle}"/>
                 <Style TargetType="CheckBox" BasedOn="{StaticResource BaseStyle}"/>
                 <Style TargetType="ComboBox" BasedOn="{StaticResource BaseStyle}"/>
+                <Style TargetType="Label">
+                    <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+                </Style>
 
             </DataTemplate.Resources>
             <Border Margin="5">
@@ -181,7 +193,7 @@ Contact by Email: tony@nefariousmotorsports.com
                         <RowDefinition Height="Auto"></RowDefinition>
                         <RowDefinition Height="*"></RowDefinition>
                     </Grid.RowDefinitions>
-                    <Label Grid.Row="0" Grid.Column="0">Variable ID:</Label>
+                    <Label Grid.Row="0" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Variable ID:</Label>
                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Path=VariableID, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}">
                         <TextBox.Style>
                             <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
@@ -195,17 +207,17 @@ Contact by Email: tony@nefariousmotorsports.com
                             </Style>
                         </TextBox.Style>
                     </TextBox>
-                    <Label Grid.Row="1" Grid.Column="0">Name:</Label>
+                    <Label Grid.Row="1" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Name:</Label>
                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Path=Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-                    <Label Grid.Row="2" Grid.Column="0">Units:</Label>
+                    <Label Grid.Row="2" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Units:</Label>
                     <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Path=Units, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-                    <Label Grid.Row="3" Grid.Column="0">Address:</Label>
+                    <Label Grid.Row="3" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Address:</Label>
                     <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Path=StartAddress, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
-                    <Label Grid.Row="4" Grid.Column="0">Data Type:</Label>
+                    <Label Grid.Row="4" Grid.Column="0" Foreground="{StaticResource ForegroundBrush}">Data Type:</Label>
                     <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Source={StaticResource DataTypeEnumValues}}"
 								SelectedItem="{Binding Path=DataType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     <ContentControl Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Content="{Binding Path=ValueConverter}"/>
-                    <Label Grid.Row="6" Grid.Column="0" VerticalAlignment="Top">Note:</Label>
+                    <Label Grid.Row="6" Grid.Column="0" VerticalAlignment="Top" Foreground="{StaticResource ForegroundBrush}">Note:</Label>
                     <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Path=Description, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" MinLines="1" VerticalAlignment="Top" TextWrapping="Wrap" AcceptsReturn="True"/>
                 </Grid>
             </Border>
@@ -263,12 +275,12 @@ Contact by Email: tony@nefariousmotorsports.com
             </Menu.Resources>
             <MenuItem Header="Definitions">
                 <MenuItem Command="{Binding Path=AddVariableDefinitionCommand}"/>
-                <MenuItem Command="{Binding Path=DataContext.RemoveVariableDefinitionCommand}" CommandParameter="{Binding ElementName=VariableDefinitionsListBox, Path=SelectedItems}"/>
+                <MenuItem Command="{Binding Path=RemoveVariableDefinitionCommand}" CommandParameter="{Binding ElementName=VariableDefinitionsListBox, Path=SelectedItems}"/>
                 <MenuItem Command="{Binding Path=SaveVariableDefinitionsToFileCommand}"/>
                 <MenuItem Command="{Binding Path=LoadVariableDefinitionsFromFileCommand}"/>
             </MenuItem>
             <MenuItem Header="Read Variables">
-                <MenuItem Command="{Binding Path=DataContext.AddReadVariableCommand}" CommandParameter="{Binding ElementName=VariableDefinitionsListBox, Path=SelectedItems}"/>
+                <MenuItem Command="{Binding Path=AddReadVariableCommand}" CommandParameter="{Binding ElementName=VariableDefinitionsListBox, Path=SelectedItems}"/>
                 <MenuItem Command="{Binding Path=RemoveReadVariableCommand}" CommandParameter="{Binding ElementName=ReadVariablesListBox, Path=SelectedItems}"/>
                 <MenuItem Command="{Binding Path=SaveReadVariablesToFileCommand}"/>
                 <MenuItem Command="{Binding Path=LoadReadVariablesFromFileCommand}"/>
@@ -528,4 +540,3 @@ Contact by Email: tony@nefariousmotorsports.com
         </Grid>
     </DockPanel>
 </ECUFlasher:BaseUserControl>
-

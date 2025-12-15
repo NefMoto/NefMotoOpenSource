@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -36,21 +36,13 @@ Contact by Email: tony@nefariousmotorsports.com
 
         <Shared:ByteArrayToBitmapConverter x:Key="byteArrayToBitmapConverter"/>
 
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+        </Style>
+
     </ECUFlasher:BaseUserControl.Resources>
 
     <DockPanel IsItemsHost="False" VerticalAlignment="Stretch" LastChildFill="True">
-        <Menu DockPanel.Dock="Top">
-            <Menu.Resources>
-                <Style TargetType="MenuItem" BasedOn="{StaticResource ReactiveCommandMenuItemStyle}"/>
-            </Menu.Resources>
-            <MenuItem Header="Operations">
-                <MenuItem Command="{Binding Path=ReadEntireFlashCommand}"/>
-                <MenuItem Command="{Binding Path=WriteEntireFlashCommand}"/>
-                <MenuItem Command="{Binding Path=WriteDiffFlashCommand}"/>
-                <MenuItem Command="{Binding Path=VerifyChecksumsCommand}"/>
-                <MenuItem Command="{Binding Path=CorrectChecksumsCommand}" IsEnabled="false"/>
-            </MenuItem>
-        </Menu>
         <Grid DockPanel.Dock="Top">
             <Grid.RowDefinitions>
                 <RowDefinition/>
