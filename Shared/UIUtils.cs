@@ -1036,9 +1036,16 @@ namespace Shared
 
             if (handler != null)
             {
-                //call the delegate via the dispatcher to avoid re-entrancy
-                object[] args = { sender, propertyChangedArgs };
-                Application.Current.Dispatcher.BeginInvoke(handler, args);
+                // Use CheckAccess pattern to avoid unnecessary marshaling and ensure exceptions are properly handled.
+                // InvokeAsync provides better exception handling than BeginInvoke (exceptions propagate via Task).
+                if (Application.Current.Dispatcher.CheckAccess())
+                {
+                    handler(sender, propertyChangedArgs);
+                }
+                else
+                {
+                    Application.Current.Dispatcher.InvokeAsync(() => handler(sender, propertyChangedArgs));
+                }
             }
         }
 
