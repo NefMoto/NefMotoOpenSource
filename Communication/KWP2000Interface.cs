@@ -479,6 +479,10 @@ namespace Communication
             }
             set
             {
+                if (value == (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
+                {
+                    value = DEFAULT_COMMUNICATION_BAUD_RATE;
+                }
                 lock (mFTDIDevice)
                 {
                     if (IsFTDIDeviceOpen())

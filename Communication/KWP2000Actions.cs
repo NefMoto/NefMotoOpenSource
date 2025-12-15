@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -240,7 +240,15 @@ namespace Communication
             : base(commInterface)
         {
             mSessionType = sessionType;
-            mBaudRates = baudRates;
+            // Materialize IEnumerable to List to ensure it can be enumerated multiple times safely
+            if (baudRates != null && !(baudRates is List<uint>))
+            {
+                mBaudRates = new List<uint>(baudRates);
+            }
+            else
+            {
+                mBaudRates = baudRates;
+            }
             mMessageFormatState = MessageFormatState.NoBaudRate;
         }
 
@@ -255,6 +263,16 @@ namespace Communication
 
             if (result)
             {
+				// Handle null baudRates by defaulting to BAUD_UNSPECIFIED (use current/default baud rate)
+				if (mBaudRates == null)
+				{
+					mBaudRates = new List<uint>() { (uint)KWP2000BaudRates.BAUD_UNSPECIFIED };
+				}
+				// Dispose previous enumerator if it exists before creating a new one
+				if (mCurrentBaudRate != null)
+				{
+					mCurrentBaudRate.Dispose();
+				}
 				mCurrentBaudRate = mBaudRates.GetEnumerator();
 				result = mCurrentBaudRate.MoveNext();//move to the first baud rate
 
