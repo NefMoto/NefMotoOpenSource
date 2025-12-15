@@ -248,9 +248,9 @@ Contact by Email: tony@nefariousmotorsports.com
                             <Border x:Name="border" CornerRadius="4,4,0,0" BorderBrush="Transparent" BorderThickness="1,1,1,0" Margin="2,2,2,0" ClipToBounds="False">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#FFFFFFFF" Offset="0"/>
-                                        <GradientStop Color="#FFE0E0E0" Offset="0.5"/>
-                                        <GradientStop Color="#FFC0C0C0" Offset="1"/>
+                                        <GradientStop Color="#FF7A0C0C" Offset="0"/>
+                                        <GradientStop Color="#FF6A0A0A" Offset="0.5"/>
+                                        <GradientStop Color="#FF5A0808" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Border.Background>
                                 <ContentPresenter x:Name="ContentSite" ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,4"/>
@@ -263,7 +263,7 @@ Contact by Email: tony@nefariousmotorsports.com
                                         <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TabItem}, Path=IsSelected}" Value="False">
-                                        <Setter Property="Foreground" Value="Black"/>
+                                        <Setter Property="Foreground" Value="#FFB0B0B0"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -274,11 +274,9 @@ Contact by Email: tony@nefariousmotorsports.com
                                 <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
                                 <Setter TargetName="border" Property="Margin" Value="2,2,2,-1"/>
                                 <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="{StaticResource ForegroundBrush}"/>
-                                <Setter TargetName="border" Property="Opacity" Value="1.0"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="False">
-                                <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="Black"/>
-                                <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                                <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="#FFB0B0B0"/>
                             </Trigger>
                             <MultiTrigger>
                                 <MultiTrigger.Conditions>
@@ -288,9 +286,9 @@ Contact by Email: tony@nefariousmotorsports.com
                                 <Setter TargetName="border" Property="Background">
                                     <Setter.Value>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#FFFFFFFF" Offset="0"/>
-                                            <GradientStop Color="#FFE8E8E8" Offset="0.5"/>
-                                            <GradientStop Color="#FFD0D0D0" Offset="1"/>
+                                            <GradientStop Color="#FF9A2020" Offset="0"/>
+                                            <GradientStop Color="#FF8A1A1A" Offset="0.5"/>
+                                            <GradientStop Color="#FF7A1414" Offset="1"/>
                                         </LinearGradientBrush>
                                     </Setter.Value>
                                 </Setter>
