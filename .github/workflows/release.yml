@@ -45,9 +45,17 @@ jobs:
           isPrerelease="false"
         fi
 
+        # Find previous stable tag (no hyphen) reachable from this tag
+        prev_tag=$(git describe --tags --match 'v[0-9]*' --abbrev=0 "${tag}^" 2>/dev/null || true)
+        if [ -z "$prev_tag" ]; then
+          echo "Error: Could not find previous stable tag before $tag"
+          exit 1
+        fi
+
         echo "tag=$tag" >> $GITHUB_OUTPUT
         echo "prerelease=$isPrerelease" >> $GITHUB_OUTPUT
-        echo "Building for tag: $tag (prerelease: $isPrerelease)"
+        echo "prev_tag=$prev_tag" >> $GITHUB_OUTPUT
+        echo "Building for tag: $tag (prerelease: $isPrerelease, previous: $prev_tag)"
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -102,6 +110,7 @@ jobs:
         msiUrl="https://github.com/${{ github.repository }}/releases/download/${tag}/${msiName}"
         token="${{ secrets.GITHUB_TOKEN }}"
         repo="${{ github.repository }}"
+        prev_tag="${{ steps.release.outputs.prev_tag }}"
 
         # Generate standard release notes using GitHub API
         response=$(curl -s -w "\n%{http_code}" \
@@ -110,7 +119,7 @@ jobs:
           -H "Authorization: Bearer ${token}" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
           -H "Content-Type: application/json" \
-          -d "{\"tag_name\":\"${tag}\",\"target_commitish\":\"HEAD\"}" \
+          -d "{\"tag_name\":\"${tag}\",\"previous_tag_name\":\"${prev_tag}\",\"target_commitish\":\"${tag}\"}" \
           "https://api.github.com/repos/${repo}/releases/generate-notes")
 
         httpCode=$(echo "$response" | tail -n1)
