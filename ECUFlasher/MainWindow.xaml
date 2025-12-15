@@ -180,21 +180,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 </TextBlock.Style>
             </TextBlock>
             <StatusBarItem HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
-                <ProgressBar Value="{Binding Path=App.PercentOperationComplete, Mode=OneWay}">
-                    <ProgressBar.Style>
-                        <Style TargetType="ProgressBar">
-                            <Setter Property="IsIndeterminate" Value="false"/>
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding Path=App.PercentOperationComplete, Mode=OneWay}" Value="-1"/>
-                                        <Condition Binding="{Binding Path=App.OperationInProgress, Mode=OneWay}" Value="true"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="IsIndeterminate" Value="true"/>
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ProgressBar.Style>
+                <ProgressBar Value="{Binding Path=App.PercentOperationComplete, Mode=OneWay}" IsIndeterminate="false">
                 </ProgressBar>
             </StatusBarItem>
         </StatusBar>

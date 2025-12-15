@@ -59,7 +59,15 @@ Contact by Email: tony@nefariousmotorsports.com
         </Style>
 
         <Style TargetType="CheckBox" BasedOn="{StaticResource DisconnectedBaseStyle}"/>
-        <Style TargetType="ComboBox" BasedOn="{StaticResource DisconnectedBaseStyle}"/>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=App.CommInterface.ConnectionStatus, Converter={StaticResource isConnectionOpenConverter}}" Value="true">
+                    <Setter Property="FrameworkElement.IsEnabled" Value="false"/>
+                    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+                    <Setter Property="FrameworkElement.ToolTip" Value="Must be disconnected to change setting"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
 
         <Style TargetType="Label" BasedOn="{StaticResource {x:Type Label}}">
             <Setter Property="HorizontalAlignment" Value="Right"/>

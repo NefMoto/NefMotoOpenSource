@@ -258,6 +258,32 @@ Contact by Email: tony@nefariousmotorsports.com
 
     <DockPanel LastChildFill="True">
         <Menu DockPanel.Dock="Top">
+            <Menu.Style>
+                <Style TargetType="Menu">
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                <GradientStop Color="#FFE0E0E0" Offset="0.5"/>
+                                <GradientStop Color="#FFC0C0C0" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Setter.Value>
+                    </Setter>
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background">
+                                <Setter.Value>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#FFE8F0FF" Offset="0"/>
+                                        <GradientStop Color="#FFD8E8FF" Offset="0.5"/>
+                                        <GradientStop Color="#FFC8D8FF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Menu.Style>
             <Menu.Resources>
                 <Style TargetType="MenuItem" BasedOn="{StaticResource ReactiveCommandMenuItemStyle}"/>
             </Menu.Resources>
@@ -528,4 +554,3 @@ Contact by Email: tony@nefariousmotorsports.com
         </Grid>
     </DockPanel>
 </ECUFlasher:BaseUserControl>
-

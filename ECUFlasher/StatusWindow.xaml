@@ -34,6 +34,32 @@ Contact by Email: tony@nefariousmotorsports.com
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Menu Grid.Row="0" Margin="0,0,0,5">
+            <Menu.Style>
+                <Style TargetType="Menu">
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                <GradientStop Color="#FFE0E0E0" Offset="0.5"/>
+                                <GradientStop Color="#FFC0C0C0" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Setter.Value>
+                    </Setter>
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background">
+                                <Setter.Value>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#FFE8F0FF" Offset="0"/>
+                                        <GradientStop Color="#FFD8E8FF" Offset="0.5"/>
+                                        <GradientStop Color="#FFC8D8FF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Menu.Style>
             <MenuItem Header="Status Window">
                 <MenuItem Command="{Binding Path=ClearStatusTextCommand}" Style="{StaticResource ReactiveCommandMenuItemStyle}"/>
             </MenuItem>
