@@ -1904,7 +1904,20 @@ namespace Communication
                     {
                         foreach (char curChar in messageBlock.mBlockData)
                         {
-                            asciiMessage += curChar;
+                            // Sanitize null and other unprintable characters
+                            if (curChar == '\0')
+                            {
+                                asciiMessage += "\\x00";
+                            }
+                            else if (char.IsControl(curChar) && !char.IsWhiteSpace(curChar))
+                            {
+                                // Replace other control characters with hex representation
+                                asciiMessage += "\\x" + ((byte)curChar).ToString("X2");
+                            }
+                            else
+                            {
+                                asciiMessage += curChar;
+                            }
                         }
                     }
 
