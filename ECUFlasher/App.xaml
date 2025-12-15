@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -228,11 +228,11 @@ Contact by Email: tony@nefariousmotorsports.com
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="1" CornerRadius="0,0,4,4" Background="{TemplateBinding Background}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,1,1,1">
-                                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" Margin="4"/>
+                            <Border Grid.Row="0" CornerRadius="4,4,0,0" Background="Transparent" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,1,1,0">
+                                <TabPanel x:Name="HeaderPanel" IsItemsHost="True" Margin="2,2,2,0"/>
                             </Border>
-                            <Border Grid.Row="0" CornerRadius="4,4,0,0" Background="Transparent" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,1,1,0" ClipToBounds="False">
-                                <TabPanel x:Name="HeaderPanel" IsItemsHost="True" Margin="2,2,2,0" ClipToBounds="False"/>
+                            <Border Grid.Row="1" CornerRadius="0,0,4,4" Background="{TemplateBinding Background}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,1,1">
+                                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" Margin="4"/>
                             </Border>
                         </Grid>
                     </ControlTemplate>
@@ -244,55 +244,34 @@ Contact by Email: tony@nefariousmotorsports.com
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
-                        <Grid ClipToBounds="False">
-                            <Border x:Name="border" CornerRadius="4,4,0,0" BorderBrush="Transparent" BorderThickness="1,1,1,0" Margin="2,2,2,0" ClipToBounds="False">
+                        <Grid>
+                            <Border x:Name="border" CornerRadius="4,4,0,0" BorderBrush="Transparent" BorderThickness="1,1,1,0" Margin="2,2,2,0">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#FF7A0C0C" Offset="0"/>
-                                        <GradientStop Color="#FF6A0A0A" Offset="0.5"/>
-                                        <GradientStop Color="#FF5A0808" Offset="1"/>
+                                        <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                        <GradientStop Color="#FFE0E0E0" Offset="0.5"/>
+                                        <GradientStop Color="#FFC0C0C0" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Border.Background>
                                 <ContentPresenter x:Name="ContentSite" ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,4"/>
                             </Border>
                         </Grid>
-                        <ControlTemplate.Resources>
-                            <Style TargetType="TextBlock">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TabItem}, Path=IsSelected}" Value="True">
-                                        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TabItem}, Path=IsSelected}" Value="False">
-                                        <Setter Property="Foreground" Value="#FFB0B0B0"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ControlTemplate.Resources>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+                                <Setter TargetName="border" Property="Background" Value="White"/>
                                 <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                                <Setter TargetName="border" Property="Margin" Value="2,2,2,-1"/>
-                                <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="{StaticResource ForegroundBrush}"/>
                             </Trigger>
-                            <Trigger Property="IsSelected" Value="False">
-                                <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="#FFB0B0B0"/>
-                            </Trigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsSelected" Value="False"/>
-                                    <Condition Property="IsMouseOver" Value="True"/>
-                                </MultiTrigger.Conditions>
+                            <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="Background">
                                     <Setter.Value>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#FF9A2020" Offset="0"/>
-                                            <GradientStop Color="#FF8A1A1A" Offset="0.5"/>
-                                            <GradientStop Color="#FF7A1414" Offset="1"/>
+                                            <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                            <GradientStop Color="#FFE8E8E8" Offset="0.5"/>
+                                            <GradientStop Color="#FFD0D0D0" Offset="1"/>
                                         </LinearGradientBrush>
                                     </Setter.Value>
                                 </Setter>
-                            </MultiTrigger>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

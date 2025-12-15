@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -35,10 +35,6 @@ Contact by Email: tony@nefariousmotorsports.com
     <ECUFlasher:BaseUserControl.Resources>
 
         <Shared:ByteArrayToBitmapConverter x:Key="byteArrayToBitmapConverter"/>
-
-        <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
-        </Style>
 
     </ECUFlasher:BaseUserControl.Resources>
 

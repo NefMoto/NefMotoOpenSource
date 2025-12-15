@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -48,10 +48,6 @@ Contact by Email: tony@nefariousmotorsports.com
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-        </Style>
-
-        <Style TargetType="GridSplitter">
-            <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
         </Style>
 
         <Style TargetType="ListBoxItem">
