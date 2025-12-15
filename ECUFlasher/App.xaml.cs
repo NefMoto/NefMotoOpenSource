@@ -551,13 +551,40 @@ namespace ECUFlasher
         private float mPercentComplete;
 
         #region OpenLogFileCommand
+        // NOTE: Using notepad.exe is simpler and sufficient for viewing log files. A custom log file pager
+        // would require building a WPF window with TextBox/TextBlock, file reading logic, scroll handling,
+        // and potentially virtualized rendering for large files. Notepad handles all of this already and
+        // is familiar to users. Only consider a custom pager if you need features like auto-refresh,
+        // filtering, search highlighting, or real-time tailing - otherwise notepad is the better choice.
         public ReactiveCommand OpenLogFileCommand
         {
             get
             {
                 if (_OpenLogFileCommand == null)
                 {
-                    _OpenLogFileCommand = new ReactiveCommand(delegate() { Process.Start(mLogFileName); });
+                    _OpenLogFileCommand = new ReactiveCommand(delegate()
+                    {
+                        try
+                        {
+                            if (File.Exists(mLogFileName))
+                            {
+                                Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "notepad.exe",
+                                    Arguments = "\"" + mLogFileName + "\"",
+                                    UseShellExecute = true
+                                });
+                            }
+                            else
+                            {
+                                DisplayStatusMessage("Log file does not exist: " + mLogFileName, StatusMessageType.USER);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DisplayStatusMessage("Failed to open log file: " + ex.Message, StatusMessageType.USER);
+                        }
+                    });
                     _OpenLogFileCommand.Name = "Open Log File";
                     _OpenLogFileCommand.Description = "Open the log file";
                 }
