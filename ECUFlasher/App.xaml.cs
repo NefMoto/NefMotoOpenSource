@@ -944,8 +944,9 @@ namespace ECUFlasher
 
         public void OnFailedToStartConnecting()
         {
-            //if we failed to connect, then maybe the FTDI device isn't valid
-            RefreshDevices();
+            //if we failed to connect, then maybe the device isn't valid
+            // Refresh devices but preserve the current selection if it still exists
+            OnRefreshDevices();
         }
 
         private void PreventSleepMode()
