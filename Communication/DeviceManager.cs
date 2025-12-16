@@ -18,8 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: tony@nefariousmotorsports.com
 */
 
+using System;
 using System.Collections.Generic;
-using FTD2XX_NET;
+using System.Linq;
+using Shared;
 
 namespace Communication
 {
@@ -29,44 +31,26 @@ namespace Communication
     public static class DeviceManager
     {
         /// <summary>
+        /// Optional logging delegate for debug messages during device enumeration
+        /// </summary>
+        public static DisplayStatusMessageDelegate LogMessage { get; set; }
+
+        /// <summary>
         /// Enumerates all available communication devices
         /// </summary>
         public static IEnumerable<DeviceInfo> EnumerateAllDevices()
         {
             var devices = new List<DeviceInfo>();
 
-            // Enumerate FTDI devices (existing)
-            if (FTDI.IsFTD2XXDLLLoaded())
-            {
-                var ftdiLibrary = new FTDI(null, null);
-                var ftdiDevices = ftdiLibrary.EnumerateFTDIDevices();
-                foreach (var ftdiNode in ftdiDevices)
-                {
-                    // Skip unknown FTDI devices
-                    if (ftdiNode.Type == FTDI.FT_DEVICE.FT_DEVICE_UNKNOWN)
-                    {
-                        continue;
-                    }
+            // Enumerate FTDI devices
+            devices.AddRange(FtdiCommunicationDevice.Enumerate(LogMessage));
 
-                    // Try to get chip ID if available
-                    uint chipID = 0;
-                    if (FTDI.IsFTDChipIDDLLLoaded())
-                    {
-                        var tempFtdi = new FTDI(null, null);
-                        if (tempFtdi.OpenByLocation(ftdiNode.LocId) == FTDI.FT_STATUS.FT_OK)
-                        {
-                            tempFtdi.GetChipIDFromCurrentDevice(out chipID);
-                            tempFtdi.Close();
-                        }
-                    }
-                    devices.Add(new FtdiDeviceInfo(ftdiNode, chipID));
-                }
-            }
-
-            // TODO: Enumerate CH340 devices when CH340 support is implemented
+            // Enumerate CH340 devices
+            devices.AddRange(Ch340CommunicationDevice.Enumerate(LogMessage));
 
             return devices;
         }
+
 
         /// <summary>
         /// Creates a communication device instance for the given device info
@@ -83,8 +67,7 @@ namespace Communication
                 case DeviceType.FTDI:
                     return new FtdiCommunicationDevice();
                 case DeviceType.CH340:
-                    // TODO: Return Ch340CommunicationDevice when implemented
-                    return null;
+                    return new Ch340CommunicationDevice();
                 default:
                     return null;
             }

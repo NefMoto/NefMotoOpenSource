@@ -149,14 +149,16 @@ namespace Communication
                         bool setupSuccess = true;
                         setupSuccess &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
                         setupSuccess &= mCommunicationDevice.SetFlowControl(FlowControl.None);
-                        setupSuccess &= mCommunicationDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
+                        // SetLatency is USB-specific (FTDI feature), optional for other devices like CH340
+                        mCommunicationDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
 
                         //setupSuccess &= mCommunicationDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
                         setupSuccess &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
                         setupSuccess &= mCommunicationDevice.SetDTR(true);//enable receive for self powered devices
                         setupSuccess &= mCommunicationDevice.SetRTS(false);//set low to tell device we are ready to send
                         setupSuccess &= mCommunicationDevice.SetBreak(false);//set to high idle state
-                        setupSuccess &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                        // SetBitMode is FTDI-specific (bit-bang mode), optional for other devices like CH340
+                        mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset); // Don't fail if not supported
                         setupSuccess &= mCommunicationDevice.SetBaudRate(baudRate);
                         setupSuccess &= mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
 

@@ -17,6 +17,7 @@
 
     <Feature Id="ProductFeature" Title="$(var.ProductName)" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="RuntimeDlls" />
       <ComponentGroupRef Id="MemoryLayouts" />
       <ComponentGroupRef Id="ApplicationShortcuts" />
       <ComponentGroupRef Id="DesktopShortcut" />
@@ -78,6 +79,13 @@
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)">
         <Directory Id="MemoryLayoutsFolder" Name="MemoryLayouts" />
+        <Directory Id="RuntimesFolder" Name="runtimes">
+          <Directory Id="WinFolder" Name="win">
+            <Directory Id="LibFolder" Name="lib">
+              <Directory Id="Net80Folder" Name="net8.0" />
+            </Directory>
+          </Directory>
+        </Directory>
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
@@ -128,6 +136,14 @@
       </Component>
       <Component Id="ApplicationShared.dll" Guid="d42fabc7-0a7b-48b2-8104-3b8f85d8d525">
         <File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.TargetDir)ApplicationShared.dll" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+    <ComponentGroup Id="RuntimeDlls" Directory="Net80Folder">
+      <Component Id="System.IO.Ports.dll.runtime" Guid="a7b8c9d0-e1f2-3456-7890-123456789abc">
+        <File Id="System.IO.Ports.dll.runtime" Name="System.IO.Ports.dll" Source="$(var.TargetDir)runtimes/win/lib/net8.0/System.IO.Ports.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="System.Management.dll.runtime" Guid="b8c9d0e1-f2a3-4567-8901-23456789abcd">
+        <File Id="System.Management.dll.runtime" Name="System.Management.dll" Source="$(var.TargetDir)runtimes/win/lib/net8.0/System.Management.dll" KeyPath="yes" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="MemoryLayouts" Directory="MemoryLayoutsFolder">
