@@ -22,7 +22,6 @@ using System.Diagnostics;
 using System.ComponentModel;
 using System.Threading;
 using Shared;
-using FTD2XX_NET;
 
 namespace Communication
 {
@@ -193,7 +192,7 @@ namespace Communication
 
             KillSendReceiveThread();
 
-            CloseFTDIDevice();
+            CloseCommunicationDevice();
 
             ConnectionStatus = ConnectionStatusType.Disconnected;
         }
@@ -838,7 +837,7 @@ namespace Communication
             }
 
             ConnectionStatus = ConnectionStatusType.CommunicationTerminated;//we need to do this to ensure any operations or actions fail due to disconnection
-            CloseFTDIDevice();
+            CloseCommunicationDevice();
             mSendReceiveThread = null;
 
             DisplayStatusMessage("Send receive thread now terminated.", StatusMessageType.LOG);

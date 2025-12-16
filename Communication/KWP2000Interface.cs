@@ -26,7 +26,6 @@ Contact by Email: tony@nefariousmotorsports.com
 #define CHECK_CABLE_IN_DUMB_MODE
 //#define SEND_START_COMM_AFTER_SLOW_INIT //EDC15 gets angry when you send a start communication message after doing a double slow init to start a KWP2000 session
 
-using FTD2XX_NET;
 using Shared;
 using System;
 using System.Collections.Generic;
@@ -3220,7 +3219,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 			}
 
             ConnectionStatus = ConnectionStatusType.CommunicationTerminated;//we need to do this to ensure any operations or actions fail due to disconnection
-            CloseFTDIDevice();
+            CloseCommunicationDevice();
 			mSendReceiveThread = null;
 
             DisplayStatusMessage("Send receive thread now terminated.", StatusMessageType.LOG);
