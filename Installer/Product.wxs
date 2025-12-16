@@ -36,11 +36,15 @@
       Schedule="afterInstallInitialize" />
 
     <!-- Launch conditions: Check for .NET 8 -->
+    <Property Id="DOTNET8STATUS" Secure="yes" />
+    <Property Id="DOTNET8STATUS86" Secure="yes" />
     <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX64" />
     <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX86" />
+    <!-- DotNetCompatibilityCheck sets DOTNET8STATUS and/or DOTNET8STATUS86 to 0 if the .NET 8.0 Runtime is installed -->
+    <!-- Install fails and the Message is displayed if the condition is NOT met -->
     <Launch
-      Condition="NOT Installed AND DOTNET8STATUS=&quot;0&quot; AND DOTNET8STATUS86=&quot;0&quot;"
-      Message="This application requires .NET 8.0 Runtime. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0" />
+      Condition="Installed OR DOTNET8STATUS=&quot;0&quot; OR DOTNET8STATUS86=&quot;0&quot;"
+      Message="This application requires the .NET 8.0 Runtime. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0" />
   </Package>
 
   <Fragment>
