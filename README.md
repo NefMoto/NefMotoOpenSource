@@ -8,7 +8,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - **KWP2000** (ISO 14230) - Full support for diagnostic and programming operations
 - **KWP1281** - Legacy protocol support for older ECUs
-- **Boot Mode** - Not yet supported (UI components present but functionality not implemented)
+- **Boot Mode** - Partial support: Connection, ECU information reading, and register access (Flash read/write operations in progress)
 
 ### Connection Methods
 
@@ -20,7 +20,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 - Read flash memory (full or partial)
 - Write flash memory with verification
 - Erase flash sectors
-- Read ECU identification information
+- Read ECU identification information (KWP2000 and Bootmode)
+- Bootmode ECU information: Device ID, CPU family, system registers (SYSCON, BUSCON, ADDRSEL), memory status
 - Read and clear diagnostic trouble codes (DTCs)
 - Extended data logging
 - Memory layout validation
