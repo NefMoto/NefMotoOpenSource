@@ -106,12 +106,13 @@
                 <Label>Should Verify Cable In Dumb Mode</Label>
                 <CheckBox IsChecked="{Binding Path=App.KWP2000CommInterface.ShouldVerifyDumbMode, Mode=TwoWay}" />
             </DockPanel>
+            <!-- Property names still contain "FTDI" for backward compatibility with saved preferences/settings -->
             <DockPanel >
-                <Label>FTDI Device Read Time Out MS</Label>
+                <Label>Device Read Time Out MS</Label>
                 <TextBox Text="{Binding Path=App.KWP2000CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay}" />
             </DockPanel>
             <DockPanel >
-                <Label>FTDI Device Write Time Out MS</Label>
+                <Label>Device Write Time Out MS</Label>
                 <TextBox Text="{Binding Path=App.KWP2000CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay}" />
             </DockPanel>
         </StackPanel>

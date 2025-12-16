@@ -178,11 +178,12 @@ Contact by Email: tony@nefariousmotorsports.com
                 <CheckBox Grid.Column="1" Grid.Row="17" IsChecked="{Binding Path=CommInterface.ShouldVerifyDumbMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
 
 
-                <Label Grid.Column="0" Grid.Row="18">FTDI Device Read Time Out MS</Label>
+                <!-- Property names still contain "FTDI" for backward compatibility with saved preferences/settings -->
+                <Label Grid.Column="0" Grid.Row="18">Device Read Time Out MS</Label>
                 <TextBox Grid.Column="1" Grid.Row="18" Text="{Binding Path=CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
 
 
-                <Label Grid.Column="0" Grid.Row="19">FTDI Device Write Time Out MS</Label>
+                <Label Grid.Column="0" Grid.Row="19">Device Write Time Out MS</Label>
                 <TextBox Grid.Column="1" Grid.Row="19" Text="{Binding Path=CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
 
 

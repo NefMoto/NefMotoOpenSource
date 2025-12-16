@@ -57,6 +57,23 @@ namespace Communication
                 return $"{Type}: {Description}";
             }
         }
+
+        /// <summary>
+        /// Gets the device description (for UI binding compatibility)
+        /// </summary>
+        public virtual string DescriptionProp
+        {
+            get { return Description; }
+        }
+
+        /// <summary>
+        /// Gets the device ID (for UI binding compatibility)
+        /// Base implementation returns DeviceID as string, but derived classes may override to return numeric ID
+        /// </summary>
+        public virtual object IDProp
+        {
+            get { return DeviceID; }
+        }
     }
 
     /// <summary>
@@ -115,6 +132,14 @@ namespace Communication
         public FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE FtdiNode
         {
             get { return _ftdiNode; }
+        }
+
+        /// <summary>
+        /// Gets the device ID as uint (for UI binding compatibility with old ApplicationShared.FTDIDeviceInfo)
+        /// </summary>
+        public override object IDProp
+        {
+            get { return _ftdiNode.ID; }
         }
 
         public override bool Equals(object obj)

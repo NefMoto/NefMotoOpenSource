@@ -311,22 +311,23 @@ Contact by Email: tony@nefariousmotorsports.com
             </Setter>
         </Style>
 
-        <Style x:Key="FTDIToolTipStyle" TargetType="ToolTip">
+        <Style x:Key="DeviceToolTipStyle" TargetType="ToolTip">
             <!--Set the context so that the we can use it in the style-->
             <Setter Property="DataContext" Value="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource Self}}"/>
             <!--Set the content so that the content data template can use it-->
             <Setter Property="Content" Value="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="ContentTemplate">
                 <Setter.Value>
-                    <DataTemplate DataType="ECUFlasher:FTDIDeviceInfo">
+                    <!-- Note: This template is currently FTDI-specific because ChipID is only available on FtdiDeviceInfo.
+                         When other device types (e.g., CH340) are added, consider using a DataTemplateSelector or
+                         making this template work with the base DeviceInfo type and conditionally showing ChipID. -->
+                    <DataTemplate DataType="Communication:FtdiDeviceInfo">
                         <!--We are in a data template so data context is automatically the element content-->
                         <StackPanel>
-                            <TextBlock Text="{Binding Path=DescriptionProp}"/>
-                            <TextBlock Text="{Binding StringFormat=Type: {0}, Path=TypeProp}"/>
-                            <TextBlock Text="{Binding StringFormat=Flags: 0x{0:X8}, Path=FlagsProp}"/>
-                            <TextBlock Text="{Binding StringFormat=Serial Number: {0}, Path=SerialNumberProp}"/>
+                            <TextBlock Text="{Binding Path=Description}"/>
+                            <TextBlock Text="{Binding StringFormat=Type: {0}, Path=Type}"/>
+                            <TextBlock Text="{Binding StringFormat=Serial Number: {0}, Path=SerialNumber}"/>
                             <TextBlock Text="{Binding StringFormat=ChipID: 0x{0:X8}, Path=ChipID}"/>
-                            <TextBlock Text="premium feature licensing supported"/>
                         </StackPanel>
                     </DataTemplate>
                 </Setter.Value>
@@ -335,15 +336,13 @@ Contact by Email: tony@nefariousmotorsports.com
                 <DataTrigger Binding="{Binding Path=ChipID}" Value="0">
                     <Setter Property="ContentTemplate">
                         <Setter.Value>
-                            <DataTemplate DataType="ECUFlasher:FTDIDeviceInfo">
+                            <DataTemplate DataType="Communication:FtdiDeviceInfo">
                                 <!--We are in a data template so data context is automatically the element content-->
                                 <StackPanel>
-                                    <TextBlock Text="{Binding Path=DescriptionProp}"/>
-                                    <TextBlock Text="{Binding StringFormat=Type: {0}, Path=TypeProp}"/>
-                                    <TextBlock Text="{Binding StringFormat=Flags: 0x{0:X8}, Path=FlagsProp}"/>
-                                    <TextBlock Text="{Binding StringFormat=Serial Number: {0}, Path=SerialNumberProp}"/>
+                                    <TextBlock Text="{Binding Path=Description}"/>
+                                    <TextBlock Text="{Binding StringFormat=Type: {0}, Path=Type}"/>
+                                    <TextBlock Text="{Binding StringFormat=Serial Number: {0}, Path=SerialNumber}"/>
                                     <TextBlock Text="ChipID: Not supported by this device"/>
-                                    <TextBlock Text="premium feature licensing NOT supported"/>
                                 </StackPanel>
                             </DataTemplate>
                         </Setter.Value>
@@ -352,7 +351,7 @@ Contact by Email: tony@nefariousmotorsports.com
             </Style.Triggers>
         </Style>
 
-        <ToolTip x:Key="FTDIToolTip" Style="{StaticResource FTDIToolTipStyle}"/>
+        <ToolTip x:Key="DeviceToolTip" Style="{StaticResource DeviceToolTipStyle}"/>
 
         <Style x:Key="ValidationComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource BaseValidationStyle}">
             <Setter Property="MinWidth" Value="40"/>
@@ -439,11 +438,11 @@ Contact by Email: tony@nefariousmotorsports.com
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="FTDIComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}">
+        <Style x:Key="DeviceComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}">
             <Setter Property="IsEnabled" Value="false"/>
             <Style.Triggers>
                 <Trigger Property="Validation.HasError" Value="false">
-                    <Setter Property="ToolTip" Value="{StaticResource FTDIToolTip}"/>
+                    <Setter Property="ToolTip" Value="{StaticResource DeviceToolTip}"/>
                 </Trigger>
                 <DataTrigger Binding="{Binding Path=CommInterface.ConnectionStatus}" Value="{x:Static Communication:CommunicationInterface+ConnectionStatusType.CommunicationTerminated}">
                     <Setter Property="IsEnabled" Value="true"/>

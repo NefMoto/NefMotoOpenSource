@@ -108,7 +108,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 </DataTemplate>
             </ComboBox.ItemTemplate>
         </ComboBox>
-        <ComboBox Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource FTDIComboBoxStyle}" ItemsSource="{Binding Path=App.FTDIDevices}"
+        <ComboBox Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource DeviceComboBoxStyle}" ItemsSource="{Binding Path=App.Devices}"
 							SelectedItem="{Binding Path=App.SelectedDeviceInfo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}">
             <ComboBox.ItemTemplate>
                 <DataTemplate>

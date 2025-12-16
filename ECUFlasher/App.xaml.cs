@@ -107,13 +107,26 @@ namespace ECUFlasher
 
                 DisplayStatusMessage("Opening " + GetApplicationName(), StatusMessageType.LOG);
 
-                mFTDILibrary = new FTDI(delegate(string message) { this.DisplayStatusMessage("FTDI Error: " + message, StatusMessageType.USER); },
-                                        delegate(string message) { this.DisplayStatusMessage("FTDI Warning: " + message, StatusMessageType.LOG); });
+                // mFTDILibrary no longer needed - DeviceManager handles device enumeration
 
-                FTDIDevices = new ObservableCollection<FTDIDeviceInfo>();
+                Devices = new ObservableCollection<DeviceInfo>();
 
-                //get the last used device
-                SelectedDeviceInfo = ECUFlasher.Properties.Settings.Default.FTDIUSBDevice;
+                //get the last used device (convert from legacy format if needed)
+                var legacyDevice = ECUFlasher.Properties.Settings.Default.FTDIUSBDevice;
+                if (legacyDevice != null)
+                {
+                    // Convert legacy ApplicationShared.FTDIDeviceInfo to Communication.FtdiDeviceInfo
+                    var ftdiNode = new FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE
+                    {
+                        Description = legacyDevice.Description,
+                        Flags = legacyDevice.Flags,
+                        ID = legacyDevice.ID,
+                        LocId = legacyDevice.LocId,
+                        SerialNumber = legacyDevice.SerialNumber,
+                        Type = legacyDevice.Type
+                    };
+                    SelectedDeviceInfo = new Communication.FtdiDeviceInfo(ftdiNode, legacyDevice.ChipID);
+                }
 
                 OnRefreshDevices();
             }
@@ -227,19 +240,16 @@ namespace ECUFlasher
             }
         }
 
-        private bool SelectedUSBDevicePredicate(FTDIDeviceInfo device)
+        private bool SelectedUSBDevicePredicate(DeviceInfo device)
         {
-            if (device != null)
+            if (device != null && SelectedDeviceInfo != null)
             {
-                if (SelectedDeviceInfo != null)
+                if ((SelectedDeviceInfo.Description != device.Description)
+                    || (SelectedDeviceInfo.SerialNumber != device.SerialNumber)
+                    || (SelectedDeviceInfo.Type != device.Type)
+                    || (SelectedDeviceInfo.DeviceID != device.DeviceID))
                 {
-                    if ((SelectedDeviceInfo.Description != device.Description)
-                        || (SelectedDeviceInfo.SerialNumber != device.SerialNumber)
-                        || (SelectedDeviceInfo.Type != device.Type)
-                        || (SelectedDeviceInfo.ID != device.ID))
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
 
@@ -792,11 +802,11 @@ namespace ECUFlasher
         {
             RefreshDevices();
 
-            FTDIDeviceInfo matchedInfoInList = FTDIDevices.FirstOrDefault(this.SelectedUSBDevicePredicate);
+            DeviceInfo matchedInfoInList = Devices.FirstOrDefault(this.SelectedUSBDevicePredicate);
             if (matchedInfoInList == null)
             {
                 //couldn't find the the selected device in the list, try to use the first one in the list
-                SelectedDeviceInfo = FTDIDevices.FirstOrDefault();
+                SelectedDeviceInfo = Devices.FirstOrDefault();
             }
             else
             {
@@ -804,170 +814,10 @@ namespace ECUFlasher
                 SelectedDeviceInfo = matchedInfoInList;
             }
 
-            CollectionViewSource.GetDefaultView(FTDIDevices).MoveCurrentToFirst();
+            CollectionViewSource.GetDefaultView(Devices).MoveCurrentToFirst();
         }
         #endregion
-
-        #region SaveDeviceInfoCommand
-        public ReactiveCommand SaveDeviceInfoCommand
-        {
-            get
-            {
-                if (_SaveDeviceInfoCommand == null)
-                {
-                    _SaveDeviceInfoCommand = new ReactiveCommand(this.OnSaveDeviceInfo);
-                    _SaveDeviceInfoCommand.Name = "Save Device Info to File";
-                    _SaveDeviceInfoCommand.Description = "Save the FTDI device info of currently connected devices to a file";
-                    _SaveDeviceInfoCommand.AddWatchedCollection(this, "FTDIDevices", FTDIDevices);
-
-                    _SaveDeviceInfoCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
-                    {
-                        bool result = true;
-
-                        if (!FTDIDevices.Any())
-                        {
-                            reasonsDisabled.Add("There must be at least one FTDI device connected");
-                            result = false;
-                        }
-
-                        return result;
-                    };
-                }
-
-                return _SaveDeviceInfoCommand;
-            }
-        }
-        private ReactiveCommand _SaveDeviceInfoCommand;
-
-        private void OnSaveDeviceInfo()
-        {
-            string deviceSaveLocation = ECUFlasher.Properties.Settings.Default.SaveDeviceInfoLocation;
-
-            if (string.IsNullOrEmpty(deviceSaveLocation))
-            {
-                deviceSaveLocation = Directory.GetCurrentDirectory();
-            }
-
-            var dialog = new SaveFileDialog();
-			dialog.DefaultExt = FTDIDevicesFile.EXT;//gets long extensions to work properly when they are added to a filename when saved
-			dialog.Filter = FTDIDevicesFile.FILTER;
-            dialog.InitialDirectory = deviceSaveLocation;
-            dialog.OverwritePrompt = true;
-            dialog.Title = "Select Where to Save Device Info File";
-
-            if (dialog.ShowDialog() == true)
-            {
-                bool successfullySavedInfo = false;
-
-				//replace .xml with .FTDIDevices.xml
-				var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, FTDIDevicesFile.SHORT_EXT, FTDIDevicesFile.EXT);
-
-                try
-                {
-                    using (var fStream = new FileStream(actualFileName, FileMode.Create, FileAccess.Write, FileShare.Write))
-                    {
-						var devicesFile = new FTDIDevicesFile();
-						devicesFile.Devices.AddRange(FTDIDevices);
-
-						SerializeToXML(fStream, devicesFile);
-
-                        successfullySavedInfo = true;
-                    }
-                }
-                catch(Exception e)
-                {
-					DisplayStatusMessage("Encountered exception while saving device info to file: " + e.Message, StatusMessageType.USER);
-                    successfullySavedInfo = false;
-                }
-
-                if (!String.IsNullOrEmpty(dialog.FileName))
-                {
-                    DirectoryInfo dirInfo = Directory.GetParent(dialog.FileName);
-
-                    if (dirInfo != null)
-                    {
-                        ECUFlasher.Properties.Settings.Default.SaveDeviceInfoLocation = dirInfo.FullName;
-                    }
-                }
-
-                if (successfullySavedInfo)
-                {
-                    DisplayStatusMessage("Successfully saved device info to file.", StatusMessageType.USER);
-                }
-                else
-                {
-                    DisplayStatusMessage("Failed to save device info to file.", StatusMessageType.USER);
-                }
-            }
-        }
-
-        #endregion
-
-        #region DoDevicesSupportLicensing
-        public ReactiveCommand DoDevicesSupportLicensing
-        {
-            get
-            {
-                if (_DoDevicesSupportLicensing == null)
-                {
-                    _DoDevicesSupportLicensing = new ReactiveCommand(this.OnDoDevicesSupportLicensing);
-                    _DoDevicesSupportLicensing.Name = "Check if FTDI Devices Support Licensing";
-                    _DoDevicesSupportLicensing.Description = "Checks if the connected FTDI devices support premium feature licensing";
-                    _DoDevicesSupportLicensing.AddWatchedProperty(CommInterface, "ConnectionStatus");
-                    _DoDevicesSupportLicensing.AddWatchedCollection(this, "FTDIDevices", FTDIDevices);
-
-                    _DoDevicesSupportLicensing.CanExecuteMethod = delegate(List<string> reasonsDisabled)
-                    {
-                        bool canExecute = true;
-
-                        //getting the ChipID fails when we have a connection open, so easiest thing is to disable this
-                        if (CommInterface.IsConnectionOpen())
-                        {
-                            canExecute = false;
-                            reasonsDisabled.Add("Cannot check if FTDI devices support licensing while connected to ECU");
-                        }
-
-                        if(FTDIDevices.Count <= 0)
-                        {
-                            canExecute = false;
-                            reasonsDisabled.Add("There must be at least one FTDI device connected");
-                        }
-
-                        return canExecute;
-                    };
-                }
-
-                return _DoDevicesSupportLicensing;
-            }
-        }
-        private ReactiveCommand _DoDevicesSupportLicensing;
-        #endregion
-
-        private void OnDoDevicesSupportLicensing()
-        {
-            DisplayStatusMessage("Checking if connected FTDI devices support premium feature licensing:", StatusMessageType.USER);
-
-            if(FTDIDevices.Count > 0)
-            {
-                foreach (FTDIDeviceInfo device in FTDIDevices)
-                {
-                    if (device.ChipID != 0)
-                    {
-                        DisplayStatusMessage("Device " + device.Index + " supports premium feature licensing.", StatusMessageType.USER);
-                    }
-                    else
-                    {
-                        DisplayStatusMessage("Device " + device.Index + " does NOT support premium feature licensing.", StatusMessageType.USER);
-                    }
-                }
-            }
-            else
-            {
-                DisplayStatusMessage("There are no FTDI devices connected to check.", StatusMessageType.USER);
-            }
-        }
-
-        public FTDIDeviceInfo SelectedDeviceInfo
+        public DeviceInfo SelectedDeviceInfo
         {
             get
             {
@@ -981,40 +831,29 @@ namespace ECUFlasher
 
                     if (CommInterface != null)
                     {
-                        // Convert ApplicationShared.FTDIDeviceInfo to Communication.FtdiDeviceInfo
-                        if (_SelectedDeviceInfo != null)
-                        {
-                            var ftdiNode = new FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE
-                            {
-                                Description = _SelectedDeviceInfo.Description,
-                                Flags = _SelectedDeviceInfo.Flags,
-                                ID = _SelectedDeviceInfo.ID,
-                                LocId = _SelectedDeviceInfo.LocId,
-                                SerialNumber = _SelectedDeviceInfo.SerialNumber,
-                                Type = _SelectedDeviceInfo.Type
-                            };
-                            CommInterface.SelectedDeviceInfo = new Communication.FtdiDeviceInfo(ftdiNode, _SelectedDeviceInfo.ChipID);
-                        }
-                        else
-                        {
-                            CommInterface.SelectedDeviceInfo = null;
-                        }
+                        CommInterface.SelectedDeviceInfo = _SelectedDeviceInfo;
                     }
 
                     string error = null;
 
                     if (_SelectedDeviceInfo == null)
                     {
-                        error = "No FTDI device selected";
+                        error = "No device selected";
                     }
-                    else if (!FTDIDevices.Contains(_SelectedDeviceInfo))
+                    else if (!Devices.Contains(_SelectedDeviceInfo))
                     {
-                        error = "Selected FTDI device is not connected";
+                        error = "Selected device is not connected";
                     }
 
-                    if (error == null)
+                    if (error == null && _SelectedDeviceInfo is FtdiDeviceInfo ftdiInfo)
                     {
-                        ECUFlasher.Properties.Settings.Default.FTDIUSBDevice = _SelectedDeviceInfo;
+                        // Convert to legacy format for Settings serialization
+                        var legacyDevice = new ApplicationShared.FTDIDeviceInfo(ftdiInfo.FtdiNode, 0, ftdiInfo.ChipID);
+                        ECUFlasher.Properties.Settings.Default.FTDIUSBDevice = legacyDevice;
+                    }
+                    else if (error == null)
+                    {
+                        ECUFlasher.Properties.Settings.Default.FTDIUSBDevice = null;
                     }
 
                     this["SelectedDeviceInfo"] = error;
@@ -1023,7 +862,7 @@ namespace ECUFlasher
                 }
             }
         }
-        private FTDIDeviceInfo _SelectedDeviceInfo;
+        private DeviceInfo _SelectedDeviceInfo;
 
         public CommunicationInterface.Protocol DesiredProtocol
         {
@@ -1062,24 +901,7 @@ namespace ECUFlasher
 
                     if (CommInterface != null)
                     {
-                        // Convert ApplicationShared.FTDIDeviceInfo to Communication.FtdiDeviceInfo
-                        if (SelectedDeviceInfo != null)
-                        {
-                            var ftdiNode = new FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE
-                            {
-                                Description = SelectedDeviceInfo.Description,
-                                Flags = SelectedDeviceInfo.Flags,
-                                ID = SelectedDeviceInfo.ID,
-                                LocId = SelectedDeviceInfo.LocId,
-                                SerialNumber = SelectedDeviceInfo.SerialNumber,
-                                Type = SelectedDeviceInfo.Type
-                            };
-                            CommInterface.SelectedDeviceInfo = new Communication.FtdiDeviceInfo(ftdiNode, SelectedDeviceInfo.ChipID);
-                        }
-                        else
-                        {
-                            CommInterface.SelectedDeviceInfo = null;
-                        }
+                        CommInterface.SelectedDeviceInfo = SelectedDeviceInfo;
                         CommInterfaceViewModel.FailedToStartConnectingEvent += OnFailedToStartConnecting;
                     }
 
@@ -1142,56 +964,45 @@ namespace ECUFlasher
 
         private void RefreshDevices()
         {
-            FTDIDevices.Clear();
+            Devices.Clear();
 
-            // Use DeviceManager to enumerate all devices (currently only FTDI)
+            // Use DeviceManager to enumerate all devices
             var allDevices = Communication.DeviceManager.EnumerateAllDevices();
 
-            uint index = 0;
             foreach (var deviceInfo in allDevices)
             {
-                if (deviceInfo is Communication.FtdiDeviceInfo ftdiDeviceInfo)
-                {
-                    // Convert Communication.FtdiDeviceInfo to ApplicationShared.FTDIDeviceInfo for UI
-                    var ftdiNode = ftdiDeviceInfo.FtdiNode;
-                    if (ftdiNode.Type != FTDI.FT_DEVICE.FT_DEVICE_UNKNOWN)
-                    {
-                        FTDIDevices.Add(new FTDIDeviceInfo(ftdiNode, index, ftdiDeviceInfo.ChipID));
-                        index++;
-                    }
-                }
+                Devices.Add(deviceInfo);
             }
 
             #region fakeDevices
 #if ENABLE_FAKE_USB_DEVICES
-            if ((FTDIDevices.Count == 0) && (DateTime.Now.Second % 3 == 0))
+            if ((Devices.Count == 0) && (DateTime.Now.Second % 3 == 0))
             {
                 FTDI.FT_DEVICE_INFO_NODE tempInfo0 = new FTDI.FT_DEVICE_INFO_NODE();
                 tempInfo0.Description = "Debug Placeholder FTDI Device 0";
                 tempInfo0.ID = 1000;
                 tempInfo0.SerialNumber = "SerialNum 1000";
                 tempInfo0.Type = FTDI.FT_DEVICE.FT_DEVICE_232R;
-                FTDIDevices.Add(new FTDIDeviceInfo(tempInfo0, index++, 0x01010101));
+                Devices.Add(new Communication.FtdiDeviceInfo(tempInfo0, 0x01010101));
 
                 FTDI.FT_DEVICE_INFO_NODE tempInfo1 = new FTDI.FT_DEVICE_INFO_NODE();
                 tempInfo1.Description = "Debug Placeholder FTDI Device 1";
                 tempInfo1.ID = 1001;
                 tempInfo1.SerialNumber = "SerialNum 1001";
                 tempInfo1.Type = FTDI.FT_DEVICE.FT_DEVICE_UNKNOWN;
-                FTDIDevices.Add(new FTDIDeviceInfo(tempInfo1, index++, 0x00000000));
+                Devices.Add(new Communication.FtdiDeviceInfo(tempInfo1, 0x00000000));
 
                 FTDI.FT_DEVICE_INFO_NODE tempInfo2 = new FTDI.FT_DEVICE_INFO_NODE();
                 tempInfo2.Description = "Debug Placeholder FTDI Device 2";
                 tempInfo2.ID = 1002;
                 tempInfo2.SerialNumber = "SerialNum 1002";
                 tempInfo2.Type = FTDI.FT_DEVICE.FT_DEVICE_BM;
-                FTDIDevices.Add(new FTDIDeviceInfo(tempInfo2, index++, 0x01010101));
+                Devices.Add(new Communication.FtdiDeviceInfo(tempInfo2, 0x01010101));
             }
 #endif
             #endregion
         }
 
-        private FTDI mFTDILibrary;
-        public ObservableCollection<FTDIDeviceInfo> FTDIDevices { get; private set; }
+        public ObservableCollection<DeviceInfo> Devices { get; private set; }
     }
 }

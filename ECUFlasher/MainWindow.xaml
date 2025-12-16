@@ -95,15 +95,6 @@ Contact by Email: tony@nefariousmotorsports.com
                 <Separator/>
                 <MenuItem Command="{Binding Path=App.ExitCommand}" Header="_Exit"/>
             </MenuItem>
-            <!--
-            <MenuItem Header="_Licensing" Visibility="Collapsed">
-                <MenuItem Command="{Binding Path=App.ListInstalledLicensesCommand}"/>
-                <MenuItem Command="{Binding Path=App.ImportLicenseCommand}"/>
-                <MenuItem Command="{Binding Path=App.DoDevicesSupportLicensing}"/>
-                <MenuItem Command="{Binding Path=App.SaveDeviceInfoCommand}"/>
-                <MenuItem Command="{Binding Path=App.OpenParameterCommand}" CommandParameter="http://featurelicensing.nefariousmotorsports.com" Header="Get Licenses at NefMoto.com" ToolTip="Visit NefMoto.com on the internet to get premium feature licenses"/>
-            </MenuItem>
-            -->
             <MenuItem Header="_Help">
                 <MenuItem Command="{Binding Path=App.ShowAboutDialogCommand}" Header="_About..." ToolTip="Show information about NefMotoECUFlasher"/>
             </MenuItem>
