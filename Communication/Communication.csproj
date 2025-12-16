@@ -89,6 +89,8 @@
     <Reference Update="System.Xml.Linq">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
+    <Reference Include="System.IO.Ports" />
+    <Reference Include="System.Management" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FTD2XX_NET\FTD2XX_NET.csproj" />
@@ -96,6 +98,8 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
   <PropertyGroup />
 </Project>

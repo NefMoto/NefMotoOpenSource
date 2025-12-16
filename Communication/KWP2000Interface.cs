@@ -32,6 +32,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Xml.Serialization;
 
@@ -345,6 +346,14 @@ namespace Communication
 
         public bool ConnectToECUSlowInit(byte connectAddress)
         {
+            // CH340 devices do not support slow init (5-baud break signal method)
+            // Fast init works with CH340, so disable slow init for these devices
+            if (SelectedDeviceInfo?.Type == DeviceType.CH340)
+            {
+                DisplayStatusMessage("Slow init is not supported with CH340 devices. Please use fast init instead.", StatusMessageType.USER);
+                return false;
+            }
+
             return ConnectToECU(KWP2000AddressMode.None, connectAddress, KWP2000ConnectionMethod.SlowInit);
         }
 
@@ -375,14 +384,16 @@ namespace Communication
                     bool setupSuccess = true;
                     setupSuccess &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
                     setupSuccess &= mCommunicationDevice.SetFlowControl(FlowControl.None);
-                    setupSuccess &= mCommunicationDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
+                    // SetLatency is USB-specific (FTDI feature), optional for other devices like CH340
+                    mCommunicationDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
 
                     //setupStatus |= mFTDIDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
                     setupSuccess &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
                     setupSuccess &= mCommunicationDevice.SetDTR(true);//enable receive for self powered devices
                     setupSuccess &= mCommunicationDevice.SetRTS(false);//set low to tell device we are ready to send
                     setupSuccess &= mCommunicationDevice.SetBreak(false);//set to high idle state
-                    setupSuccess &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                    // SetBitMode is FTDI-specific (bit-bang mode), optional for other devices like CH340
+                    mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset); // Don't fail if not supported
                     setupSuccess &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
                     setupSuccess &= mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
 
@@ -415,7 +426,7 @@ namespace Communication
                                     {
                                         if (dumbTestMessage[x] != dumbTestMessageEcho[x])
                                         {
-                                            DisplayStatusMessage("Failed to read test echo from FTDI device. Make sure the cable is in dumb mode and connected to the OBD port.", StatusMessageType.USER);
+                                            DisplayStatusMessage("Failed to read test echo from " + (mCommunicationDevice?.Type.ToString() ?? "communication") + " device. Make sure the cable is in dumb mode and connected to the OBD port.", StatusMessageType.USER);
                                             success = false;
                                             break;
                                         }
@@ -423,28 +434,28 @@ namespace Communication
                                 }
                                 else
                                 {
-                                    DisplayStatusMessage("Failed to read test echo from FTDI device.", StatusMessageType.USER);
+                                    DisplayStatusMessage("Failed to read test echo from " + (mCommunicationDevice?.Type.ToString() ?? "communication") + " device.", StatusMessageType.USER);
                                 }
                             }
                             else
                             {
-                                DisplayStatusMessage("Failed to write test echo to FTDI device.", StatusMessageType.USER);
+                                DisplayStatusMessage("Failed to write test echo to " + (mCommunicationDevice?.Type.ToString() ?? "communication") + " device.", StatusMessageType.USER);
                             }
 
                             if (success)
                             {
-                                DisplayStatusMessage("Validated FTDI device is in dumb mode.", StatusMessageType.USER);
+                                DisplayStatusMessage("Validated " + (mCommunicationDevice?.Type.ToString() ?? "communication") + " device is in dumb mode.", StatusMessageType.USER);
                             }
                         }
                     }
                     else
                     {
-                        DisplayStatusMessage("Failed to setup FTDI device.", StatusMessageType.USER);
+                        DisplayStatusMessage("Failed to setup " + (mCommunicationDevice?.Type.ToString() ?? "communication") + " device.", StatusMessageType.USER);
                     }
                 }
                 else
                 {
-                    DisplayStatusMessage("Could not open FTDI device.", StatusMessageType.USER);
+                    DisplayStatusMessage("Could not open " + (SelectedDeviceInfo?.Type.ToString() ?? "communication") + " device.", StatusMessageType.USER);
                 }
             }
 
@@ -1586,7 +1597,7 @@ namespace Communication
                 }
                 else
                 {
-                    DisplayStatusMessage("Failed to setup FTDI device for slow init.", StatusMessageType.LOG);
+                    DisplayStatusMessage("Failed to setup " + (mCommunicationDevice?.Type.ToString() ?? "communication") + " device for slow init.", StatusMessageType.LOG);
                 }
 
                 if (!result)

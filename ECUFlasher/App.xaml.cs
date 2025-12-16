@@ -966,10 +966,11 @@ namespace ECUFlasher
         {
             Devices.Clear();
 
-            // Use DeviceManager to enumerate all devices
-            var allDevices = Communication.DeviceManager.EnumerateAllDevices();
+            // Set up logging for DeviceManager enumeration
+            Communication.DeviceManager.LogMessage = DisplayStatusMessage;
 
-            foreach (var deviceInfo in allDevices)
+            // Use DeviceManager to enumerate all devices and add them to the collection
+            foreach (var deviceInfo in Communication.DeviceManager.EnumerateAllDevices())
             {
                 Devices.Add(deviceInfo);
             }
