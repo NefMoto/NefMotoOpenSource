@@ -43,6 +43,7 @@ using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.Reflection;
 using System.Security.Cryptography;
+using Path = System.IO.Path;
 
 using Communication;
 using Shared;
@@ -64,8 +65,12 @@ namespace ECUFlasher
 			FileNameToFlash = "";
 			MemoryLayoutFileName = "";
 
+			AvailableMemoryLayouts = new ObservableCollection<string>();
+			SelectedMemoryLayout = null;
+
 			InitializeComponent();
 
+			PopulateMemoryLayouts();
 			MemoryLayoutFileName = Properties.Settings.Default.MemoryLayoutFile;
 			FileNameToFlash = Properties.Settings.Default.FlashFile;
 		}
@@ -206,6 +211,39 @@ namespace ECUFlasher
 			{
 				mMemoryLayoutFileName = value;
 
+				// Update the selected memory layout in the dropdown if the file path matches
+				if (!String.IsNullOrEmpty(value))
+				{
+					string memoryLayoutsDir = GetMemoryLayoutsDirectory();
+					if (!String.IsNullOrEmpty(memoryLayoutsDir))
+					{
+						string fileName = Path.GetFileName(value);
+						string basename = fileName;
+						if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_EXT))
+						{
+							basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_EXT.Length);
+						}
+						else if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT))
+						{
+							basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT.Length);
+						}
+
+						if (AvailableMemoryLayouts.Contains(basename) && mSelectedMemoryLayout != basename)
+						{
+							mSelectedMemoryLayout = basename;
+							OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+						}
+					}
+				}
+				else
+				{
+					if (mSelectedMemoryLayout != null)
+					{
+						mSelectedMemoryLayout = null;
+						OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+					}
+				}
+
 				LoadMemoryLayoutFile();
 
 				//because changing the memory layout can change if the file to flash is valid
@@ -220,6 +258,131 @@ namespace ECUFlasher
 			}
 		}
 		private string mMemoryLayoutFileName;
+
+		public ObservableCollection<string> AvailableMemoryLayouts { get; private set; }
+
+		public string SelectedMemoryLayout
+		{
+			get { return mSelectedMemoryLayout; }
+			set
+			{
+				if (mSelectedMemoryLayout != value)
+				{
+					mSelectedMemoryLayout = value;
+
+					if (!String.IsNullOrEmpty(value))
+					{
+						// Construct the full path to the memory layout file
+						string memoryLayoutsDir = GetMemoryLayoutsDirectory();
+						if (!String.IsNullOrEmpty(memoryLayoutsDir))
+						{
+							// Find the file with this basename
+							string fullPath = Path.Combine(memoryLayoutsDir, value + MemoryLayout.MEMORY_LAYOUT_FILE_EXT);
+							if (File.Exists(fullPath))
+							{
+								MemoryLayoutFileName = fullPath;
+							}
+							else
+							{
+								// Try without extension in case the basename already includes it
+								fullPath = Path.Combine(memoryLayoutsDir, value);
+								if (File.Exists(fullPath))
+								{
+									MemoryLayoutFileName = fullPath;
+								}
+							}
+						}
+					}
+					else
+					{
+						MemoryLayoutFileName = "";
+					}
+
+					OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+				}
+			}
+		}
+		private string mSelectedMemoryLayout;
+
+		private string GetMemoryLayoutsDirectory()
+		{
+			// Try to find MemoryLayouts directory relative to the executable
+			string exePath = Assembly.GetEntryAssembly()?.Location;
+			if (String.IsNullOrEmpty(exePath))
+			{
+				exePath = Assembly.GetExecutingAssembly().Location;
+			}
+
+			if (!String.IsNullOrEmpty(exePath))
+			{
+				string exeDir = Path.GetDirectoryName(exePath);
+				string memoryLayoutsDir = Path.Combine(exeDir, "MemoryLayouts");
+
+				if (Directory.Exists(memoryLayoutsDir))
+				{
+					return memoryLayoutsDir;
+				}
+
+				// Try parent directory (for development)
+				string parentDir = Path.GetDirectoryName(exeDir);
+				if (parentDir != null)
+				{
+					memoryLayoutsDir = Path.Combine(parentDir, "MemoryLayouts");
+					if (Directory.Exists(memoryLayoutsDir))
+					{
+						return memoryLayoutsDir;
+					}
+				}
+			}
+
+			// Fallback to current directory
+			string currentDirMemoryLayouts = Path.Combine(Directory.GetCurrentDirectory(), "MemoryLayouts");
+			if (Directory.Exists(currentDirMemoryLayouts))
+			{
+				return currentDirMemoryLayouts;
+			}
+
+			return null;
+		}
+
+		private void PopulateMemoryLayouts()
+		{
+			AvailableMemoryLayouts.Clear();
+
+			string memoryLayoutsDir = GetMemoryLayoutsDirectory();
+			if (!String.IsNullOrEmpty(memoryLayoutsDir) && Directory.Exists(memoryLayoutsDir))
+			{
+				try
+				{
+					var files = Directory.GetFiles(memoryLayoutsDir, "*" + MemoryLayout.MEMORY_LAYOUT_FILE_EXT);
+					foreach (var file in files)
+					{
+						string fileName = Path.GetFileName(file);
+						// Remove the extension to get just the basename
+						string basename = fileName;
+						if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_EXT))
+						{
+							basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_EXT.Length);
+						}
+						else if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT))
+						{
+							basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT.Length);
+						}
+
+						if (!AvailableMemoryLayouts.Contains(basename))
+						{
+							AvailableMemoryLayouts.Add(basename);
+						}
+					}
+				}
+				catch
+				{
+					// If we can't read the directory, just leave the list empty
+				}
+			}
+
+			OnPropertyChanged(new PropertyChangedEventArgs("AvailableMemoryLayouts"));
+		}
 
 		public bool IsFlashFileOK
 		{
@@ -308,75 +471,6 @@ namespace ECUFlasher
 			if (dialog.ShowDialog() == true)
 			{
 				FileNameToFlash = dialog.FileName;
-			}
-		}
-
-		public ICommand ChooseMemoryLayoutCommand
-		{
-			get
-			{
-				if (_ChooseMemoryLayoutCommand == null)
-				{
-					_ChooseMemoryLayoutCommand = new ReactiveCommand(this.OnChooseMemoryLayout);
-					_ChooseMemoryLayoutCommand.Name = "Choose Memory Layout";
-					_ChooseMemoryLayoutCommand.Description = "Choose the memory layout";
-
-					if (App != null)
-					{
-						_ChooseMemoryLayoutCommand.AddWatchedProperty(App, "OperationInProgress");
-					}
-
-					_ChooseMemoryLayoutCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
-					{
-						if (App == null)
-						{
-							reasonsDisabled.Add("Internal program error");
-							return false;
-						}
-
-						bool result = true;
-
-						if (App.OperationInProgress)
-						{
-							reasonsDisabled.Add("Operation is in progress");
-							result = false;
-						}
-
-						return result;
-					};
-				}
-
-				return _ChooseMemoryLayoutCommand;
-			}
-		}
-		private ReactiveCommand _ChooseMemoryLayoutCommand;
-
-		private void OnChooseMemoryLayout()
-		{
-			OpenFileDialog dialog = new OpenFileDialog();
-			dialog.Filter = MemoryLayout.MEMORY_LAYOUT_FILE_FILTER;
-			dialog.CheckFileExists = true;
-			dialog.CheckPathExists = true;
-			dialog.Title = "Select Memory Layout File for Flashing";
-
-			if (!String.IsNullOrEmpty(MemoryLayoutFileName))
-			{
-				DirectoryInfo dirInfo = Directory.GetParent(MemoryLayoutFileName);
-
-				if(dirInfo != null)
-				{
-					dialog.InitialDirectory = dirInfo.FullName;
-				}
-			}
-
-			if (String.IsNullOrEmpty(dialog.InitialDirectory))
-			{
-				dialog.InitialDirectory = Directory.GetCurrentDirectory();
-			}
-
-			if (dialog.ShowDialog() == true)
-			{
-				MemoryLayoutFileName = dialog.FileName;
 			}
 		}
 
@@ -964,6 +1058,104 @@ namespace ECUFlasher
 			}
 		}
 
+		public ReactiveCommand ReadDiffFlashCommand
+		{
+			get
+			{
+				if (_ReadDiffFlashCommand == null)
+				{
+					_ReadDiffFlashCommand = new ReactiveCommand(this.OnReadDiffFlash);
+					_ReadDiffFlashCommand.Name = "Diff Read Flash";
+					_ReadDiffFlashCommand.Description = "Read only changed sectors of ECU flash memory, using the loaded file to skip matching sectors";
+
+					if (App != null)
+					{
+						_ReadDiffFlashCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+						_ReadDiffFlashCommand.AddWatchedProperty(App, "OperationInProgress");
+						_ReadDiffFlashCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
+						_ReadDiffFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
+						_ReadDiffFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
+					}
+
+					_ReadDiffFlashCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
+					{
+						return CanExecuteReadDiffFlashCommand(reasonsDisabled);
+					};
+				}
+
+				return _ReadDiffFlashCommand;
+			}
+		}
+		private ReactiveCommand _ReadDiffFlashCommand;
+
+		private bool CanExecuteReadDiffFlashCommand(List<string> reasonsDisabled)
+		{
+			if (App == null)
+			{
+				reasonsDisabled.Add("Internal program error");
+				return false;
+			}
+
+			bool result = true;
+
+			if (!IsMemoryLayoutOK)
+			{
+				reasonsDisabled.Add("Specified memory layout is not correct");
+				result = false;
+			}
+
+			if (!IsFlashFileOK)
+			{
+				reasonsDisabled.Add("Specified flash file is not correct");
+				result = false;
+			}
+
+			if (!App.CommInterface.IsConnected())
+			{
+				reasonsDisabled.Add("Not connected to ECU");
+				result = false;
+			}
+
+			if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+			{
+				reasonsDisabled.Add("Not connected with KWP2000 protocol");
+				result = false;
+			}
+
+			if (App.OperationInProgress)
+			{
+				reasonsDisabled.Add("Another operation is in progress");
+				result = false;
+			}
+
+			return result;
+		}
+
+		private void OnReadDiffFlash()
+		{
+			//done to trigger a reload of the memory layout and flash files and cause them to revalidate
+			FileNameToFlash = FileNameToFlash;
+			MemoryLayoutFileName = MemoryLayoutFileName;
+
+			if (ReadDiffFlashCommand.IsEnabled)
+			{
+				string confirmationMessage = "If you are ready to read, confirm the following things:";
+				confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
+				confirmationMessage += "\n2) The engine is not running.";
+				confirmationMessage += "\nNote: Diff read will only read sectors that differ from the loaded file.";
+				confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent reading the flash memory.";
+				confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
+
+				if (App.DisplayUserPrompt("Confirm Diff Read ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+				{
+					App.OperationInProgress = true;
+					App.PercentOperationComplete = 0.0f;
+
+					OnReadExternalFlashStarted(true, true, true, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted);
+				}
+			}
+		}
+
 		private void OnReadFlashCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...
@@ -1262,4 +1454,3 @@ namespace ECUFlasher
 		private MemoryLayout _FlashMemoryLayout;
 	}
 }
-

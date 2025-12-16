@@ -776,7 +776,7 @@ namespace ECUFlasher
                 {
                     _RefreshDevicesCommand = new ReactiveCommand(this.OnRefreshDevices);
                     _RefreshDevicesCommand.Name = "Refresh Devices";
-                    _RefreshDevicesCommand.Description = "Refresh the connected FTDI USB devices";
+                    _RefreshDevicesCommand.Description = "Refresh the connected USB devices";
                     _RefreshDevicesCommand.AddWatchedProperty(CommInterface, "ConnectionStatus");
 
                     _RefreshDevicesCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
@@ -944,8 +944,9 @@ namespace ECUFlasher
 
         public void OnFailedToStartConnecting()
         {
-            //if we failed to connect, then maybe the FTDI device isn't valid
-            RefreshDevices();
+            //if we failed to connect, then maybe the device isn't valid
+            // Refresh devices but preserve the current selection if it still exists
+            OnRefreshDevices();
         }
 
         private void PreventSleepMode()
