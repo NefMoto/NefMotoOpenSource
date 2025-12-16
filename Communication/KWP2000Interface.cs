@@ -2454,19 +2454,19 @@ while (watch.ElapsedMilliseconds < totalConTime) ;
                             }
                             else
                             {
-                                DisplayStatusMessage("Failed to get bytes waiting, set baud rate, or purge receive buffer on FTDI device", StatusMessageType.LOG);
+                                DisplayStatusMessage("Failed to get bytes waiting, set baud rate, or purge receive buffer on device", StatusMessageType.LOG);
                             }
                         }
                         else
                         {
-                            DisplayStatusMessage("Failed to write connection data to FTDI device", StatusMessageType.LOG);
+                            DisplayStatusMessage("Failed to write connection data to device", StatusMessageType.LOG);
                         }
 
                         watch.Stop();
                     }
                     else
                     {
-                        DisplayStatusMessage("Failed to set bit mode or baud rate on FTDI device.", StatusMessageType.LOG);
+                        DisplayStatusMessage("Failed to set bit mode or baud rate on device.", StatusMessageType.LOG);
                     }
 
                     if (!waitingForConnect)
@@ -2624,19 +2624,19 @@ connectEndTime = connectStartTime + connectTime + 3;
                             }
                             else
                             {
-                                DisplayStatusMessage("Failed to write connection message to FTDI device", StatusMessageType.LOG);
+                                DisplayStatusMessage("Failed to write connection message to device", StatusMessageType.LOG);
                             }
 
                             messageSendFinishTime = watch.ElapsedMilliseconds;
 						}
 						else
 						{
-							DisplayStatusMessage("Failed to write low byte to FTDI device", StatusMessageType.LOG);
+							DisplayStatusMessage("Failed to write low byte to device", StatusMessageType.LOG);
 						}
 					}
 					else
 					{
-						DisplayStatusMessage("Failed to set baud rate on FTDI device.", StatusMessageType.LOG);
+						DisplayStatusMessage("Failed to set baud rate on device.", StatusMessageType.LOG);
 					}
 
 					if (!waitingForConnect)
@@ -2764,12 +2764,12 @@ connectEndTime = connectStartTime + connectTime + 3;
                             }
                             else
                             {
-                                DisplayStatusMessage("Failed to clear break on FTDI device.", StatusMessageType.LOG);
+                                DisplayStatusMessage("Failed to clear break on device.", StatusMessageType.LOG);
                             }
                         }
                         else
                         {
-                            DisplayStatusMessage("Failed to set break on FTDI device.", StatusMessageType.LOG);
+                            DisplayStatusMessage("Failed to set break on device.", StatusMessageType.LOG);
                         }
                     }
                     else

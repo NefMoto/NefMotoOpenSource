@@ -776,7 +776,7 @@ namespace ECUFlasher
                 {
                     _RefreshDevicesCommand = new ReactiveCommand(this.OnRefreshDevices);
                     _RefreshDevicesCommand.Name = "Refresh Devices";
-                    _RefreshDevicesCommand.Description = "Refresh the connected FTDI USB devices";
+                    _RefreshDevicesCommand.Description = "Refresh the connected USB devices";
                     _RefreshDevicesCommand.AddWatchedProperty(CommInterface, "ConnectionStatus");
 
                     _RefreshDevicesCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)

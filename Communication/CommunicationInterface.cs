@@ -512,7 +512,7 @@ namespace Communication
                             // If FTDI device, try to get chip ID
                             if (deviceInfo is FtdiDeviceInfo ftdiDeviceInfo && ftdiDeviceInfo.ChipID != 0)
                             {
-                                DisplayStatusMessage("FTDI device chip ID: 0x" + ftdiDeviceInfo.ChipID.ToString("X"), StatusMessageType.LOG);
+                                DisplayStatusMessage("Device chip ID: 0x" + ftdiDeviceInfo.ChipID.ToString("X"), StatusMessageType.LOG);
                             }
 
                             connected = true;

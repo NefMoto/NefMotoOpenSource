@@ -99,7 +99,7 @@ namespace ECUFlasher
 
                         if (App.SelectedDeviceInfo == null)
                         {
-                            reasonsDisabled.Add("No FTDI USB device selected");
+                            reasonsDisabled.Add("No device selected");
                             result = false;
                         }
 
