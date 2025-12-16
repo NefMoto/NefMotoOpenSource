@@ -8,3 +8,11 @@ updates:
     open-pull-requests-limit: 5
     assignees:
       - "nyetwurk"
+  # Monitor NuGet packages for updates
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    assignees:
+      - "nyetwurk"
