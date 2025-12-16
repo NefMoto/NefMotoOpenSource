@@ -142,36 +142,43 @@ namespace Communication
 
                 KillSendReceiveThread();
 
-                if (OpenFTDIDevice(SelectedDeviceInfo))
+                if (OpenCommunicationDevice(SelectedDeviceInfo))
                 {
-                    FTDI.FT_STATUS setupStatus = FTDI.FT_STATUS.FT_OK;
-                    setupStatus |= mFTDIDevice.SetDataCharacteristics(FTDI.FT_DATA_BITS.FT_BITS_8, FTDI.FT_STOP_BITS.FT_STOP_BITS_1, FTDI.FT_PARITY.FT_PARITY_NONE);
-                    setupStatus |= mFTDIDevice.SetFlowControl(FTDI.FT_FLOW_CONTROL.FT_FLOW_NONE, 0, 0);
-                    setupStatus |= mFTDIDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
-
-                    //setupStatus |= mFTDIDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
-                    setupStatus |= mFTDIDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
-                    setupStatus |= mFTDIDevice.SetDTR(true);//enable receive for self powered devices
-                    setupStatus |= mFTDIDevice.SetRTS(false);//set low to tell device we are ready to send
-                    setupStatus |= mFTDIDevice.SetBreak(false);//set to high idle state
-                    setupStatus |= mFTDIDevice.SetBitMode(0xFF, FTDI.FT_BIT_MODES.FT_BIT_MODE_RESET);
-                    setupStatus |= mFTDIDevice.SetBaudRate(baudRate);
-                    setupStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
-
-                    if (setupStatus == FTDI.FT_STATUS.FT_OK)
+                    if (mCommunicationDevice != null)
                     {
-                        success = true;
+                        bool setupSuccess = true;
+                        setupSuccess &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
+                        setupSuccess &= mCommunicationDevice.SetFlowControl(FlowControl.None);
+                        setupSuccess &= mCommunicationDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
 
-                        StartSendReceiveThread(SendReceiveThread);
+                        //setupSuccess &= mCommunicationDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
+                        setupSuccess &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
+                        setupSuccess &= mCommunicationDevice.SetDTR(true);//enable receive for self powered devices
+                        setupSuccess &= mCommunicationDevice.SetRTS(false);//set low to tell device we are ready to send
+                        setupSuccess &= mCommunicationDevice.SetBreak(false);//set to high idle state
+                        setupSuccess &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                        setupSuccess &= mCommunicationDevice.SetBaudRate(baudRate);
+                        setupSuccess &= mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
+
+                        if (setupSuccess)
+                        {
+                            success = true;
+
+                            StartSendReceiveThread(SendReceiveThread);
+                        }
+                        else
+                        {
+                            DisplayStatusMessage("Failed to setup communication device.", StatusMessageType.USER);
+                        }
                     }
                     else
                     {
-                        DisplayStatusMessage("Failed to setup FTDI device.", StatusMessageType.USER);
+                        DisplayStatusMessage("Failed to create communication device instance.", StatusMessageType.USER);
                     }
                 }
                 else
                 {
-                    DisplayStatusMessage("Could not open FTDI device.", StatusMessageType.USER);
+                    DisplayStatusMessage("Could not open communication device.", StatusMessageType.USER);
                 }
             }
 
@@ -216,18 +223,17 @@ namespace Communication
 
         bool SendBytes(byte[] data)
         {
-            uint numBytesWritten = 0;
-            var status = mFTDIDevice.Write(data, data.Length, ref numBytesWritten, 1);
+            if (mCommunicationDevice == null)
+                return false;
 
-            bool success = (status == FTD2XX_NET.FTDI.FT_STATUS.FT_OK) && (numBytesWritten == data.Length);
+            uint numBytesWritten = 0;
+            bool success = mCommunicationDevice.Write(data, data.Length, ref numBytesWritten, 1) && (numBytesWritten == data.Length);
 
             if (success)
             {
                 byte[] echoData = new byte[data.Length];
                 uint numEchoBytesRead = 0;
-                status = mFTDIDevice.Read(echoData, (uint)echoData.Length, ref numEchoBytesRead, 3);
-
-                success = (status == FTD2XX_NET.FTDI.FT_STATUS.FT_OK) && (numBytesWritten == data.Length);
+                success = mCommunicationDevice.Read(echoData, (uint)echoData.Length, ref numEchoBytesRead, 3) && (numBytesWritten == data.Length);
             }
 
             return success;
@@ -237,10 +243,16 @@ namespace Communication
         {
             data = new byte[numBytes];
 
-            uint numBytesRead = 0;
-            var status = mFTDIDevice.Read(data, numBytes, ref numBytesRead, 3);
+            if (mCommunicationDevice == null)
+            {
+                data = null;
+                return false;
+            }
 
-            if ((status != FTD2XX_NET.FTDI.FT_STATUS.FT_OK) || (numBytesRead != numBytes))
+            uint numBytesRead = 0;
+            bool success = mCommunicationDevice.Read(data, numBytes, ref numBytesRead, 3) && (numBytesRead == numBytes);
+
+            if (!success)
             {
                 data = null;
                 return false;
@@ -786,9 +798,11 @@ namespace Communication
 
             while ((ConnectionStatus != ConnectionStatusType.Disconnected) || (mNumConnectionAttemptsRemaining > 0))
             {
-                lock (mFTDIDevice)
+                if (mCommunicationDevice != null)
                 {
-                    #region HandleConnecting
+                    lock (mCommunicationDevice)
+                    {
+                        #region HandleConnecting
                     while ((ConnectionStatus == ConnectionStatusType.Disconnected) && (mNumConnectionAttemptsRemaining > 0))
                     {
                         mNumConnectionAttemptsRemaining--;
@@ -806,8 +820,9 @@ namespace Communication
                             ConnectionStatus = ConnectionStatusType.Connected;
                             mNumConnectionAttemptsRemaining = 0;
                         }
+                        }
+                        #endregion
                     }
-                    #endregion
                 }
 
                 //TODO: communicate....
@@ -866,7 +881,7 @@ namespace Communication
                         //TODO: reset any communication state we have cached such as DeviceID
 
                         //TODO: restore the communication state to default settings
-                        mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                        mCommunicationDevice?.Purge(PurgeType.RX | PurgeType.TX);
                     }
                 }
             }

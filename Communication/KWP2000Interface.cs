@@ -370,23 +370,23 @@ namespace Communication
                 ClearMessageBuffers();
                 KillSendReceiveThread();
 
-                if (OpenFTDIDevice(SelectedDeviceInfo))
+                if (OpenCommunicationDevice(SelectedDeviceInfo))
                 {
-                    FTDI.FT_STATUS setupStatus = FTDI.FT_STATUS.FT_OK;
-                    setupStatus |= mFTDIDevice.SetDataCharacteristics(FTDI.FT_DATA_BITS.FT_BITS_8, FTDI.FT_STOP_BITS.FT_STOP_BITS_1, FTDI.FT_PARITY.FT_PARITY_NONE);
-                    setupStatus |= mFTDIDevice.SetFlowControl(FTDI.FT_FLOW_CONTROL.FT_FLOW_NONE, 0, 0);
-                    setupStatus |= mFTDIDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
+                    bool setupSuccess = true;
+                    setupSuccess &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
+                    setupSuccess &= mCommunicationDevice.SetFlowControl(FlowControl.None);
+                    setupSuccess &= mCommunicationDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
 
                     //setupStatus |= mFTDIDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
-                    setupStatus |= mFTDIDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
-                    setupStatus |= mFTDIDevice.SetDTR(true);//enable receive for self powered devices
-                    setupStatus |= mFTDIDevice.SetRTS(false);//set low to tell device we are ready to send
-                    setupStatus |= mFTDIDevice.SetBreak(false);//set to high idle state
-                    setupStatus |= mFTDIDevice.SetBitMode(0xFF, FTDI.FT_BIT_MODES.FT_BIT_MODE_RESET);
-                    setupStatus |= mFTDIDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
-                    setupStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                    setupSuccess &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
+                    setupSuccess &= mCommunicationDevice.SetDTR(true);//enable receive for self powered devices
+                    setupSuccess &= mCommunicationDevice.SetRTS(false);//set low to tell device we are ready to send
+                    setupSuccess &= mCommunicationDevice.SetBreak(false);//set to high idle state
+                    setupSuccess &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                    setupSuccess &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                    setupSuccess &= mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
 
-                    if (setupStatus == FTDI.FT_STATUS.FT_OK)
+                    if (setupSuccess)
                     {
                         if (!ShouldVerifyDumbMode)
                         {
@@ -396,18 +396,18 @@ namespace Communication
                         {
                             byte[] dumbTestMessage = { 0xF0 };//don't use something that could be confused for 0x55 sync byte, incase that will confuse ECUs
                             uint numBytesWritten = 0;
-                            setupStatus = mFTDIDevice.Write(dumbTestMessage, dumbTestMessage.Length, ref numBytesWritten, 1);
+                            success = mCommunicationDevice.Write(dumbTestMessage, dumbTestMessage.Length, ref numBytesWritten, 1) && (numBytesWritten == dumbTestMessage.Length);
 
-                            if ((setupStatus == FTDI.FT_STATUS.FT_OK) && (numBytesWritten == dumbTestMessage.Length))
+                            if (success)
                             {
                                 byte[] dumbTestMessageEcho = new byte[dumbTestMessage.Length];
                                 uint numEchoBytesRead = 0;
-                                FTDI.FT_STATUS echoStatus = mFTDIDevice.Read(dumbTestMessageEcho, (uint)dumbTestMessageEcho.Length, ref numEchoBytesRead, 2);
+                                success = mCommunicationDevice.Read(dumbTestMessageEcho, (uint)dumbTestMessageEcho.Length, ref numEchoBytesRead, 2) && (numEchoBytesRead == dumbTestMessageEcho.Length);
 
                                 //get rid of all data just in case
-                                mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                                mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
 
-                                if ((echoStatus == FTDI.FT_STATUS.FT_OK) && (numEchoBytesRead == dumbTestMessageEcho.Length))
+                                if (success && (numEchoBytesRead == dumbTestMessageEcho.Length))
                                 {
                                     success = true;
 
@@ -483,11 +483,11 @@ namespace Communication
                 {
                     value = DEFAULT_COMMUNICATION_BAUD_RATE;
                 }
-                lock (mFTDIDevice)
+                lock (mCommunicationDevice)
                 {
-                    if (IsFTDIDeviceOpen())
+                    if (IsCommunicationDeviceOpen())
                     {
-                        mFTDIDevice.SetBaudRate(value);
+                        mCommunicationDevice.SetBaudRate(value);
                     }
                 }
                 mDiagnosticSessionBaudRate = value;
@@ -1064,9 +1064,9 @@ namespace Communication
                         CurrentDiagnosticSessionType = KWP2000DiagnosticSessionType.InternalUndefined;
                         DiagnosticSessionBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
 
-                        mFTDIDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
-                        mFTDIDevice.SetBitMode(0xFF, FTDI.FT_BIT_MODES.FT_BIT_MODE_RESET);
-                        mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                        mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                        mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                        mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
 
                         SetTimingParametersToDefaults();
 
@@ -1136,19 +1136,23 @@ namespace Communication
             bool success = false;
             numPreceedingBytesToIgnore = 0;
 
-            lock (mFTDIDevice)
+            if (mCommunicationDevice == null)
+            {
+                return false;
+            }
+
+            lock (mCommunicationDevice)
             {
                 DisplayStatusMessage("Sending slow init address byte", StatusMessageType.DEV);
 
                 double TICKS_PER_MS = Stopwatch.Frequency / 1000.0;
                 double TICKS_PER_200_MS = Stopwatch.Frequency / 5.0;
                 long FIVE_BAUD_BIT_TIME_TICKS = (long)(TICKS_PER_200_MS + (TICKS_PER_MS * SlowInitFiveBaudBitTimeOffsetMS));
-                FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
 
                 //low start bit
                 Stopwatch watch = new Stopwatch(); watch.Start();
 
-                ftdiStatus |= mFTDIDevice.SetBreak(true);//low
+                success = mCommunicationDevice.SetBreak(true);//low
                 bool isLow = true;
 
                 long currentBitEndTime = FIVE_BAUD_BIT_TIME_TICKS;
@@ -1165,7 +1169,7 @@ namespace Communication
                     {
                         if(isLow)
                         {
-                            ftdiStatus |= mFTDIDevice.SetBreak(false);//high
+                            success &= mCommunicationDevice.SetBreak(false);//high
                             numPreceedingBytesToIgnore++;
                         }
 
@@ -1176,7 +1180,7 @@ namespace Communication
                     {
                         if(!isLow)
                         {
-                            ftdiStatus |= mFTDIDevice.SetBreak(true);//low
+                            success &= mCommunicationDevice.SetBreak(true);//low
                         }
 
                         isLow = true;
@@ -1192,7 +1196,7 @@ namespace Communication
                     {
                         if (isLow)
                         {
-                            ftdiStatus |= mFTDIDevice.SetBreak(false);//high
+                            success &= mCommunicationDevice.SetBreak(false);//high
                             numPreceedingBytesToIgnore++;
                         }
 
@@ -1202,7 +1206,7 @@ namespace Communication
                     {
                         if (!isLow)
                         {
-                            ftdiStatus |= mFTDIDevice.SetBreak(true);//low
+                            success &= mCommunicationDevice.SetBreak(true);//low
                         }
 
                         isLow = true;
@@ -1215,7 +1219,7 @@ namespace Communication
                 //high stop bit
                 if (isLow)
                 {
-                    ftdiStatus |= mFTDIDevice.SetBreak(false);//high
+                    success &= mCommunicationDevice.SetBreak(false);//high
                     numPreceedingBytesToIgnore++;
                 }
 
@@ -1223,8 +1227,6 @@ namespace Communication
                 //while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
 
 				//don't purge because that can cause us to miss the sync byte, just use the low to high transitions we counted
-
-                success = (ftdiStatus == FTDI.FT_STATUS.FT_OK);
 
                 if (!success)
                 {
@@ -1237,7 +1239,12 @@ namespace Communication
 
         protected bool SendSlowInitAddress_FTDI_UsingBitBang(byte connectAddress)
         {
-            bool success = false;
+            if (mCommunicationDevice == null)
+            {
+                return false;
+            }
+
+            bool success = true;
 
             const byte HIGH_DATA = 0x01;
             const byte LOW_DATA = 0x00;
@@ -1300,17 +1307,15 @@ namespace Communication
             }
             #endregion
 
-            lock (mFTDIDevice)
+            lock (mCommunicationDevice)
             {
-                FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
-
-                ftdiStatus |= mFTDIDevice.SetBitMode(BIT_MODE_MASK, FTDI.FT_BIT_MODES.FT_BIT_MODE_ASYNC_BITBANG);
-                ftdiStatus |= mFTDIDevice.SetBaudRate(BIT_BANG_ADDRESS_BAUD_RATE);
+                success &= mCommunicationDevice.SetBitMode(BIT_MODE_MASK, BitMode.AsyncBitBang);
+                success &= mCommunicationDevice.SetBaudRate(BIT_BANG_ADDRESS_BAUD_RATE);
 
                 //give it enough write timeout to send, and a super small read timeout so we get a quick response
-                ftdiStatus |= mFTDIDevice.SetTimeouts(1, FIVE_BAUD_SEND_TIME_MS * 2);//times 2 to be safe
+                success &= mCommunicationDevice.SetTimeouts(1, FIVE_BAUD_SEND_TIME_MS * 2);//times 2 to be safe
 
-                if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                if (success)
                 {
                     DisplayStatusMessage("Sending slow init address byte", StatusMessageType.DEV);
 
@@ -1319,43 +1324,40 @@ namespace Communication
 
                     //send the connect address at 5 baud
                     uint numBytesWritten = 0;
-                    ftdiStatus |= mFTDIDevice.Write(addressData, addressData.Length, ref numBytesWritten, 1);
+                    success &= mCommunicationDevice.Write(addressData, addressData.Length, ref numBytesWritten, 1) && (numBytesWritten == addressData.Length);
 
-                    if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesWritten == addressData.Length))
+                    if (success)
                     {
                         //wait for the minimum time to pass
                         while (watch.ElapsedMilliseconds < FIVE_BAUD_SEND_TIME_MS) ;//busy wait
                         watch.Stop();
 
                         //wait for the 5 baud address to send
-                        uint numBytesInTxBuffer = 0;
+                        uint numBytesInSendBuffer = 0;
                         do
                         {
-                            ftdiStatus = mFTDIDevice.GetTxBytesWaiting(ref numBytesInTxBuffer);
-                        } while ((numBytesInTxBuffer > 0) && (ftdiStatus == FTDI.FT_STATUS.FT_OK));
+                            success &= mCommunicationDevice.GetTxBytesWaiting(ref numBytesInSendBuffer);
+                        } while (success && (numBytesInSendBuffer > 0));
 
-                        ftdiStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_TX);
-                        ftdiStatus |= mFTDIDevice.SetBitMode(0xFF, FTDI.FT_BIT_MODES.FT_BIT_MODE_RESET);
-                        ftdiStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX);//TODO: this purge will occasionally make us miss the key byte
-                        ftdiStatus |= mFTDIDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
-
-                        success = (ftdiStatus == FTDI.FT_STATUS.FT_OK);
-                    }
-                    else
-                    {
-                        DisplayStatusMessage("Failed to write connect address.", StatusMessageType.LOG);
+                        // Reset bit mode and restore baud rate after sending slow init address
+                        if (success)
+                        {
+                            success &= mCommunicationDevice.Purge(PurgeType.TX);
+                            success &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                            success &= mCommunicationDevice.Purge(PurgeType.RX);//TODO: this purge will occasionally make us miss the key byte
+                            success &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                        }
                     }
                 }
-                else
+
+                if (!success)
                 {
-                    DisplayStatusMessage("Failed to setup FTDI device.", StatusMessageType.LOG);
+                    DisplayStatusMessage("Failed to send slow init address byte.", StatusMessageType.LOG);
                 }
             }
 
             return success;
         }
-
-		//send five baud address byte, receive sync byte, receive key byte 1, receive key byte 2, send last key byte complement, maybe receive address complement
         protected bool SendSlowInit(byte connectAddress, SlowInitDataBits numDataBits, SlowInitParity parity, out byte keyByte1, out byte keyByte2)
         {
             uint PRIMARY_SLOW_INIT_BAUD_RATE = 10400;
@@ -1364,16 +1366,21 @@ namespace Communication
             bool result = false;
             keyByte1 = 0; keyByte2 = 0;
 
-            lock (mFTDIDevice)
+            if (mCommunicationDevice == null)
+            {
+                return false;
+            }
+
+            lock (mCommunicationDevice)
             {
                 uint currentBaudRate = PRIMARY_SLOW_INIT_BAUD_RATE;
 
-                FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
-                ftdiStatus |= mFTDIDevice.SetBaudRate(currentBaudRate);
-                ftdiStatus |= mFTDIDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
-                ftdiStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                bool success = true;
+                success &= mCommunicationDevice.SetBaudRate(currentBaudRate);
+                success &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
+                success &= mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
 
-                if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                if (success)
                 {
                     Stopwatch watch = new Stopwatch();
                     uint numPreceedingBytesToIgnore = 0;
@@ -1388,7 +1395,7 @@ namespace Communication
                         //read the sync byte
                         byte[] syncByte = new byte[1 + numPreceedingBytesToIgnore];
                         uint numSyncBytesRead = 0;
-                        ftdiStatus |= mFTDIDevice.Read(syncByte, 1 + numPreceedingBytesToIgnore, ref numSyncBytesRead, 2);
+                        bool readSuccess = mCommunicationDevice.Read(syncByte, 1 + numPreceedingBytesToIgnore, ref numSyncBytesRead, 2);
 
                         watch.Reset(); watch.Start();//start timing for first key byte
 
@@ -1398,18 +1405,18 @@ namespace Communication
                         bool readSyncByte = false;
 
                         //check if we read the sync byte
-                        if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numSyncBytesRead > numPreceedingBytesToIgnore))
+                        if (readSuccess && (numSyncBytesRead > numPreceedingBytesToIgnore))
                         {
                             readSyncByte = true;
 
                             if (syncByte[numPreceedingBytesToIgnore] != 0x55)
                             {
                                 currentBaudRate = SECONDARY_SLOW_INIT_BAUD_RATE;
-                                ftdiStatus |= mFTDIDevice.SetBaudRate(currentBaudRate);
+                                success &= mCommunicationDevice.SetBaudRate(currentBaudRate);
 
                                 DisplayStatusMessage("Read incorrect sync byte, guessing baud rate is actually " + currentBaudRate + ".", StatusMessageType.LOG);
 
-                                if (ftdiStatus != FTDI.FT_STATUS.FT_OK)
+                                if (!success)
                                 {
                                     DisplayStatusMessage("Failed to set new baud rate based on sync byte.", StatusMessageType.LOG);
                                     readSyncByte = false;
@@ -1421,11 +1428,11 @@ namespace Communication
                             readSyncByte = true;
 
                             currentBaudRate = SECONDARY_SLOW_INIT_BAUD_RATE;
-                            ftdiStatus |= mFTDIDevice.SetBaudRate(currentBaudRate);
+                            success &= mCommunicationDevice.SetBaudRate(currentBaudRate);
 
                             DisplayStatusMessage("Failed to read sync byte, guessing baud rate is actually " + currentBaudRate + ".", StatusMessageType.LOG);
 
-                            if (ftdiStatus != FTDI.FT_STATUS.FT_OK)
+                            if (!success)
                             {
                                 DisplayStatusMessage("Failed to set new baud rate based on sync byte.", StatusMessageType.LOG);
                                 readSyncByte = false;
@@ -1434,9 +1441,9 @@ namespace Communication
 
                         if (readSyncByte)
                         {
-                            ftdiStatus |= mFTDIDevice.SetTimeouts(1, FTDIDeviceWriteTimeOutMs);
+                            success &= mCommunicationDevice.SetTimeouts(1, FTDIDeviceWriteTimeOutMs);
 
-                            if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                            if (success)
                             {
                                 //read the key bytes
                                 List<byte> keyBytes = new List<byte>();
@@ -1451,9 +1458,9 @@ namespace Communication
                                 do
                                 {
                                     lastReadTime = watch.ElapsedMilliseconds;
-                                    ftdiStatus = mFTDIDevice.Read(keyByteData, numKeyBytesToRead, ref numBytesRead, 1);
+                                    bool keyByteReadSuccess = mCommunicationDevice.Read(keyByteData, numKeyBytesToRead, ref numBytesRead, 1);
 
-                                    if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesRead > 0))
+                                    if (keyByteReadSuccess && (numBytesRead > 0))
                                     {
                                         //ignore old bit bang data
                                         //if(keyByteData[0] != 0xFF)
@@ -1481,7 +1488,7 @@ namespace Communication
                                 {
                                     //switch data format
                                     //ftdiStatus |= mFTDIDevice.SetDataCharacteristics(FTDI.FT_DATA_BITS.FT_BITS_8, FTDI.FT_STOP_BITS.FT_STOP_BITS_1, FTDI.FT_PARITY.FT_PARITY_NONE);
-                                    mFTDIDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
+                                    success &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
 
                                     //send the complement of the last key byte
                                     byte[] keyByteComp = new byte[1];
@@ -1491,19 +1498,19 @@ namespace Communication
                                     while (watch.ElapsedMilliseconds < (uint)SlowInitConnectionTiming.W4Min) ;//busy loop
 
                                     uint numBytesWritten = 0;
-                                    ftdiStatus = mFTDIDevice.Write(keyByteComp, keyByteComp.Length, ref numBytesWritten, 2);
+                                    success &= mCommunicationDevice.Write(keyByteComp, keyByteComp.Length, ref numBytesWritten, 2) && (numBytesWritten == keyByteComp.Length);
 
                                     watch.Stop();
 
-                                    if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesWritten == keyByteComp.Length))
+                                    if (success)
 									{
 										if (mConsumeTransmitEcho)
 										{
 											//read the echo
 											byte[] echo = new byte[1];
-											ftdiStatus = mFTDIDevice.Read(echo, (uint)echo.Length, ref numBytesRead, 2);
+											success &= mCommunicationDevice.Read(echo, (uint)echo.Length, ref numBytesRead, 2) && (numBytesRead == echo.Length);
 
-											if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesRead == echo.Length))
+											if (success)
 											{
 												if (echo[0] == keyByteComp[0])
 												{
@@ -1567,9 +1574,9 @@ namespace Communication
 							//read the complement of the address
                             byte[] addressComplement = new byte[1];
 							uint numBytesRead = 0;
-                            ftdiStatus = mFTDIDevice.Read(addressComplement, (uint)addressComplement.Length, ref numBytesRead, 2);
+                            success &= mCommunicationDevice.Read(addressComplement, (uint)addressComplement.Length, ref numBytesRead, 2);
 
-							if ((ftdiStatus != FTDI.FT_STATUS.FT_OK) || (numBytesRead != addressComplement.Length) || (addressComplement[0] != (byte)~connectAddress))
+							if (!success || (numBytesRead != addressComplement.Length) || (addressComplement[0] != (byte)~connectAddress))
 							{
 								result = false;
 								DisplayStatusMessage("Failed to read address complement.", StatusMessageType.LOG);
@@ -1586,11 +1593,11 @@ namespace Communication
                 {
                     //failed to connect so purge the buffers
                     ClearMessageBuffers();
-                    mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                    mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
                 }
 
-                mFTDIDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
-                mFTDIDevice.SetDataCharacteristics(FTDI.FT_DATA_BITS.FT_BITS_8, FTDI.FT_STOP_BITS.FT_STOP_BITS_1, FTDI.FT_PARITY.FT_PARITY_NONE);
+                success &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
+                success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
             }
 
             return result;
@@ -1677,11 +1684,11 @@ namespace Communication
             //read the byte
             byte[] tempData = new byte[1];
             uint numBytesRead = 0;
-            FTDI.FT_STATUS ftdiStatus = mFTDIDevice.Read(tempData, 1, ref numBytesRead, 2);
+            bool success = mCommunicationDevice.Read(tempData, 1, ref numBytesRead, 2) && (numBytesRead == 1);
 
             stopwatch.Start();
 
-            if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesRead == 1))
+            if (success)
             {
                 readByte = tempData[0];
 
@@ -1694,17 +1701,17 @@ namespace Communication
 
                     while (stopwatch.ElapsedMilliseconds < KWP1281_TesterMinTimeToSendByteComplementMS) ;//busy loop
 
-                    ftdiStatus = mFTDIDevice.Write(tempDataComplement, 1, ref numBytesWritten, 2);
+                    success &= mCommunicationDevice.Write(tempDataComplement, 1, ref numBytesWritten, 2) && (numBytesWritten == 1);
 
-                    if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesWritten == 1))
+                    if (success)
                     {
 						if (mConsumeTransmitEcho)
 						{
 							//read the echo
 							byte[] tempDataEcho = new byte[1];
-							ftdiStatus = mFTDIDevice.Read(tempDataEcho, 1, ref numBytesRead, 2);
+							success &= mCommunicationDevice.Read(tempDataEcho, 1, ref numBytesRead, 2) && (numBytesRead == 1);
 
-							if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesRead == 1) && (tempDataEcho[0] == tempDataComplement[0]))
+							if (success && (numBytesRead == 1) && (tempDataEcho[0] == tempDataComplement[0]))
 							{
 								result = true;
 							}
@@ -1751,18 +1758,18 @@ namespace Communication
 
             while (stopwatch.ElapsedMilliseconds < KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS) ;//busy loop
 
-            FTDI.FT_STATUS ftdiStatus = mFTDIDevice.Write(tempData, 1, ref numBytesWritten, 2);
+            bool success = mCommunicationDevice.Write(tempData, 1, ref numBytesWritten, 2) && (numBytesWritten == 1);
 
-            if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesWritten == 1))
+            if (success)
             {
 				if(mConsumeTransmitEcho)
 				{
 					//read the echo
 					byte[] tempEchoData = new byte[1];
 					uint numBytesRead = 0;
-					ftdiStatus = mFTDIDevice.Read(tempEchoData, 1, ref numBytesRead, 2);
+					success &= mCommunicationDevice.Read(tempEchoData, 1, ref numBytesRead, 2) && (numBytesRead == 1);
 
-					if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesRead == 1) && (tempData[0] == tempEchoData[0]))
+					if (success && (numBytesRead == 1) && (tempData[0] == tempEchoData[0]))
 					{
 						result = true;
 					}
@@ -1779,9 +1786,9 @@ namespace Communication
 					//read the complement response
 					byte[] tempDataComplement = new byte[1];
 					uint numBytesRead = 0;
-					ftdiStatus = mFTDIDevice.Read(tempDataComplement, 1, ref numBytesRead, 2);
+					success &= mCommunicationDevice.Read(tempDataComplement, 1, ref numBytesRead, 2) && (numBytesRead == 1);
 
-					if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesRead == 1) && (tempData[0] == (byte)~tempDataComplement[0]))
+					if (success && (numBytesRead == 1) && (tempData[0] == (byte)~tempDataComplement[0]))
 					{
 						result = true;
 					}
@@ -2062,7 +2069,7 @@ namespace Communication
             string ASCIIData = "";
 
             const uint KWP1281_ECU_MAX_TIME_UNTIL_RESPONSE_MS = 1200;
-            mFTDIDevice.SetTimeouts(KWP1281_ECU_MAX_TIME_UNTIL_RESPONSE_MS, FTDIDeviceWriteTimeOutMs);
+            bool success = mCommunicationDevice.SetTimeouts(KWP1281_ECU_MAX_TIME_UNTIL_RESPONSE_MS, FTDIDeviceWriteTimeOutMs);
 
             while (sendOK)
             {
@@ -2144,7 +2151,7 @@ namespace Communication
                 DisplayStatusMessage("Failed to read KWP1281 connect info.", StatusMessageType.USER);
             }
 
-            mFTDIDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
+            success &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
 
             return sendOK;
         }
@@ -2156,7 +2163,7 @@ namespace Communication
 
             DisplayStatusMessage("Starting slow init connection.", StatusMessageType.USER);
 
-            lock(mFTDIDevice)
+            lock(mCommunicationDevice)
             {
                 //wait for the required idle time
                 Stopwatch watch = new Stopwatch(); watch.Start();
@@ -2380,21 +2387,21 @@ namespace Communication
             Stopwatch watch = new Stopwatch();
             long offset = 0;
             uint connectionAttempt = 0;
-            FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
+            bool success = true;
 
-            while ((Math.Abs(offset) < MAX_CONNECTION_TIMING_OFFSET) && (ConnectionStatus != ConnectionStatusType.Connected) && (ftdiStatus == FTDI.FT_STATUS.FT_OK))
+            while ((Math.Abs(offset) < MAX_CONNECTION_TIMING_OFFSET) && (ConnectionStatus != ConnectionStatusType.Connected) && success)
             {
                 bool waitingForConnect = false;
 
-                lock (mFTDIDevice)
+                lock (mCommunicationDevice)
                 {
                     connectionAttempt++;
                     DisplayStatusMessage("Connection attempt: " + connectionAttempt, StatusMessageType.USER);
                     DisplayStatusMessage("Connecting using timing offset: " + offset + "ms", StatusMessageType.LOG);
 
-                    ftdiStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
-                    ftdiStatus |= mFTDIDevice.SetBitMode(0xFF, FTDI.FT_BIT_MODES.FT_BIT_MODE_RESET);
-                    ftdiStatus |= mFTDIDevice.SetBaudRate(BIT_BANG_BAUD_RATE);
+                    success &= mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
+                    success &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                    success &= mCommunicationDevice.SetBaudRate(BIT_BANG_BAUD_RATE);
 
                     //wait for the required idle time
                     watch.Reset(); watch.Start();
@@ -2402,15 +2409,15 @@ namespace Communication
 					while (watch.ElapsedMilliseconds < idleTime);//busy wait
                     watch.Stop();
 
-                    ftdiStatus |= mFTDIDevice.SetBitMode(BIT_MODE_MASK, FTDI.FT_BIT_MODES.FT_BIT_MODE_ASYNC_BITBANG);
+                    success &= mCommunicationDevice.SetBitMode(BIT_MODE_MASK, BitMode.AsyncBitBang);
 
-                    if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                    if (success)
                     {
                         uint numBytesWritten = 0;
                         watch.Reset(); watch.Start();
-                        ftdiStatus |= mFTDIDevice.Write(connectionBitData, connectionBitData.Length, ref numBytesWritten, 1);
+                        success &= mCommunicationDevice.Write(connectionBitData, connectionBitData.Length, ref numBytesWritten, 1) && (numBytesWritten == connectionBitData.Length);
 
-                        if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesWritten == connectionBitData.Length))
+                        if (success)
                         {
                             //uint numBytesInTxBuffer = 0;
                             //do
@@ -2424,11 +2431,11 @@ long interByteTime = (P4TesterInterByteTimeMinMsWhenConnecting + 2) * (startComm
 long totalConTime = 25 + 25 + (long)(messageTime) + interByteTime;
 while (watch.ElapsedMilliseconds < totalConTime) ;
 
-                            ftdiStatus |= mFTDIDevice.SetBitMode(0xFF, FTDI.FT_BIT_MODES.FT_BIT_MODE_RESET);
-                            ftdiStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX);
-                            ftdiStatus |= mFTDIDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                            success &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
+                            success &= mCommunicationDevice.Purge(PurgeType.RX);
+                            success &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
 
-                            if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                            if (success)
                             {
                                 SendMessage(startCommMessage);//queue the message, so we know to expect a response
 
@@ -2455,7 +2462,7 @@ while (watch.ElapsedMilliseconds < totalConTime) ;
                     {
                         //failed to connect so purge the buffers
                         ClearMessageBuffers();
-                        mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                        mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
                     }
                 }
 
@@ -2468,7 +2475,7 @@ while (watch.ElapsedMilliseconds < totalConTime) ;
                         //wait for response
                         Thread.Sleep((int)mP2ECUResponseMaxTimeCurrent);
 
-                        lock (mFTDIDevice)
+                        lock (mCommunicationDevice)
                         {
 							if (!IsCurrentMessagePendingSend((byte)KWP2000ServiceID.StartCommunication) || (ConnectionStatus != ConnectionStatusType.ConnectionPending))
                             {
@@ -2493,7 +2500,7 @@ while (watch.ElapsedMilliseconds < totalConTime) ;
                 }
             }
 
-            lock (mFTDIDevice)
+            lock (mCommunicationDevice)
             {
                 if (ConnectionStatus != ConnectionStatusType.Connected)
                 {
@@ -2518,9 +2525,8 @@ while (watch.ElapsedMilliseconds < totalConTime) ;
 			byte[] lowBuffer = { 0x00 };
 
             uint connectionAttempt = 0;
-            FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
 
-			//while ((Math.Abs(offset) < MAX_CONNECTION_TIMING_OFFSET) && (ConnectionStatus != ConnectionStatusType.Connected) && (ftdiStatus == FTDI.FT_STATUS.FT_OK))
+			//while ((Math.Abs(offset) < MAX_CONNECTION_TIMING_OFFSET) && (ConnectionStatus != ConnectionStatusType.Connected) && success)
 			{
 				long connectStartTime = 0;
 				long connectEndTime = 0;
@@ -2532,7 +2538,7 @@ while (watch.ElapsedMilliseconds < totalConTime) ;
 
 				Stopwatch watch = new Stopwatch();
 
-				lock (mFTDIDevice)
+				lock (mCommunicationDevice)
 				{
                     Debug.Assert(!AnyMessagesPendingSend());
 
@@ -2547,29 +2553,29 @@ while (watch.ElapsedMilliseconds < totalConTime) ;
 					idleEndTime = watch.ElapsedMilliseconds + idleTime;
                     Thread.Sleep((int)idleTime);
 					while (watch.ElapsedMilliseconds < idleEndTime);//busy wait
+                    bool success = true;
 
                     //set the baud rate and purge the device
-                    ftdiStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX);
-                    ftdiStatus |= mFTDIDevice.SetBaudRate(CONNECTION_BAUD_RATE);
+                    success &= mCommunicationDevice.Purge(PurgeType.RX);
+                    success &= mCommunicationDevice.SetBaudRate(CONNECTION_BAUD_RATE);
 
-                    if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                    if (success)
                     {
                         //connectStartTime = watch.ElapsedMilliseconds;
 
                         //one byte of zeros at 360 baud should pull the line low for 25ms, one low start bit, eight low data bits, one high stop bit
                         //bool wroteBytes = TransmitBytesConsumeEcho(lowBuffer);
 
-bool wroteBytes = true;
-uint numBytesWritten = 0;
-connectStartTime = watch.ElapsedMilliseconds;
-ftdiStatus |= mFTDIDevice.Write(lowBuffer, lowBuffer.Length, ref numBytesWritten, 1);
-
+                        uint numBytesWritten = 0;
+                        connectStartTime = watch.ElapsedMilliseconds;
+                        bool wroteBytes = mCommunicationDevice.Write(lowBuffer, lowBuffer.Length, ref numBytesWritten, 1) && (numBytesWritten == lowBuffer.Length);
+                        success &= wroteBytes;
 
                         if (wroteBytes)
 						{
-byte[] tempBuffer = new byte[1];
-uint numBytesRead = 0;
-ftdiStatus |= mFTDIDevice.Read(tempBuffer, 1, ref numBytesRead, 2);
+                            byte[] tempBuffer = new byte[1];
+                            uint numBytesRead = 0;
+                            success &= mCommunicationDevice.Read(tempBuffer, 1, ref numBytesRead, 2) && (numBytesRead == 1);
 
                             SendMessage(startCommMessage);//queue the message so we know we are waiting for a response
 
@@ -2581,7 +2587,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                             while (watch.ElapsedMilliseconds < connectEndTime) ;//busy wait
 
                             //change to the communication baud rate and send the connection message
-                            ftdiStatus |= mFTDIDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                            success &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
 
                             messageSendTime = watch.ElapsedMilliseconds;
                             bool sentMessage = TransmitMessage(startCommMessage, false, (uint)lowBuffer.Length);
@@ -2601,7 +2607,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 //TODO: consume echo
 
 
-                            if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && sentMessage)
+                            if (success && sentMessage)
                             {
                                 waitingForConnect = true;
                             }
@@ -2626,7 +2632,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 					{
 						//failed to connect so purge the buffers
                         ClearMessageBuffers();
-						mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+						mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
 					}
 				}
 
@@ -2669,9 +2675,9 @@ connectEndTime = connectStartTime + connectTime + 3;
 				watch.Stop();
 			}
 
-            lock (mFTDIDevice)
+            lock (mCommunicationDevice)
             {
-               mFTDIDevice.SetDTR(true); //enable receive on self powered devices
+               mCommunicationDevice.SetDTR(true); //enable receive on self powered devices
 
                 if (ConnectionStatus != ConnectionStatusType.Connected)
                 {
@@ -2693,11 +2699,11 @@ connectEndTime = connectStartTime + connectTime + 3;
 
             DisplayStatusMessage("Starting fast init connection.", StatusMessageType.USER);
 
-			lock (mFTDIDevice)
+			lock (mCommunicationDevice)
 			{
                 DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
 
-                if (mFTDIDevice.SetBaudRate((uint)KWP2000BaudRates.BAUD_DEFAULT) == FTDI.FT_STATUS.FT_OK)
+                if (mCommunicationDevice.SetBaudRate((uint)KWP2000BaudRates.BAUD_DEFAULT))
                 {
                     DiagnosticSessionBaudRate = (uint)KWP2000BaudRates.BAUD_DEFAULT;
 
@@ -2710,7 +2716,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                     byte[] startCommMessageDataBytes = startCommMessage.GetMessageDataBytes(this);
 
-                    if (mFTDIDevice.SetBreak(false) == FTDI.FT_STATUS.FT_OK)//let the line return to normal high state
+                    if (mCommunicationDevice.SetBreak(false))//let the line return to normal high state
                     {
                         watch.Start();
                         long idleEndTime = watch.ElapsedMilliseconds + idleTimeMS;
@@ -2721,7 +2727,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         //lowEndTime = watch.ElapsedMilliseconds + lowTime + offset;
                         long lowEndTime = watch.ElapsedTicks + lowTimeTicks;
 
-                        if (mFTDIDevice.SetBreak(true) == FTDI.FT_STATUS.FT_OK)//pull the line low
+                        if (mCommunicationDevice.SetBreak(true))//pull the line low
                         {
                             while (watch.ElapsedTicks < lowEndTime) ;
 
@@ -2729,7 +2735,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                             //highEndTime = lowEndTime + highTime + offset;
                             long highEndTime = lowEndTime + highTimeTicks;
 
-                            if (mFTDIDevice.SetBreak(false) == FTDI.FT_STATUS.FT_OK)//restore the line to high
+                            if (mCommunicationDevice.SetBreak(false))//restore the line to high
                             {
                                 //don't need to purge since we will just plan on a dirty echo with one byte from the low to high transition from the fast init
                                 //mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX);//purge the echo from pulling the line low
@@ -2769,10 +2775,10 @@ connectEndTime = connectStartTime + connectTime + 3;
                 {
                     //failed to connect so purge the buffers
                     ClearMessageBuffers();
-                    mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
+                    mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
                 }
 
-                mFTDIDevice.SetDTR(true); //enable receive on self powered devices
+                mCommunicationDevice.SetDTR(true); //enable receive on self powered devices
 			}
 
             if (waitingForConnect)
@@ -2853,9 +2859,9 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                 uint numBytesRead = 0;
                 byte[] bytesReadBuffer = new byte[numBytesToReceive];
-                FTDI.FT_STATUS ftdiStatus = mFTDIDevice.Read(bytesReadBuffer, numBytesToReceive, ref numBytesRead, 2);
+                bool success = mCommunicationDevice.Read(bytesReadBuffer, numBytesToReceive, ref numBytesRead, 2) && (numBytesRead > 0);
 
-                if ((ftdiStatus == FTDI.FT_STATUS.FT_OK) && (numBytesRead > 0))
+                if (success)
                 {
                     AppendBytesToReceiveBuffer(bytesReadBuffer, numBytesRead);
                     ConsumeEchoFromReceiveBuffer();
@@ -2887,7 +2893,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
             while ((ConnectionStatus != ConnectionStatusType.Disconnected) || (mNumConnectionAttemptsRemaining > 0))
 			{
-				lock (mFTDIDevice)
+				lock (mCommunicationDevice)
 				{
                     #region HandleConnecting
                     while ((ConnectionStatus == ConnectionStatusType.Disconnected) && (mNumConnectionAttemptsRemaining > 0))
@@ -2939,7 +2945,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                     long p1TimeAtLastRead = mP1ECUResponseInterByteTimeOut.IsRunning ? mP1ECUResponseInterByteTimeOut.ElapsedMilliseconds : 0;
 
                     uint numBytesToReceive = 0;
-                    FTDI.FT_STATUS ftdiStatus = mFTDIDevice.GetRxBytesAvailable(ref numBytesToReceive, 4);
+                    bool success = mCommunicationDevice.GetRxBytesAvailable(ref numBytesToReceive, 4);
 
     				LogKWP2000Performance("Checked read queue, " + numBytesToReceive + " bytes in queue");
 
@@ -3351,14 +3357,14 @@ connectEndTime = connectStartTime + connectTime + 3;
                 mCurrentMessageSentFinishedEvent = false;
 
                 uint bytesInReceiveQueue = 0;
-                FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
+                bool success = true;
 
                 if (checkForBytesPendingReceive)
                 {
-                    ftdiStatus = mFTDIDevice.GetRxBytesAvailable(ref bytesInReceiveQueue, 4);
+                    success &= mCommunicationDevice.GetRxBytesAvailable(ref bytesInReceiveQueue, 4);
                 }
 
-                if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                if (success)
                 {
                     //only send if there is nothing waiting in the receive queue, this is a simplex connection remember!
                     if (bytesInReceiveQueue == 0)
@@ -3438,7 +3444,7 @@ connectEndTime = connectStartTime + connectTime + 3;
             LogKWP2000Performance("TransmitBytes Start");
 
             uint totalNumBytesWritten = 0;
-            FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
+            bool success = true;
 
             long currentP4TesterInterByteTimeMinMs = CurrentTimingParameters.P4TesterInterByteTimeMinMs;
 
@@ -3463,11 +3469,12 @@ connectEndTime = connectStartTime + connectTime + 3;
                     }
 
                     temp[0] = messageBytes[x];
-                    ftdiStatus = mFTDIDevice.Write(temp, temp.Length, ref numBytesWritten, 4);
+                    bool writeSuccess = mCommunicationDevice.Write(temp, temp.Length, ref numBytesWritten, 4) && (numBytesWritten == temp.Length);
+                    success &= writeSuccess;
 
                     LogKWP2000Performance("TransmitBytes WriteStartWithInterByteTime WroteByte");
 
-                    if ((ftdiStatus != FTDI.FT_STATUS.FT_OK) || (numBytesWritten != temp.Length))
+                    if (!writeSuccess)
                     {
                         break;
                     }
@@ -3481,14 +3488,14 @@ connectEndTime = connectStartTime + connectTime + 3;
             {
                 LogKWP2000Performance("TransmitBytes WriteStart");
 
-                ftdiStatus = mFTDIDevice.Write(messageBytes, messageBytes.Length, ref totalNumBytesWritten, 4);
+                success = mCommunicationDevice.Write(messageBytes, messageBytes.Length, ref totalNumBytesWritten, 4) && (totalNumBytesWritten == messageBytes.Length);
 
                 LogKWP2000Performance("TransmitBytes WriteEnd");
             }
 
             LogKWP2000Performance("TransmitBytes End");
 
-            if (ftdiStatus != FTDI.FT_STATUS.FT_OK)
+            if (!success)
             {
                 DisplayStatusMessage("Did not transmit bytes properly.", StatusMessageType.LOG);
             }
