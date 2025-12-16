@@ -73,17 +73,17 @@ Contact by Email: tony@nefariousmotorsports.com
                 </DataTemplate>
             </ComboBox.ItemTemplate>
         </ComboBox>
-        <ComboBox Grid.Column="1" Grid.Row="0" Style="{StaticResource FTDIComboBoxStyle}" ItemsSource="{Binding Path=App.FTDIDevices}"
+        <ComboBox Grid.Column="1" Grid.Row="0" Style="{StaticResource DeviceComboBoxStyle}" ItemsSource="{Binding Path=App.Devices}"
 							SelectedItem="{Binding Path=App.SelectedDeviceInfo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}">
             <ComboBox.ItemTemplate>
                 <DataTemplate>
                     <TextBlock>
-								<TextBlock.Text>
-									<PriorityBinding FallbackValue="Unknown Device">
-										<Binding Path="DescriptionProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>
-										<Binding Path="IDProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>
-									</PriorityBinding>
-								</TextBlock.Text>
+                        <TextBlock.Text>
+                            <PriorityBinding FallbackValue="Unknown Device">
+                                <Binding Path="DescriptionProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>
+                                <Binding Path="IDProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>
+                            </PriorityBinding>
+                        </TextBlock.Text>
                     </TextBlock>
                 </DataTemplate>
             </ComboBox.ItemTemplate>

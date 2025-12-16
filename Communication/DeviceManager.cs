@@ -42,6 +42,12 @@ namespace Communication
                 var ftdiDevices = ftdiLibrary.EnumerateFTDIDevices();
                 foreach (var ftdiNode in ftdiDevices)
                 {
+                    // Skip unknown FTDI devices
+                    if (ftdiNode.Type == FTDI.FT_DEVICE.FT_DEVICE_UNKNOWN)
+                    {
+                        continue;
+                    }
+
                     // Try to get chip ID if available
                     uint chipID = 0;
                     if (FTDI.IsFTDChipIDDLLLoaded())
