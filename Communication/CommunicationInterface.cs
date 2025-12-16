@@ -381,7 +381,7 @@ namespace Communication
         public DeviceInfo SelectedDeviceInfo { get; set; }
 
         // Legacy property for backward compatibility
-        public FTDI.FT_DEVICE_INFO_NODE SelectedFTDIDeviceInfo
+        public FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE SelectedFTDIDeviceInfo
         {
             get
             {
@@ -843,8 +843,12 @@ namespace Communication
                 // Cancel the task/thread via the cancellation token
                 _cancellationTokenSource?.Cancel();
 
-                // Optionally, wait for the thread to finish (this will give it a chance to clean up)
-                mSendReceiveThread.Join();
+                // Wait for the thread to finish with a timeout to prevent UI hanging
+                // Use a reasonable timeout (2 seconds) - if thread doesn't exit, we'll continue anyway
+                if (!mSendReceiveThread.Join(2000))
+                {
+                    DisplayStatusMessage("Send receive thread did not exit within timeout, continuing with cleanup.", StatusMessageType.LOG);
+                }
             }
 
             // Clean up resources

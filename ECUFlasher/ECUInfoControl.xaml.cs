@@ -516,14 +516,27 @@ namespace ECUFlasher
 
 					if (App != null)
 					{
-						_ReadInfoCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+						if (App.CommInterface != null)
+						{
+							_ReadInfoCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+						}
 						_ReadInfoCommand.AddWatchedProperty(App, "OperationInProgress");
 						_ReadInfoCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
+
+						// Re-attach ConnectionStatus watcher when CommInterface becomes available or changes
+						App.PropertyChanged += App_CommInterfacePropertyChanged;
 					}
 
 					_ReadInfoCommand.ExecuteMethod = delegate
 					{
-						this.ReadAllECUIdentificationInfo(ReadInfoSessionType);
+						if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+						{
+							this.ReadBootmodeECUInfo();
+						}
+						else
+						{
+							this.ReadAllECUIdentificationInfo(ReadInfoSessionType);
+						}
 					};
 
 					_ReadInfoCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
@@ -531,6 +544,12 @@ namespace ECUFlasher
 						if (App == null)
 						{
 							reasonsDisabled.Add("Internal program error");
+							return false;
+						}
+
+						if (App.CommInterface == null)
+						{
+							reasonsDisabled.Add("Communication interface not available");
 							return false;
 						}
 
@@ -542,9 +561,10 @@ namespace ECUFlasher
 							result = false;
 						}
 
-						if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+						if ((App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000) &&
+						    (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode))
 						{
-							reasonsDisabled.Add("Not connected with KWP2000 protocol");
+							reasonsDisabled.Add("Not connected with KWP2000 or BootMode protocol");
 							result = false;
 						}
 
@@ -562,6 +582,276 @@ namespace ECUFlasher
 			}
 		}
 		private ReactiveCommand _ReadInfoCommand;
+
+		private void App_CommInterfacePropertyChanged(object sender, PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName == "CommInterface" && App != null && App.CommInterface != null && _ReadInfoCommand != null)
+			{
+				_ReadInfoCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+			}
+		}
+
+		private void ReadBootmodeECUInfo()
+		{
+			App.OperationInProgress = true;
+			App.PercentOperationComplete = -1.0f;
+
+			App.DisplayStatusMessage("Reading bootmode ECU information...", StatusMessageType.USER);
+
+			ECUInfo.Clear();
+			BootmodeInfo.Clear();
+
+			var bootstrapInterface = App.CommInterface as BootstrapInterface;
+			if (bootstrapInterface == null)
+			{
+				App.DisplayStatusMessage("Failed to get bootstrap interface.", StatusMessageType.USER);
+				App.OperationInProgress = false;
+				return;
+			}
+
+			// Read device ID
+			byte deviceID = bootstrapInterface.DeviceID;
+			byte actualDeviceID = deviceID;
+			const byte CORE_ALREADY_RUNNING = 0xAA;
+
+			// If core is already running (0xAA), try to use the last known device ID
+			if (deviceID == CORE_ALREADY_RUNNING && bootstrapInterface.LastKnownDeviceID != 0)
+			{
+				actualDeviceID = bootstrapInterface.LastKnownDeviceID;
+				AddBootmodeInfoEntry("Device ID (Current)", $"0x{deviceID:X2} (Core Already Running)");
+				AddBootmodeInfoEntry("Device ID (Last Known)", $"0x{actualDeviceID:X2} ({GetDeviceIDName(actualDeviceID)})");
+			}
+			else
+			{
+				AddBootmodeInfoEntry("Device ID", $"0x{deviceID:X2} ({GetDeviceIDName(deviceID)})");
+			}
+
+			string cpuFamily = GetCPUFamily(actualDeviceID);
+			AddBootmodeInfoEntry("CPU Family", cpuFamily);
+			App.DisplayStatusMessage($"Bootmode Info: Device ID = 0x{deviceID:X2} ({GetDeviceIDName(deviceID)})", StatusMessageType.LOG);
+			if (deviceID == CORE_ALREADY_RUNNING && bootstrapInterface.LastKnownDeviceID != 0)
+			{
+				App.DisplayStatusMessage($"Bootmode Info: Last Known Device ID = 0x{actualDeviceID:X2} ({GetDeviceIDName(actualDeviceID)})", StatusMessageType.LOG);
+			}
+			App.DisplayStatusMessage($"Bootmode Info: CPU Family = {cpuFamily}", StatusMessageType.LOG);
+
+			// Read SYSCON register (0x00FF12) - System Configuration Register
+			uint sysconValue;
+			if (bootstrapInterface.MiniMon_ReadWord(0x00FF12, out sysconValue))
+			{
+				string sysconInfo = FormatSYSCON(sysconValue);
+				AddBootmodeInfoEntry("SYSCON Register (0x00FF12)", sysconInfo);
+				App.DisplayStatusMessage($"Bootmode Info: SYSCON Register (0x00FF12) = {sysconInfo}", StatusMessageType.LOG);
+			}
+
+			// Read BUSCON0 register (0x00FF0C) - Bus Configuration Register 0
+			uint buscon0Value;
+			if (bootstrapInterface.MiniMon_ReadWord(0x00FF0C, out buscon0Value))
+			{
+				string buscon0Info = FormatBUSCON0(buscon0Value);
+				AddBootmodeInfoEntry("BUSCON0 Register (0x00FF0C)", buscon0Info);
+				App.DisplayStatusMessage($"Bootmode Info: BUSCON0 Register (0x00FF0C) = {buscon0Info}", StatusMessageType.LOG);
+			}
+
+			// Read BUSCON1 register (0x00FF14) - Bus Configuration Register 1
+			uint buscon1Value;
+			if (bootstrapInterface.MiniMon_ReadWord(0x00FF14, out buscon1Value))
+			{
+				string buscon1Info = FormatBUSCON1(buscon1Value);
+				AddBootmodeInfoEntry("BUSCON1 Register (0x00FF14)", buscon1Info);
+				App.DisplayStatusMessage($"Bootmode Info: BUSCON1 Register (0x00FF14) = {buscon1Info}", StatusMessageType.LOG);
+			}
+
+			// Read Port 2 register (0xFFC0) - Port 2 Data Register
+			uint port2Value;
+			if (bootstrapInterface.MiniMon_ReadWord(0xFFC0, out port2Value))
+			{
+				string port2Info = $"0x{port2Value:X4} (Binary: {Convert.ToString(port2Value, 2).PadLeft(16, '0')})";
+				AddBootmodeInfoEntry("Port 2 Register (0xFFC0)", port2Info);
+				App.DisplayStatusMessage($"Bootmode Info: Port 2 Register (0xFFC0) = {port2Info}", StatusMessageType.LOG);
+			}
+
+			// Read ADDRSEL registers to understand memory mapping
+			uint addrsel1Value;
+			if (bootstrapInterface.MiniMon_ReadWord(0x00FE18, out addrsel1Value))
+			{
+				string addrsel1Info = FormatADDRSEL(addrsel1Value, 1);
+				AddBootmodeInfoEntry("ADDRSEL1 Register (0x00FE18)", addrsel1Info);
+				App.DisplayStatusMessage($"Bootmode Info: ADDRSEL1 Register (0x00FE18) = {addrsel1Info}", StatusMessageType.LOG);
+			}
+
+			uint addrsel2Value;
+			if (bootstrapInterface.MiniMon_ReadWord(0x00FE1A, out addrsel2Value))
+			{
+				string addrsel2Info = FormatADDRSEL(addrsel2Value, 2);
+				AddBootmodeInfoEntry("ADDRSEL2 Register (0x00FE1A)", addrsel2Info);
+				App.DisplayStatusMessage($"Bootmode Info: ADDRSEL2 Register (0x00FE1A) = {addrsel2Info}", StatusMessageType.LOG);
+			}
+
+			uint addrsel3Value;
+			if (bootstrapInterface.MiniMon_ReadWord(0x00FE1C, out addrsel3Value))
+			{
+				if (addrsel3Value != 0)
+				{
+					string addrsel3Info = FormatADDRSEL(addrsel3Value, 3);
+					AddBootmodeInfoEntry("ADDRSEL3 Register (0x00FE1C)", addrsel3Info);
+					App.DisplayStatusMessage($"Bootmode Info: ADDRSEL3 Register (0x00FE1C) = {addrsel3Info}", StatusMessageType.LOG);
+				}
+			}
+
+			// Read internal RAM to check if driver area is initialized
+			byte[] ramData;
+			if (bootstrapInterface.MiniMon_ReadBlock(0x00F600, 16, out ramData))
+			{
+				bool allZero = ramData.All(b => b == 0);
+				bool allFF = ramData.All(b => b == 0xFF);
+				string ramStatus = allZero ? "All zeros (uninitialized)" : (allFF ? "All 0xFF (erased)" : "Contains data");
+				AddBootmodeInfoEntry("Internal RAM (0xF600, 16 bytes)", ramStatus);
+				App.DisplayStatusMessage($"Bootmode Info: Internal RAM (0xF600, 16 bytes) = {ramStatus}", StatusMessageType.LOG);
+			}
+
+			App.DisplayStatusMessage($"Read {BootmodeInfo.Count} bootmode ECU info entries.", StatusMessageType.USER);
+			App.DisplayStatusMessage($"Bootmode Info Summary: {BootmodeInfo.Count} entries read successfully", StatusMessageType.LOG);
+			App.PercentOperationComplete = 100.0f;
+			App.OperationInProgress = false;
+		}
+
+		private void AddBootmodeInfoEntry(string name, string value)
+		{
+			BootmodeInfo.Add(new BootmodeInfoEntry(name, value));
+		}
+
+		private string GetDeviceIDName(byte deviceID)
+		{
+			switch (deviceID)
+			{
+				case 0x55: return "C166";
+				case 0xA5: return "C167 (Old)";
+				case 0xB5: return "C165";
+				case 0xC5: return "C167";
+				case 0xD5: return "C167 (With ID) / ST10";
+				case 0xAA: return "Core Already Running";
+				default: return "Unknown";
+			}
+		}
+
+		private string GetCPUFamily(byte deviceID)
+		{
+			switch (deviceID)
+			{
+				case 0x55: return "C16x Family (C166)";
+				case 0xA5: return "C16x Family (C167 Old)";
+				case 0xB5: return "C16x Family (C165)";
+				case 0xC5: return "C16x Family (C167)";
+				case 0xD5: return "C16x/ST10 Family (C167 with ID or ST10)";
+				case 0xAA: return "C16x/ST10 Family (Cannot determine specific variant - Core Already Running)";
+				default: return "Unknown CPU Family";
+			}
+		}
+
+		private string FormatADDRSEL(uint value, int addrselNumber)
+		{
+			// ADDRSEL register format:
+			// Bits 15-12: Segment address (A23-A20)
+			// Bits 11-8: Window size (0=32KB, 1=64KB, 2=128KB, 3=256KB, 4=512KB, 5=1MB, 6=2MB, 7=4MB, 8=1024KB, etc.)
+			// Bits 7-0: Reserved/configuration
+
+			if (value == 0)
+			{
+				return $"0x{value:X4} - Disabled/Not configured";
+			}
+
+			uint segmentAddr = (value >> 12) & 0xF;
+			uint windowSize = (value >> 8) & 0xF;
+
+			// Calculate window size in KB
+			string windowSizeStr;
+			switch (windowSize)
+			{
+				case 0: windowSizeStr = "32 KB"; break;
+				case 1: windowSizeStr = "64 KB"; break;
+				case 2: windowSizeStr = "128 KB"; break;
+				case 3: windowSizeStr = "256 KB"; break;
+				case 4: windowSizeStr = "512 KB"; break;
+				case 5: windowSizeStr = "1 MB"; break;
+				case 6: windowSizeStr = "2 MB"; break;
+				case 7: windowSizeStr = "4 MB"; break;
+				case 8: windowSizeStr = "1024 KB"; break;
+				default: windowSizeStr = $"{windowSize} (unknown)"; break;
+			}
+
+			uint baseAddress = segmentAddr << 20; // Convert segment to address (A23-A20)
+
+			return $"0x{value:X4} - Base: 0x{baseAddress:X6}, Window: {windowSizeStr}";
+		}
+
+		private string FormatSYSCON(uint value)
+		{
+			// SYSCON register bit fields (C167):
+			// Bits 15-13: Stack size (STKSZ)
+			// Bit 12: ROMS1 (ROM mapping)
+			// Bit 11: SGTDIS (Segment disable)
+			// Bit 10: ROMEN (ROM enable)
+			// Bit 9: BYTDIS (Byte disable)
+			// Bit 8: CLKEN (Clock enable)
+			// Bit 7: WRCFG (Write config)
+			// Bit 6: CSCFG (Chip select config)
+			// Bit 5: Reserved
+			// Bit 4: OWDDIS (Watchdog disable)
+			// Bit 3: BDRSTEN (Brown-out reset enable)
+			// Bit 2: XPEN (External bus enable)
+			// Bit 1: VISIBLE (Visible mode)
+			// Bit 0: SPER-SHARE (Special function share)
+
+			uint stackSize = (value >> 13) & 0x7;
+			bool romEnabled = ((value >> 10) & 0x1) != 0;
+			bool byteDisable = ((value >> 9) & 0x1) != 0;
+			bool extBusEnabled = ((value >> 2) & 0x1) != 0;
+			bool visibleMode = ((value >> 1) & 0x1) != 0;
+
+			return $"0x{value:X4} - Stack: {stackSize}, ROM: {(romEnabled ? "On" : "Off")}, " +
+			       $"ByteMode: {(byteDisable ? "Word" : "Byte")}, ExtBus: {(extBusEnabled ? "On" : "Off")}, " +
+			       $"Visible: {(visibleMode ? "Yes" : "No")}";
+		}
+
+		private string FormatBUSCON0(uint value)
+		{
+			// BUSCON0 register bit fields (C167):
+			// Bits 15-12: Wait states (WTC)
+			// Bits 11-8: Bus configuration
+			// Bits 7-4: Address setup/hold
+			// Bits 3-0: Chip select configuration
+
+			uint waitStates = (value >> 12) & 0xF;
+			uint busConfig = (value >> 8) & 0xF;
+			bool extBusActive = ((value >> 2) & 0x1) != 0;
+
+			string busType = "Unknown";
+			if ((busConfig & 0x8) != 0)
+			{
+				busType = ((busConfig & 0x4) != 0) ? "16-bit Demux" : "8-bit Demux";
+			}
+
+			return $"0x{value:X4} - Wait States: {waitStates}, Bus: {busType}, " +
+			       $"ExtBus: {(extBusActive ? "Active" : "Inactive")}";
+		}
+
+		private string FormatBUSCON1(uint value)
+		{
+			// BUSCON1 register bit fields (similar to BUSCON0 but for different address range)
+			uint waitStates = (value >> 12) & 0xF;
+			uint busConfig = (value >> 8) & 0xF;
+			bool extBusActive = ((value >> 2) & 0x1) != 0;
+
+			string busType = "Unknown";
+			if ((busConfig & 0x8) != 0)
+			{
+				busType = ((busConfig & 0x4) != 0) ? "16-bit Demux" : "8-bit Demux";
+			}
+
+			return $"0x{value:X4} - Wait States: {waitStates}, Bus: {busType}, " +
+			       $"ExtBus: {(extBusActive ? "Active" : "Inactive")}";
+		}
 
 		private void ReadAllECUIdentificationInfo(KWP2000DiagnosticSessionType sessionType)
 		{
@@ -618,6 +908,12 @@ namespace ECUFlasher
 
 		public static string GetIdentOptionName(byte identOption)
 		{
+			// Handle bootmode info entries (0xFF)
+			if (identOption == 0xFF)
+			{
+				return "Bootmode Info";
+			}
+
 			var identOptionName = "Unknown";
 
 			var identOptionEnum = (KWP2000IdentificationOption)Enum.ToObject(typeof(KWP2000IdentificationOption), identOption);
@@ -801,6 +1097,7 @@ namespace ECUFlasher
 				if (_ECUInfo == null)
 				{
 					_ECUInfo = new ObservableCollection<KWP2000IdentificationOptionValue>();
+					_ECUInfo.CollectionChanged += ECUInfo_CollectionChanged;
 				}
 
 				return _ECUInfo;
@@ -809,13 +1106,143 @@ namespace ECUFlasher
 			{
 				if (_ECUInfo != value)
 				{
+					if (_ECUInfo != null)
+					{
+						_ECUInfo.CollectionChanged -= ECUInfo_CollectionChanged;
+					}
+
 					_ECUInfo = value;
 
+					if (_ECUInfo != null)
+					{
+						_ECUInfo.CollectionChanged += ECUInfo_CollectionChanged;
+					}
+
 					OnPropertyChanged(new PropertyChangedEventArgs("ECUInfo"));
+					OnPropertyChanged(new PropertyChangedEventArgs("CombinedECUInfo"));
 				}
 			}
 		}
 		private ObservableCollection<KWP2000IdentificationOptionValue> _ECUInfo;
+
+		private void ECUInfo_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+		{
+			OnPropertyChanged(new PropertyChangedEventArgs("CombinedECUInfo"));
+		}
+
+		public ObservableCollection<BootmodeInfoEntry> BootmodeInfo
+		{
+			get
+			{
+				if (_BootmodeInfo == null)
+				{
+					_BootmodeInfo = new ObservableCollection<BootmodeInfoEntry>();
+					_BootmodeInfo.CollectionChanged += BootmodeInfo_CollectionChanged;
+				}
+
+				return _BootmodeInfo;
+			}
+			set
+			{
+				if (_BootmodeInfo != value)
+				{
+					if (_BootmodeInfo != null)
+					{
+						_BootmodeInfo.CollectionChanged -= BootmodeInfo_CollectionChanged;
+					}
+
+					_BootmodeInfo = value;
+
+					if (_BootmodeInfo != null)
+					{
+						_BootmodeInfo.CollectionChanged += BootmodeInfo_CollectionChanged;
+					}
+
+					OnPropertyChanged(new PropertyChangedEventArgs("BootmodeInfo"));
+					OnPropertyChanged(new PropertyChangedEventArgs("CombinedECUInfo"));
+				}
+			}
+		}
+		private ObservableCollection<BootmodeInfoEntry> _BootmodeInfo;
+
+		private void BootmodeInfo_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+		{
+			OnPropertyChanged(new PropertyChangedEventArgs("CombinedECUInfo"));
+		}
+
+		/// <summary>
+		/// Combined collection of ECUInfo and BootmodeInfo for display in the ListBox
+		/// </summary>
+		public IEnumerable<object> CombinedECUInfo
+		{
+			get
+			{
+				var combined = new List<object>();
+				if (ECUInfo != null)
+				{
+					foreach (var item in ECUInfo)
+					{
+						combined.Add(item);
+					}
+				}
+				if (BootmodeInfo != null)
+				{
+					foreach (var item in BootmodeInfo)
+					{
+						combined.Add(item);
+					}
+				}
+				return combined;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Represents a bootmode information entry for display in the ECU Info UI
+	/// </summary>
+	public class BootmodeInfoEntry : INotifyPropertyChanged
+	{
+		private string _name;
+		private string _value;
+
+		public string Name
+		{
+			get { return _name; }
+			set
+			{
+				if (_name != value)
+				{
+					_name = value;
+					OnPropertyChanged("Name");
+				}
+			}
+		}
+
+		public string Value
+		{
+			get { return _value; }
+			set
+			{
+				if (_value != value)
+				{
+					_value = value;
+					OnPropertyChanged("Value");
+				}
+			}
+		}
+
+		public BootmodeInfoEntry(string name, string value)
+		{
+			_name = name;
+			_value = value;
+		}
+
+		public event PropertyChangedEventHandler PropertyChanged;
+
+		protected void OnPropertyChanged(string propertyName)
+		{
+			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+		}
 	}
 
 	public class IdentOptionNameConverter : IValueConverter

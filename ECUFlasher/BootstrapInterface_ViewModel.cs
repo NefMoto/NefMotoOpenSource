@@ -27,7 +27,6 @@ using System.ComponentModel;
 
 using Shared;
 using Communication;
-using FTD2XX_NET;
 
 namespace ECUFlasher
 {

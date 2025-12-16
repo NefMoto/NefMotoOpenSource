@@ -79,5 +79,25 @@ namespace Communication.Properties {
                 return ((byte[])(obj));
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] BootmodeLoader {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeLoader", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] BootmodeMiniMon {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeMiniMon", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }

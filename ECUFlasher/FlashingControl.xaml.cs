@@ -48,7 +48,6 @@ using Path = System.IO.Path;
 using Communication;
 using Shared;
 using ApplicationShared;
-using FTD2XX_NET;
 
 namespace ECUFlasher
 {

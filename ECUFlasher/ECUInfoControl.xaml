@@ -113,7 +113,22 @@ Contact by Email: tony@nefariousmotorsports.com
                         <TextBlock Text="{Binding Path=IdentOption, StringFormat=0x{0:X2}}" Margin="0,0,5,0"/>
                         <TextBlock Text="{Binding Path=IdentOption, Converter={StaticResource identOptionNameConverter}}"/>
                     </StackPanel>
-                    <TextBlock Text="{Binding}"/><!--Converts via the ToString method for display-->
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap"/><!--Converts via the ToString method for display-->
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type ECUFlasher:BootmodeInfoEntry}">
+            <DataTemplate.Resources>
+                <Style TargetType="Border" BasedOn="{StaticResource {x:Type Border}}"/>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                    <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+                </Style>
+            </DataTemplate.Resources>
+            <Border>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="{Binding Path=Name}" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding Path=Value}" TextWrapping="Wrap" Margin="10,0,0,0"/>
                 </StackPanel>
             </Border>
         </DataTemplate>
@@ -163,8 +178,9 @@ Contact by Email: tony@nefariousmotorsports.com
                     <Button Command="{Binding Path=RemoveInfoEntryCommand}" CommandParameter="{Binding ElementName=ECUInfoListBox, Path=SelectedItems}"/>
                 </WrapPanel>
                 <Border DockPanel.Dock="Top">
-                    <ListBox Name="ECUInfoListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" ItemsSource="{Binding Path=ECUInfo}" Background="Transparent"
-                                             Shared:ListBoxHelper.AutoScrollToCurrentItem="True"/>
+                    <ListBox Name="ECUInfoListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" Background="Transparent"
+                                             Shared:ListBoxHelper.AutoScrollToCurrentItem="True"
+                                             ItemsSource="{Binding Path=CombinedECUInfo}"/>
                 </Border>
             </DockPanel>
         </Grid>

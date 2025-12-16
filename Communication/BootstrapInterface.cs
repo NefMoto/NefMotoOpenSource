@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: tony@nefariousmotorsports.com
 */
 
+using System;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Threading;
@@ -117,11 +118,39 @@ namespace Communication
                 {
                     _DeviceID = value;
 
+                    // Store the actual device ID (not 0xAA) for later use
+                    const byte CORE_ALREADY_RUNNING = 0xAA;
+                    if (value != CORE_ALREADY_RUNNING)
+                    {
+                        LastKnownDeviceID = value;
+                    }
+
                     OnPropertyChanged(new PropertyChangedEventArgs("DeviceID"));
                 }
             }
         }
         private byte _DeviceID = 0;
+
+        /// <summary>
+        /// The last known actual device ID (excluding 0xAA status code).
+        /// This is stored when we get a real device ID and can be used when core is already running.
+        /// </summary>
+        public byte LastKnownDeviceID
+        {
+            get
+            {
+                return _LastKnownDeviceID;
+            }
+            private set
+            {
+                if (_LastKnownDeviceID != value)
+                {
+                    _LastKnownDeviceID = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("LastKnownDeviceID"));
+                }
+            }
+        }
+        private byte _LastKnownDeviceID = 0;
 
         public override Protocol CurrentProtocol
         {
@@ -194,7 +223,12 @@ namespace Communication
 
             CloseCommunicationDevice();
 
+            // Set to Disconnected first to show proper status message
             ConnectionStatus = ConnectionStatusType.Disconnected;
+
+            // Then set to CommunicationTerminated to allow reconnection
+            // ConnectCommand checks for CommunicationTerminated status to enable the button
+            ConnectionStatus = ConnectionStatusType.CommunicationTerminated;
         }
 
 		private const uint NumConnectionAttemptsDefaultValue = 3;
@@ -232,9 +266,26 @@ namespace Communication
 
             if (success)
             {
+                // Read echo and verify it matches what was sent
                 byte[] echoData = new byte[data.Length];
                 uint numEchoBytesRead = 0;
-                success = mCommunicationDevice.Read(echoData, (uint)echoData.Length, ref numEchoBytesRead, 3) && (numBytesWritten == data.Length);
+                if (mCommunicationDevice.Read(echoData, (uint)echoData.Length, ref numEchoBytesRead, 3) && (numEchoBytesRead == data.Length))
+                {
+                    // Verify each byte of echo matches what was sent
+                    for (int i = 0; i < data.Length; i++)
+                    {
+                        if (data[i] != echoData[i])
+                        {
+                            DisplayStatusMessage($"Echo error: sent 0x{data[i]:X2}, received 0x{echoData[i]:X2} at position {i}", StatusMessageType.LOG);
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    DisplayStatusMessage($"Echo error: expected {data.Length} bytes, received {numEchoBytesRead}", StatusMessageType.LOG);
+                    return false;
+                }
             }
 
             return success;
@@ -399,22 +450,156 @@ namespace Communication
 
         bool StartMiniMon()
         {
-			//TODO: this should be a program resource
-            byte[] miniMonLoader = { 0xE6, 0x58, 0x01, 0x00, 0x9A, 0xB6, 0xFE, 0x70, 0xE6, 0xF0, 0x60, 0xFA, 0x7E, 0xB7, 0x9A, 0xB7, 0xFE, 0x70, 0xA4, 0x00, 0xB2, 0xFE, 0x86, 0xF0, 0xE7, 0xFB, 0x3D, 0xF8, 0xEA, 0x00, 0x60, 0xFA };
+            // Load binary resources
+            byte[] miniMonLoader = Properties.Resources.BootmodeLoader;
+            byte[] miniMonProgram = Properties.Resources.BootmodeMiniMon;
 
-            byte deviceID;
-            if (!UploadMiniMonBootstrapLoader(miniMonLoader, out deviceID))
+            if (miniMonLoader == null || miniMonLoader.Length == 0)
             {
+                DisplayStatusMessage("Failed to load bootmode loader from resources.", StatusMessageType.USER);
                 return false;
             }
 
-            byte[] miniMonProgram = {};
-
-            if (!UploadMiniMonProgram(miniMonProgram))
+            if (miniMonProgram == null || miniMonProgram.Length == 0)
             {
+                DisplayStatusMessage("Failed to load bootmode runtime from resources.", StatusMessageType.USER);
                 return false;
             }
 
+            DisplayStatusMessage("Initializing bootmode connection...", StatusMessageType.USER);
+
+            // Send init byte to check device status (say hello)
+            byte[] zeroByte = { 0 };
+            if (!SendBytes(zeroByte))
+            {
+                DisplayStatusMessage("Failed to send bootstrap init zero byte.", StatusMessageType.USER);
+                return false;
+            }
+
+            byte[] deviceIDData;
+            if (!ReceiveBytes(1, out deviceIDData))
+            {
+                DisplayStatusMessage("Failed to receive device ID response. Make sure device is in bootmode.", StatusMessageType.USER);
+                return false;
+            }
+
+            byte deviceID = deviceIDData[0];
+            DeviceID = deviceID;
+
+            DisplayStatusMessage($"Received device ID: 0x{deviceID:X2}", StatusMessageType.USER);
+
+            // 0xAA means core is already running, skip loader/core upload
+            const byte CORE_ALREADY_RUNNING = 0xAA;
+            if (deviceID == CORE_ALREADY_RUNNING)
+            {
+                DisplayStatusMessage("Bootmode runtime is already running. Skipping upload.", StatusMessageType.USER);
+            }
+            else
+            {
+                DisplayStatusMessage("Uploading bootmode loader and runtime...", StatusMessageType.USER);
+
+                // Upload loader (32 bytes)
+                DisplayStatusMessage($"Uploading loader ({miniMonLoader.Length} bytes)...", StatusMessageType.USER);
+                if (!SendBytes(miniMonLoader))
+                {
+                    DisplayStatusMessage("Failed to send bootstrap loader data.", StatusMessageType.USER);
+                    return false;
+                }
+
+                // Wait for loader started confirmation
+                byte[] loaderResult;
+                if (!ReceiveBytes(1, out loaderResult) || (loaderResult[0] != (byte)CommunicationConstants.I_LOADER_STARTED))
+                {
+                    DisplayStatusMessage($"Failed to receive loader started confirmation. Expected 0x{(byte)CommunicationConstants.I_LOADER_STARTED:X2}, got 0x{(loaderResult != null && loaderResult.Length > 0 ? loaderResult[0] : 0):X2}", StatusMessageType.USER);
+                    return false;
+                }
+                DisplayStatusMessage("Loader started successfully.", StatusMessageType.USER);
+
+                // Upload core runtime
+                DisplayStatusMessage($"Uploading bootmode runtime ({miniMonProgram.Length} bytes)...", StatusMessageType.USER);
+                if (!SendBytes(miniMonProgram))
+                {
+                    DisplayStatusMessage("Failed to send bootmode runtime data.", StatusMessageType.USER);
+                    return false;
+                }
+
+                // Wait for application started confirmation (I_APPLICATION_STARTED = 0x03)
+                byte[] programStatus;
+                if (!ReceiveBytes(1, out programStatus))
+                {
+                    DisplayStatusMessage("Failed to receive application started confirmation.", StatusMessageType.USER);
+                    return false;
+                }
+
+                if (programStatus[0] != (byte)CommunicationConstants.I_APPLICATION_STARTED)
+                {
+                    DisplayStatusMessage($"Unexpected response after core upload. Expected 0x{(byte)CommunicationConstants.I_APPLICATION_STARTED:X2} (I_APPLICATION_STARTED), got 0x{programStatus[0]:X2}", StatusMessageType.USER);
+                    return false;
+                }
+                DisplayStatusMessage("Bootmode runtime started successfully.", StatusMessageType.USER);
+            }
+
+            // Test communication to verify connection
+            DisplayStatusMessage("Testing communication...", StatusMessageType.USER);
+            if (!MiniMon_TestCommunication())
+            {
+                DisplayStatusMessage("Communication test failed.", StatusMessageType.USER);
+                return false;
+            }
+
+            DisplayStatusMessage("Communication test successful. Bootmode connection established.", StatusMessageType.USER);
+            return true;
+        }
+
+        /// <summary>
+        /// Test reading registers to verify MINIMON is responding correctly.
+        /// This is a lightweight test that reads accessible registers without requiring setup.
+        /// </summary>
+        public bool TestReadRegisters()
+        {
+            DisplayStatusMessage("Testing register read operations...", StatusMessageType.USER);
+
+            // Test 1: Read SYSCON register (0x00FF12) - always accessible
+            const uint SYSCON_Address = 0x00FF12;
+            uint sysconValue;
+            if (MiniMon_ReadWord(SYSCON_Address, out sysconValue))
+            {
+                DisplayStatusMessage($"SYSCON register (0x{SYSCON_Address:X6}) = 0x{sysconValue:X4}", StatusMessageType.USER);
+            }
+            else
+            {
+                DisplayStatusMessage("Failed to read SYSCON register.", StatusMessageType.USER);
+                return false;
+            }
+
+            // Test 2: Read Port 2 register (0xFFC0) - always accessible
+            const uint Port2_Address = 0xFFC0;
+            uint port2Value;
+            if (MiniMon_ReadWord(Port2_Address, out port2Value))
+            {
+                DisplayStatusMessage($"Port 2 register (0x{Port2_Address:X6}) = 0x{port2Value:X4}", StatusMessageType.USER);
+            }
+            else
+            {
+                DisplayStatusMessage("Failed to read Port 2 register.", StatusMessageType.USER);
+                return false;
+            }
+
+            // Test 3: Read a small block from internal RAM (0xF600 - driver area)
+            const uint InternalRAM_Address = 0x00F600;
+            byte[] ramData;
+            if (MiniMon_ReadBlock(InternalRAM_Address, 16, out ramData))
+            {
+                string hexData = BitConverter.ToString(ramData).Replace("-", " ");
+                DisplayStatusMessage($"Internal RAM (0x{InternalRAM_Address:X6}, 16 bytes) = {hexData}", StatusMessageType.USER);
+            }
+            else
+            {
+                DisplayStatusMessage("Failed to read internal RAM block.", StatusMessageType.USER);
+                return false;
+            }
+
+            DisplayStatusMessage("All register read tests passed successfully.", StatusMessageType.USER);
             return true;
         }
 
@@ -570,7 +755,7 @@ namespace Communication
             return true;
         }
 
-        bool MiniMon_ReadBlock(uint address, ushort numBytes, out byte[] data)
+        public bool MiniMon_ReadBlock(uint address, ushort numBytes, out byte[] data)
         {
             Debug.Assert((0xFF000000 & address) == 0);
             Debug.Assert((0xFFFF0000 & numBytes) == 0);
@@ -678,7 +863,7 @@ namespace Communication
             return true;
         }
 
-        bool MiniMon_ReadWord(uint address, out uint word)
+        public bool MiniMon_ReadWord(uint address, out uint word)
         {
             Debug.Assert((0xFF000000 & address) == 0);
             word = 0;
@@ -797,21 +982,47 @@ namespace Communication
             DisplayStatusMessage("Send receive thread now started.", StatusMessageType.LOG);
             ConnectionStatus = ConnectionStatusType.Disconnected;
 
-            while ((ConnectionStatus != ConnectionStatusType.Disconnected) || (mNumConnectionAttemptsRemaining > 0))
+            while ((ConnectionStatus != ConnectionStatusType.Disconnected)
+                && (ConnectionStatus != ConnectionStatusType.DisconnectionPending)
+                && (ConnectionStatus != ConnectionStatusType.CommunicationTerminated)
+                || (mNumConnectionAttemptsRemaining > 0))
             {
+                // Check for disconnection request first
+                if (ConnectionStatus == ConnectionStatusType.DisconnectionPending)
+                {
+                    DisplayStatusMessage("Disconnection requested, exiting thread.", StatusMessageType.LOG);
+                    break;
+                }
+
                 if (mCommunicationDevice != null)
                 {
+                    bool shouldAttemptConnection = false;
+
+                    // Check if we should attempt connection (minimal lock time)
                     lock (mCommunicationDevice)
                     {
-                        #region HandleConnecting
-                    while ((ConnectionStatus == ConnectionStatusType.Disconnected) && (mNumConnectionAttemptsRemaining > 0))
+                        shouldAttemptConnection = (ConnectionStatus == ConnectionStatusType.Disconnected) && (mNumConnectionAttemptsRemaining > 0);
+                        if (shouldAttemptConnection)
+                        {
+                            mNumConnectionAttemptsRemaining--;
+                            ConnectionStatus = ConnectionStatusType.ConnectionPending;
+                        }
+                    }
+
+                    if (shouldAttemptConnection)
                     {
-                        mNumConnectionAttemptsRemaining--;
-
-                        ConnectionStatus = ConnectionStatusType.ConnectionPending;
-
+                        // Perform connection attempt OUTSIDE the lock to avoid blocking other threads
+                        // This prevents the lock from being held during blocking I/O operations
                         bool connected = StartMiniMon();
 
+                        // Check again for disconnection request after potentially long I/O operation
+                        if (ConnectionStatus == ConnectionStatusType.DisconnectionPending)
+                        {
+                            DisplayStatusMessage("Disconnection requested during connection attempt, exiting thread.", StatusMessageType.LOG);
+                            break;
+                        }
+
+                        // Update status after connection attempt
                         if (!connected)
                         {
                             ConnectionStatus = ConnectionStatusType.Disconnected;
@@ -819,25 +1030,58 @@ namespace Communication
                         else
                         {
                             ConnectionStatus = ConnectionStatusType.Connected;
-                            mNumConnectionAttemptsRemaining = 0;
+
+                            lock (mCommunicationDevice)
+                            {
+                                mNumConnectionAttemptsRemaining = 0;
+                            }
                         }
-                        }
-                        #endregion
                     }
                 }
 
-                //TODO: communicate....
-
-                //if we sleep longer, the communication will run slower and could cause timeouts
-                //this sleep makes a big difference in system performance
-                //sleep zero is dangerous, could cause thread starvation of other lower priority threads
-                Thread.Sleep(2);
-
-                //TODO: see if increasing this sleep time reduces the frequenecy of FT_IO_ERROR since FTDI seems to like 5ms sleeps for updating the receive queue status
+                // Once connected, reduce CPU usage by sleeping longer
+                // Bootmode doesn't need continuous message handling like KWP2000
+                if (ConnectionStatus == ConnectionStatusType.Connected)
+                {
+                    // Sleep longer when connected to reduce CPU usage
+                    // But check for disconnection more frequently
+                    for (int i = 0; i < 10; i++)
+                    {
+                        if (ConnectionStatus == ConnectionStatusType.DisconnectionPending)
+                        {
+                            break;
+                        }
+                        Thread.Sleep(10);
+                    }
+                }
+                else
+                {
+                    // Shorter sleep when attempting connection
+                    Thread.Sleep(10);
+                }
             }
 
-            ConnectionStatus = ConnectionStatusType.CommunicationTerminated;//we need to do this to ensure any operations or actions fail due to disconnection
-            CloseCommunicationDevice();
+            // Only set to CommunicationTerminated if CloseConnection hasn't already done it
+            // This prevents race conditions where CloseConnection sets it after the thread exits
+            if (ConnectionStatus != ConnectionStatusType.CommunicationTerminated)
+            {
+                ConnectionStatus = ConnectionStatusType.CommunicationTerminated;
+            }
+
+            // Only close device if CloseConnection hasn't already done it
+            // CloseConnection() will handle device cleanup
+            if (mCommunicationDevice != null)
+            {
+                try
+                {
+                    CloseCommunicationDevice();
+                }
+                catch
+                {
+                    // Ignore errors during cleanup
+                }
+            }
+
             mSendReceiveThread = null;
 
             DisplayStatusMessage("Send receive thread now terminated.", StatusMessageType.LOG);
