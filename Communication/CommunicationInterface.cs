@@ -558,7 +558,7 @@ namespace Communication
         }
 
         // Legacy methods for backward compatibility (delegate to new abstraction)
-        protected bool OpenFTDIDevice(FTDI.FT_DEVICE_INFO_NODE deviceToOpen)
+        protected bool OpenFTDIDevice(FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE deviceToOpen)
         {
             if (deviceToOpen == null)
             {
