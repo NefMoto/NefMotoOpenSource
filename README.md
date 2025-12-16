@@ -1,18 +1,97 @@
 # NefMoto ME7 ECU Flasher
 
-This version is now compatible with NET8
+Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
-Let's test it
+## Features
 
+### Communication Protocols
 
+- **KWP2000** (ISO 14230) - Full support for diagnostic and programming operations
+- **KWP1281** - Legacy protocol support for older ECUs
+- **Boot Mode** - Not yet supported (UI components present but functionality not implemented)
 
+### Connection Methods
 
+- **Fast Init** - Supported on FTDI and CH340 devices
+- **Slow Init** - Supported on FTDI devices only (5-baud initialization)
 
+### ECU Operations
 
+- Read flash memory (full or partial)
+- Write flash memory with verification
+- Erase flash sectors
+- Read ECU identification information
+- Read and clear diagnostic trouble codes (DTCs)
+- Extended data logging
+- Memory layout validation
+- Checksum calculation and verification
 
-Original Readme.md
-Developed using C# in Microsoft Visual Studio 2010 and and C166 assembly in Keil uVision.
+### Supported Hardware
 
-See www.nefariousmotorsports.com for more information.
+- **FTDI USB-to-Serial adapters** (FT232R, FT2232, etc.)
+  - Full feature support including slow init
+  - Bit-bang mode for 5-baud slow init
+- **CH340 USB-to-Serial adapters**
+  - Fast init connection method
+  - Standard KWP2000 operations
+  - Slow init not supported (hardware limitation)
 
-Latest release will always be here: https://github.com/NefMoto/NefMotoOpenSource/releases/latest
+### User Interface
+
+- Tabbed interface for ECU info, flashing, and logging
+- Real-time status messages and logging
+- Configurable communication timeouts and baud rates
+- Memory layout selection and validation
+- Progress indicators for long operations
+
+## Limitations
+
+### CH340 Devices
+
+- **Slow init is not supported** - CH340 devices cannot reliably generate the 5-baud break signal required for slow init. Use fast init instead.
+- Driver buffering may cause timing variations in some edge cases
+
+### Platform
+
+- **Windows only** - Requires Windows for WMI-based device enumeration (CH340 detection)
+
+### ECU Support
+
+- Primarily designed for VW/Audi ME7.x ECUs
+- Memory layouts provided for common flash chips (29F200, 29F400, 29F800 series)
+- Some ECUs may require specific connection parameters or timing adjustments
+
+### Known Issues
+
+See [GitHub Issues](https://github.com/NefMoto/NefMotoOpenSource/issues) for current known issues and feature requests.
+
+## Building
+
+See [BUILDING.md](BUILDING.md) for build instructions.
+
+## Installation
+
+Pre-built releases are available at: <https://github.com/NefMoto/NefMotoOpenSource/releases/latest>
+
+## Requirements
+
+- Windows operating system
+- Compatible USB-to-serial adapter (FTDI or CH340)
+- OBD-II cable in "dumb mode" (no protocol translation)
+- Compatible VW/Audi ME7 ECU
+
+## License
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+See [LICENSE.txt](LICENSE.txt) for details.
+
+## Links
+
+- **Latest Release**: <https://github.com/NefMoto/NefMotoOpenSource/releases/latest>
+- **Issues**: <https://github.com/NefMoto/NefMotoOpenSource/issues>
+- **Discussion Thread**: <https://nefariousmotorsports.com/forum/index.php?topic=12861.0title=>
+
+## Development
+
+Developed using C# (.NET 8.0) and C166 assembly (Keil uVision) for bootstrap loaders.
