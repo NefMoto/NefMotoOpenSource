@@ -24,6 +24,7 @@ using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows;
+using Shared;
 
 namespace ECUFlasher
 {
@@ -170,5 +171,52 @@ namespace ECUFlasher
         }
 
 		public App App { get; private set; }
+
+		/// <summary>
+		/// Safely adds a watched property to a ReactiveCommand, handling null owners and automatic re-attachment.
+		/// This is especially useful for App.CommInterface which may be null initially and set later.
+		/// When the appPropertyName property changes, the watcher is automatically re-attached to the new instance.
+		/// </summary>
+		/// <param name="command">The ReactiveCommand to add the watcher to</param>
+		/// <param name="owner">The object that owns the property (may be null initially)</param>
+		/// <param name="propertyName">The name of the property to watch</param>
+		/// <param name="appPropertyName">If provided, also watches App.PropertyChanged for this property name to re-attach when it becomes available or changes</param>
+		protected void AddWatchedPropertySafe(ReactiveCommand command, INotifyPropertyChanged owner, string propertyName, string appPropertyName = null)
+		{
+			if (command == null)
+			{
+				return;
+			}
+
+			// Add the watcher if owner is not null
+			if (owner != null)
+			{
+				command.AddWatchedProperty(owner, propertyName);
+			}
+
+			// If appPropertyName is provided, set up automatic re-attachment when the App property changes
+			if (!string.IsNullOrEmpty(appPropertyName) && App != null)
+			{
+				// Use a single event handler that we can track to avoid duplicates
+				// Note: This assumes the property being watched is App.CommInterface
+				// For other properties, this pattern would need to be adjusted
+				PropertyChangedEventHandler handler = (sender, e) =>
+				{
+					if (e.PropertyName == appPropertyName)
+					{
+						// Get the new value of the property (e.g., App.CommInterface)
+						var newOwner = App.GetType().GetProperty(appPropertyName)?.GetValue(App) as INotifyPropertyChanged;
+						if (newOwner != null)
+						{
+							// Re-attach the watcher to the new instance
+							command.AddWatchedProperty(newOwner, propertyName);
+						}
+					}
+				};
+
+				// Subscribe to App.PropertyChanged to detect when the property becomes available or changes
+				App.PropertyChanged += handler;
+			}
+		}
     }
 }

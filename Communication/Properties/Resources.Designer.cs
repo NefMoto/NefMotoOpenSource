@@ -99,5 +99,25 @@ namespace Communication.Properties {
                 return ((byte[])(obj));
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] BootmodeFlashDriverME7 {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeFlashDriverME7", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] BootmodeFlashDriverSimos3 {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeFlashDriverSimos3", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }

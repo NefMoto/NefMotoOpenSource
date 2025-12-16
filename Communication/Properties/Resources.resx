@@ -130,4 +130,10 @@
   <data name="BootmodeMiniMon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\MINIMONK.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="BootmodeFlashDriverME7" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\FX00Bx_Driver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="BootmodeFlashDriverSimos3" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\FX00B_Simos3Driver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
 </root>

@@ -516,15 +516,9 @@ namespace ECUFlasher
 
 					if (App != null)
 					{
-						if (App.CommInterface != null)
-						{
-							_ReadInfoCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
-						}
+						AddWatchedPropertySafe(_ReadInfoCommand, App.CommInterface, "ConnectionStatus", "CommInterface");
 						_ReadInfoCommand.AddWatchedProperty(App, "OperationInProgress");
 						_ReadInfoCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
-
-						// Re-attach ConnectionStatus watcher when CommInterface becomes available or changes
-						App.PropertyChanged += App_CommInterfacePropertyChanged;
 					}
 
 					_ReadInfoCommand.ExecuteMethod = delegate
@@ -583,13 +577,6 @@ namespace ECUFlasher
 		}
 		private ReactiveCommand _ReadInfoCommand;
 
-		private void App_CommInterfacePropertyChanged(object sender, PropertyChangedEventArgs e)
-		{
-			if (e.PropertyName == "CommInterface" && App != null && App.CommInterface != null && _ReadInfoCommand != null)
-			{
-				_ReadInfoCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
-			}
-		}
 
 		private void ReadBootmodeECUInfo()
 		{

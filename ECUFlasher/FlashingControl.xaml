@@ -57,7 +57,8 @@ Contact by Email: tony@nefariousmotorsports.com
                 Style="{StaticResource ValidationComboBoxStyle}"
                 ItemsSource="{Binding Path=AvailableMemoryLayouts}"
                 SelectedItem="{Binding Path=SelectedMemoryLayout, Mode=TwoWay}"
-                ToolTip="{Binding Path=MemoryLayoutFileName}"/>
+                IsEnabled="{Binding Path=IsMemoryLayoutEnabled}"
+                ToolTip="{Binding Path=MemoryLayoutToolTip}"/>
         </Grid>
         <Grid DockPanel.Dock="Top">
             <Grid.RowDefinitions>
@@ -76,7 +77,7 @@ Contact by Email: tony@nefariousmotorsports.com
             <Button Command="{Binding Path=WriteDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="1"/>
             <Button Command="{Binding Path=VerifyChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="0"/>
             <StackPanel Orientation="Horizontal" Grid.Column="2" Grid.Row="1" Margin="8,0,0,0">
-                <CheckBox x:Name="chkVerifyWrite" VerticalAlignment="Center" IsChecked="True"/>
+                <CheckBox x:Name="chkVerifyWrite" VerticalAlignment="Center" IsChecked="True" IsEnabled="{Binding Path=IsVerifyWriteEnabled}"/>
                 <Label>Verify Write</Label>
             </StackPanel>
             <!-- <Button Command="{Binding Path=CorrectChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="1" IsEnabled="true"/>-->

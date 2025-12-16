@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -19,6 +19,7 @@ Contact by Email: tony@nefariousmotorsports.com
 */
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Threading;
@@ -106,6 +107,71 @@ namespace Communication
             Other = 0xD5, //All devices equipped with identification registers.
         }
 
+        public enum ECUFlashVariant
+        {
+            ME7,        // ME7.x.x variant - 0x800000 base address
+            Simos3,     // Simos 3.x variant - 0x400000 base address
+            EDC15       // EDC15 variant - 0x400000 base address (top boot)
+        }
+
+        // Register addresses
+        private const uint SYSCON_Addr = 0x00FF12;
+        private const uint BUSCON0_Addr = 0x00FF0C;
+        private const uint BUSCON1_Addr = 0x00FF14;
+        private const uint BUSCON2_Addr = 0x00FF16;
+        private const uint BUSCON3_Addr = 0x00FF18;
+        private const uint BUSCON4_Addr = 0x00FF1A;
+        private const uint ADDRSEL1_Addr = 0x00FE18;
+        private const uint ADDRSEL2_Addr = 0x00FE1A;
+        private const uint ADDRSEL3_Addr = 0x00FE1C;
+        private const uint ADDRSEL4_Addr = 0x00FE1E;
+
+        // Register values for external flash read (ME7 variant)
+        private const ushort SYSCON_Data_ext = 0xE204;  // ROM mapped at >0x000000, ROMEN=0, BYTDIS=1
+        private const ushort BUSCON0_Data = 0x04AD;     // 2 wait states, 16-bit demux bus, external bus active
+        private const ushort BUSCON0_WriteData = 0x04AD;  // Same as BUSCON0_Data for ME7 write (Python)
+        private const ushort BUSCON1_Data = 0x040D;    // 2 wait states, 8-bit demux bus, external bus inactive
+        private const ushort BUSCON2_Data = 0x04AD;     // 2 wait states, 16-bit demux bus, external bus active
+        private const ushort ADDRSEL1_Data = 0x3803;    // 32KB window starting at 0x380000
+        private const ushort ADDRSEL2_Data = 0x2008;    // 1024KB window starting at 0x200000
+
+        // Register values for Simos3 variant
+        private const ushort BUSCON0_Simos3_Data = 0x44BE;
+        private const ushort BUSCON1_Simos3_Data = 0x848E;
+        private const ushort ADDRSEL1_Simos3_Data = 0x4008;  // 1024KB window starting at 0x400000
+
+        // Register values for EDC15 variant
+        private const ushort BUSCON3_EDC15_Data = 0x848E;
+        private const ushort ADDRSEL3_EDC15_Data = 0x4008;  // 1024KB window starting at 0x400000
+
+        // Flash address mappings
+        private const uint ExtFlashAddress_ME7 = 0x800000;
+        private const uint ExtFlashAddress_Simos3 = 0x400000;
+        private const uint ExtFlashAddress_EDC15 = 0x400000;
+
+        // Flash write address mappings (same as read addresses)
+        private const uint ExtFlashWriteAddress_ME7 = 0x800000;
+        private const uint ExtFlashWriteAddress_Simos3 = 0x400000;
+        private const uint ExtFlashWriteAddress_EDC15 = 0x400000;
+
+        // Flash driver addresses
+        private const uint FlashDriverEntryPoint = 0x00F640;
+        private const uint DriverCopyAddress = 0xFC00;
+        private const uint DriverAddress = 0x00F600;  // Where driver is loaded
+
+        // Flash driver function code addresses
+        private const byte FC_GETSTATE_ADDR_MANUFID = 0x00;
+        private const byte FC_GETSTATE_ADDR_DEVICEID = 0x01;
+
+        // Flash device IDs
+        private const ushort DEV_ID_F400BB = 0x22AB;  // 512KB bottom boot
+        private const ushort DEV_ID_F800BB = 0x2258;  // 1024KB bottom boot
+        private const ushort DEV_ID_F400BT = 0x2223;  // 512KB top boot
+        private const ushort DEV_ID_F800BT = 0x22D6;  // 1024KB top boot
+
+        // Block size for reading/writing
+        private const ushort DefaultBlockLength = 0x200;  // 512 bytes
+
         public byte DeviceID
         {
             get
@@ -152,6 +218,27 @@ namespace Communication
         }
         private byte _LastKnownDeviceID = 0;
 
+        /// <summary>
+        /// The last known flash device ID (from FC_GETSTATE).
+        /// This is stored when we successfully read the flash device ID and can be used when core is already running.
+        /// </summary>
+        public ushort LastKnownFlashDeviceID
+        {
+            get
+            {
+                return _LastKnownFlashDeviceID;
+            }
+            private set
+            {
+                if (_LastKnownFlashDeviceID != value)
+                {
+                    _LastKnownFlashDeviceID = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("LastKnownFlashDeviceID"));
+                }
+            }
+        }
+        private ushort _LastKnownFlashDeviceID = 0;
+
         public override Protocol CurrentProtocol
         {
             get
@@ -182,8 +269,21 @@ namespace Communication
 
                         //setupSuccess &= mCommunicationDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
                         setupSuccess &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
-                        setupSuccess &= mCommunicationDevice.SetDTR(true);//enable receive for self powered devices
-                        setupSuccess &= mCommunicationDevice.SetRTS(false);//set low to tell device we are ready to send
+                        // CH340/KKL cables need DTR=0,RTS=0 (matches Python SetAdapterKKL); FTDI uses DTR=1 for self-powered
+                        if (mCommunicationDevice.Type == DeviceType.CH340)
+                        {
+                            mCommunicationDevice.SetDTR(true);
+                            Thread.Sleep(100);
+                            mCommunicationDevice.SetDTR(false);
+                            Thread.Sleep(100);
+                            setupSuccess &= mCommunicationDevice.SetDTR(false);
+                            setupSuccess &= mCommunicationDevice.SetRTS(false);
+                        }
+                        else
+                        {
+                            setupSuccess &= mCommunicationDevice.SetDTR(true);
+                            setupSuccess &= mCommunicationDevice.SetRTS(false);
+                        }
                         setupSuccess &= mCommunicationDevice.SetBreak(false);//set to high idle state
                         // SetBitMode is FTDI-specific (bit-bang mode), optional for other devices like CH340
                         mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset); // Don't fail if not supported
@@ -259,17 +359,44 @@ namespace Communication
         bool SendBytes(byte[] data)
         {
             if (mCommunicationDevice == null)
+            {
+                DisplayStatusMessage("SendBytes: mCommunicationDevice is null", StatusMessageType.LOG);
                 return false;
+            }
 
             uint numBytesWritten = 0;
-            bool success = mCommunicationDevice.Write(data, data.Length, ref numBytesWritten, 1) && (numBytesWritten == data.Length);
+            // Write timeout must allow physical transmission: at 9600 baud ~1ms/byte
+            uint writeTimeoutMs = (uint)Math.Max(1, data.Length * 2);
+            bool success = mCommunicationDevice.Write(data, data.Length, ref numBytesWritten, writeTimeoutMs) && (numBytesWritten == data.Length);
 
             if (success)
             {
-                // Read echo and verify it matches what was sent
+                // Read echo and verify it matches what was sent.
+                // Read may return incomplete data; loop until we have all bytes or timeout.
+                uint echoTimeoutMs = (uint)Math.Max(10, data.Length * 5);
                 byte[] echoData = new byte[data.Length];
                 uint numEchoBytesRead = 0;
-                if (mCommunicationDevice.Read(echoData, (uint)echoData.Length, ref numEchoBytesRead, 3) && (numEchoBytesRead == data.Length))
+                var totalDeadline = Stopwatch.StartNew();
+                while (numEchoBytesRead < echoData.Length && totalDeadline.ElapsedMilliseconds < echoTimeoutMs)
+                {
+                    uint remaining = (uint)echoData.Length - numEchoBytesRead;
+                    uint remainingTimeout = (uint)Math.Max(1, echoTimeoutMs - totalDeadline.ElapsedMilliseconds);
+                    byte[] chunk = new byte[remaining];
+                    uint chunkRead = 0;
+                    if (!mCommunicationDevice.Read(chunk, remaining, ref chunkRead, remainingTimeout))
+                        break;
+                    if (chunkRead > 0)
+                    {
+                        Array.Copy(chunk, 0, echoData, (int)numEchoBytesRead, (int)chunkRead);
+                        numEchoBytesRead += chunkRead;
+                    }
+                    else
+                    {
+                        Thread.Sleep(5);
+                    }
+                }
+                bool readOk = numEchoBytesRead > 0;
+                if (readOk && (numEchoBytesRead == data.Length))
                 {
                     // Verify each byte of echo matches what was sent
                     for (int i = 0; i < data.Length; i++)
@@ -288,6 +415,8 @@ namespace Communication
                 }
             }
 
+            if (!success)
+                DisplayStatusMessage($"SendBytes: Write failed or partial write (requested {data.Length}, wrote {numBytesWritten})", StatusMessageType.LOG);
             return success;
         }
 
@@ -298,14 +427,40 @@ namespace Communication
             if (mCommunicationDevice == null)
             {
                 data = null;
+                DisplayStatusMessage("ReceiveBytes: mCommunicationDevice is null", StatusMessageType.LOG);
                 return false;
             }
 
+            // Read may return incomplete data; loop until we have all bytes or timeout.
+            // Minimum 1000ms so CH340 has time for ECU responses.
+            uint readTimeout = (uint)Math.Max(1000, numBytes * 3);
             uint numBytesRead = 0;
-            bool success = mCommunicationDevice.Read(data, numBytes, ref numBytesRead, 3) && (numBytesRead == numBytes);
-
-            if (!success)
+            var totalDeadline = Stopwatch.StartNew();
+            while (numBytesRead < numBytes && totalDeadline.ElapsedMilliseconds < readTimeout)
             {
+                uint remaining = numBytes - numBytesRead;
+                uint remainingTimeout = (uint)Math.Max(1, readTimeout - totalDeadline.ElapsedMilliseconds);
+                byte[] chunk = new byte[remaining];
+                uint chunkRead = 0;
+                if (!mCommunicationDevice.Read(chunk, remaining, ref chunkRead, remainingTimeout))
+                {
+                    DisplayStatusMessage($"ReceiveBytes: [VERIFY] Read returned false, got {numBytesRead}/{numBytes}, device={mCommunicationDevice.Type}", StatusMessageType.LOG);
+                    break;
+                }
+                if (chunkRead > 0)
+                {
+                    Array.Copy(chunk, 0, data, (int)numBytesRead, (int)chunkRead);
+                    numBytesRead += chunkRead;
+                }
+                else
+                {
+                    Thread.Sleep(5);
+                }
+            }
+
+            if (numBytesRead != numBytes)
+            {
+                DisplayStatusMessage($"ReceiveBytes: [VERIFY] FAILED got {numBytesRead}/{numBytes} in {totalDeadline.ElapsedMilliseconds}ms (timeout={readTimeout}ms, device={mCommunicationDevice.Type})", StatusMessageType.LOG);
                 data = null;
                 return false;
             }
@@ -394,6 +549,7 @@ namespace Communication
                 }
             }
 
+            DisplayStatusMessage("UploadBootstrapLoader: failed after retries or invalid response", StatusMessageType.LOG);
             return false;
         }
 
@@ -608,12 +764,19 @@ namespace Communication
             byte[] functionCodeData = { functionCode };
             if (!SendBytes(functionCodeData))
             {
+                DisplayStatusMessage($"MiniMon_RequestFunction: SendBytes failed for function 0x{functionCode:X2}", StatusMessageType.LOG);
                 return false;
             }
 
             byte[] functionCodeAck;
-            if (!ReceiveBytes(1, out functionCodeAck) || (functionCodeAck[0] != (byte)CommunicationConstants.A_ACK1))
+            if (!ReceiveBytes(1, out functionCodeAck))
             {
+                DisplayStatusMessage($"MiniMon_RequestFunction: ReceiveBytes(1) failed for function 0x{functionCode:X2}", StatusMessageType.LOG);
+                return false;
+            }
+            if (functionCodeAck[0] != (byte)CommunicationConstants.A_ACK1)
+            {
+                DisplayStatusMessage($"MiniMon_RequestFunction: wrong ack for function 0x{functionCode:X2}, got 0x{functionCodeAck[0]:X2} (expected A_ACK1=0x{(byte)CommunicationConstants.A_ACK1:X2})", StatusMessageType.LOG);
                 return false;
             }
 
@@ -625,20 +788,27 @@ namespace Communication
             result = (byte)CommunicationConstants.A_ACK2;
 
             byte[] functionFinishedAck;
-            if(!ReceiveBytes(1, out functionFinishedAck))
+            if (!ReceiveBytes(1, out functionFinishedAck))
             {
+                DisplayStatusMessage("MiniMon_GetFunctionRequestAck: [VERIFY] ReceiveBytes(1) failed", StatusMessageType.LOG);
                 return false;
             }
 
             result = functionFinishedAck[0];
-
             return true;
         }
 
         bool MiniMon_WasFunctionRequestSuccessful()
         {
             byte result;
-            return MiniMon_GetFunctionRequestAck(out result) && (result == (byte)CommunicationConstants.A_ACK2);
+            if (!MiniMon_GetFunctionRequestAck(out result))
+                return false;
+            if (result != (byte)CommunicationConstants.A_ACK2)
+            {
+                DisplayStatusMessage($"MiniMon_WasFunctionRequestSuccessful: wrong ack 0x{result:X2} (expected A_ACK2=0xEA), device={mCommunicationDevice?.Type}", StatusMessageType.LOG);
+                return false;
+            }
+            return true;
         }
 
         bool MiniMon_EndInitialization()
@@ -749,6 +919,7 @@ namespace Communication
 
             if (!MiniMon_GetFunctionRequestAck(out functionResult) || (functionResult != (byte)CommunicationConstants.A_ACK2))
             {
+                DisplayStatusMessage($"MiniMon_WriteBlock: wrong ack 0x{functionResult:X2} (expected 0xEA) at 0x{address:X6}", StatusMessageType.LOG);
                 return false;
             }
 
@@ -764,6 +935,7 @@ namespace Communication
 
             if (!MiniMon_RequestFunction((byte)CommunicationConstants.C_READ_BLOCK))
             {
+                DisplayStatusMessage("MiniMon_ReadBlock: Failed to request C_READ_BLOCK function", StatusMessageType.LOG);
                 return false;
             }
 
@@ -774,6 +946,7 @@ namespace Communication
 
             if (!SendBytes(addressBytes))
             {
+                DisplayStatusMessage("MiniMon_ReadBlock: Failed to send address bytes", StatusMessageType.LOG);
                 return false;
             }
 
@@ -783,16 +956,46 @@ namespace Communication
 
             if (!SendBytes(sizeBytes))
             {
+                DisplayStatusMessage("MiniMon_ReadBlock: Failed to send size bytes", StatusMessageType.LOG);
                 return false;
             }
 
             if (!ReceiveBytes((uint)numBytes, out data))
             {
+                DisplayStatusMessage($"MiniMon_ReadBlock: Failed to receive {numBytes} bytes of data", StatusMessageType.LOG);
+                return false;
+            }
+
+            if (data == null || data.Length != numBytes)
+            {
+                DisplayStatusMessage($"MiniMon_ReadBlock: Received data length mismatch: expected {numBytes}, got {(data?.Length ?? 0)}", StatusMessageType.LOG);
                 return false;
             }
 
             if (!MiniMon_WasFunctionRequestSuccessful())
             {
+                DisplayStatusMessage("MiniMon_ReadBlock: Function request was not successful", StatusMessageType.LOG);
+                return false;
+            }
+
+            byte receivedChecksum;
+            if (!MiniMon_GetChecksum(out receivedChecksum))
+            {
+                DisplayStatusMessage("MiniMon_ReadBlock: Failed to get checksum from ECU", StatusMessageType.LOG);
+                return false;
+            }
+
+            // Calculate checksum (XOR of all bytes)
+            byte calculatedChecksum = 0;
+            foreach (byte b in data)
+            {
+                calculatedChecksum = (byte)(calculatedChecksum ^ b);
+            }
+
+            if (calculatedChecksum != receivedChecksum)
+            {
+                DisplayStatusMessage($"MiniMon_ReadBlock: Checksum mismatch at address 0x{address:X6}! Received: 0x{receivedChecksum:X2}, Calculated: 0x{calculatedChecksum:X2}", StatusMessageType.USER);
+                DisplayStatusMessage($"MiniMon_ReadBlock: Checksum verification failed - data may be corrupted", StatusMessageType.LOG);
                 return false;
             }
 
@@ -833,6 +1036,7 @@ namespace Communication
 
             if (!MiniMon_RequestFunction((byte)CommunicationConstants.C_WRITE_WORD))
             {
+                DisplayStatusMessage($"MiniMon_WriteWord: Failed to request C_WRITE_WORD function for address 0x{address:X6}", StatusMessageType.LOG);
                 return false;
             }
 
@@ -843,6 +1047,7 @@ namespace Communication
 
             if (!SendBytes(addressBytes))
             {
+                DisplayStatusMessage($"MiniMon_WriteWord: Failed to send address bytes for 0x{address:X6}", StatusMessageType.LOG);
                 return false;
             }
 
@@ -852,11 +1057,27 @@ namespace Communication
 
             if (!SendBytes(wordBytes))
             {
+                DisplayStatusMessage($"MiniMon_WriteWord: Failed to send word bytes for 0x{word:X4}", StatusMessageType.LOG);
                 return false;
             }
 
             if (!MiniMon_WasFunctionRequestSuccessful())
             {
+                DisplayStatusMessage($"MiniMon_WriteWord: Function request failed for address 0x{address:X6}", StatusMessageType.LOG);
+                return false;
+            }
+
+            uint readBackValue;
+            if (!MiniMon_ReadWord(address, out readBackValue))
+            {
+                DisplayStatusMessage($"MiniMon_WriteWord: Failed to read back value from 0x{address:X6}", StatusMessageType.LOG);
+                return false;
+            }
+
+            ushort readBackWord = (ushort)(readBackValue & 0xFFFF);
+            if (readBackWord != word)
+            {
+                DisplayStatusMessage($"MiniMon_WriteWord: Write verification failed at 0x{address:X6}! Wrote: 0x{word:X4}, Read back: 0x{readBackWord:X4}", StatusMessageType.LOG);
                 return false;
             }
 
@@ -870,6 +1091,7 @@ namespace Communication
 
             if (!MiniMon_RequestFunction((byte)CommunicationConstants.C_READ_WORD))
             {
+                DisplayStatusMessage("MiniMon_ReadWord: Failed to request C_READ_WORD function", StatusMessageType.LOG);
                 return false;
             }
 
@@ -880,12 +1102,14 @@ namespace Communication
 
             if (!SendBytes(addressBytes))
             {
+                DisplayStatusMessage("MiniMon_ReadWord: Failed to send address bytes", StatusMessageType.LOG);
                 return false;
             }
 
             byte[] wordData;
             if (!ReceiveBytes(2, out wordData))
             {
+                DisplayStatusMessage("MiniMon_ReadWord: Failed to receive word data", StatusMessageType.LOG);
                 return false;
             }
 
@@ -895,6 +1119,7 @@ namespace Communication
 
             if (!MiniMon_WasFunctionRequestSuccessful())
             {
+                DisplayStatusMessage("MiniMon_ReadWord: request not successful", StatusMessageType.LOG);
                 return false;
             }
 
@@ -909,6 +1134,7 @@ namespace Communication
 
             if (!MiniMon_RequestFunction((byte)CommunicationConstants.C_CALL_FUNCTION))
             {
+                DisplayStatusMessage("MiniMon_Call: Failed to request C_CALL_FUNCTION function", StatusMessageType.LOG);
                 return false;
             }
 
@@ -1105,27 +1331,22 @@ namespace Communication
 
                     if (_ConnectionStatus == ConnectionStatusType.ConnectionPending)
                     {
-                        //reset all of the communication state when we start trying to connect,
-                        //this way we can respect the old settings when we start connecting
                         shouldReset = true;
                     }
                     else if (_ConnectionStatus == ConnectionStatusType.Connected)
                     {
-                        //no more connection attempts
                         mNumConnectionAttemptsRemaining = 0;
                     }
-                    else if (_ConnectionStatus == ConnectionStatusType.Disconnected)
+                    else if (_ConnectionStatus == ConnectionStatusType.Disconnected ||
+                             _ConnectionStatus == ConnectionStatusType.DisconnectionPending ||
+                             _ConnectionStatus == ConnectionStatusType.CommunicationTerminated)
                     {
-                        //we can reset the communication now and not wait for the next
-                        //connection attempt because we were never connected
-                        shouldReset = !wasConnected;
+                        shouldReset = true;
                     }
 
                     if (shouldReset)
                     {
-                        //TODO: reset any communication state we have cached such as DeviceID
-
-                        //TODO: restore the communication state to default settings
+                        ResetBootmodeConnectionState();
                         mCommunicationDevice?.Purge(PurgeType.RX | PurgeType.TX);
                     }
                 }
@@ -1133,5 +1354,898 @@ namespace Communication
         }
 
         protected uint mNumConnectionAttemptsRemaining = 0;
+
+        #region External Flash Read Operations
+
+        /// <summary>
+        /// Configures registers for external flash read operations.
+        /// </summary>
+        /// <param name="variant">ECU/Flash variant (ME7, Simos3, or EDC15)</param>
+        /// <returns>True if configuration successful, false otherwise</returns>
+        public bool ConfigureRegistersForExternalFlashRead(ECUFlashVariant variant)
+        {
+            DisplayStatusMessage($"Configuring registers for external flash read ({variant} variant)...", StatusMessageType.LOG);
+
+            if (!MiniMon_WriteWord(SYSCON_Addr, SYSCON_Data_ext))
+            {
+                DisplayStatusMessage("Failed to configure SYSCON register for external flash.", StatusMessageType.USER);
+                return false;
+            }
+
+            ushort buscon0Value = variant == ECUFlashVariant.Simos3 ? BUSCON0_Simos3_Data : BUSCON0_Data;
+            if (!MiniMon_WriteWord(BUSCON0_Addr, buscon0Value))
+            {
+                DisplayStatusMessage("Failed to configure BUSCON0 register.", StatusMessageType.USER);
+                return false;
+            }
+
+            // Configure ADDRSEL registers based on variant
+            if (variant == ECUFlashVariant.ME7)
+            {
+                // ME7: ADDRSEL1 and ADDRSEL2
+                if (!MiniMon_WriteWord(ADDRSEL1_Addr, ADDRSEL1_Data))
+                {
+                    DisplayStatusMessage("Failed to configure ADDRSEL1 register.", StatusMessageType.USER);
+                    return false;
+                }
+                if (!MiniMon_WriteWord(ADDRSEL2_Addr, ADDRSEL2_Data))
+                {
+                    DisplayStatusMessage("Failed to configure ADDRSEL2 register.", StatusMessageType.USER);
+                    return false;
+                }
+                // Clear ADDRSEL3 and ADDRSEL4
+                if (!MiniMon_WriteWord(ADDRSEL3_Addr, 0))
+                {
+                    DisplayStatusMessage("Failed to clear ADDRSEL3 register.", StatusMessageType.USER);
+                    return false;
+                }
+                if (!MiniMon_WriteWord(ADDRSEL4_Addr, 0))
+                {
+                    DisplayStatusMessage("Failed to clear ADDRSEL4 register.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+            else if (variant == ECUFlashVariant.Simos3)
+            {
+                // Simos3: ADDRSEL1
+                if (!MiniMon_WriteWord(ADDRSEL1_Addr, ADDRSEL1_Simos3_Data))
+                {
+                    DisplayStatusMessage("Failed to configure ADDRSEL1 register for Simos3.", StatusMessageType.USER);
+                    return false;
+                }
+                // Clear other ADDRSEL registers
+                if (!MiniMon_WriteWord(ADDRSEL2_Addr, 0) ||
+                    !MiniMon_WriteWord(ADDRSEL3_Addr, 0) ||
+                    !MiniMon_WriteWord(ADDRSEL4_Addr, 0))
+                {
+                    DisplayStatusMessage("Failed to clear ADDRSEL registers.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+            else if (variant == ECUFlashVariant.EDC15)
+            {
+                // EDC15: ADDRSEL3
+                if (!MiniMon_WriteWord(ADDRSEL3_Addr, ADDRSEL3_EDC15_Data))
+                {
+                    DisplayStatusMessage("Failed to configure ADDRSEL3 register for EDC15.", StatusMessageType.USER);
+                    return false;
+                }
+                // Clear other ADDRSEL registers
+                if (!MiniMon_WriteWord(ADDRSEL1_Addr, 0) ||
+                    !MiniMon_WriteWord(ADDRSEL2_Addr, 0) ||
+                    !MiniMon_WriteWord(ADDRSEL4_Addr, 0))
+                {
+                    DisplayStatusMessage("Failed to clear ADDRSEL registers.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+
+            // Configure BUSCON registers
+            ushort buscon1Value = variant == ECUFlashVariant.Simos3 ? BUSCON1_Simos3_Data : BUSCON1_Data;
+            if (!MiniMon_WriteWord(BUSCON1_Addr, buscon1Value))
+            {
+                DisplayStatusMessage("Failed to configure BUSCON1 register.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (variant == ECUFlashVariant.ME7)
+            {
+                if (!MiniMon_WriteWord(BUSCON2_Addr, BUSCON2_Data))
+                {
+                    DisplayStatusMessage("Failed to configure BUSCON2 register.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+
+            if (variant == ECUFlashVariant.EDC15)
+            {
+                if (!MiniMon_WriteWord(BUSCON3_Addr, BUSCON3_EDC15_Data))
+                {
+                    DisplayStatusMessage("Failed to configure BUSCON3 register for EDC15.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+
+            // Clear unused BUSCON registers
+            if (variant != ECUFlashVariant.ME7)
+            {
+                if (!MiniMon_WriteWord(BUSCON2_Addr, 0))
+                {
+                    DisplayStatusMessage("Failed to clear BUSCON2 register.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+            if (variant != ECUFlashVariant.EDC15)
+            {
+                if (!MiniMon_WriteWord(BUSCON3_Addr, 0))
+                {
+                    DisplayStatusMessage("Failed to clear BUSCON3 register.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+            if (!MiniMon_WriteWord(BUSCON4_Addr, 0))
+            {
+                DisplayStatusMessage("Failed to clear BUSCON4 register.", StatusMessageType.USER);
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Configures registers for external flash write. Different from read: zeros ADDRSEL/BUSCON first, then variant-specific.
+        /// Reference: ME7BootTool.py jobWriteExtFlash lines 887-919.
+        /// </summary>
+        public bool ConfigureRegistersForExternalFlashWrite(ECUFlashVariant variant)
+        {
+            if (!MiniMon_WriteWord(SYSCON_Addr, SYSCON_Data_ext))
+            {
+                DisplayStatusMessage("Failed to configure SYSCON register for external flash write.", StatusMessageType.USER);
+                return false;
+            }
+
+            // Zero ADDRSEL and BUSCON (Python write path)
+            if (!MiniMon_WriteWord(ADDRSEL1_Addr, 0) || !MiniMon_WriteWord(ADDRSEL2_Addr, 0) ||
+                !MiniMon_WriteWord(ADDRSEL3_Addr, 0) || !MiniMon_WriteWord(ADDRSEL4_Addr, 0) ||
+                !MiniMon_WriteWord(BUSCON1_Addr, 0) || !MiniMon_WriteWord(BUSCON2_Addr, 0) ||
+                !MiniMon_WriteWord(BUSCON3_Addr, 0) || !MiniMon_WriteWord(BUSCON4_Addr, 0))
+            {
+                DisplayStatusMessage("Failed to clear ADDRSEL/BUSCON registers for write.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (variant == ECUFlashVariant.Simos3)
+            {
+                if (!MiniMon_WriteWord(ADDRSEL1_Addr, ADDRSEL1_Simos3_Data) ||
+                    !MiniMon_WriteWord(BUSCON1_Addr, BUSCON1_Simos3_Data) ||
+                    !MiniMon_WriteWord(BUSCON0_Addr, BUSCON0_Simos3_Data))
+                {
+                    DisplayStatusMessage("Failed to configure Simos3 write registers.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+            else if (variant == ECUFlashVariant.ME7)
+            {
+                if (!MiniMon_WriteWord(ADDRSEL1_Addr, 0) || !MiniMon_WriteWord(BUSCON1_Addr, 0) ||
+                    !MiniMon_WriteWord(BUSCON0_Addr, BUSCON0_WriteData))
+                {
+                    DisplayStatusMessage("Failed to configure ME7 write registers.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+            else if (variant == ECUFlashVariant.EDC15)
+            {
+                if (!MiniMon_WriteWord(ADDRSEL3_Addr, ADDRSEL3_EDC15_Data) ||
+                    !MiniMon_WriteWord(BUSCON3_Addr, BUSCON3_EDC15_Data) ||
+                    !MiniMon_WriteWord(BUSCON0_Addr, BUSCON0_Data))
+                {
+                    DisplayStatusMessage("Failed to configure EDC15 write registers.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+
+            DisplayStatusMessage("Registers configured successfully for external flash write.", StatusMessageType.LOG);
+            return true;
+        }
+
+        /// <summary>
+        /// Erases one sector via FC_ERASE. Call ConfigureRegistersForExternalFlashWrite and LoadFlashDriver first.
+        /// </summary>
+        /// <param name="writeAddressBase">Write base (ExtFlashWriteAddress for variant)</param>
+        /// <param name="readAddressBase">Read base (ExtFlashAddress for variant)</param>
+        /// <param name="sectorOffset">Byte offset of sector from flash base</param>
+        /// <param name="sectorIndex">0-based sector number (passed to FC_ERASE)</param>
+        /// <param name="sectorSize">Sector size in bytes</param>
+        public bool EraseSector(uint writeAddressBase, uint readAddressBase, uint sectorOffset, int sectorIndex, uint sectorSize)
+        {
+            uint writeAddr = writeAddressBase + sectorOffset;
+            uint readAddr = readAddressBase + sectorOffset;
+            ushort writeAddressLow = (ushort)(writeAddr & 0xFFFF);
+            ushort writeAddressHigh = (ushort)((writeAddr >> 16) & 0xFFFF);
+            ushort readAddressHigh = (ushort)((readAddr >> 16) & 0xFFFF);
+            ushort lastWordAddress = (ushort)((readAddr + sectorSize - 2) & 0xFFFF);
+
+            byte[] regParams = new byte[16];
+            PutU16LE(regParams, 0, (ushort)CommunicationConstants.FC_ERASE);
+            PutU16LE(regParams, 2, writeAddressLow);
+            PutU16LE(regParams, 4, writeAddressHigh);
+            PutU16LE(regParams, 6, readAddressHigh);
+            PutU16LE(regParams, 8, lastWordAddress);
+            PutU16LE(regParams, 10, 0);
+            PutU16LE(regParams, 12, (ushort)sectorIndex);
+            PutU16LE(regParams, 14, 1);
+
+            if (!MiniMon_Call(FlashDriverEntryPoint, regParams, out byte[] regResults))
+            {
+                DisplayStatusMessage($"EraseSector: FC_ERASE sector {sectorIndex} failed", StatusMessageType.LOG);
+                return false;
+            }
+            ushort errWord = (ushort)(regResults[14] | (regResults[15] << 8));
+            if (errWord != (ushort)CommunicationConstants.FE_NOERROR)
+            {
+                DisplayStatusMessage($"EraseSector: FC_ERASE sector {sectorIndex} returned error 0x{errWord:X4}", StatusMessageType.LOG);
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Programs one block via FC_PROG. Writes data to DriverCopyAddress first, then calls driver.
+        /// </summary>
+        public bool ProgramBlock(ECUFlashVariant variant, uint writeAddressBase, uint readAddressBase, uint offset, byte[] blockData)
+        {
+            if (blockData == null || blockData.Length == 0 || blockData.Length > DefaultBlockLength)
+            {
+                DisplayStatusMessage($"ProgramBlock: invalid block size {blockData?.Length ?? 0}", StatusMessageType.LOG);
+                return false;
+            }
+
+            if (!MiniMon_WriteBlock(DriverCopyAddress, blockData, out byte functionResult))
+            {
+                DisplayStatusMessage($"ProgramBlock: WriteBlock to 0x{DriverCopyAddress:X4} failed (result=0x{functionResult:X2})", StatusMessageType.LOG);
+                return false;
+            }
+
+            uint writeAddr = writeAddressBase + offset;
+            uint readAddr = readAddressBase + offset;
+            ushort writesize = (ushort)blockData.Length;
+            ushort writeAddressLow = (ushort)(writeAddr & 0xFFFF);
+            ushort writeAddressHigh = (ushort)((writeAddr >> 16) & 0xFFFF);
+            ushort readAddressHigh = (ushort)((readAddr >> 16) & 0xFFFF);
+
+            byte[] regParams = new byte[16];
+            PutU16LE(regParams, 0, (ushort)CommunicationConstants.FC_PROG);
+            PutU16LE(regParams, 2, writesize);
+            PutU16LE(regParams, 4, (ushort)(DriverCopyAddress & 0xFFFF));
+            PutU16LE(regParams, 6, 0);
+            PutU16LE(regParams, 8, readAddressHigh);
+            PutU16LE(regParams, 10, writeAddressLow);
+            PutU16LE(regParams, 12, writeAddressHigh);
+            PutU16LE(regParams, 14, 1);
+
+            if (!MiniMon_Call(FlashDriverEntryPoint, regParams, out byte[] regResults))
+            {
+                DisplayStatusMessage($"ProgramBlock: FC_PROG at 0x{writeAddr:X6} failed", StatusMessageType.LOG);
+                return false;
+            }
+            ushort errWord = (ushort)(regResults[14] | (regResults[15] << 8));
+            if (errWord != (ushort)CommunicationConstants.FE_NOERROR)
+            {
+                DisplayStatusMessage($"ProgramBlock: FC_PROG at 0x{writeAddr:X6} returned error 0x{errWord:X4}", StatusMessageType.LOG);
+                return false;
+            }
+            return true;
+        }
+
+        private static void PutU16LE(byte[] buf, int offset, ushort value)
+        {
+            buf[offset] = (byte)(value & 0xFF);
+            buf[offset + 1] = (byte)(value >> 8);
+        }
+
+        /// <summary>
+        /// Lightweight check: whether bootmode flash layout can be obtained without performing I/O.
+        /// Use for button enablement. Does not load driver or query flash.
+        /// </summary>
+        public bool CanGetBootmodeFlashLayout()
+        {
+            if (!IsConnected())
+            {
+                return false;
+            }
+
+            const byte CORE_ALREADY_RUNNING = 0xAA;
+            if (DeviceID == CORE_ALREADY_RUNNING)
+            {
+                return LastKnownFlashDeviceID != 0;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the bootmode flash layout for the current session. Single entry point for layout resolution.
+        /// If core is already running (DeviceID == 0xAA), uses LastKnownFlashDeviceID.
+        /// Otherwise loads driver, reads flash device ID, and generates layout.
+        /// </summary>
+        /// <param name="layout">Output layout, or null on failure</param>
+        /// <param name="errorMessage">Error description on failure</param>
+        /// <returns>True if layout was obtained successfully</returns>
+        public bool GetBootmodeFlashLayout(out MemoryLayout layout, out string errorMessage)
+        {
+            layout = null;
+            errorMessage = null;
+
+            if (!IsConnected())
+            {
+                errorMessage = "Not connected to ECU.";
+                return false;
+            }
+
+            ECUFlashVariant variant = ECUFlashVariant.ME7;
+            uint baseAddress = GetFlashBaseAddress(variant);
+            ushort deviceID = 0;
+            const byte CORE_ALREADY_RUNNING = 0xAA;
+
+            if (DeviceID == CORE_ALREADY_RUNNING)
+            {
+                if (LastKnownFlashDeviceID != 0)
+                {
+                    deviceID = LastKnownFlashDeviceID;
+                    DisplayStatusMessage($"Using stored flash device ID: 0x{deviceID:X4} (core already running)", StatusMessageType.USER);
+                }
+                else
+                {
+                    errorMessage = "Core is already running and no stored flash device ID available. Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type.";
+                    return false;
+                }
+            }
+            else
+            {
+                DisplayStatusMessage("Loading flash driver for device identification...", StatusMessageType.USER);
+                if (!LoadFlashDriver(variant))
+                {
+                    errorMessage = "Flash driver load failed. Check ECU variant (ME7/Simos3/EDC15).";
+                    return false;
+                }
+
+                if (!GetFlashDeviceID(variant, out deviceID))
+                {
+                    errorMessage = "Failed to read flash device ID. Wrong variant, bad connection, or unsupported flash chip.";
+                    return false;
+                }
+            }
+
+            if (!GenerateMemoryLayoutFromDeviceID(deviceID, baseAddress, out layout))
+            {
+                errorMessage = $"Unknown flash device ID: 0x{deviceID:X4}. Cannot auto-detect layout.";
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Resets bootmode-specific connection state (DeviceID, LastKnownDeviceID, LastKnownFlashDeviceID).
+        /// Called when connection is reset (ConnectionPending, Disconnected after failed connect).
+        /// </summary>
+        private void ResetBootmodeConnectionState()
+        {
+            if (_DeviceID != 0 || _LastKnownDeviceID != 0 || _LastKnownFlashDeviceID != 0)
+            {
+                _DeviceID = 0;
+                _LastKnownDeviceID = 0;
+                _LastKnownFlashDeviceID = 0;
+                OnPropertyChanged(new PropertyChangedEventArgs("DeviceID"));
+                OnPropertyChanged(new PropertyChangedEventArgs("LastKnownDeviceID"));
+                OnPropertyChanged(new PropertyChangedEventArgs("LastKnownFlashDeviceID"));
+            }
+        }
+
+        /// <summary>
+        /// Gets the base flash address for the specified ECU variant.
+        /// </summary>
+        public uint GetFlashBaseAddress(ECUFlashVariant variant)
+        {
+            switch (variant)
+            {
+                case ECUFlashVariant.ME7:
+                    return ExtFlashAddress_ME7;
+                case ECUFlashVariant.Simos3:
+                    return ExtFlashAddress_Simos3;
+                case ECUFlashVariant.EDC15:
+                    return ExtFlashAddress_EDC15;
+                default:
+                    return ExtFlashAddress_ME7;  // Default to ME7
+            }
+        }
+
+        /// <summary>
+        /// Reads external flash memory.
+        /// </summary>
+        /// <param name="variant">ECU/Flash variant (ME7, Simos3, or EDC15)</param>
+        /// <param name="startAddress">Start address offset from flash base (0-based)</param>
+        /// <param name="size">Number of bytes to read</param>
+        /// <param name="data">Output buffer for read data</param>
+        /// <param name="progressCallback">Optional callback for progress reporting (bytesRead, totalBytes)</param>
+        /// <param name="sectorNumber">Current sector number (for progress display, 0 to skip)</param>
+        /// <param name="totalSectors">Total number of sectors (for progress display, 0 to skip)</param>
+        /// <returns>True if read successful, false otherwise</returns>
+        public bool ReadExternalFlash(ECUFlashVariant variant, uint startAddress, uint size, out byte[] data, Action<uint, uint> progressCallback = null, int sectorNumber = 0, int totalSectors = 0)
+        {
+            data = null;
+
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot read flash.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (size == 0)
+            {
+                DisplayStatusMessage("Invalid read size: 0 bytes.", StatusMessageType.USER);
+                return false;
+            }
+
+            DisplayStatusMessage($"Starting external flash read ({variant} variant, {size} bytes from offset 0x{startAddress:X6})...", StatusMessageType.LOG);
+
+            if (!ConfigureRegistersForExternalFlashRead(variant))
+            {
+                DisplayStatusMessage("Failed to configure registers for external flash read.", StatusMessageType.USER);
+                return false;
+            }
+
+            uint flashBaseAddress = GetFlashBaseAddress(variant);
+            uint actualStartAddress = flashBaseAddress + startAddress;
+
+            if (actualStartAddress < flashBaseAddress)
+            {
+                DisplayStatusMessage($"Start address overflow: 0x{actualStartAddress:X6}", StatusMessageType.USER);
+                return false;
+            }
+
+            data = new byte[size];
+            uint totalBytesRead = 0;
+            uint offset = 0;
+            ushort blockSize = DefaultBlockLength;
+            int totalBlocks = (int)((size + blockSize - 1) / blockSize);
+
+            // Read flash in blocks
+            int blockNumber = 0;
+            while (offset < size)
+            {
+                blockNumber++;
+                // Adjust block size for last block
+                ushort currentBlockSize = blockSize;
+                if ((size - offset) < blockSize)
+                {
+                    currentBlockSize = (ushort)(size - offset);
+                }
+
+                uint currentAddress = actualStartAddress + offset;
+                byte[] blockData;
+
+                if (!MiniMon_ReadBlock(currentAddress, currentBlockSize, out blockData))
+                {
+                    DisplayStatusMessage($"Failed to read flash block {blockNumber} at address 0x{currentAddress:X6} (offset 0x{offset:X6})", StatusMessageType.USER);
+                    DisplayStatusMessage($"ReadExternalFlash: Block {blockNumber} read failed at address 0x{currentAddress:X6}", StatusMessageType.LOG);
+                    return false;
+                }
+
+                if (blockData == null || blockData.Length != currentBlockSize)
+                {
+                    DisplayStatusMessage($"ReadExternalFlash: Block {blockNumber} data length mismatch: expected {currentBlockSize}, got {(blockData?.Length ?? 0)}", StatusMessageType.LOG);
+                    DisplayStatusMessage($"Failed to read flash block {blockNumber}: data length mismatch", StatusMessageType.USER);
+                    return false;
+                }
+
+                Array.Copy(blockData, 0, data, (int)offset, currentBlockSize);
+                totalBytesRead += currentBlockSize;
+                offset += currentBlockSize;
+
+                // Report progress
+                if (progressCallback != null)
+                {
+                    progressCallback(totalBytesRead, size);
+                }
+
+                // Update status message periodically (no % symbol - that's reserved for overall progress)
+                // Show sector progress and bytes read in current sector
+                if (offset % (blockSize * 10) == 0 || offset >= size)
+                {
+                    if (sectorNumber > 0 && totalSectors > 0)
+                    {
+                        DisplayStatusMessage($"Reading flash: {sectorNumber}/{totalSectors} sectors, {offset}/{size} bytes in sector", StatusMessageType.LOG);
+                    }
+                    else
+                    {
+                        DisplayStatusMessage($"Reading flash: {offset}/{size} bytes", StatusMessageType.LOG);
+                    }
+                }
+            }
+
+            DisplayStatusMessage($"External flash read completed successfully: {size} bytes read from offset 0x{startAddress:X6}", StatusMessageType.LOG);
+            return true;
+        }
+
+        #endregion
+
+        #region External Flash Write Operations
+
+        /// <summary>
+        /// Loads a flash driver into ECU memory.
+        /// </summary>
+        /// <param name="variant">ECU/Flash variant (ME7, Simos3, or EDC15)</param>
+        /// <returns>True if driver loaded successfully, false otherwise</returns>
+        public bool LoadFlashDriver(ECUFlashVariant variant)
+        {
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot load flash driver.", StatusMessageType.USER);
+                return false;
+            }
+
+            byte[] driverData = null;
+            switch (variant)
+            {
+                case ECUFlashVariant.ME7:
+                case ECUFlashVariant.EDC15:
+                    driverData = Properties.Resources.BootmodeFlashDriverME7;
+                    break;
+                case ECUFlashVariant.Simos3:
+                    driverData = Properties.Resources.BootmodeFlashDriverSimos3;
+                    break;
+                default:
+                    DisplayStatusMessage($"Unknown flash variant: {variant}", StatusMessageType.USER);
+                    return false;
+            }
+
+            if (driverData == null || driverData.Length == 0)
+            {
+                DisplayStatusMessage($"Flash driver data is null or empty for variant {variant}", StatusMessageType.USER);
+                DisplayStatusMessage($"LoadFlashDriver: FAILED - Driver data is null or empty", StatusMessageType.LOG);
+                return false;
+            }
+
+            byte functionResult;
+            if (!MiniMon_WriteBlock(DriverAddress, driverData, out functionResult))
+            {
+                DisplayStatusMessage("Failed to upload flash driver to ECU memory.", StatusMessageType.USER);
+                DisplayStatusMessage($"LoadFlashDriver: FAILED - MiniMon_WriteBlock failed, functionResult=0x{functionResult:X2}", StatusMessageType.LOG);
+                return false;
+            }
+
+            DisplayStatusMessage($"Flash driver loaded successfully ({driverData.Length} bytes)", StatusMessageType.USER);
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the flash manufacturer ID using FC_GETSTATE.
+        /// </summary>
+        /// <param name="variant">ECU/Flash variant</param>
+        /// <param name="manufacturerID">Output manufacturer ID</param>
+        /// <returns>True if successful, false otherwise</returns>
+        public bool GetFlashManufacturerID(ECUFlashVariant variant, out ushort manufacturerID)
+        {
+            manufacturerID = 0;
+
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot read manufacturer ID.", StatusMessageType.USER);
+                return false;
+            }
+
+            // Configure registers for external flash access (required before calling FC_GETSTATE)
+            if (!ConfigureRegistersForExternalFlashRead(variant))
+            {
+                DisplayStatusMessage("Failed to configure registers for flash manufacturer ID read.", StatusMessageType.USER);
+                return false;
+            }
+
+            uint writeAddressBase = GetFlashWriteBaseAddress(variant);
+            uint readAddressBase = GetFlashBaseAddress(variant);
+
+            ushort writeAddressHigh = (ushort)((writeAddressBase >> 16) & 0xFFFF);
+            ushort readAddressHigh = (ushort)((readAddressBase >> 16) & 0xFFFF);
+
+            // FC_GETSTATE register array: [FC_GETSTATE, 0x0000, writeAddressHigh, readAddressHigh, 0x000, 0x000, FC_GETSTATE_ADDR_MANUFID, 0x0001]
+            ushort[] register = new ushort[]
+            {
+                (ushort)CommunicationConstants.FC_GETSTATE,
+                0x0000,
+                writeAddressHigh,
+                readAddressHigh,
+                0x0000,
+                0x0000,
+                FC_GETSTATE_ADDR_MANUFID,
+                0x0001
+            };
+
+            // Convert ushort[] to byte[] for MiniMon_Call
+            byte[] registerBytes = new byte[16];
+            for (int i = 0; i < register.Length && i < 8; i++)
+            {
+                registerBytes[i * 2] = (byte)(register[i] & 0xFF);
+                registerBytes[i * 2 + 1] = (byte)(register[i] >> 8);
+            }
+
+            byte[] retRegisterBytes;
+            if (!MiniMon_Call(FlashDriverEntryPoint, registerBytes, out retRegisterBytes))
+            {
+                DisplayStatusMessage("Call FC_GETSTATE failed (manufacturer ID)", StatusMessageType.USER);
+                return false;
+            }
+
+            // Convert byte[] back to ushort[]
+            ushort[] retRegister = new ushort[8];
+            for (int i = 0; i < 8; i++)
+            {
+                retRegister[i] = (ushort)(retRegisterBytes[i * 2] | (retRegisterBytes[i * 2 + 1] << 8));
+            }
+
+            if (retRegister[7] != (ushort)CommunicationConstants.FE_NOERROR)
+            {
+                DisplayStatusMessage($"Call FC_GETSTATE failed with error code 0x{retRegister[7]:X4} (manufacturer ID)", StatusMessageType.USER);
+                return false;
+            }
+
+            manufacturerID = retRegister[1];
+
+            // Handle Simos3 bit-crossing
+            if (variant == ECUFlashVariant.Simos3)
+                manufacturerID = GetCrossedWord(manufacturerID);
+
+            DisplayStatusMessage($"Flash manufacturer ID: 0x{manufacturerID:X4}", StatusMessageType.USER);
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the flash device ID using FC_GETSTATE.
+        /// </summary>
+        /// <param name="variant">ECU/Flash variant</param>
+        /// <param name="deviceID">Output device ID</param>
+        /// <returns>True if successful, false otherwise</returns>
+        public bool GetFlashDeviceID(ECUFlashVariant variant, out ushort deviceID)
+        {
+            deviceID = 0;
+
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot read device ID.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (!ConfigureRegistersForExternalFlashRead(variant))
+            {
+                DisplayStatusMessage("Failed to configure registers for flash device ID read.", StatusMessageType.USER);
+                return false;
+            }
+
+            uint writeAddressBase = GetFlashWriteBaseAddress(variant);
+            uint readAddressBase = GetFlashBaseAddress(variant);
+
+            ushort writeAddressHigh = (ushort)((writeAddressBase >> 16) & 0xFFFF);
+            ushort readAddressHigh = (ushort)((readAddressBase >> 16) & 0xFFFF);
+
+            // FC_GETSTATE register array: [FC_GETSTATE, 0x0000, writeAddressHigh, readAddressHigh, 0x000, 0x000, FC_GETSTATE_ADDR_DEVICEID, 0x0001]
+            ushort[] register = new ushort[]
+            {
+                (ushort)CommunicationConstants.FC_GETSTATE,
+                0x0000,
+                writeAddressHigh,
+                readAddressHigh,
+                0x0000,
+                0x0000,
+                FC_GETSTATE_ADDR_DEVICEID,
+                0x0001
+            };
+
+            // Convert ushort[] to byte[] for MiniMon_Call
+            byte[] registerBytes = new byte[16];
+            for (int i = 0; i < register.Length && i < 8; i++)
+            {
+                registerBytes[i * 2] = (byte)(register[i] & 0xFF);
+                registerBytes[i * 2 + 1] = (byte)(register[i] >> 8);
+            }
+
+            byte[] retRegisterBytes;
+            if (!MiniMon_Call(FlashDriverEntryPoint, registerBytes, out retRegisterBytes))
+            {
+                DisplayStatusMessage("Call FC_GETSTATE failed (device ID)", StatusMessageType.USER);
+                return false;
+            }
+
+            // Convert byte[] back to ushort[]
+            ushort[] retRegister = new ushort[8];
+            for (int i = 0; i < 8; i++)
+            {
+                retRegister[i] = (ushort)(retRegisterBytes[i * 2] | (retRegisterBytes[i * 2 + 1] << 8));
+            }
+
+            if (retRegister[7] != (ushort)CommunicationConstants.FE_NOERROR)
+            {
+                DisplayStatusMessage($"Call FC_GETSTATE failed with error code 0x{retRegister[7]:X4} (device ID)", StatusMessageType.USER);
+                return false;
+            }
+
+            deviceID = retRegister[1];
+            if (variant == ECUFlashVariant.Simos3)
+                deviceID = GetCrossedWord(deviceID);
+
+            DisplayStatusMessage($"Flash device ID: 0x{deviceID:X4}", StatusMessageType.USER);
+
+            // Store the flash device ID for reuse when core is already running
+            LastKnownFlashDeviceID = deviceID;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the flash write base address for the specified variant.
+        /// </summary>
+        public uint GetFlashWriteBaseAddress(ECUFlashVariant variant)
+        {
+            switch (variant)
+            {
+                case ECUFlashVariant.ME7:
+                    return ExtFlashWriteAddress_ME7;
+                case ECUFlashVariant.Simos3:
+                    return ExtFlashWriteAddress_Simos3;
+                case ECUFlashVariant.EDC15:
+                    return ExtFlashWriteAddress_EDC15;
+                default:
+                    return ExtFlashWriteAddress_ME7;  // Default to ME7
+            }
+        }
+
+        /// <summary>
+        /// Applies Simos3 bit-crossing transformation to a word.
+        /// </summary>
+        private ushort GetCrossedWord(ushort inputData)
+        {
+            ushort output = 0;
+            output |= (ushort)((inputData & 0x0001) << 15);
+            output |= (ushort)((inputData & 0x0002) << 12);
+            output |= (ushort)((inputData & 0x0004) << 9);
+            output |= (ushort)((inputData & 0x0008) << 6);
+            output |= (ushort)((inputData & 0x0010) << 3);
+            output |= (ushort)((inputData & 0x0020) >> 0);
+            output |= (ushort)((inputData & 0x0040) >> 3);
+            output |= (ushort)((inputData & 0x0080) >> 6);
+            output |= (ushort)((inputData & 0x0100) << 6);
+            output |= (ushort)((inputData & 0x0200) << 3);
+            output |= (ushort)((inputData & 0x0400) << 0);
+            output |= (ushort)((inputData & 0x0800) >> 3);
+            output |= (ushort)((inputData & 0x1000) >> 6);
+            output |= (ushort)((inputData & 0x2000) >> 9);
+            output |= (ushort)((inputData & 0x4000) >> 12);
+            output |= (ushort)((inputData & 0x8000) >> 15);
+            return output;
+        }
+
+        /// <summary>
+        /// Determines if a flash device ID represents a bottom boot or top boot chip.
+        /// </summary>
+        /// <param name="deviceID">Flash device ID</param>
+        /// <returns>True if bottom boot, false if top boot</returns>
+        public static bool IsBottomBoot(ushort deviceID)
+        {
+            // F400BB and F800BB are bottom boot
+            // F400BT and F800BT are top boot
+            return (deviceID == DEV_ID_F400BB || deviceID == DEV_ID_F800BB);
+        }
+
+        /// <summary>
+        /// Gets the flash size in bytes for a given device ID.
+        /// </summary>
+        /// <param name="deviceID">Flash device ID</param>
+        /// <returns>Flash size in bytes, or 0 if unknown</returns>
+        public static uint GetFlashSizeFromDeviceID(ushort deviceID)
+        {
+            switch (deviceID)
+            {
+                case DEV_ID_F400BB:
+                case DEV_ID_F400BT:
+                    return 512 * 1024;  // 512KB
+                case DEV_ID_F800BB:
+                case DEV_ID_F800BT:
+                    return 1024 * 1024;  // 1024KB
+                default:
+                    return 0;  // Unknown
+            }
+        }
+
+        /// <summary>
+        /// Calculates the sector size for a given sector number, device ID, and flash size.
+        /// Based on Python reference implementation.
+        /// </summary>
+        /// <param name="sector">Sector number (0-based)</param>
+        /// <param name="deviceID">Flash device ID</param>
+        /// <param name="flashSize">Total flash size in bytes</param>
+        /// <returns>Sector size in bytes</returns>
+        public static uint CalculateSectorSize(int sector, ushort deviceID, uint flashSize)
+        {
+            bool bottomBoot = IsBottomBoot(deviceID);
+            bool is1024KB = (flashSize == (1024 * 1024));
+
+            if (!bottomBoot)  // Top boot sector
+            {
+                if (is1024KB)  // F800BT - 1024KB
+                {
+                    if (sector == 18)
+                        return 0x4000;  // 16KB
+                    else if (sector == 17 || sector == 16)
+                        return 0x2000;  // 8KB
+                    else if (sector == 15)
+                        return 0x8000;  // 32KB
+                    else
+                        return 0x10000;  // 64KB
+                }
+                else  // F400BT - 512KB
+                {
+                    if (sector == 10)
+                        return 0x4000;  // 16KB
+                    else if (sector == 9 || sector == 8)
+                        return 0x2000;  // 8KB
+                    else if (sector == 7)
+                        return 0x8000;  // 32KB
+                    else
+                        return 0x10000;  // 64KB
+                }
+            }
+            else  // Bottom boot sector (F400BB, F800BB)
+            {
+                if (sector == 0)
+                    return 0x4000;  // 16KB
+                else if (sector == 1 || sector == 2)
+                    return 0x2000;  // 8KB
+                else if (sector == 3)
+                    return 0x8000;  // 32KB
+                else
+                    return 0x10000;  // 64KB
+            }
+        }
+
+        /// <summary>
+        /// Generates a MemoryLayout from flash device ID.
+        /// Auto-detects sector sizes based on device ID.
+        /// </summary>
+        /// <param name="deviceID">Flash device ID</param>
+        /// <param name="baseAddress">Base address for flash (from variant)</param>
+        /// <param name="layout">Output MemoryLayout</param>
+        /// <returns>True if successful, false if device ID is unknown</returns>
+        public static bool GenerateMemoryLayoutFromDeviceID(ushort deviceID, uint baseAddress, out MemoryLayout layout)
+        {
+            layout = null;
+
+            uint flashSize = GetFlashSizeFromDeviceID(deviceID);
+            if (flashSize == 0)
+            {
+                return false;  // Unknown device ID
+            }
+
+            var sectorSizes = new List<uint>();
+            uint totalSize = 0;
+            int sector = 0;
+
+            // Calculate all sector sizes until we reach the flash size
+            while (totalSize < flashSize)
+            {
+                uint sectorSize = CalculateSectorSize(sector, deviceID, flashSize);
+                sectorSizes.Add(sectorSize);
+                totalSize += sectorSize;
+                sector++;
+
+                // Safety check to prevent infinite loop
+                if (sector > 100)
+                {
+                    break;
+                }
+            }
+
+            layout = new MemoryLayout(baseAddress, totalSize, sectorSizes);
+            return true;
+        }
+
+        #endregion
     }
 }
