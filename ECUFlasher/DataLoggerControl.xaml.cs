@@ -46,7 +46,6 @@ using Microsoft.Win32;
 
 using Communication;
 using Shared;
-using FTD2XX_NET;
 using ApplicationShared;
 
 namespace ECUFlasher
