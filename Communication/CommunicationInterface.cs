@@ -328,7 +328,7 @@ namespace Communication
 
         public CommunicationInterface()
         {
-            mFTDIDevice = new FTDI(this.DisplayFTDIErrorMessage, this.DisplayFTDIWarningMessage);
+            mCommunicationDevice = null;
             mConsumeTransmitEcho = true;
 
             mQueuedEvents = new Queue<EventHolder>();
@@ -337,16 +337,6 @@ namespace Communication
 
         public delegate void ConnectionStatusChangedDelegate(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect);
         public event ConnectionStatusChangedDelegate ConnectionStatusChangedEvent;
-
-        private void DisplayFTDIErrorMessage(string ftdiMessage)
-        {
-            DisplayStatusMessage("FTDI Error: " + ftdiMessage, StatusMessageType.USER);
-        }
-
-        private void DisplayFTDIWarningMessage(string ftdiMessage)
-        {
-            DisplayStatusMessage("FTDI Warning: " + ftdiMessage, StatusMessageType.LOG);
-        }
 
 		private const uint FTDIDeviceReadTimeOutMsDefaultValue = 1000;
 		[DefaultValue(FTDIDeviceReadTimeOutMsDefaultValue)]
@@ -388,7 +378,31 @@ namespace Communication
         }
 		private uint _FTDIDeviceWriteTimeOutMs = FTDIDeviceWriteTimeOutMsDefaultValue;
 
-        public FTDI.FT_DEVICE_INFO_NODE SelectedDeviceInfo { get; set; }
+        public DeviceInfo SelectedDeviceInfo { get; set; }
+
+        // Legacy property for backward compatibility
+        public FTDI.FT_DEVICE_INFO_NODE SelectedFTDIDeviceInfo
+        {
+            get
+            {
+                if (SelectedDeviceInfo is FtdiDeviceInfo ftdiInfo)
+                {
+                    return ftdiInfo.FtdiNode;
+                }
+                return null;
+            }
+            set
+            {
+                if (value != null)
+                {
+                    SelectedDeviceInfo = new FtdiDeviceInfo(value);
+                }
+                else
+                {
+                    SelectedDeviceInfo = null;
+                }
+            }
+        }
 
         public virtual ConnectionStatusType ConnectionStatus
         {
@@ -463,104 +477,119 @@ namespace Communication
         }
         public event PropertyChangedEventHandler PropertyChanged;
 
-        protected FTD2XX_NET.FTDI mFTDIDevice = null;
+        protected ICommunicationDevice mCommunicationDevice = null;
         protected bool mConsumeTransmitEcho = true;
 
-        protected bool OpenFTDIDevice(FTDI.FT_DEVICE_INFO_NODE deviceToOpen)
+        protected bool OpenCommunicationDevice(DeviceInfo deviceInfo)
         {
             bool connected = false;
 
-            lock (mFTDIDevice)
+            if (mCommunicationDevice != null)
             {
-                if (IsFTDIDeviceOpen())
+                lock (mCommunicationDevice)
                 {
-                    CloseFTDIDevice();
-                }
-
-                if (FTDI.IsFTD2XXDLLLoaded())
-                {
-                    if (deviceToOpen != null)
+                    if (IsCommunicationDeviceOpen())
                     {
-                        if (mFTDIDevice.OpenByLocation(deviceToOpen.LocId) == FTDI.FT_STATUS.FT_OK)
+                        CloseCommunicationDevice();
+                    }
+                }
+            }
+
+            if (deviceInfo != null)
+            {
+                mCommunicationDevice = DeviceManager.CreateDevice(deviceInfo);
+                if (mCommunicationDevice != null)
+                {
+                    if (mCommunicationDevice.Open(deviceInfo))
+                    {
+                        // Reset and purge the device
+                        if (mCommunicationDevice.Reset() && mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX))
                         {
-                            FTDI.FT_STATUS ftdiStatus = FTDI.FT_STATUS.FT_OK;
+                            DisplayStatusMessage("Opened " + deviceInfo.Type + " device.", StatusMessageType.LOG);
+                            DisplayStatusMessage(deviceInfo.Type + " device info - Description: " + deviceInfo.Description
+                                + " Serial Number: " + deviceInfo.SerialNumber + " Device ID: " + deviceInfo.DeviceID, StatusMessageType.LOG);
 
-                            ftdiStatus |= mFTDIDevice.ResetDevice();
-                            //ftdiStatus |= mFTDIDevice.ResetPort();
-                            ftdiStatus |= mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX | FTDI.FT_PURGE.FT_PURGE_TX);
-
-                            if (ftdiStatus == FTDI.FT_STATUS.FT_OK)
+                            // If FTDI device, try to get chip ID
+                            if (deviceInfo is FtdiDeviceInfo ftdiDeviceInfo && ftdiDeviceInfo.ChipID != 0)
                             {
-                                DisplayStatusMessage("Opened FTDI device.", StatusMessageType.LOG);
-                                DisplayStatusMessage("FTDI device info - Description: " + deviceToOpen.Description
-                                    + " Serial Number: " + deviceToOpen.SerialNumber + " Device Type: " + deviceToOpen.Type
-                                    + " ID: 0x" + deviceToOpen.ID.ToString("X") + " Device Flags: 0x" + deviceToOpen.Flags.ToString("X"), StatusMessageType.LOG);
-
-                                if (FTDI.IsFTDChipIDDLLLoaded())
-                                {
-                                    DisplayStatusMessage("FTDI ChipID DLL is loaded, checking chip ID...", StatusMessageType.LOG);
-
-                                    uint chipID = 0;
-                                    if (mFTDIDevice.GetChipIDFromCurrentDevice(out chipID) == FTDI.FT_STATUS.FT_OK)
-                                    {
-                                        DisplayStatusMessage("FTDI device chip ID: 0x" + chipID.ToString("X"), StatusMessageType.LOG);
-                                    }
-                                    else
-                                    {
-                                        DisplayStatusMessage("Unable to read FTDI device chip ID", StatusMessageType.LOG);
-                                    }
-                                }
-
-                                connected = true;
+                                DisplayStatusMessage("FTDI device chip ID: 0x" + ftdiDeviceInfo.ChipID.ToString("X"), StatusMessageType.LOG);
                             }
-                            else
-                            {
-                                mFTDIDevice.Close();
-                            }
+
+                            connected = true;
                         }
                         else
                         {
-                            DisplayStatusMessage("Could not open FTDI device", StatusMessageType.LOG);
+                            mCommunicationDevice.Close();
+                            mCommunicationDevice = null;
                         }
                     }
                     else
                     {
-                        DisplayStatusMessage("No FTDI device selected", StatusMessageType.LOG);
+                        DisplayStatusMessage("Could not open " + deviceInfo.Type + " device", StatusMessageType.LOG);
+                        mCommunicationDevice = null;
                     }
                 }
                 else
                 {
-                    DisplayStatusMessage("FTDI FTD2XX device driver DLL could not be loaded.", StatusMessageType.USER);
+                    DisplayStatusMessage("Failed to create device instance for " + deviceInfo.Type, StatusMessageType.USER);
                 }
+            }
+            else
+            {
+                DisplayStatusMessage("No device selected", StatusMessageType.LOG);
             }
 
             return connected;
         }
 
+        protected void CloseCommunicationDevice()
+        {
+            if (IsCommunicationDeviceOpen())
+            {
+                DisplayStatusMessage("Closing " + (mCommunicationDevice?.Type.ToString() ?? "communication") + " device.", StatusMessageType.LOG);
+                mCommunicationDevice?.Close();
+            }
+            mCommunicationDevice = null;
+        }
+
+        protected bool IsCommunicationDeviceOpen()
+        {
+            return mCommunicationDevice?.IsOpen ?? false;
+        }
+
+        // Legacy methods for backward compatibility (delegate to new abstraction)
+        protected bool OpenFTDIDevice(FTDI.FT_DEVICE_INFO_NODE deviceToOpen)
+        {
+            if (deviceToOpen == null)
+            {
+                return OpenCommunicationDevice(null);
+            }
+
+            // Convert FTDI device info to DeviceInfo
+            FtdiDeviceInfo deviceInfo = new FtdiDeviceInfo(deviceToOpen);
+            return OpenCommunicationDevice(deviceInfo);
+        }
+
         protected void CloseFTDIDevice()
         {
-            if (IsFTDIDeviceOpen())
-            {
-                DisplayStatusMessage("Closing FTDI device.", StatusMessageType.LOG);
-                mFTDIDevice.Close();
-            }
+            CloseCommunicationDevice();
         }
 
         protected bool IsFTDIDeviceOpen()
         {
-            return mFTDIDevice.IsOpen;
+            return IsCommunicationDeviceOpen();
         }
 
         public event DisplayStatusMessageDelegate mDisplayStatusMessage;
         public event DisplayUserPrompt mDisplayUserPrompt;
 
         public void DisplayStatusMessage(string message, StatusMessageType messageType)
-		{
-			if (mDisplayStatusMessage != null)
-			{
-				mDisplayStatusMessage(message, messageType);
-			}
-		}
+        {
+            if (mDisplayStatusMessage != null)
+            {
+                mDisplayStatusMessage(message, messageType);
+            }
+        }
 
         public UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType)
         {

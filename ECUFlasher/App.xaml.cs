@@ -981,7 +981,24 @@ namespace ECUFlasher
 
                     if (CommInterface != null)
                     {
-                        CommInterface.SelectedDeviceInfo = _SelectedDeviceInfo;
+                        // Convert ApplicationShared.FTDIDeviceInfo to Communication.FtdiDeviceInfo
+                        if (_SelectedDeviceInfo != null)
+                        {
+                            var ftdiNode = new FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE
+                            {
+                                Description = _SelectedDeviceInfo.Description,
+                                Flags = _SelectedDeviceInfo.Flags,
+                                ID = _SelectedDeviceInfo.ID,
+                                LocId = _SelectedDeviceInfo.LocId,
+                                SerialNumber = _SelectedDeviceInfo.SerialNumber,
+                                Type = _SelectedDeviceInfo.Type
+                            };
+                            CommInterface.SelectedDeviceInfo = new Communication.FtdiDeviceInfo(ftdiNode, _SelectedDeviceInfo.ChipID);
+                        }
+                        else
+                        {
+                            CommInterface.SelectedDeviceInfo = null;
+                        }
                     }
 
                     string error = null;
@@ -1039,13 +1056,30 @@ namespace ECUFlasher
                             }
                     }
 
-//TODO: previously written code doesn't handle CommInterface being NULL
+                    //TODO: previously written code doesn't handle CommInterface being NULL
 
                     CommInterfaceViewModel = newViewModel;//done this way to only cause the change notification to happen once
 
                     if (CommInterface != null)
                     {
-                        CommInterface.SelectedDeviceInfo = SelectedDeviceInfo;
+                        // Convert ApplicationShared.FTDIDeviceInfo to Communication.FtdiDeviceInfo
+                        if (SelectedDeviceInfo != null)
+                        {
+                            var ftdiNode = new FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE
+                            {
+                                Description = SelectedDeviceInfo.Description,
+                                Flags = SelectedDeviceInfo.Flags,
+                                ID = SelectedDeviceInfo.ID,
+                                LocId = SelectedDeviceInfo.LocId,
+                                SerialNumber = SelectedDeviceInfo.SerialNumber,
+                                Type = SelectedDeviceInfo.Type
+                            };
+                            CommInterface.SelectedDeviceInfo = new Communication.FtdiDeviceInfo(ftdiNode, SelectedDeviceInfo.ChipID);
+                        }
+                        else
+                        {
+                            CommInterface.SelectedDeviceInfo = null;
+                        }
                         CommInterfaceViewModel.FailedToStartConnectingEvent += OnFailedToStartConnecting;
                     }
 
@@ -1110,21 +1144,21 @@ namespace ECUFlasher
         {
             FTDIDevices.Clear();
 
-            var newDevices = mFTDILibrary.EnumerateFTDIDevices();
+            // Use DeviceManager to enumerate all devices (currently only FTDI)
+            var allDevices = Communication.DeviceManager.EnumerateAllDevices();
 
             uint index = 0;
-            foreach (var node in newDevices)
+            foreach (var deviceInfo in allDevices)
             {
-                if (node.Type != FTDI.FT_DEVICE.FT_DEVICE_UNKNOWN)
+                if (deviceInfo is Communication.FtdiDeviceInfo ftdiDeviceInfo)
                 {
-                    uint chipID = 0;
-                    if (FTDI.IsFTDChipIDDLLLoaded())
+                    // Convert Communication.FtdiDeviceInfo to ApplicationShared.FTDIDeviceInfo for UI
+                    var ftdiNode = ftdiDeviceInfo.FtdiNode;
+                    if (ftdiNode.Type != FTDI.FT_DEVICE.FT_DEVICE_UNKNOWN)
                     {
-                        mFTDILibrary.GetChipIDFromDeviceIndex(index, out chipID);
+                        FTDIDevices.Add(new FTDIDeviceInfo(ftdiNode, index, ftdiDeviceInfo.ChipID));
+                        index++;
                     }
-
-                    FTDIDevices.Add(new FTDIDeviceInfo(node, index, chipID));
-                    index++;
                 }
             }
 
