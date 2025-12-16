@@ -20,6 +20,8 @@ Contact by Email: tony@nefariousmotorsports.com
 
 using FTD2XX_NET;
 using System;
+using System.Collections.Generic;
+using Shared;
 
 namespace Communication
 {
@@ -420,6 +422,43 @@ namespace Communication
 
             FTD2XX_NET.FTDI.FT_STATUS status = _ftdi.GetTxBytesWaiting(ref bytesWaiting);
             return (status == FTD2XX_NET.FTDI.FT_STATUS.FT_OK);
+        }
+
+        /// <summary>
+        /// Enumerates all available FTDI devices
+        /// </summary>
+        public static IEnumerable<DeviceInfo> Enumerate(DisplayStatusMessageDelegate logMessage = null)
+        {
+            var devices = new List<DeviceInfo>();
+
+            if (FTDI.IsFTD2XXDLLLoaded())
+            {
+                var ftdiLibrary = new FTDI(null, null);
+                var ftdiDevices = ftdiLibrary.EnumerateFTDIDevices();
+                foreach (var ftdiNode in ftdiDevices)
+                {
+                    // Skip unknown FTDI devices
+                    if (ftdiNode.Type == FTDI.FT_DEVICE.FT_DEVICE_UNKNOWN)
+                    {
+                        continue;
+                    }
+
+                    // Try to get chip ID if available
+                    uint chipID = 0;
+                    if (FTDI.IsFTDChipIDDLLLoaded())
+                    {
+                        var tempFtdi = new FTDI(null, null);
+                        if (tempFtdi.OpenByLocation(ftdiNode.LocId) == FTDI.FT_STATUS.FT_OK)
+                        {
+                            tempFtdi.GetChipIDFromCurrentDevice(out chipID);
+                            tempFtdi.Close();
+                        }
+                    }
+                    devices.Add(new FtdiDeviceInfo(ftdiNode, chipID));
+                }
+            }
+
+            return devices;
         }
     }
 }

@@ -156,4 +156,73 @@ namespace Communication
             return _ftdiNode.LocId.GetHashCode();
         }
     }
+
+    /// <summary>
+    /// Device information for CH340 devices
+    /// </summary>
+    public class Ch340DeviceInfo : DeviceInfo
+    {
+        private readonly string _portName;
+        private readonly string _description;
+        private readonly string _serialNumber;
+        private readonly string _deviceID;
+
+        public Ch340DeviceInfo(string portName, string description = null, string serialNumber = null, string deviceID = null)
+        {
+            _portName = portName ?? throw new ArgumentNullException(nameof(portName));
+            _description = description ?? $"CH340 Device ({portName})";
+            _serialNumber = serialNumber ?? string.Empty;
+            _deviceID = deviceID ?? portName;
+        }
+
+        public override string Description
+        {
+            get { return _description; }
+        }
+
+        public override string SerialNumber
+        {
+            get { return _serialNumber; }
+        }
+
+        public override string DeviceID
+        {
+            get { return _deviceID; }
+        }
+
+        public override DeviceType Type
+        {
+            get { return DeviceType.CH340; }
+        }
+
+        /// <summary>
+        /// Gets the COM port name (e.g., "COM3")
+        /// </summary>
+        public string PortName
+        {
+            get { return _portName; }
+        }
+
+        /// <summary>
+        /// Gets the device ID as string (for UI binding compatibility)
+        /// </summary>
+        public override object IDProp
+        {
+            get { return _deviceID; }
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is Ch340DeviceInfo other)
+            {
+                return _portName == other._portName;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return _portName.GetHashCode();
+        }
+    }
 }
