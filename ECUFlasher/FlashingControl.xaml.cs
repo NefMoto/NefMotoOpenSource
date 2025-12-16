@@ -1058,6 +1058,104 @@ namespace ECUFlasher
 			}
 		}
 
+		public ReactiveCommand ReadDiffFlashCommand
+		{
+			get
+			{
+				if (_ReadDiffFlashCommand == null)
+				{
+					_ReadDiffFlashCommand = new ReactiveCommand(this.OnReadDiffFlash);
+					_ReadDiffFlashCommand.Name = "Diff Read Flash";
+					_ReadDiffFlashCommand.Description = "Read only changed sectors of ECU flash memory, using the loaded file to skip matching sectors";
+
+					if (App != null)
+					{
+						_ReadDiffFlashCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+						_ReadDiffFlashCommand.AddWatchedProperty(App, "OperationInProgress");
+						_ReadDiffFlashCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
+						_ReadDiffFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
+						_ReadDiffFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
+					}
+
+					_ReadDiffFlashCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
+					{
+						return CanExecuteReadDiffFlashCommand(reasonsDisabled);
+					};
+				}
+
+				return _ReadDiffFlashCommand;
+			}
+		}
+		private ReactiveCommand _ReadDiffFlashCommand;
+
+		private bool CanExecuteReadDiffFlashCommand(List<string> reasonsDisabled)
+		{
+			if (App == null)
+			{
+				reasonsDisabled.Add("Internal program error");
+				return false;
+			}
+
+			bool result = true;
+
+			if (!IsMemoryLayoutOK)
+			{
+				reasonsDisabled.Add("Specified memory layout is not correct");
+				result = false;
+			}
+
+			if (!IsFlashFileOK)
+			{
+				reasonsDisabled.Add("Specified flash file is not correct");
+				result = false;
+			}
+
+			if (!App.CommInterface.IsConnected())
+			{
+				reasonsDisabled.Add("Not connected to ECU");
+				result = false;
+			}
+
+			if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+			{
+				reasonsDisabled.Add("Not connected with KWP2000 protocol");
+				result = false;
+			}
+
+			if (App.OperationInProgress)
+			{
+				reasonsDisabled.Add("Another operation is in progress");
+				result = false;
+			}
+
+			return result;
+		}
+
+		private void OnReadDiffFlash()
+		{
+			//done to trigger a reload of the memory layout and flash files and cause them to revalidate
+			FileNameToFlash = FileNameToFlash;
+			MemoryLayoutFileName = MemoryLayoutFileName;
+
+			if (ReadDiffFlashCommand.IsEnabled)
+			{
+				string confirmationMessage = "If you are ready to read, confirm the following things:";
+				confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
+				confirmationMessage += "\n2) The engine is not running.";
+				confirmationMessage += "\nNote: Diff read will only read sectors that differ from the loaded file.";
+				confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent reading the flash memory.";
+				confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
+
+				if (App.DisplayUserPrompt("Confirm Diff Read ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+				{
+					App.OperationInProgress = true;
+					App.PercentOperationComplete = 0.0f;
+
+					OnReadExternalFlashStarted(true, true, true, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted);
+				}
+			}
+		}
+
 		private void OnReadFlashCompleted(Operation operation, bool success)
 		{
 			//UI should occur on the UI thread...

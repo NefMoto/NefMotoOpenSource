@@ -71,7 +71,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 <ColumnDefinition />
             </Grid.ColumnDefinitions>
             <Button Command="{Binding Path=ReadEntireFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="0"/>
-            <!--<Button Command="{Binding Path=ReadDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="0" IsEnabled="true"/>-->
+            <Button Command="{Binding Path=ReadDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="1"/>
             <Button Command="{Binding Path=WriteEntireFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="0"/>
             <Button Command="{Binding Path=WriteDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="1"/>
             <Button Command="{Binding Path=VerifyChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="0"/>
