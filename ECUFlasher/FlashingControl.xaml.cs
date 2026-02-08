@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -84,37 +84,90 @@ namespace ECUFlasher
 			}
 		}
 
-		private void App_PropertyChanged(object sender, PropertyChangedEventArgs e)
+	private void App_PropertyChanged(object sender, PropertyChangedEventArgs e)
+	{
+		if (e.PropertyName == "CommInterface")
 		{
-			if (e.PropertyName == "CommInterface")
+			// Unsubscribe from old CommInterface
+			if (sender is App app && app.CommInterface != null)
 			{
-				// Unsubscribe from old CommInterface
-				if (sender is App app && app.CommInterface != null)
-				{
-					app.CommInterface.PropertyChanged -= CommInterface_PropertyChanged;
-				}
+				app.CommInterface.PropertyChanged -= CommInterface_PropertyChanged;
+			}
 
-				// Subscribe to new CommInterface
-				if (App.CommInterface != null)
-				{
-					App.CommInterface.PropertyChanged += CommInterface_PropertyChanged;
-				}
+			// Subscribe to new CommInterface
+			if (App.CommInterface != null)
+			{
+				App.CommInterface.PropertyChanged += CommInterface_PropertyChanged;
+			}
 
-				OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
-				OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
-				OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyWriteEnabled"));
+			OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
+			OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+			OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyWriteEnabled"));
+
+			// For bootmode, try to auto-detect layout if file is already selected
+			if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode &&
+			    App.CommInterface.IsConnected() && IsFlashFileOK)
+			{
+				TryAutoDetectLayoutForBootmode();
 			}
 		}
+	}
 
-		private void CommInterface_PropertyChanged(object sender, PropertyChangedEventArgs e)
+	private void CommInterface_PropertyChanged(object sender, PropertyChangedEventArgs e)
+	{
+		if (e.PropertyName == "CurrentProtocol")
 		{
-			if (e.PropertyName == "CurrentProtocol")
+			OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
+			OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+			OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyWriteEnabled"));
+			OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+
+			// Re-validate memory layout when protocol changes (to clear errors for bootmode)
+			LoadMemoryLayoutFile();
+
+			// For bootmode, try to auto-detect layout if file is already selected
+			if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode &&
+			    App.CommInterface.IsConnected() && IsFlashFileOK)
 			{
-				OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
-				OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
-				OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyWriteEnabled"));
+				TryAutoDetectLayoutForBootmode();
 			}
 		}
+		else if (e.PropertyName == "ConnectionStatus")
+		{
+			if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+			{
+				var status = App.CommInterface.ConnectionStatus;
+				if (status == CommunicationInterface.ConnectionStatusType.Disconnected || status == CommunicationInterface.ConnectionStatusType.CommunicationTerminated)
+				{
+					// Clear layout cache on disconnect so we re-detect when connecting to (possibly different) ECU
+					// Must run on UI thread - PropertyChanged can fire from SendReceive thread
+					if (FlashMemoryLayout != null || IsMemoryLayoutOK)
+					{
+						Dispatcher.BeginInvoke(new Action(() =>
+						{
+							FlashMemoryLayout = null;
+							IsMemoryLayoutOK = false;
+							string placeholder = "Auto-detected (pending)";
+							if (!AvailableMemoryLayouts.Contains(placeholder))
+							{
+								AvailableMemoryLayouts.Insert(0, placeholder);
+							}
+							mSelectedMemoryLayout = placeholder;
+							OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryLayout"));
+							OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutOK"));
+							OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+							OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+						}));
+					}
+				}
+				else if (App.CommInterface.IsConnected())
+				{
+					// Auto-detect layout so read/write are enabled; no flash file required for read
+					TryAutoDetectLayoutForBootmode();
+				}
+			}
+		}
+	}
 
 		private static bool ValidateFileToFlash(MemoryImage flashImage, MemoryLayout flashLayout, out string error)
 		{
@@ -143,47 +196,53 @@ namespace ECUFlasher
 			return (error == null);
 		}
 
-		private void LoadFlashFile()
+	private void LoadFlashFile()
+	{
+		if (FlashMemoryImage != null)
 		{
-			if (FlashMemoryImage != null)
-			{
-				FlashMemoryImage.Reset();
-			}
-
-			IsFlashFileOK = false;
-			string error = null;
-
-			if (FlashMemoryImage == null)
-			{
-				error = "Internal program error";
-			}
-			else if (!String.IsNullOrEmpty(FileNameToFlash))
-			{
-				Properties.Settings.Default.FlashFile = FileNameToFlash;
-
-				try
-				{
-					var fileBytes = File.ReadAllBytes(FileNameToFlash);
-					FlashMemoryImage = new MemoryImage(fileBytes, 0);
-
-					ValidateFileToFlash(FlashMemoryImage, FlashMemoryLayout, out error);
-				}
-				catch (Exception)
-				{
-					error = "Could not read flash file";
-				}
-			}
-			else
-			{
-				error = "No file selected";
-			}
-
-			//force and update without setting the property
-			OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryImage"));
-
-			this["FileNameToFlash"] = error;
-			IsFlashFileOK = (error == null);
+			FlashMemoryImage.Reset();
 		}
+
+		IsFlashFileOK = false;
+		string error = null;
+
+		if (FlashMemoryImage == null)
+		{
+			error = "Internal program error";
+		}
+		else if (!String.IsNullOrEmpty(FileNameToFlash))
+		{
+			Properties.Settings.Default.FlashFile = FileNameToFlash;
+
+			try
+			{
+				var fileBytes = File.ReadAllBytes(FileNameToFlash);
+				FlashMemoryImage = new MemoryImage(fileBytes, 0);
+
+				ValidateFileToFlash(FlashMemoryImage, FlashMemoryLayout, out error);
+			}
+			catch (Exception)
+			{
+				error = "Could not read flash file";
+			}
+		}
+		else
+		{
+			error = "No file selected";
+		}
+
+		//force and update without setting the property
+		OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryImage"));
+
+		this["FileNameToFlash"] = error;
+		IsFlashFileOK = (error == null);
+
+		// For bootmode, try to auto-detect layout when file is selected
+		if (IsFlashFileOK && App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode && App.CommInterface.IsConnected())
+		{
+			TryAutoDetectLayoutForBootmode();
+		}
+	}
 
 		public string FileNameToFlash
 		{
@@ -199,53 +258,137 @@ namespace ECUFlasher
 		}
 		private string mFileNameToFlash;
 
-		private void LoadMemoryLayoutFile()
+	private void LoadMemoryLayoutFile()
+	{
+		// For bootmode, layout is auto-detected - don't require a layout file
+		bool isBootMode = App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode;
+
+		// For bootmode, preserve auto-detected layout if it exists
+		MemoryLayout preservedAutoDetectedLayout = null;
+		bool preservedIsMemoryLayoutOK = false;
+		if (isBootMode && FlashMemoryLayout != null && FlashMemoryLayout.Validate() && IsMemoryLayoutOK)
 		{
-			if (FlashMemoryLayout != null)
+			// Preserve the auto-detected layout
+			preservedAutoDetectedLayout = FlashMemoryLayout;
+			preservedIsMemoryLayoutOK = IsMemoryLayoutOK;
+		}
+
+		if (FlashMemoryLayout != null)
+		{
+			FlashMemoryLayout.Reset();
+			FlashMemoryLayout = null;
+		}
+
+		IsMemoryLayoutOK = false;
+		string error = null;
+
+		if (!String.IsNullOrEmpty(MemoryLayoutFileName))
+		{
+			try
 			{
-				FlashMemoryLayout.Reset();
-				FlashMemoryLayout = null;
-			}
-
-			IsMemoryLayoutOK = false;
-			string error = null;
-
-			if (!String.IsNullOrEmpty(MemoryLayoutFileName))
-			{
-				try
+				using (var fStream = new FileStream(MemoryLayoutFileName, FileMode.Open, FileAccess.Read))
 				{
-					using (var fStream = new FileStream(MemoryLayoutFileName, FileMode.Open, FileAccess.Read))
-					{
-						var xmlFormat = new XmlSerializer(typeof(MemoryLayout));
-						FlashMemoryLayout = (MemoryLayout)xmlFormat.Deserialize(fStream);
-					}
-
-					IsMemoryLayoutOK = FlashMemoryLayout.Validate();
-
-					if (!IsMemoryLayoutOK)
-					{
-						error = FlashMemoryLayout.Error;
-					}
-				}
-				catch
-				{
-					error = "Error reading memory layout file";
+					var xmlFormat = new XmlSerializer(typeof(MemoryLayout));
+					FlashMemoryLayout = (MemoryLayout)xmlFormat.Deserialize(fStream);
 				}
 
-				Properties.Settings.Default.MemoryLayoutFile = MemoryLayoutFileName;
+				IsMemoryLayoutOK = FlashMemoryLayout.Validate();
+
+				if (!IsMemoryLayoutOK)
+				{
+					error = FlashMemoryLayout.Error;
+				}
 			}
-			else
+			catch
+			{
+				error = "Error reading memory layout file";
+			}
+
+			Properties.Settings.Default.MemoryLayoutFile = MemoryLayoutFileName;
+		}
+		else
+		{
+			// Only show error if not bootmode (bootmode auto-detects layout)
+			if (!isBootMode)
 			{
 				error = "No file selected";
 			}
-
-			//force and update without setting the property
-			OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryLayout"));
-
-			this["MemoryLayoutFileName"] = error;
+			else if (preservedAutoDetectedLayout != null)
+			{
+				// Restore the auto-detected layout for bootmode
+				FlashMemoryLayout = preservedAutoDetectedLayout;
+				IsMemoryLayoutOK = preservedIsMemoryLayoutOK;
+			}
 		}
 
-		public string MemoryLayoutFileName
+		//force and update without setting the property
+		OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryLayout"));
+
+		this["MemoryLayoutFileName"] = error;
+	}
+
+	/// <summary>
+	/// Attempts to auto-detect the flash layout for bootmode when connected.
+	/// Uses GetBootmodeFlashLayout: it loads the flash driver, reads the flash device ID from the ECU,
+	/// and builds the layout from an in-memory device-ID table. No flash file is used, so this runs
+	/// on connect regardless of IsFlashFileOK (needed for read-before-save as well as write).
+	/// </summary>
+	private void TryAutoDetectLayoutForBootmode()
+	{
+		if (App.CommInterface == null || App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode || !App.CommInterface.IsConnected())
+		{
+			return;
+		}
+
+		if (FlashMemoryLayout != null && FlashMemoryLayout.Validate() && IsMemoryLayoutOK)
+		{
+			return;
+		}
+
+		var bootstrapInterface = App.CommInterface as BootstrapInterface;
+		if (bootstrapInterface == null)
+		{
+			return;
+		}
+
+		MemoryLayout layout;
+		string errorMessage;
+		if (!bootstrapInterface.GetBootmodeFlashLayout(out layout, out errorMessage))
+		{
+			Dispatcher.Invoke((Action)(() =>
+			{
+				string placeholder = "Auto-detected (requires bootmode)";
+				if (!AvailableMemoryLayouts.Contains(placeholder))
+				{
+					AvailableMemoryLayouts.Insert(0, placeholder);
+				}
+				mSelectedMemoryLayout = placeholder;
+				OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+				OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+			}));
+			return;
+		}
+
+		MemoryLayout layoutForClosure = layout;
+		Dispatcher.Invoke((Action)(() =>
+		{
+			FlashMemoryLayout = layoutForClosure;
+			IsMemoryLayoutOK = true;
+
+			string autoDetectedString = $"Auto-detected: {layoutForClosure.Size / 1024}KB, {layoutForClosure.SectorSizes.Count} sectors";
+			if (!AvailableMemoryLayouts.Contains(autoDetectedString))
+			{
+				AvailableMemoryLayouts.Insert(0, autoDetectedString);
+			}
+			mSelectedMemoryLayout = autoDetectedString;
+
+			OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryLayout"));
+			OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+			OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+		}));
+	}
+
+	public string MemoryLayoutFileName
 		{
 			get { return mMemoryLayoutFileName; }
 			set
@@ -278,10 +421,16 @@ namespace ECUFlasher
 				}
 				else
 				{
-					if (mSelectedMemoryLayout != null)
+					// For bootmode, don't clear mSelectedMemoryLayout if it's an auto-detected layout
+					// (it will be updated by TryAutoDetectLayoutForBootmode if needed)
+					bool isBootMode = App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode;
+					if (!isBootMode || (mSelectedMemoryLayout == null || !mSelectedMemoryLayout.StartsWith("Auto-detected")))
 					{
-						mSelectedMemoryLayout = null;
-						OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+						if (mSelectedMemoryLayout != null)
+						{
+							mSelectedMemoryLayout = null;
+							OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+						}
 					}
 				}
 
@@ -302,11 +451,76 @@ namespace ECUFlasher
 
 		public ObservableCollection<string> AvailableMemoryLayouts { get; private set; }
 
-		public string SelectedMemoryLayout
+	public string SelectedMemoryLayout
+	{
+		get
 		{
-			get { return mSelectedMemoryLayout; }
+			// For bootmode, show auto-detected layout or placeholder
+			if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+			{
+				var bootstrapInterface = App.CommInterface as BootstrapInterface;
+				const byte DEVICE_ID_CORE_RUNNING = 0xAA;
+
+				// Check if core is already running - try to use stored flash device ID
+				if (bootstrapInterface != null && bootstrapInterface.DeviceID == DEVICE_ID_CORE_RUNNING)
+				{
+					// Try to use stored flash device ID if available and layout is already generated
+					if (bootstrapInterface.LastKnownFlashDeviceID != 0 && FlashMemoryLayout != null && FlashMemoryLayout.Validate() && IsMemoryLayoutOK)
+					{
+						// Layout is available from stored device ID
+						string storedString = $"Auto-detected (stored): {FlashMemoryLayout.Size / 1024}KB, {FlashMemoryLayout.SectorSizes.Count} sectors";
+						if (!AvailableMemoryLayouts.Contains(storedString))
+						{
+							AvailableMemoryLayouts.Insert(0, storedString);
+						}
+						return storedString;
+					}
+
+					// No stored flash device ID available
+					string placeholder = "Auto-detected (requires bootmode)";
+					if (!AvailableMemoryLayouts.Contains(placeholder))
+					{
+						AvailableMemoryLayouts.Insert(0, placeholder);
+					}
+					return placeholder;
+				}
+
+				if (FlashMemoryLayout != null && FlashMemoryLayout.Validate() && IsMemoryLayoutOK)
+				{
+					// Layout is detected, return the auto-detected string
+					if (!String.IsNullOrEmpty(mSelectedMemoryLayout) && mSelectedMemoryLayout.StartsWith("Auto-detected:"))
+					{
+						return mSelectedMemoryLayout;
+					}
+					// Create the string if it doesn't exist
+					string autoDetectedString = $"Auto-detected: {FlashMemoryLayout.Size / 1024}KB, {FlashMemoryLayout.SectorSizes.Count} sectors";
+					if (!AvailableMemoryLayouts.Contains(autoDetectedString))
+					{
+						AvailableMemoryLayouts.Insert(0, autoDetectedString);
+					}
+					return autoDetectedString;
+				}
+				else
+				{
+					// Layout not detected yet, show placeholder
+					string placeholder = "Auto-detected (pending)";
+					if (!AvailableMemoryLayouts.Contains(placeholder))
+					{
+						AvailableMemoryLayouts.Insert(0, placeholder);
+					}
+					return placeholder;
+				}
+			}
+			return mSelectedMemoryLayout;
+		}
 			set
 			{
+				// Ignore changes for bootmode (ComboBox is disabled anyway)
+				if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+				{
+					return;
+				}
+
 				if (mSelectedMemoryLayout != value)
 				{
 					mSelectedMemoryLayout = value;
@@ -364,7 +578,7 @@ namespace ECUFlasher
 
 		/// <summary>
 		/// Returns tooltip text for memory layout ComboBox.
-		/// Shows different message for bootmode.
+		/// Shows different message for bootmode with auto-detected layout details.
 		/// </summary>
 		public string MemoryLayoutToolTip
 		{
@@ -372,7 +586,16 @@ namespace ECUFlasher
 			{
 				if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
 				{
-					return "Memory layout is auto-detected from flash device ID in bootmode";
+					if (FlashMemoryLayout != null && FlashMemoryLayout.Validate())
+					{
+						// Show auto-detected layout details
+						string tooltip = "Auto-detected layout (BootMode):\n";
+						tooltip += $"Base Address: 0x{FlashMemoryLayout.BaseAddress:X6}\n";
+						tooltip += $"Size: {FlashMemoryLayout.Size} bytes ({FlashMemoryLayout.Size / 1024} KB)\n";
+						tooltip += $"Sectors: {FlashMemoryLayout.SectorSizes.Count}";
+						return tooltip;
+					}
+					return "Memory layout will be auto-detected from flash device ID when read/write operation starts";
 				}
 				return MemoryLayoutFileName;
 			}
@@ -875,6 +1098,40 @@ namespace ECUFlasher
 
 			bool result = true;
 
+			// For bootmode, layout is auto-detected via GetBootmodeFlashLayout
+			if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+			{
+				if (!App.CommInterface.IsConnected())
+				{
+					reasonsDisabled.Add("Not connected to ECU");
+					result = false;
+				}
+				else
+				{
+					var bootstrapInterface = App.CommInterface as BootstrapInterface;
+					if (bootstrapInterface != null && !bootstrapInterface.CanGetBootmodeFlashLayout())
+					{
+						reasonsDisabled.Add("Flash device ID not available (core already running, no stored device ID from recent bootmode session)");
+						result = false;
+					}
+				}
+
+				if (App.OperationInProgress)
+				{
+					reasonsDisabled.Add("Another operation is in progress");
+					result = false;
+				}
+
+				if (!IsFlashFileOK)
+				{
+					reasonsDisabled.Add("Specified flash file is not correct");
+					result = false;
+				}
+
+				return result;
+			}
+
+			// For KWP2000, require memory layout
 			if (!IsMemoryLayoutOK)
 			{
 				reasonsDisabled.Add("Specified memory layout is not correct");
@@ -1113,14 +1370,22 @@ namespace ECUFlasher
 
 			bool result = true;
 
-			// For bootmode, layout is auto-detected - don't require it
+			// For bootmode, layout is auto-detected via GetBootmodeFlashLayout
 			if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
 			{
-				// Bootmode auto-detects layout from device ID - no layout file needed
 				if (!App.CommInterface.IsConnected())
 				{
 					reasonsDisabled.Add("Not connected to ECU");
 					result = false;
+				}
+				else
+				{
+					var bootstrapInterface = App.CommInterface as BootstrapInterface;
+					if (bootstrapInterface != null && !bootstrapInterface.CanGetBootmodeFlashLayout())
+					{
+						reasonsDisabled.Add("Flash device ID not available (core already running, no stored device ID from recent bootmode session)");
+						result = false;
+					}
 				}
 
 				if (App.OperationInProgress)
@@ -1322,7 +1587,10 @@ namespace ECUFlasher
 				App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
 				App.DisplayUserPrompt("Reading ECU Flash Memory Complete", statusMessage, UserPromptType.OK);
 
-				App.PercentOperationComplete = 100.0f;
+				// Clear operation state before showing the modal so user can cancel/close/disconnect
+				// while the completion dialog is open (e.g. after a read failure).
+				if (success)
+					App.PercentOperationComplete = 100.0f;
 				App.OperationInProgress = false;
 			}), null);
 		}
@@ -1436,31 +1704,76 @@ namespace ECUFlasher
 			}), null);
 		}
 
-		private void OnWriteExternalFlashStarted(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete, bool diffWrite, bool verify)
+	private void OnWriteExternalFlashStarted(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete, bool diffWrite, bool verify)
+	{
+		// Check if we're using BootMode protocol
+		if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
 		{
-			var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+			var bootstrapInterface = App.CommInterface as BootstrapInterface;
+			if (bootstrapInterface == null)
+			{
+				App.DisplayStatusMessage("Failed to get bootstrap interface for flash write.", StatusMessageType.USER);
+				App.OperationInProgress = false;
+				return;
+			}
 
-			var settings = new WriteExternalFlashOperation.WriteExternalFlashSettings();
-			settings.CheckIfWriteRequired = diffWrite;
-			settings.OnlyWriteNonMatchingSectors = diffWrite;
-			settings.VerifyWrittenData = verify;
-			settings.EraseEntireFlashAtOnce = false;
-			settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
-			settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
-			settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+			App.DisplayStatusMessage("Loading flash driver for device identification...", StatusMessageType.USER);
+			MemoryLayout autoDetectedLayout;
+			string errorMessage;
+			if (!bootstrapInterface.GetBootmodeFlashLayout(out autoDetectedLayout, out errorMessage))
+			{
+				App.DisplayStatusMessage(errorMessage ?? "Cannot auto-detect flash layout.", StatusMessageType.USER);
+				App.OperationInProgress = false;
+				return;
+			}
 
-			var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(flashMemoryImage, flashMemoryLayout);
+			App.DisplayStatusMessage($"Auto-detected flash layout: BaseAddress=0x{autoDetectedLayout.BaseAddress:X6}, Size={autoDetectedLayout.Size}, Sectors={autoDetectedLayout.SectorSizes.Count}", StatusMessageType.USER);
 
-			App.CurrentOperation = new WriteExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
-			App.CurrentOperation.CompletedOperationEvent += onOperationComplete;
+			FlashMemoryLayout = autoDetectedLayout;
+			IsMemoryLayoutOK = true;
+			string autoDetectedString = $"Auto-detected: {autoDetectedLayout.Size / 1024}KB, {autoDetectedLayout.SectorSizes.Count} sectors";
+			if (!AvailableMemoryLayouts.Contains(autoDetectedString))
+			{
+				AvailableMemoryLayouts.Insert(0, autoDetectedString);
+			}
+			mSelectedMemoryLayout = autoDetectedString;
+			OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+			OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
 
-			App.OperationInProgress = true;
-			App.PercentOperationComplete = 0.0f;
+			flashMemoryLayout = autoDetectedLayout;
 
-			App.DisplayStatusMessage("Writing ECU flash memory.", StatusMessageType.USER);
+			// TODO: Bootmode write operation is not yet implemented
+			App.DisplayStatusMessage("Bootmode flash write is not yet implemented.", StatusMessageType.USER);
+			App.OperationInProgress = false;
 
-			App.CurrentOperation.Start();
+			App.DisplayUserPrompt("Bootmode Write Not Implemented", "Bootmode flash write functionality is not yet implemented. Please use KWP2000 protocol for flash write operations.", UserPromptType.OK);
+			return;
 		}
+
+		// KWP2000 write operation
+		var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+
+		var settings = new WriteExternalFlashOperation.WriteExternalFlashSettings();
+		settings.CheckIfWriteRequired = diffWrite;
+		settings.OnlyWriteNonMatchingSectors = diffWrite;
+		settings.VerifyWrittenData = verify;
+		settings.EraseEntireFlashAtOnce = false;
+		settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
+		settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
+		settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+
+		var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(flashMemoryImage, flashMemoryLayout);
+
+		App.CurrentOperation = new WriteExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
+		App.CurrentOperation.CompletedOperationEvent += onOperationComplete;
+
+		App.OperationInProgress = true;
+		App.PercentOperationComplete = 0.0f;
+
+		App.DisplayStatusMessage("Writing ECU flash memory.", StatusMessageType.USER);
+
+		App.CurrentOperation.Start();
+	}
 
 		private string OnWriteExternalFlashCompleted(Operation operation, bool success)
 		{
@@ -1492,58 +1805,39 @@ namespace ECUFlasher
 
 	private void OnReadExternalFlashStarted(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel)
 	{
-		App.DisplayStatusMessage($"OnReadExternalFlashStarted: Entry - checkIfReadRequired={checkIfReadRequired}, flashLayout={(flashLayout != null ? $"BaseAddress=0x{flashLayout.BaseAddress:X6}, Size={flashLayout.Size}" : "NULL")}", StatusMessageType.LOG);
-
-		// Check if we're using BootMode protocol - auto-detect layout from device ID
+		// Check if we're using BootMode protocol
 		if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
 		{
-			App.DisplayStatusMessage("OnReadExternalFlashStarted: Using BootMode protocol - auto-detecting flash layout", StatusMessageType.LOG);
 			var bootstrapInterface = App.CommInterface as BootstrapInterface;
 			if (bootstrapInterface == null)
 			{
 				App.DisplayStatusMessage("Failed to get bootstrap interface for flash read.", StatusMessageType.USER);
-				App.DisplayStatusMessage("OnReadExternalFlashStarted: FAILED - Cannot cast CommInterface to BootstrapInterface", StatusMessageType.LOG);
 				App.OperationInProgress = false;
 				return;
 			}
 
-			// Auto-detect flash layout from device ID
-			// First, determine variant (ME7, Simos3, or EDC15) - for now default to ME7, TODO: auto-detect from ECU info
-			BootstrapInterface.ECUFlashVariant variant = BootstrapInterface.ECUFlashVariant.ME7;
-			uint baseAddress = bootstrapInterface.GetFlashBaseAddress(variant);
-
-			// Load flash driver (required to read device ID)
 			App.DisplayStatusMessage("Loading flash driver for device identification...", StatusMessageType.USER);
-			if (!bootstrapInterface.LoadFlashDriver(variant))
-			{
-				App.DisplayStatusMessage("Failed to load flash driver. Cannot auto-detect layout.", StatusMessageType.USER);
-				App.DisplayStatusMessage("OnReadExternalFlashStarted: FAILED - LoadFlashDriver returned false", StatusMessageType.LOG);
-				App.OperationInProgress = false;
-				return;
-			}
-
-			// Read flash device ID
-			ushort deviceID;
-			if (!bootstrapInterface.GetFlashDeviceID(variant, out deviceID))
-			{
-				App.DisplayStatusMessage("Failed to read flash device ID. Cannot auto-detect layout.", StatusMessageType.USER);
-				App.DisplayStatusMessage("OnReadExternalFlashStarted: FAILED - GetFlashDeviceID returned false", StatusMessageType.LOG);
-				App.OperationInProgress = false;
-				return;
-			}
-
-			// Generate layout from device ID
 			MemoryLayout autoDetectedLayout;
-			if (!BootstrapInterface.GenerateMemoryLayoutFromDeviceID(deviceID, baseAddress, out autoDetectedLayout))
+			string errorMessage;
+			if (!bootstrapInterface.GetBootmodeFlashLayout(out autoDetectedLayout, out errorMessage))
 			{
-				App.DisplayStatusMessage($"Unknown flash device ID: 0x{deviceID:X4}. Cannot auto-detect layout.", StatusMessageType.USER);
-				App.DisplayStatusMessage($"OnReadExternalFlashStarted: FAILED - Unknown device ID 0x{deviceID:X4}", StatusMessageType.LOG);
+				App.DisplayStatusMessage(errorMessage ?? "Cannot auto-detect flash layout.", StatusMessageType.USER);
 				App.OperationInProgress = false;
 				return;
 			}
 
-			App.DisplayStatusMessage($"Auto-detected flash layout: Device ID=0x{deviceID:X4}, Size={autoDetectedLayout.Size} bytes, Sectors={autoDetectedLayout.SectorSizes.Count}", StatusMessageType.USER);
-			App.DisplayStatusMessage($"OnReadExternalFlashStarted: Auto-detected layout - BaseAddress=0x{autoDetectedLayout.BaseAddress:X6}, Size={autoDetectedLayout.Size}, Sectors={autoDetectedLayout.SectorSizes.Count}", StatusMessageType.LOG);
+			App.DisplayStatusMessage($"Auto-detected flash layout: Size={autoDetectedLayout.Size} bytes, Sectors={autoDetectedLayout.SectorSizes.Count}", StatusMessageType.USER);
+
+			FlashMemoryLayout = autoDetectedLayout;
+			IsMemoryLayoutOK = true;
+			string autoDetectedString = $"Auto-detected: {autoDetectedLayout.Size / 1024}KB, {autoDetectedLayout.SectorSizes.Count} sectors";
+			if (!AvailableMemoryLayouts.Contains(autoDetectedString))
+			{
+				AvailableMemoryLayouts.Insert(0, autoDetectedString);
+			}
+			mSelectedMemoryLayout = autoDetectedString;
+			OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+			OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
 
 			// Use auto-detected layout
 			flashLayout = autoDetectedLayout;
@@ -1553,8 +1847,7 @@ namespace ECUFlasher
 			// KWP2000 requires user-provided layout
 			if (flashLayout == null)
 			{
-				App.DisplayStatusMessage("OnReadExternalFlashStarted: FAILED - flashLayout is null", StatusMessageType.USER);
-				App.DisplayStatusMessage("OnReadExternalFlashStarted: FAILED - flashLayout is null", StatusMessageType.LOG);
+				App.DisplayStatusMessage("Memory layout is required for read. Select a layout file (KWP2000) or use BootMode for auto-detect.", StatusMessageType.USER);
 				App.OperationInProgress = false;
 				return;
 			}
@@ -1564,7 +1857,6 @@ namespace ECUFlasher
 
 		if ((readImage == null) || (readImage.Length != flashLayout.Size))
 		{
-			App.DisplayStatusMessage($"OnReadExternalFlashStarted: Creating new readImage buffer of size {flashLayout.Size}", StatusMessageType.LOG);
 			readImage = new byte[flashLayout.Size];
 
 			//fill the memory image with 0xFF because that is what blank data in the flash chip is
@@ -1574,9 +1866,7 @@ namespace ECUFlasher
 			}
 		}
 
-		App.DisplayStatusMessage($"OnReadExternalFlashStarted: Splitting memory image into sectors...", StatusMessageType.LOG);
 		var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(readImage, flashLayout);
-		App.DisplayStatusMessage($"OnReadExternalFlashStarted: Created {sectorImages.Count()} sector images", StatusMessageType.LOG);
 
 		// Check if we're using BootMode protocol
 		if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
@@ -1585,7 +1875,6 @@ namespace ECUFlasher
 			if (bootstrapInterface == null)
 			{
 				App.DisplayStatusMessage("Failed to get bootstrap interface for flash read.", StatusMessageType.USER);
-				App.DisplayStatusMessage("OnReadExternalFlashStarted: FAILED - Cannot cast CommInterface to BootstrapInterface", StatusMessageType.LOG);
 				App.OperationInProgress = false;
 				return;
 			}
@@ -1599,13 +1888,10 @@ namespace ECUFlasher
 			settings.StartAddress = flashLayout.BaseAddress;
 			settings.Size = (uint)flashLayout.Size;
 
-			App.DisplayStatusMessage($"OnReadExternalFlashStarted: Creating BootmodeReadExternalFlashOperation - Variant={settings.Variant}, StartAddress=0x{settings.StartAddress:X6}, Size={settings.Size}", StatusMessageType.LOG);
-
 			App.CurrentOperation = new BootmodeReadExternalFlashOperation(bootstrapInterface, settings, sectorImages);
 			App.CurrentOperation.CompletedOperationEvent += operationCompletedDel;
 
 			App.DisplayStatusMessage("Reading ECU flash memory via BootMode.", StatusMessageType.USER);
-			App.DisplayStatusMessage("OnReadExternalFlashStarted: Starting operation...", StatusMessageType.LOG);
 
 			App.CurrentOperation.Start();
 		}

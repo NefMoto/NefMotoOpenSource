@@ -401,6 +401,19 @@ Contact by Email: tony@nefariousmotorsports.com
                                                     </Setter.Value>
                                                 </Setter>
                                             </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="border" Property="Background">
+                                                    <Setter.Value>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                            <GradientStop Color="#FFE0E0E0" Offset="0"/>
+                                                            <GradientStop Color="#FFD0D0D0" Offset="0.5"/>
+                                                            <GradientStop Color="#FFC0C0C0" Offset="1"/>
+                                                        </LinearGradientBrush>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Setter TargetName="Arrow" Property="Fill" Value="#FF808080"/>
+                                                <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+                                            </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
@@ -420,6 +433,19 @@ Contact by Email: tony@nefariousmotorsports.com
                                 <Setter Property="IsHitTestVisible" TargetName="PART_EditableTextBox" Value="True"/>
                                 <Setter Property="Visibility" TargetName="PART_EditableTextBox" Value="Visible"/>
                                 <Setter Property="Visibility" TargetName="ContentSite" Value="Hidden"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ToggleButton" Property="Opacity" Value="0.5"/>
+                                <Setter TargetName="ContentSite" Property="Opacity" Value="0.5"/>
+                                <Setter TargetName="ToggleButton" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#FFE0E0E0" Offset="0"/>
+                                            <GradientStop Color="#FFD0D0D0" Offset="0.5"/>
+                                            <GradientStop Color="#FFC0C0C0" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
                             </Trigger>
                             <Trigger Property="Validation.HasError" Value="true">
                                 <Setter Property="Background" Value="{StaticResource ErrorBackgroundBrush}"/>
