@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -51,4 +51,30 @@ namespace Shared
 
 	public delegate void DisplayStatusMessageDelegate(string message, StatusMessageType messageType);
 	public delegate UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType);
+
+    /// <summary>
+    /// Fallback for DisplayStatusMessage when the CommInterface delegate is not subscribed.
+    /// App registers its DisplayStatusMessage at startup so logs still reach the log file.
+    /// </summary>
+    public static class LogFallback
+    {
+        private static DisplayStatusMessageDelegate s_handler;
+
+        public static void SetHandler(DisplayStatusMessageDelegate handler)
+        {
+            s_handler = handler;
+        }
+
+        public static void Invoke(string message, StatusMessageType messageType)
+        {
+            try
+            {
+                s_handler?.Invoke(message, messageType);
+            }
+            catch
+            {
+                // Swallow - do not break the communication path
+            }
+        }
+    }
 }

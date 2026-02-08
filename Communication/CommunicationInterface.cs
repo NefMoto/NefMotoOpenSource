@@ -589,6 +589,10 @@ namespace Communication
             {
                 mDisplayStatusMessage(message, messageType);
             }
+            else
+            {
+                Shared.LogFallback.Invoke(message, messageType);
+            }
         }
 
         public UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType)
