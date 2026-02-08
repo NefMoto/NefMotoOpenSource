@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -913,16 +913,18 @@ namespace Shared
 
         private void WatchedPropertyChangedEventHandler()
         {
-            if (CanExecuteChanged != null)
+            if (CanExecuteChanged == null)
+                return;
+            var app = Application.Current;
+            if (app == null)
+                return; // app shutting down
+            if (app.Dispatcher.CheckAccess())
             {
-                if (Application.Current.Dispatcher.CheckAccess())
-                {
-                    CanExecuteChanged(null, null);
-                }
-                else
-                {
-                    Application.Current.Dispatcher.Invoke((Action)this.WatchedPropertyChangedEventHandler, null);
-                }
+                CanExecuteChanged(null, null);
+            }
+            else
+            {
+                app.Dispatcher.Invoke((Action)this.WatchedPropertyChangedEventHandler, null);
             }
         }
 
@@ -1036,15 +1038,18 @@ namespace Shared
 
             if (handler != null)
             {
+                var app = Application.Current;
+                if (app == null)
+                    return; // app shutting down
                 // Use CheckAccess pattern to avoid unnecessary marshaling and ensure exceptions are properly handled.
                 // InvokeAsync provides better exception handling than BeginInvoke (exceptions propagate via Task).
-                if (Application.Current.Dispatcher.CheckAccess())
+                if (app.Dispatcher.CheckAccess())
                 {
                     handler(sender, propertyChangedArgs);
                 }
                 else
                 {
-                    Application.Current.Dispatcher.InvokeAsync(() => handler(sender, propertyChangedArgs));
+                    app.Dispatcher.InvokeAsync(() => handler(sender, propertyChangedArgs));
                 }
             }
         }
