@@ -389,6 +389,10 @@ namespace Communication
             return false;
         }
 
+        /// <summary>
+        /// Reads from the serial port. May return fewer bytes than requested (incomplete read)
+        /// if data arrives in chunks; caller must loop if full read is required.
+        /// </summary>
         public bool Read(byte[] buffer, uint bytesToRead, ref uint bytesRead, uint timeoutMs)
         {
             bytesRead = 0;

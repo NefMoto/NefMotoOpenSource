@@ -229,7 +229,8 @@ namespace Communication
 
         // I/O Operations
         /// <summary>
-        /// Reads data from the device
+        /// Reads data from the device. May return fewer bytes than requested (incomplete read);
+        /// callers requiring a full read must loop.
         /// </summary>
         /// <param name="buffer">Buffer to read into</param>
         /// <param name="bytesToRead">Number of bytes to read</param>

@@ -352,6 +352,10 @@ namespace Communication
             return (status == FTD2XX_NET.FTDI.FT_STATUS.FT_OK);
         }
 
+        /// <summary>
+        /// Reads from the FTDI device. May return fewer bytes than requested (incomplete read);
+        /// FTDI driver uses "attempts" not ms converted from timeoutMs.
+        /// </summary>
         public bool Read(byte[] buffer, uint bytesToRead, ref uint bytesRead, uint timeoutMs)
         {
             bytesRead = 0;
