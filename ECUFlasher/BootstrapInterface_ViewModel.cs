@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -40,12 +40,13 @@ namespace ECUFlasher
 			AvailableBaudRates.Add(9600);
             AvailableBaudRates.Add(19200);
 			AvailableBaudRates.Add(38400);
+			AvailableBaudRates.Add(57600);
+			AvailableBaudRates.Add(124800);
 
-            //get the last used baud rate
+            // Get the last used baud rate; default to 57600 when 0 or not in list
             var previousRate = ECUFlasher.Properties.Settings.Default.DesiredBootModeBaudRate;
-
-            //try to find the last used baud rate in the available rates list, if it isn't there, then use the last baud rate
-			DesiredBaudRate = AvailableBaudRates.DefaultIfEmpty(AvailableBaudRates.Last()).FirstOrDefault(baudRate => (baudRate == previousRate));
+            var matched = AvailableBaudRates.FirstOrDefault(baudRate => (baudRate == previousRate));
+            DesiredBaudRate = (matched != 0) ? matched : 57600u;
         }
 
         public BootstrapInterface BootstrapCommInterface
