@@ -8,7 +8,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - **KWP2000** (ISO 14230) - Full support for diagnostic and programming operations
 - **KWP1281** - Legacy protocol support for older ECUs
-- **Boot Mode** - Not yet supported (UI components present but functionality not implemented)
+- **Boot Mode** - Connection, ECU information reading, register access, flash read and flash write (ME7/Simos3/EDC15 variants). Layout auto-detect from device ID
 
 ### Connection Methods
 
@@ -20,7 +20,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 - Read flash memory (full or partial)
 - Write flash memory with verification
 - Erase flash sectors
-- Read ECU identification information
+- Read ECU identification information (KWP2000 and Bootmode)
+- Bootmode ECU information: Device ID, CPU family, system registers (SYSCON, BUSCON, ADDRSEL), memory status
 - Read and clear diagnostic trouble codes (DTCs)
 - Extended data logging
 - Memory layout validation
@@ -34,6 +35,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 - **CH340 USB-to-Serial adapters**
   - Fast init connection method
   - Standard KWP2000 operations
+  - Bootmode support (up to 124800 baud)
   - Slow init not supported (hardware limitation)
 
 ### User Interface
@@ -49,7 +51,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### CH340 Devices
 
 - **Slow init is not supported** - CH340 devices cannot reliably generate the 5-baud break signal required for slow init. Use fast init instead.
-- Driver buffering may cause timing variations in some edge cases
+- **Bootmode:** Use 57600 baud for best compatibility; 9600/19200 may fail at BUSCON3. See `docs/CABLE_SUPPORT.md` for details.
 
 ### Platform
 
