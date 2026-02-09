@@ -1738,7 +1738,7 @@ namespace ECUFlasher
             }
 
             var writeSettings = new BootmodeWriteExternalFlashOperation.BootmodeWriteExternalFlashSettings();
-            writeSettings.Variant = InferBootmodeVariantFromLayout(layout);
+            writeSettings.Variant = InferBootmodeVariantFromLayout(layout, bootstrap);
             writeSettings.FlashMemoryLayout = layout;
 
             var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(flashMemoryImage, layout);
@@ -1809,9 +1809,12 @@ namespace ECUFlasher
             return statusMesage;
         }
 
-        private static BootstrapInterface.ECUFlashVariant InferBootmodeVariantFromLayout(MemoryLayout layout)
+        private static BootstrapInterface.ECUFlashVariant InferBootmodeVariantFromLayout(MemoryLayout layout, BootstrapInterface bootstrap)
         {
             if (layout == null) return BootstrapInterface.ECUFlashVariant.ME7;
+            // M5.9.2: 256KB at 0x800000 (flash ID 0x22BA)
+            if (bootstrap != null && BootstrapInterface.IsM59FlashDevice(bootstrap.LastKnownFlashDeviceID))
+                return BootstrapInterface.ECUFlashVariant.M59;
             // ME7: 0x800000, Simos3/EDC15: 0x400000
             return layout.BaseAddress == 0x400000 ? BootstrapInterface.ECUFlashVariant.Simos3 : BootstrapInterface.ECUFlashVariant.ME7;
         }
@@ -1901,7 +1904,7 @@ namespace ECUFlasher
             var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(readImage, layout);
 
             var settings = new BootmodeReadExternalFlashOperation.BootmodeReadExternalFlashSettings();
-            settings.Variant = InferBootmodeVariantFromLayout(layout);
+            settings.Variant = InferBootmodeVariantFromLayout(layout, bootstrap);
             settings.StartAddress = layout.BaseAddress;
             settings.Size = (uint)layout.Size;
 
