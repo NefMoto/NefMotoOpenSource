@@ -967,6 +967,14 @@ namespace Communication
 							validationCompleted = false;
                             validationMesage = "Validation did not complete.";
                         }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
+                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
+                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
+                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+                        {
+							validationCompleted = false;
+                            validationMesage = "Validation did not complete.";
+                        }
                         else
                         {
                             Debug.Fail("Unknown memory layout validation result");
@@ -992,10 +1000,33 @@ namespace Communication
                     if (!success)
                     {
 						var promptResult = UserPromptResult.CANCEL;
+						string promptTitle = "Unable to validate memory layout";
+						string promptBody = "Unable to validate memory layout. Do you want to continue reading flash memory without validating the memory layout?";
 
 						if (!validationCompleted)
 						{
-							promptResult = CommInterface.DisplayUserPrompt("Unable to validate memory layout", "Unable to validate memory layout. Do you want to continue reading flash memory without validating the memory layout?", UserPromptType.OK_CANCEL);
+							var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+							if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+							{
+								promptTitle = "RequestUpload is not supported";
+								promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
+							}
+							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
+							{
+								promptTitle = "RequestUpload was rejected";
+								promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
+							}
+							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
+							{
+								promptTitle = "RequestDownload is not supported";
+								promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue reading flash memory without validating the memory layout?";
+							}
+							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+							{
+								promptTitle = "RequestDownload was rejected";
+								promptBody = "The ECU rejected the RequestDownload service. Do you want to continue reading flash memory without validating the memory layout?";
+							}
+							promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
 						}
 						else if (!layoutIsValid)
 						{
@@ -1783,6 +1814,14 @@ namespace Communication
 							validationCompleted = false;
 							validationMesage = "Validation did not complete.";
 						}
+						else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
+							|| validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
+							|| validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
+							|| validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+						{
+							validationCompleted = false;
+							validationMesage = "Validation did not complete.";
+						}
 						else
 						{
 							Debug.Fail("Unknown memory layout validation result");
@@ -1808,10 +1847,33 @@ namespace Communication
 					if (!success)
 					{
 						var promptResult = UserPromptResult.CANCEL;
+						string promptTitle = "Unable to validate memory layout";
+						string promptBody = "Unable to validate memory layout. Do you want to continue writing flash memory without validating the memory layout?";
 
 						if (!validationCompleted)
 						{
-							promptResult = CommInterface.DisplayUserPrompt("Unable to validate memory layout", "Unable to validate memory layout. Do you want to continue writing flash memory without validating the memory layout?", UserPromptType.OK_CANCEL);
+							var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+							if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+							{
+								promptTitle = "RequestUpload is not supported";
+								promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
+							}
+							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
+							{
+								promptTitle = "RequestUpload was rejected";
+								promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
+							}
+							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
+							{
+								promptTitle = "RequestDownload is not supported";
+								promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue writing flash memory without validating the memory layout?";
+							}
+							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+							{
+								promptTitle = "RequestDownload was rejected";
+								promptBody = "The ECU rejected the RequestDownload service. Do you want to continue writing flash memory without validating the memory layout?";
+							}
+							promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
 						}
 						else if (!layoutIsValid)
 						{

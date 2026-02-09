@@ -1668,7 +1668,11 @@ namespace Communication
             EndInvalid,
             StartIsntLowest,
             EndIsntHighest,
-            ValidationDidNotComplete
+            ValidationDidNotComplete,
+            RequestUploadNotSupported,
+            RequestUploadRejected,
+            RequestDownloadNotSupported,
+            RequestDownloadRejected
         }
 
         public Result ValidationResult { get; protected set; }
@@ -1735,13 +1739,17 @@ namespace Communication
 								if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestDownload service is not supported.", StatusMessageType.USER);
+                                    ValidationResult = Result.RequestDownloadNotSupported;
                                 }
 								else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestUpload service is not supported. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
+                                    ValidationResult = Result.RequestUploadNotSupported;
                                 }
-
-                                ValidationResult = Result.ValidationDidNotComplete;
+                                else
+                                {
+                                    ValidationResult = Result.ValidationDidNotComplete;
+                                }
 
                                 handled = true;
                                 ActionCompleted(false);
@@ -1751,13 +1759,17 @@ namespace Communication
 								if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestDownload was rejected.", StatusMessageType.USER);
+                                    ValidationResult = Result.RequestDownloadRejected;
                                 }
 								else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestUpload was rejected. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
+                                    ValidationResult = Result.RequestUploadRejected;
                                 }
-
-                                ValidationResult = Result.ValidationDidNotComplete;
+                                else
+                                {
+                                    ValidationResult = Result.ValidationDidNotComplete;
+                                }
 
                                 handled = true;
                                 ActionCompleted(false);
