@@ -563,14 +563,19 @@ Contact by Email: tony@nefariousmotorsports.com
                                 </Grid>
                             </Border>
                         </Grid>
-                        <ControlTemplate.Resources>
-                            <Storyboard x:Key="ShimmerAnimation" RepeatBehavior="Forever">
-                                <DoubleAnimation Storyboard.TargetName="HighlightTransform" Storyboard.TargetProperty="X" From="-400" To="400" Duration="0:0:1.5"/>
-                            </Storyboard>
-                        </ControlTemplate.Resources>
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding Path=App.OperationInProgress, Mode=OneWay}" Value="true">
                                 <Setter TargetName="PART_Indicator" Property="Background" Value="{StaticResource ProgressBarGreenGradient}"/>
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard x:Name="ShimmerBegin">
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetName="HighlightTransform" Storyboard.TargetProperty="X" From="-400" To="400" Duration="0:0:1.5"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                                <DataTrigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="ShimmerBegin"/>
+                                </DataTrigger.ExitActions>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Path=App.PercentOperationComplete, Mode=OneWay}" Value="100">
                                 <Setter TargetName="PART_Indicator" Property="Background" Value="{StaticResource ProgressBarGreenGradient}"/>
@@ -582,9 +587,6 @@ Contact by Email: tony@nefariousmotorsports.com
                                 </MultiDataTrigger.Conditions>
                                 <Setter TargetName="PART_Indicator" Property="Background" Value="{StaticResource ButtonShadingGradient}"/>
                             </MultiDataTrigger>
-                            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                                <BeginStoryboard Storyboard="{StaticResource ShimmerAnimation}"/>
-                            </EventTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
