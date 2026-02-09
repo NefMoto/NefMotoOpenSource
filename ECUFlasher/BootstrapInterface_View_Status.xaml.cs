@@ -1,6 +1,6 @@
 ﻿/*
 Nefarious Motorsports ME7 ECU Flasher
-Copyright (C) 2017  Nefarious Motorsports Inc
+Copyright (C) 2026  Nefarious Motorsports Inc
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
