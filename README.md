@@ -8,7 +8,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - **KWP2000** (ISO 14230) - Full support for diagnostic and programming operations
 - **KWP1281** - Legacy protocol support for older ECUs
-- **Boot Mode** - Connection, ECU information reading, register access, flash read and flash write (ME7/Simos3/EDC15 variants). Layout auto-detect from device ID. Bootmode implementation is derived from [C167BootTool](https://github.com/EcuProg7/C167BootTool) (ME7BootTool.py); that repo is the source of nearly all bootmode code. Clone it for the Python reference or driver binaries.
+- **Boot Mode** - Connection, ECU information reading, register access, flash read and flash write (ME7/Simos3/EDC15 variants). Layout auto-detect from device ID. Bootmode implementation is derived from [C167BootTool](https://github.com/EcuProg7/C167BootTool) (ME7BootTool.py)
 
 ### Connection Methods
 
@@ -33,10 +33,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
   - Full feature support including slow init
   - Bit-bang mode for 5-baud slow init
 - **CH340 USB-to-Serial adapters**
-  - Fast init connection method
+  - Fast init connection method - slow init not supported (hardware limitation)
   - Standard KWP2000 operations
-  - Bootmode support (up to 124800 baud)
-  - Slow init not supported (hardware limitation)
 
 ### User Interface
 
@@ -51,7 +49,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### CH340 Devices
 
 - **Slow init is not supported** - CH340 devices cannot reliably generate the 5-baud break signal required for slow init. Use fast init instead.
-- **Bootmode:** Use 57600 baud for best compatibility; 9600/19200 may fail at BUSCON3. See `docs/CABLE_SUPPORT.md` for details.
+- **Bootmode:** Use 57600 baud for best compatibility; 9600/19200 may fail at BUSCON3.
 
 ### Platform
 
@@ -59,7 +57,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### ECU Support
 
-- Primarily designed for VW/Audi ME7.x ECUs
+- **ME7.x** - Primary target; full KWP2000 and bootmode support
+- **Simos 3.x / EDC15** - Bootmode support (layout auto-detect)
 - Memory layouts provided for common flash chips (29F200, 29F400, 29F800 series)
 - Some ECUs may require specific connection parameters or timing adjustments
 
@@ -80,7 +79,6 @@ Pre-built releases are available at: <https://github.com/NefMoto/NefMotoOpenSour
 - Windows operating system
 - Compatible USB-to-serial adapter (FTDI or CH340)
 - OBD-II cable in "dumb mode" (no protocol translation)
-- Compatible VW/Audi ME7 ECU
 
 ## License
 
