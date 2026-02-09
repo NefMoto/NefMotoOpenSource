@@ -380,30 +380,6 @@ namespace Communication
 
         public DeviceInfo SelectedDeviceInfo { get; set; }
 
-        // Legacy property for backward compatibility
-        public FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE SelectedFTDIDeviceInfo
-        {
-            get
-            {
-                if (SelectedDeviceInfo is FtdiDeviceInfo ftdiInfo)
-                {
-                    return ftdiInfo.FtdiNode;
-                }
-                return null;
-            }
-            set
-            {
-                if (value != null)
-                {
-                    SelectedDeviceInfo = new FtdiDeviceInfo(value);
-                }
-                else
-                {
-                    SelectedDeviceInfo = null;
-                }
-            }
-        }
-
         public virtual ConnectionStatusType ConnectionStatus
         {
             get
@@ -555,29 +531,6 @@ namespace Communication
         protected bool IsCommunicationDeviceOpen()
         {
             return mCommunicationDevice?.IsOpen ?? false;
-        }
-
-        // Legacy methods for backward compatibility (delegate to new abstraction)
-        protected bool OpenFTDIDevice(FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE deviceToOpen)
-        {
-            if (deviceToOpen == null)
-            {
-                return OpenCommunicationDevice(null);
-            }
-
-            // Convert FTDI device info to DeviceInfo
-            FtdiDeviceInfo deviceInfo = new FtdiDeviceInfo(deviceToOpen);
-            return OpenCommunicationDevice(deviceInfo);
-        }
-
-        protected void CloseFTDIDevice()
-        {
-            CloseCommunicationDevice();
-        }
-
-        protected bool IsFTDIDeviceOpen()
-        {
-            return IsCommunicationDeviceOpen();
         }
 
         public event DisplayStatusMessageDelegate mDisplayStatusMessage;

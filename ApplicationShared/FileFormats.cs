@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -60,63 +60,6 @@ namespace ApplicationShared
 
 		public uint Index { get; set; }
 		public uint ChipID { get; set; }
-
-		//public override bool Equals(object obj)
-		//{
-		//    if (obj is FTDIDeviceInfo)
-		//    {
-		//        var otherObj = obj as FTDIDeviceInfo;
-
-		//        if (otherObj.Description != Description)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.Flags != Flags)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.ftHandle != ftHandle)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.ID != ID)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.LocId != LocId)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.SerialNumber != SerialNumber)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.Type != Type)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.Index != Index)
-		//        {
-		//            return false;
-		//        }
-
-		//        if (otherObj.ChipID != ChipID)
-		//        {
-		//            return false;
-		//        }
-
-		//        return true;
-		//    }
-
-		//    return base.Equals(obj);
-		//}
 	}
 
 	public class BaseFile

@@ -385,8 +385,7 @@ namespace Communication
                     setupSuccess &= mCommunicationDevice.SetFlowControl(FlowControl.None);
                     // SetLatency is USB-specific (FTDI feature), optional for other devices like CH340
                     mCommunicationDevice.SetLatency(2);//2 ms is min, this is the max time before data must be sent from the device to the PC even if not a full block
-
-                    //setupStatus |= mFTDIDevice.InTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10);//64 bytes is min, must be multiple of 64 (this size includes a few bytes of USB header overhead)
+                    // mCommunicationDevice.SetInTransferSize(64 * ((MAX_MESSAGE_SIZE / 64) + 1) * 10); // USB device-specific: 64 bytes min, multiple of 64, incl. header overhead
                     setupSuccess &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
                     setupSuccess &= mCommunicationDevice.SetDTR(true);//enable receive for self powered devices
                     setupSuccess &= mCommunicationDevice.SetRTS(false);//set low to tell device we are ready to send
@@ -1397,11 +1396,8 @@ namespace Communication
 
                     if (SendSlowInitAddress_FTDI_UsingBreak(connectAddress, numDataBits, parity, out numPreceedingBytesToIgnore))
                     {
-                        //EDC15 ECUs don't seem to send the sync byte for 405ms when the W1Max limit is 300ms
-                        //watch.Start();
-                        //uint syncByteReadTimeOut = (uint)SlowInitConnectionTiming.W1Max;
-                        //mFTDIDevice.SetTimeouts(syncByteReadTimeOut, FTDIDeviceWriteTimeOutMs);
-
+                        // Some ECUs (e.g. EDC15) send sync byte later than W1Max (e.g. 405ms vs 300ms)
+                        // Consider: SetTimeouts((uint)SlowInitConnectionTiming.W1Max, WriteTimeoutMs) before reading sync byte
                         //read the sync byte
                         byte[] syncByte = new byte[1 + numPreceedingBytesToIgnore];
                         uint numSyncBytesRead = 0;
@@ -1496,8 +1492,7 @@ namespace Communication
                                 //todo: according to the spec there could be more than two key bytes
                                 if (keyBytes.Count >= 2)
                                 {
-                                    //switch data format
-                                    //ftdiStatus |= mFTDIDevice.SetDataCharacteristics(FTDI.FT_DATA_BITS.FT_BITS_8, FTDI.FT_STOP_BITS.FT_STOP_BITS_1, FTDI.FT_PARITY.FT_PARITY_NONE);
+                                    // Switch from slow-init data format (7E1) to 8N1 before sending key byte complement
                                     success &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
 
                                     //send the complement of the last key byte
@@ -2429,17 +2424,12 @@ namespace Communication
 
                         if (success)
                         {
-                            //uint numBytesInTxBuffer = 0;
-                            //do
-                            //{
-                            //    ftdiStatus = mFTDIDevice.GetTxBytesWaiting(ref numBytesInTxBuffer);
-                            //} while ((numBytesInTxBuffer > 0) && (ftdiStatus == FTDI.FT_STATUS.FT_OK));
-
-const float messageBitTime = 1000.0f / DEFAULT_COMMUNICATION_BAUD_RATE;
-float messageTime = startCommMessageBytes.Length * 10 * messageBitTime;
-long interByteTime = (P4TesterInterByteTimeMinMsWhenConnecting + 2) * (startCommMessageBytes.Length - 1);
-long totalConTime = 25 + 25 + (long)(messageTime) + interByteTime;
-while (watch.ElapsedMilliseconds < totalConTime) ;
+                            // Wait for device TX buffer to drain before switching baud/mode (GetTxBytesWaiting until 0)
+                            const float messageBitTime = 1000.0f / DEFAULT_COMMUNICATION_BAUD_RATE;
+                            float messageTime = startCommMessageBytes.Length * 10 * messageBitTime;
+                            long interByteTime = (P4TesterInterByteTimeMinMsWhenConnecting + 2) * (startCommMessageBytes.Length - 1);
+                            long totalConTime = 25 + 25 + (long)(messageTime) + interByteTime;
+                            while (watch.ElapsedMilliseconds < totalConTime) ;
 
                             success &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
                             success &= mCommunicationDevice.Purge(PurgeType.RX);
@@ -2601,21 +2591,12 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                             messageSendTime = watch.ElapsedMilliseconds;
                             bool sentMessage = TransmitMessage(startCommMessage, false, (uint)lowBuffer.Length);
-
-//TODO: min inter byte time P4
-//ftdiStatus |= mFTDIDevice.Write(messageData, messageData.Length, ref numBytesWritten);
-//ftdiStatus |= mFTDIDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
-//numBytesWaitingWrite = 255;
-//do
-//{
-//    messageSendTime = watch.ElapsedMilliseconds;
-//    mFTDIDevice.GetTxBytesWaiting(ref numBytesWaitingWrite);
-//} while (numBytesWaitingWrite > 0);
-//ftdiStatus |= mFTDIDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
-//bool sentMessage = true;
-//mIsWaitingForResponse = true;
-//TODO: consume echo
-
+                            // P4 min inter-byte time pseudo-code:
+                            // Write(messageData); SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                            // do { messageSendTime = ElapsedMs; numBytes = GetTxBytesWaiting(); } while (numBytes > 0);
+                            // SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                            // TODO: enforce P4 spacing between bytes when sending
+                            // TODO: consume echo
 
                             if (success && sentMessage)
                             {
@@ -2649,39 +2630,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                 DisplayStatusMessage(string.Format("Idle end: {0}ms Connect start: {1}ms Connect end: {2}ms Message Send Time: {3}ms Message Send Finish Time: {4}ms", idleEndTime, connectStartTime, connectEndTime, messageSendTime, messageSendFinishTime), StatusMessageType.LOG);
                 DisplayStatusMessage("Time base: " + watchStartTime.ToString("hh:mm:ss.fff"), StatusMessageType.LOG);
 
-                //if (waitingForConnect)
-                //{
-                //    StartSendReceiveThread(SendReceiveThread);
-
-                //    while (true)
-                //    {
-                //        //wait for response
-                //        Thread.Sleep((int)mP2ECUResponseMaxTimeCurrent);
-
-                //        lock (mFTDIDevice)
-                //        {
-                //            if (!IsCurrentMessagePendingSend(KWP2000ServiceID.StartCommunication) || (ConnectionStatus != ConnectionStatusType.ConnectionPending))
-                //            {
-                //                break;
-                //            }
-                //        }
-                //    }
-                //}
-
-                //if (ConnectionStatus != ConnectionStatusType.Connected)
-                //{
-                //    KillSendReceiveThread();
-
-                //    DisplayStatusMessage(string.Format("Failed to connect with offset: {0}ms", offset), StatusMessageType.LOG);
-
-                //    offset *= -1;
-
-                //    if (offset >= 0)
-                //    {
-                //        offset++;
-                //    }
-                //}
-
+                // Alternate flow: StartSendReceiveThread, poll until !IsCurrentMessagePendingSend(StartCommunication) or ConnectionStatus != ConnectionPending; on failure KillSendReceiveThread and retry with offset
 				watch.Stop();
 			}
 
@@ -2747,9 +2696,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                             if (mCommunicationDevice.SetBreak(false))//restore the line to high
                             {
-                                //don't need to purge since we will just plan on a dirty echo with one byte from the low to high transition from the fast init
-                                //mFTDIDevice.Purge(FTDI.FT_PURGE.FT_PURGE_RX);//purge the echo from pulling the line low
-
+                                // mCommunicationDevice.Purge(PurgeType.RX); optional: line low→high transition may produce echo byte; we tolerate it
                                 while (watch.ElapsedTicks < highEndTime) ;
 
                                 if (TransmitMessage(startCommMessageDataBytes, false, 1))
