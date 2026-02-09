@@ -1,5 +1,8 @@
 name: Build
 
+env:
+  WIX_VERSION: '6.0.2'
+
 on:
   push:
     branches:
@@ -53,8 +56,8 @@ jobs:
 
     - name: Install WiX Toolset
       run: |
-        dotnet tool install --global wix --version 6.0.2
-        wix extension add WixToolset.UI.wixext WixToolset.NetFx.wixext --global
+        dotnet tool install --global wix --version ${{ env.WIX_VERSION }}
+        wix extension add WixToolset.UI.wixext/${{ env.WIX_VERSION }} WixToolset.NetFx.wixext/${{ env.WIX_VERSION }} --global
       shell: pwsh
 
     - name: Build installer
