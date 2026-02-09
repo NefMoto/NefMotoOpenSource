@@ -8,7 +8,7 @@ RELEASE_DIR := ECUFlasher/bin/msil/Release/net8.0-windows
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(VERSION).msi
 
-.PHONY: all debug release clean installer help
+.PHONY: all debug release test clean installer help
 
 all: debug
 
@@ -17,6 +17,10 @@ debug $(DEBUG_DIR)/NefMotoECUFlasher.exe:
 
 release $(RELEASE_DIR)/NefMotoECUFlasher.exe:
 	@$(MAKE) CONFIG=Release build
+
+test: build
+	@echo "Running tests ($(CONFIG))..."
+	@dotnet test Tests/NefMotoOpenSource.Tests.csproj --configuration $(CONFIG) --no-build --verbosity normal
 
 build:
 	@echo "Building with dotnet ($(CONFIG))..."
@@ -37,6 +41,7 @@ help:
 	@echo "Available targets:"
 	@echo "  make debug     - Build in Debug configuration (default)"
 	@echo "  make release   - Build in Release configuration"
+	@echo "  make test      - Build and run unit tests"
 	@echo "  make installer - Build the MSI installer"
 	@echo "  make clean     - Remove all build artifacts"
 	@echo "  make help      - Show this help message"

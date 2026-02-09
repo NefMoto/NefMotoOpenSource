@@ -1,4 +1,4 @@
-﻿Microsoft Visual Studio Solution File, Format Version 12.00
+Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 19
 VisualStudioVersion = 19.0.0.0
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -15,6 +15,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Checksum", "Checksum\Checksum.csproj", "{7D8C0D8C-A7B5-446F-AD38-08E24D72C882}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ApplicationShared", "ApplicationShared\ApplicationShared.csproj", "{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NefMotoOpenSource.Tests", "Tests\NefMotoOpenSource.Tests.csproj", "{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -72,6 +74,10 @@ Global
 		{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}.Release|x86.ActiveCfg = Release|x86
 		{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD}.Release|x86.Build.0 = Release|x86
+		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
