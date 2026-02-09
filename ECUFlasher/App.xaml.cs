@@ -158,7 +158,21 @@ namespace ECUFlasher
 
         protected override void OnExit(ExitEventArgs e)
         {
-            ECUFlasher.Properties.Settings.Default.Save();
+            try
+            {
+                ECUFlasher.Properties.Settings.Default.Save();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    DisplayStatusMessage("Settings save failed on exit: " + ex.Message, StatusMessageType.LOG);
+                }
+                catch
+                {
+                    // Ignore if logging fails during shutdown
+                }
+            }
 
             DisplayStatusMessage("Closing " + GetApplicationName(), StatusMessageType.LOG);
 
@@ -329,7 +343,10 @@ namespace ECUFlasher
                 }
             }
 
-            var messageBoxResult = MessageBox.Show(message, title, button);
+            var owner = Application.Current?.MainWindow;
+            var messageBoxResult = owner != null
+                ? MessageBox.Show(owner, message, title, button)
+                : MessageBox.Show(message, title, button);
 
             var result = UserPromptResult.NONE;
 
