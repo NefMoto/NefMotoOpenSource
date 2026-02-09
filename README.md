@@ -8,7 +8,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - **KWP2000** (ISO 14230) - Full support for diagnostic and programming operations
 - **KWP1281** - Legacy protocol support for older ECUs
-- **Boot Mode** - Connection, ECU information reading, register access, flash read and flash write (ME7/Simos3/EDC15 variants). Layout auto-detect from device ID. Bootmode implementation is derived from [C167BootTool](https://github.com/EcuProg7/C167BootTool) (ME7BootTool.py)
+- **Boot Mode** - Connection, ECU information reading, register access, flash read and flash write (M5.9.x/ME7/Simos3/EDC15 variants). Layout auto-detect from device ID. Bootmode implementation is derived from [C167BootTool](https://github.com/EcuProg7/C167BootTool) (ME7BootTool.py)
 
 ### Connection Methods
 
@@ -55,6 +55,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - **ME7.x** - Primary target; full KWP2000 and bootmode support
 - **ME7.5 fast init** - Not supported on one bench unit after address and timing sweeps. Use **slow init** instead. Other ME7.5 images may differ. See [docs/KWP2000.md](docs/KWP2000.md)
+- **Motronic 5.9.2 (M5.9.x)** - Bootmode support with 256KB 29F200 layout
 - **Simos 3.x / EDC15** - Bootmode support (layout auto-detect)
 - Memory layouts provided for common flash chips (29F200, 29F400, 29F800 series)
 - Some ECUs may require specific connection parameters or timing adjustments
