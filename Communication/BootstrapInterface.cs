@@ -187,6 +187,11 @@ namespace Communication
         // Block size for reading/writing
         private const ushort DefaultBlockLength = 0x200;  // 512 bytes
 
+        public BootstrapInterface(DisplayStatusMessageDelegate displayStatusMessage)
+            : base(displayStatusMessage)
+        {
+        }
+
         public byte DeviceID
         {
             get

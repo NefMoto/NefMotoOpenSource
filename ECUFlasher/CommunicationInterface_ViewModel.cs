@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -79,7 +79,6 @@ namespace ECUFlasher
         {
             if ((App != null) && (CommInterface != null))
             {
-                CommInterface.mDisplayStatusMessage += App.DisplayStatusMessage;
                 CommInterface.mDisplayUserPrompt += App.DisplayUserPrompt;
             }
         }

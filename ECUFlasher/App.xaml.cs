@@ -106,7 +106,6 @@ namespace ECUFlasher
                 CreateLogFile();
 
                 DisplayStatusMessage("Opening " + GetApplicationName(), StatusMessageType.LOG);
-                Shared.LogFallback.SetHandler(DisplayStatusMessage);
 
                 // mFTDILibrary no longer needed - DeviceManager handles device enumeration
 

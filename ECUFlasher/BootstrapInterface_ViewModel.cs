@@ -34,7 +34,8 @@ namespace ECUFlasher
     {
         public BootstrapInterface_ViewModel()
         {
-            CommInterface = new BootstrapInterface();
+            var displayStatusMessage = (App != null) ? (DisplayStatusMessageDelegate)App.DisplayStatusMessage : (DisplayStatusMessageDelegate)((m, t) => { });
+            CommInterface = new BootstrapInterface(displayStatusMessage);
 
             AvailableBaudRates = new ObservableCollection<uint>();
 			AvailableBaudRates.Add(9600);

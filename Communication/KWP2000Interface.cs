@@ -208,7 +208,8 @@ namespace Communication
 		//PUBLIC METHODS
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-		public KWP2000Interface()
+		public KWP2000Interface(DisplayStatusMessageDelegate displayStatusMessage)
+			: base(displayStatusMessage)
 		{
 			mReceiveBuffer = new byte[RECEIVE_BUFFER_SIZE];
 			mMessagesPendingSend = new Queue<KWP2000Message>();

@@ -326,8 +326,9 @@ namespace Communication
             KWP2000
         }
 
-        public CommunicationInterface()
+        public CommunicationInterface(DisplayStatusMessageDelegate displayStatusMessage)
         {
+            mDisplayStatusMessage = displayStatusMessage ?? throw new ArgumentNullException(nameof(displayStatusMessage));
             mCommunicationDevice = null;
             mConsumeTransmitEcho = true;
 
@@ -533,19 +534,12 @@ namespace Communication
             return mCommunicationDevice?.IsOpen ?? false;
         }
 
-        public event DisplayStatusMessageDelegate mDisplayStatusMessage;
+        private readonly DisplayStatusMessageDelegate mDisplayStatusMessage;
         public event DisplayUserPrompt mDisplayUserPrompt;
 
         public void DisplayStatusMessage(string message, StatusMessageType messageType)
         {
-            if (mDisplayStatusMessage != null)
-            {
-                mDisplayStatusMessage(message, messageType);
-            }
-            else
-            {
-                Shared.LogFallback.Invoke(message, messageType);
-            }
+            mDisplayStatusMessage(message, messageType);
         }
 
         public UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType)

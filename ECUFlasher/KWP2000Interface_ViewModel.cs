@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -41,7 +41,8 @@ namespace ECUFlasher
 
         public KWP2000Interface_ViewModel()
         {
-            CommInterface = new KWP2000Interface();
+            var displayStatusMessage = (App != null) ? (DisplayStatusMessageDelegate)App.DisplayStatusMessage : (DisplayStatusMessageDelegate)((m, t) => { });
+            CommInterface = new KWP2000Interface(displayStatusMessage);
 
             CommInterface.PropertyChanged += CommInterfacePropertyChanged;
             CopyDefaultTimings();
