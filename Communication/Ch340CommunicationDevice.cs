@@ -28,9 +28,14 @@ using Shared;
 namespace Communication
 {
     /// <summary>
-    /// Adapter class that implements ICommunicationDevice interface using System.IO.Ports.SerialPort for CH340 devices.
-    /// CH340 devices appear as standard COM ports in Windows.
+    /// Adapter using System.IO.Ports.SerialPort for CH340. Fast init. KWP2000 slow init uses break signal (no bit-bang).
+    /// Bootmode: DTR pulsed (100ms high, 100ms low) then DTR=0, RTS=0. Windows only (WMI for detection).
     /// </summary>
+    /// <remarks>
+    /// Limitations: No bit-bang mode; slow init may be less reliable than FTDI. Bootmode baud-rate sensitive:
+    /// default 57600; use 38400 if 57600 fails; 9600/19200 can give 0xFD or read-back failures.
+    /// At 0x00FF18 (BUSCON3) bootmode-only: C_WRITE_WORD can get 0xFD (NAK) where FTDI succeeds.
+    /// </remarks>
     public class Ch340CommunicationDevice : ICommunicationDevice
     {
         private SerialPort _serialPort;

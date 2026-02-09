@@ -31,7 +31,17 @@ namespace Communication
     /// Bootmode protocol for ME7/Simos3/EDC15 ECUs. Reference: C167BootTool/ME7BootTool.py (https://github.com/EcuProg7/C167BootTool, not in this repo).
     /// Connection sequence: Send 0x00 -> receive device ID -> if != 0xAA upload loader (32B) + runtime -> C_TEST_COMM.
     /// C# does not send 0x55 autobaud; MiniMon runs at host baud (9600, 19200, 38400, 57600). Default 57600; CH340: use 38400 if 57600 fails.
+    /// Uses mCommunicationDevice. CH340/KKL: DTR=0, RTS=0; FTDI: DTR=1.
+    /// Logs every failure path; check log line immediately before high-level message for reason. Compare failing run (e.g. CH340) to success (e.g. FTDI) line-by-line.
     /// </summary>
+    /// <remarks>
+    /// <para><b>State:</b> DeviceID 0xAA = core already running. LastKnownFlashDeviceID preserved across disconnect; layout available when core running if we have it from same session.</para>
+    /// <para><b>Limitations:</b> Diff read not supported (MiniMon has no checksum-for-range). Core running: cannot load flash driver; layout only if LastKnownFlashDeviceID from prior connect. LastKnownFlashDeviceID not persisted across app restart.</para>
+    /// <para><b>I/O:</b> SendBytes/ReceiveBytes loop until full count or timeout; ReceiveBytes Math.Max(1000, numBytes*3) ms; Write timeout ~data.Length*5 ms for echo.</para>
+    /// <para><b>Troubleshooting:</b> 0xFD (NAK) vs 0xEA often baud/timing; FTDI more reliable. Connection failed: "Put ECU in boot mode". Core running, no LastKnownFlashDeviceID: "Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type."</para>
+    /// <para><b>Constants:</b> CPU IDs 0x55/0xA5/0xB5/0xC5/0xD5, 0xAA core running. Flash IDs 0x22AB/0x2258/0x2223/0x22D6. Driver 0x00F600. ME7 base 0x800000, Simos3/EDC15 0x400000.</para>
+    /// <para><b>TODO:</b> Automatic retry on sector/block failure (retry block read or sector erase+program N times before failing). Persist LastKnownFlashDeviceID in ECU RAM (requires safe address).</para>
+    /// </remarks>
     public class BootstrapInterface : CommunicationInterface
     {
         private enum CommunicationConstants : byte
@@ -255,6 +265,18 @@ namespace Communication
         /// FlashLayout non-null when Available; FlashLayoutUnavailableReason non-null when Unavailable.
         /// Variant is ME7 (hardcoded); future: from ECU info.
         /// </summary>
+        /// <remarks>
+        /// Connection lifecycle:
+        ///   State                               DeviceID              LastKnownFlashDeviceID
+        ///   --------------------------------    ------------------    ----------------------
+        ///   Not connected                       0 (stale)             0 or stale
+        ///   Connection pending                  -                     -
+        ///   Connection failed                   0                     unchanged
+        ///   ECU not in boot mode                0                     0
+        ///   Connected, core uploaded            0x55/0xA5/etc         0 or detected
+        ///   Connected, core already running     0xAA                  0 or from same session
+        ///   Disconnected                        stale                 preserved
+        /// </remarks>
         public struct BootmodeConnectionState
         {
             public ConnectionStatusType ConnectionPhase;
@@ -275,6 +297,19 @@ namespace Communication
             AlreadyRunning  // DeviceID == 0xAA; core was already in bootmode
         }
 
+        /// <summary>
+        /// Flash layout sub-state. Unknown until GetBootmodeFlashLayout runs; Available/Unavailable from layout cache.
+        /// </summary>
+        /// <remarks>
+        /// Flash layout (when connected):
+        ///   Sub-state                                   Can read flash ID?            Layout available?
+        ///   --------------------------------            ------------------            ------------------
+        ///   Core uploaded, no driver yet                Yes (after LoadFlashDriver)   No
+        ///   Core uploaded, driver loaded                Yes                           Yes (generated)
+        ///   Core uploaded, driver load failed           No                            No
+        ///   Core running, have LastKnownFlashDeviceID   No                            Yes (from cache)
+        ///   Core running, no LastKnownFlashDeviceID     No                            No
+        /// </remarks>
         public enum BootmodeFlashLayoutStatus
         {
             Unknown,    // GetBootmodeFlashLayout not yet called or cache cleared
@@ -684,7 +719,7 @@ namespace Communication
             return true;
         }
 
-        // Connection protocol (see BOOTMODE.md, ME7BootTool.py): 1) Send 0x00 2) Receive device ID 3) If != 0xAA: upload loader (BootmodeLoader), wait I_LOADER_STARTED, upload runtime (BootmodeMiniMon), wait I_APPLICATION_STARTED 4) C_TEST_COMM
+        // Connection protocol (ME7BootTool.py): 1) Send 0x00 2) Receive device ID 3) If != 0xAA: upload loader (BootmodeLoader), wait I_LOADER_STARTED, upload runtime (BootmodeMiniMon), wait I_APPLICATION_STARTED 4) C_TEST_COMM
         bool StartMiniMon()
         {
             // Load binary resources

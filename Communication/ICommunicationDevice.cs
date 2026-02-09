@@ -100,8 +100,18 @@ namespace Communication
 
     /// <summary>
     /// Interface for hardware abstraction layer (HAL) for communication devices.
-    /// Provides a unified interface for different USB-to-serial adapter types.
+    /// Provides a unified interface for different USB-to-serial adapter types (FTDI, CH340, etc.).
     /// </summary>
+    /// <remarks>
+    /// <para><b>Timeout policy:</b> Both FTDI and CH340 use the per-call timeoutMs on Read/Write.
+    /// FTDI converts it to max attempts; CH340 temporarily sets port ReadTimeout/WriteTimeout.
+    /// SetTimeouts sets default port timeouts; KWP2000 calls it before specific operations.</para>
+    /// <para><b>Optional patterns:</b> Purge(PurgeType.RX) optional after line low→high (echo byte).
+    /// GetTxBytesWaiting: wait until 0 to ensure TX drain before switching baud/mode.
+    /// SetInTransferSize is USB device-specific (FTDI only, not in interface): 64 bytes min, multiple of 64.</para>
+    /// <para><b>Adding a new cable type:</b> Implement this interface, add DeviceInfo subclass and DeviceType,
+    /// extend DeviceManager.EnumerateAllDevices() and CreateDevice().</para>
+    /// </remarks>
     public interface ICommunicationDevice
     {
         /// <summary>
@@ -230,22 +240,22 @@ namespace Communication
         // I/O Operations
         /// <summary>
         /// Reads data from the device. May return fewer bytes than requested (incomplete read);
-        /// callers requiring a full read must loop.
+        /// callers requiring a full read must loop. timeoutMs: FTDI uses max attempts; CH340 uses milliseconds.
         /// </summary>
         /// <param name="buffer">Buffer to read into</param>
         /// <param name="bytesToRead">Number of bytes to read</param>
         /// <param name="bytesRead">Output parameter for actual number of bytes read</param>
-        /// <param name="timeoutMs">Timeout in milliseconds</param>
+        /// <param name="timeoutMs">Timeout: FTDI uses max attempts; CH340 uses milliseconds</param>
         /// <returns>True if read successful</returns>
         bool Read(byte[] buffer, uint bytesToRead, ref uint bytesRead, uint timeoutMs);
 
         /// <summary>
-        /// Writes data to the device
+        /// Writes data to the device. timeoutMs: FTDI uses max attempts; CH340 uses milliseconds.
         /// </summary>
         /// <param name="buffer">Buffer containing data to write</param>
         /// <param name="bufferLength">Number of bytes to write</param>
         /// <param name="bytesWritten">Output parameter for actual number of bytes written</param>
-        /// <param name="timeoutMs">Timeout in milliseconds</param>
+        /// <param name="timeoutMs">Timeout: FTDI uses max attempts; CH340 uses milliseconds</param>
         /// <returns>True if write successful</returns>
         bool Write(byte[] buffer, int bufferLength, ref uint bytesWritten, uint timeoutMs);
 
@@ -259,7 +269,8 @@ namespace Communication
         bool GetRxBytesAvailable(ref uint bytesAvailable, uint maxAttempts);
 
         /// <summary>
-        /// Gets the number of bytes waiting in the transmit buffer
+        /// Gets the number of bytes waiting in the transmit buffer.
+        /// Use: wait until 0 before switching baud/mode to ensure TX drain.
         /// </summary>
         /// <param name="bytesWaiting">Output parameter for number of bytes waiting</param>
         /// <returns>True if operation successful</returns>

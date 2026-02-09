@@ -26,8 +26,14 @@ using Shared;
 namespace Communication
 {
     /// <summary>
-    /// Manages device enumeration and creation of communication device instances
+    /// Manages device enumeration and creation of communication device instances.
+    /// Enumerates FTDI (via FTD2XX_NET) and CH340 (via WMI/COM port detection).
     /// </summary>
+    /// <remarks>
+    /// To add a new cable type: (1) Implement ICommunicationDevice (e.g. Cp2102CommunicationDevice),
+    /// (2) Add DeviceInfo subclass and DeviceType enum value, (3) Extend EnumerateAllDevices() and CreateDevice(),
+    /// (4) Map serial I/O, DTR/RTS, break, baud rate to the new hardware API.
+    /// </remarks>
     public static class DeviceManager
     {
         /// <summary>

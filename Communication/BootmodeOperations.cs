@@ -27,16 +27,10 @@ using Shared;
 namespace Communication
 {
     /// <summary>
-    /// Bootmode flash read operation.
-    ///
-    /// NOTE: Diff read (skipping matching sectors) is NOT supported for BootMode.
-    /// Unlike KWP2000, BootMode/MINIMONK does not provide a service to calculate
-    /// checksums of flash memory ranges before reading. Therefore, all sectors
-    /// must be read regardless of whether they match the base image.
-    ///
-    /// Checksum verification after reading IS supported via MiniMon_GetChecksum(),
-    /// but this is not yet implemented in this operation.
+    /// Bootmode flash read operation. Diff read not supported (MiniMon has no checksum-for-range); all sectors read.
+    /// Checksum verification via MiniMon_GetChecksum() not yet implemented.
     /// </summary>
+    /// <remarks>TODO: On block read failure, retry that block N times (e.g. 2–3) with short delay before failing operation. Implement in ReadFlashThread.</remarks>
     public class BootmodeReadExternalFlashOperation : CommunicationOperation
     {
         public class BootmodeReadExternalFlashSettings
@@ -294,6 +288,7 @@ namespace Communication
     /// Bootmode flash write operation: erase sectors and program blocks.
     /// Load flash driver before starting. Skips blocks that are all 0xFF per Python reference.
     /// </summary>
+    /// <remarks>TODO: On sector erase or block program failure, retry that sector M times before failing. Implement in WriteFlashThread.</remarks>
     public class BootmodeWriteExternalFlashOperation : CommunicationOperation
     {
         public class BootmodeWriteExternalFlashSettings

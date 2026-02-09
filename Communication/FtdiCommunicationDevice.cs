@@ -26,8 +26,9 @@ using Shared;
 namespace Communication
 {
     /// <summary>
-    /// Adapter class that wraps the existing FTDI implementation to implement ICommunicationDevice interface.
-    /// This allows the communication layer to work with FTDI devices through the abstraction layer.
+    /// Adapter that wraps FTD2XX_NET for FTDI devices. Bit-bang mode for KWP2000 slow init.
+    /// Read/Write timeoutMs is converted to max attempts (FTDI driver does not use milliseconds directly).
+    /// DTR=1 for self-powered. SetLatency and SetBitMode supported.
     /// </summary>
     public class FtdiCommunicationDevice : ICommunicationDevice
     {
