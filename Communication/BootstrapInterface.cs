@@ -1745,6 +1745,26 @@ namespace Communication
         }
 
         /// <summary>
+        /// Returns a user-facing reason why read/write flash is unavailable when CanGetBootmodeFlashLayout() is false.
+        /// Use for button tooltips and status. Returns null when not connected or when layout is available.
+        /// </summary>
+        public string GetBootmodeFlashLayoutUnavailableReason()
+        {
+            if (!IsConnected())
+            {
+                return null;
+            }
+
+            const byte CORE_ALREADY_RUNNING = 0xAA;
+            if (DeviceID == CORE_ALREADY_RUNNING && LastKnownFlashDeviceID == 0)
+            {
+                return "Disconnect, power-cycle ECU to full boot mode, then reconnect to detect flash type.";
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Gets bootmode flash layout. Single entry point for UI, read, and write.
         /// If DeviceID == 0xAA (core running): uses LastKnownFlashDeviceID; fails if 0.
         /// Otherwise: loads driver, reads flash device ID, generates layout.
@@ -1820,22 +1840,19 @@ namespace Communication
         }
 
         /// <summary>
-        /// Clears DeviceID, LastKnownDeviceID, LastKnownFlashDeviceID, and layout cache.
+        /// Clears connection-specific bootmode state: DeviceID and layout cache.
+        /// LastKnownDeviceID and LastKnownFlashDeviceID are preserved across disconnect so that
+        /// reconnect (same app session) with core already running (0xAA) can still resolve layout.
         /// Called from ConnectionStatus setter when transitioning to ConnectionPending, Disconnected, DisconnectionPending, or CommunicationTerminated.
-        /// FlashingControl also clears its FlashMemoryLayout on disconnect so both caches stay in sync.
         /// </summary>
         private void ResetBootmodeConnectionState()
         {
             mLastBootmodeLayout = null;
             mLastBootmodeLayoutError = null;
-            if (_DeviceID != 0 || _LastKnownDeviceID != 0 || _LastKnownFlashDeviceID != 0)
+            if (_DeviceID != 0)
             {
                 _DeviceID = 0;
-                _LastKnownDeviceID = 0;
-                _LastKnownFlashDeviceID = 0;
                 OnPropertyChanged(new PropertyChangedEventArgs("DeviceID"));
-                OnPropertyChanged(new PropertyChangedEventArgs("LastKnownDeviceID"));
-                OnPropertyChanged(new PropertyChangedEventArgs("LastKnownFlashDeviceID"));
             }
         }
 

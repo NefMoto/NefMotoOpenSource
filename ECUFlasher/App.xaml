@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -170,7 +170,7 @@ Contact by Email: tony@nefariousmotorsports.com
                                 <StackPanel>
                                     <TextBlock>
                                         <TextBlock.Text>
-                                            <Binding Path="Description" StringFormat="{}{0}&#x0a;Reasons disabed:"/>
+                                            <Binding Path="Description" StringFormat="{}{0}&#x0a;Reasons disabled:"/>
                                         </TextBlock.Text>
                                     </TextBlock>
                                     <ItemsControl ItemsSource="{Binding Path=ReasonsDisabled}">

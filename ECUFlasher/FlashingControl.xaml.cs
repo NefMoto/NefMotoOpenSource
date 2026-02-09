@@ -1121,7 +1121,8 @@ namespace ECUFlasher
                     var bootstrapInterface = App.CommInterface as BootstrapInterface;
                     if (bootstrapInterface != null && !bootstrapInterface.CanGetBootmodeFlashLayout())
                     {
-                        reasonsDisabled.Add("Flash device ID not available (core already running, no stored device ID from recent bootmode session)");
+                        reasonsDisabled.Add(bootstrapInterface.GetBootmodeFlashLayoutUnavailableReason()
+                            ?? "Flash layout not available (BootMode).");
                         result = false;
                     }
                 }
@@ -1392,7 +1393,8 @@ namespace ECUFlasher
                     var bootstrapInterface = App.CommInterface as BootstrapInterface;
                     if (bootstrapInterface != null && !bootstrapInterface.CanGetBootmodeFlashLayout())
                     {
-                        reasonsDisabled.Add("Flash device ID not available (core already running, no stored device ID from recent bootmode session)");
+                        reasonsDisabled.Add(bootstrapInterface.GetBootmodeFlashLayoutUnavailableReason()
+                            ?? "Flash layout not available (BootMode).");
                         result = false;
                     }
                 }
