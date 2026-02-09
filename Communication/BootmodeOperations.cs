@@ -289,4 +289,231 @@ namespace Communication
             }
         }
     }
+
+    /// <summary>
+    /// Bootmode flash write operation: erase sectors and program blocks.
+    /// Load flash driver before starting. Skips blocks that are all 0xFF per Python reference.
+    /// </summary>
+    public class BootmodeWriteExternalFlashOperation : CommunicationOperation
+    {
+        public class BootmodeWriteExternalFlashSettings
+        {
+            public BootstrapInterface.ECUFlashVariant Variant = BootstrapInterface.ECUFlashVariant.ME7;
+            public MemoryLayout FlashMemoryLayout;
+        }
+
+        public BootmodeWriteExternalFlashOperation(BootstrapInterface commInterface, BootmodeWriteExternalFlashSettings writeSettings, IEnumerable<MemoryImage> sectorImages)
+            : base(commInterface)
+        {
+            mBootstrapInterface = commInterface;
+            mSettings = writeSettings;
+            mSectorImages = sectorImages;
+            mState = WritingState.Start;
+
+            mTotalSectors = sectorImages.Count();
+            mTotalBytesToWrite = 0;
+            foreach (var sector in sectorImages)
+            {
+                mTotalBytesToWrite += (uint)sector.Size;
+            }
+            mBytesWritten = 0;
+
+            mNOPAction = new NOPCommunicationAction(commInterface);
+        }
+
+        public int NumSectors { get { return mTotalSectors; } }
+        public int NumSuccessfullyFlashedSectors { get { return mNumSuccessfullyFlashedSectors; } }
+
+        protected override void ResetOperation()
+        {
+            mState = WritingState.Start;
+            mNumSuccessfullyFlashedSectors = 0;
+            mBytesWritten = 0;
+        }
+
+        protected override CommunicationAction NextAction()
+        {
+            if (!IsRunning)
+            {
+                return null;
+            }
+
+            switch (mState)
+            {
+                case WritingState.Start:
+                    mState = WritingState.Writing;
+                    Thread writeThread = new Thread(() => WriteFlashThread());
+                    writeThread.IsBackground = true;
+                    writeThread.Start();
+                    return mNOPAction;
+
+                case WritingState.Writing:
+                    return mNOPAction;
+
+                case WritingState.Finished:
+                    mNOPAction.ActionCompleted(true);
+                    OperationCompleted(true);
+                    return null;
+
+                case WritingState.Failed:
+                    mNOPAction.ActionCompleted(false);
+                    OperationCompleted(false);
+                    return null;
+
+                default:
+                    return null;
+            }
+        }
+
+        private static bool IsBlockAllFF(byte[] block)
+        {
+            if (block == null) return true;
+            for (int i = 0; i < block.Length; i++)
+            {
+                if (block[i] != 0xFF) return false;
+            }
+            return true;
+        }
+
+        private void WriteFlashThread()
+        {
+            try
+            {
+                CommInterface.DisplayStatusMessage("WriteFlashThread: Starting bootmode flash write", StatusMessageType.LOG);
+
+                uint writeAddressBase = mBootstrapInterface.GetFlashWriteBaseAddress(mSettings.Variant);
+                uint readAddressBase = mBootstrapInterface.GetFlashBaseAddress(mSettings.Variant);
+
+                if (!mBootstrapInterface.ConfigureRegistersForExternalFlashWrite(mSettings.Variant))
+                {
+                    CommInterface.DisplayStatusMessage("WriteFlashThread: Failed to configure registers for write", StatusMessageType.USER);
+                    mState = WritingState.Failed;
+                    StartNextAction();
+                    return;
+                }
+
+                uint sectorOffset = 0;
+                int sectorIndex = 0;
+                const int blockSize = 0x200;  // 512 bytes
+
+                foreach (var sectorImage in mSectorImages)
+                {
+                    sectorIndex++;
+                    if (!IsRunning)
+                    {
+                        CommInterface.DisplayStatusMessage($"WriteFlashThread: Operation stopped at sector {sectorIndex}", StatusMessageType.LOG);
+                        mState = WritingState.Failed;
+                        StartNextAction();
+                        return;
+                    }
+
+                    uint sectorSize = (uint)sectorImage.Size;
+                    byte[] sectorData = sectorImage.RawData;
+
+                    CommInterface.DisplayStatusMessage($"WriteFlashThread: Erasing sector {sectorIndex}/{mTotalSectors} (offset 0x{sectorOffset:X6}, size {sectorSize})", StatusMessageType.LOG);
+                    if (!mBootstrapInterface.EraseSector(writeAddressBase, readAddressBase, sectorOffset, sectorIndex - 1, sectorSize))
+                    {
+                        CommInterface.DisplayStatusMessage($"WriteFlashThread: Erase failed for sector {sectorIndex}", StatusMessageType.USER);
+                        mState = WritingState.Failed;
+                        StartNextAction();
+                        return;
+                    }
+
+                    int blocksInSector = (int)((sectorSize + blockSize - 1) / blockSize);
+                    for (int blockIdx = 0; blockIdx < blocksInSector; blockIdx++)
+                    {
+                        if (!IsRunning)
+                        {
+                            mState = WritingState.Failed;
+                            StartNextAction();
+                            return;
+                        }
+
+                        int blockStart = blockIdx * blockSize;
+                        int blockLen = Math.Min(blockSize, sectorData.Length - blockStart);
+                        byte[] blockData = new byte[blockLen];
+                        Array.Copy(sectorData, blockStart, blockData, 0, blockLen);
+
+                        if (IsBlockAllFF(blockData))
+                        {
+                            mBytesWritten += (uint)blockLen;
+                            UpdateProgress();
+                            continue;
+                        }
+
+                        uint blockOffset = sectorOffset + (uint)blockStart;
+                        if (!mBootstrapInterface.ProgramBlock(mSettings.Variant, writeAddressBase, readAddressBase, blockOffset, blockData))
+                        {
+                            CommInterface.DisplayStatusMessage($"WriteFlashThread: Program failed at sector {sectorIndex}, block {blockIdx}", StatusMessageType.USER);
+                            mState = WritingState.Failed;
+                            StartNextAction();
+                            return;
+                        }
+
+                        mBytesWritten += (uint)blockLen;
+                        UpdateProgress();
+                    }
+
+                    mNumSuccessfullyFlashedSectors++;
+                    sectorOffset += sectorSize;
+                }
+
+                CommInterface.DisplayStatusMessage("WriteFlashThread: Flash write completed successfully", StatusMessageType.LOG);
+                mState = WritingState.Finished;
+                StartNextAction();
+            }
+            catch (Exception ex)
+            {
+                CommInterface.DisplayStatusMessage($"WriteFlashThread: EXCEPTION - {ex.GetType().Name}: {ex.Message}", StatusMessageType.USER);
+                CommInterface.DisplayStatusMessage($"WriteFlashThread: {ex.StackTrace}", StatusMessageType.LOG);
+                mState = WritingState.Failed;
+                StartNextAction();
+            }
+        }
+
+        private void UpdateProgress()
+        {
+            if (mTotalBytesToWrite > 0)
+            {
+                float percent = ((float)mBytesWritten / (float)mTotalBytesToWrite) * 100.0f;
+                OnUpdatePercentComplete(percent);
+            }
+        }
+
+        private enum WritingState
+        {
+            Start,
+            Writing,
+            Finished,
+            Failed
+        }
+
+        private BootstrapInterface mBootstrapInterface;
+        private BootmodeWriteExternalFlashSettings mSettings;
+        private IEnumerable<MemoryImage> mSectorImages;
+        private WritingState mState;
+        private int mTotalSectors;
+        private uint mTotalBytesToWrite;
+        private uint mBytesWritten;
+        private int mNumSuccessfullyFlashedSectors;
+        private NOPCommunicationAction mNOPAction;
+
+        private class NOPCommunicationAction : CommunicationAction
+        {
+            public NOPCommunicationAction(CommunicationInterface commInterface)
+                : base(commInterface)
+            {
+            }
+
+            public override bool Start()
+            {
+                return base.Start();
+            }
+
+            public new void ActionCompleted(bool success)
+            {
+                ActionCompletedInternal(success, false);
+            }
+        }
+    }
 }
