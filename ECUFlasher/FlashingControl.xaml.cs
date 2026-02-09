@@ -139,7 +139,8 @@ namespace ECUFlasher
 				var status = App.CommInterface.ConnectionStatus;
 				if (status == CommunicationInterface.ConnectionStatusType.Disconnected || status == CommunicationInterface.ConnectionStatusType.CommunicationTerminated)
 				{
-					// Clear layout cache on disconnect so we re-detect when connecting to (possibly different) ECU
+					// Clear local layout so we re-detect when connecting to (possibly different) ECU.
+					// BootstrapInterface.ResetBootmodeConnectionState clears its layout cache in ConnectionStatus setter.
 					// Must run on UI thread - PropertyChanged can fire from SendReceive thread
 					if (FlashMemoryLayout != null || IsMemoryLayoutOK)
 					{
@@ -328,10 +329,9 @@ namespace ECUFlasher
 	}
 
 	/// <summary>
-	/// Attempts to auto-detect the flash layout for bootmode when connected.
-	/// Uses GetBootmodeFlashLayout: it loads the flash driver, reads the flash device ID from the ECU,
-	/// and builds the layout from an in-memory device-ID table. No flash file is used, so this runs
-	/// on connect regardless of IsFlashFileOK (needed for read-before-save as well as write).
+	/// Auto-detects flash layout for bootmode via BootstrapInterface.GetBootmodeFlashLayout.
+	/// Updates FlashMemoryLayout, IsMemoryLayoutOK. GetBootmodeFlashLayout populates BootstrapInterface layout cache.
+	/// No flash file required; runs on connect for read-before-save and write.
 	/// </summary>
 	private void TryAutoDetectLayoutForBootmode()
 	{
@@ -578,7 +578,7 @@ namespace ECUFlasher
 
 		/// <summary>
 		/// Returns tooltip text for memory layout ComboBox.
-		/// Shows different message for bootmode with auto-detected layout details.
+		/// Shows different message for bootmode with auto-detected layout details or unavailable reason.
 		/// </summary>
 		public string MemoryLayoutToolTip
 		{
@@ -594,6 +594,16 @@ namespace ECUFlasher
 						tooltip += $"Size: {FlashMemoryLayout.Size} bytes ({FlashMemoryLayout.Size / 1024} KB)\n";
 						tooltip += $"Sectors: {FlashMemoryLayout.SectorSizes.Count}";
 						return tooltip;
+					}
+					// Show specific reason when layout detection failed
+					var bootstrapInterface = App.CommInterface as BootstrapInterface;
+					if (bootstrapInterface != null)
+					{
+						var state = bootstrapInterface.GetBootmodeConnectionState();
+						if (state.FlashLayoutStatus == BootstrapInterface.BootmodeFlashLayoutStatus.Unavailable && !string.IsNullOrEmpty(state.FlashLayoutUnavailableReason))
+						{
+							return "Memory layout unavailable: " + state.FlashLayoutUnavailableReason;
+						}
 					}
 					return "Memory layout will be auto-detected from flash device ID when read/write operation starts";
 				}

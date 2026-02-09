@@ -1,4 +1,4 @@
-﻿/*
+/*
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -695,6 +695,30 @@ namespace ECUFlasher
 				string ramStatus = allZero ? "All zeros (uninitialized)" : (allFF ? "All 0xFF (erased)" : "Contains data");
 				AddBootmodeInfoEntry("Internal RAM (0xF600, 16 bytes)", ramStatus);
 				App.DisplayStatusMessage($"Bootmode Info: Internal RAM (0xF600, 16 bytes) = {ramStatus}", StatusMessageType.LOG);
+			}
+
+			// Flash layout status (updates cache via GetBootmodeFlashLayout, then reads from GetBootmodeConnectionState)
+			bootstrapInterface.GetBootmodeFlashLayout(out _, out _);
+			var connState = bootstrapInterface.GetBootmodeConnectionState();
+			switch (connState.FlashLayoutStatus)
+			{
+				case BootstrapInterface.BootmodeFlashLayoutStatus.Available:
+					var layout = connState.FlashLayout;
+					string layoutDetails = layout != null && layout.Validate()
+						? $"Available: Base 0x{layout.BaseAddress:X6}, {layout.Size / 1024} KB, {layout.SectorSizes.Count} sectors"
+						: "Available";
+					AddBootmodeInfoEntry("Flash Layout", layoutDetails);
+					App.DisplayStatusMessage($"Bootmode Info: Flash Layout = {layoutDetails}", StatusMessageType.LOG);
+					break;
+				case BootstrapInterface.BootmodeFlashLayoutStatus.Unavailable:
+					string reason = connState.FlashLayoutUnavailableReason ?? "Unknown reason";
+					AddBootmodeInfoEntry("Flash Layout", $"Unavailable: {reason}");
+					App.DisplayStatusMessage($"Bootmode Info: Flash Layout = Unavailable: {reason}", StatusMessageType.LOG);
+					break;
+				default:
+					AddBootmodeInfoEntry("Flash Layout", "Not yet detected");
+					App.DisplayStatusMessage("Bootmode Info: Flash Layout = Not yet detected", StatusMessageType.LOG);
+					break;
 			}
 
 			App.DisplayStatusMessage($"Read {BootmodeInfo.Count} bootmode ECU info entries.", StatusMessageType.USER);

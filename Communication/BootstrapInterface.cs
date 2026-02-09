@@ -27,6 +27,11 @@ using Shared;
 
 namespace Communication
 {
+    /// <summary>
+    /// Bootmode protocol for ME7/Simos3/EDC15 ECUs. Reference: C167BootTool/ME7BootTool.py (https://github.com/EcuProg7/C167BootTool, not in this repo).
+    /// Connection sequence: Send 0x00 -> receive device ID -> if != 0xAA upload loader (32B) + runtime -> C_TEST_COMM.
+    /// C# does not send 0x55 autobaud; MiniMon runs at host baud (9600, 19200, 38400, 57600). Default 57600; CH340: use 38400 if 57600 fails.
+    /// </summary>
     public class BootstrapInterface : CommunicationInterface
     {
         private enum CommunicationConstants : byte
@@ -163,7 +168,7 @@ namespace Communication
         private const byte FC_GETSTATE_ADDR_MANUFID = 0x00;
         private const byte FC_GETSTATE_ADDR_DEVICEID = 0x01;
 
-        // Flash device IDs
+        // Flash device IDs (FC_GETSTATE); see GetFlashSizeFromDeviceID, GenerateMemoryLayoutFromDeviceID
         private const ushort DEV_ID_F400BB = 0x22AB;  // 512KB bottom boot
         private const ushort DEV_ID_F800BB = 0x2258;  // 1024KB bottom boot
         private const ushort DEV_ID_F400BT = 0x2223;  // 512KB top boot
@@ -238,6 +243,81 @@ namespace Communication
             }
         }
         private ushort _LastKnownFlashDeviceID = 0;
+
+        // Layout cache: updated by GetBootmodeFlashLayout on success (layout) or failure (error); cleared by ResetBootmodeConnectionState on disconnect.
+        private MemoryLayout mLastBootmodeLayout;
+        private string mLastBootmodeLayoutError;
+
+        /// <summary>
+        /// Bootmode connection state. Single source for UI bindings and layout resolution.
+        /// ConnectionPhase: ConnectionStatusType. CoreStatus: derived from DeviceID (0xAA = AlreadyRunning).
+        /// FlashLayoutStatus: Unknown until GetBootmodeFlashLayout runs; Available/Unavailable from layout cache.
+        /// FlashLayout non-null when Available; FlashLayoutUnavailableReason non-null when Unavailable.
+        /// Variant is ME7 (hardcoded); future: from ECU info.
+        /// </summary>
+        public struct BootmodeConnectionState
+        {
+            public ConnectionStatusType ConnectionPhase;
+            public BootmodeCoreStatus CoreStatus;
+            public byte DeviceID;
+            public byte LastKnownDeviceID;
+            public ushort LastKnownFlashDeviceID;
+            public ECUFlashVariant Variant;
+            public BootmodeFlashLayoutStatus FlashLayoutStatus;
+            public MemoryLayout FlashLayout;           // Non-null when FlashLayoutStatus == Available
+            public string FlashLayoutUnavailableReason; // Non-null when FlashLayoutStatus == Unavailable
+        }
+
+        public enum BootmodeCoreStatus
+        {
+            Unknown,
+            Uploaded,       // We uploaded MINIMONK; DeviceID is 0x55, 0xA5, 0xC5, etc.
+            AlreadyRunning  // DeviceID == 0xAA; core was already in bootmode
+        }
+
+        public enum BootmodeFlashLayoutStatus
+        {
+            Unknown,    // GetBootmodeFlashLayout not yet called or cache cleared
+            Available,  // Layout obtained successfully
+            Unavailable // GetBootmodeFlashLayout failed; see FlashLayoutUnavailableReason
+        }
+
+        /// <summary>
+        /// Returns bootmode connection state. Reads layout from cache (mLastBootmodeLayout / mLastBootmodeLayoutError).
+        /// Call GetBootmodeFlashLayout first to populate cache if needed.
+        /// </summary>
+        public BootmodeConnectionState GetBootmodeConnectionState()
+        {
+            const byte CORE_ALREADY_RUNNING = 0xAA;
+            var state = new BootmodeConnectionState
+            {
+                ConnectionPhase = ConnectionStatus,
+                DeviceID = _DeviceID,
+                LastKnownDeviceID = _LastKnownDeviceID,
+                LastKnownFlashDeviceID = _LastKnownFlashDeviceID,
+                Variant = ECUFlashVariant.ME7
+            };
+            state.CoreStatus = (_DeviceID == CORE_ALREADY_RUNNING) ? BootmodeCoreStatus.AlreadyRunning : BootmodeCoreStatus.Uploaded;
+            if (_DeviceID == 0 && ConnectionStatus != ConnectionStatusType.Connected)
+            {
+                state.CoreStatus = BootmodeCoreStatus.Unknown;
+            }
+            if (mLastBootmodeLayout != null)
+            {
+                state.FlashLayoutStatus = BootmodeFlashLayoutStatus.Available;
+                state.FlashLayout = mLastBootmodeLayout;
+            }
+            else if (mLastBootmodeLayoutError != null)
+            {
+                state.FlashLayoutStatus = BootmodeFlashLayoutStatus.Unavailable;
+                state.FlashLayoutUnavailableReason = mLastBootmodeLayoutError;
+            }
+            else
+            {
+                state.FlashLayoutStatus = BootmodeFlashLayoutStatus.Unknown;
+            }
+            return state;
+        }
 
         public override Protocol CurrentProtocol
         {
@@ -604,6 +684,7 @@ namespace Communication
             return true;
         }
 
+        // Connection protocol (see BOOTMODE.md, ME7BootTool.py): 1) Send 0x00 2) Receive device ID 3) If != 0xAA: upload loader (BootmodeLoader), wait I_LOADER_STARTED, upload runtime (BootmodeMiniMon), wait I_APPLICATION_STARTED 4) C_TEST_COMM
         bool StartMiniMon()
         {
             // Load binary resources
@@ -1346,6 +1427,7 @@ namespace Communication
 
                     if (shouldReset)
                     {
+                        // Clears layout cache; FlashingControl.CommInterface_PropertyChanged clears FlashMemoryLayout on disconnect
                         ResetBootmodeConnectionState();
                         mCommunicationDevice?.Purge(PurgeType.RX | PurgeType.TX);
                     }
@@ -1663,9 +1745,10 @@ namespace Communication
         }
 
         /// <summary>
-        /// Gets the bootmode flash layout for the current session. Single entry point for layout resolution.
-        /// If core is already running (DeviceID == 0xAA), uses LastKnownFlashDeviceID.
-        /// Otherwise loads driver, reads flash device ID, and generates layout.
+        /// Gets bootmode flash layout. Single entry point for UI, read, and write.
+        /// If DeviceID == 0xAA (core running): uses LastKnownFlashDeviceID; fails if 0.
+        /// Otherwise: loads driver, reads flash device ID, generates layout.
+        /// Updates mLastBootmodeLayout / mLastBootmodeLayoutError on success/failure. Cache cleared by ResetBootmodeConnectionState.
         /// </summary>
         /// <param name="layout">Output layout, or null on failure</param>
         /// <param name="errorMessage">Error description on failure</param>
@@ -1678,6 +1761,8 @@ namespace Communication
             if (!IsConnected())
             {
                 errorMessage = "Not connected to ECU.";
+                mLastBootmodeLayout = null;
+                mLastBootmodeLayoutError = errorMessage;
                 return false;
             }
 
@@ -1696,6 +1781,8 @@ namespace Communication
                 else
                 {
                     errorMessage = "Core is already running and no stored flash device ID available. Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type.";
+                    mLastBootmodeLayout = null;
+                    mLastBootmodeLayoutError = errorMessage;
                     return false;
                 }
             }
@@ -1705,12 +1792,16 @@ namespace Communication
                 if (!LoadFlashDriver(variant))
                 {
                     errorMessage = "Flash driver load failed. Check ECU variant (ME7/Simos3/EDC15).";
+                    mLastBootmodeLayout = null;
+                    mLastBootmodeLayoutError = errorMessage;
                     return false;
                 }
 
                 if (!GetFlashDeviceID(variant, out deviceID))
                 {
                     errorMessage = "Failed to read flash device ID. Wrong variant, bad connection, or unsupported flash chip.";
+                    mLastBootmodeLayout = null;
+                    mLastBootmodeLayoutError = errorMessage;
                     return false;
                 }
             }
@@ -1718,18 +1809,25 @@ namespace Communication
             if (!GenerateMemoryLayoutFromDeviceID(deviceID, baseAddress, out layout))
             {
                 errorMessage = $"Unknown flash device ID: 0x{deviceID:X4}. Cannot auto-detect layout.";
+                mLastBootmodeLayout = null;
+                mLastBootmodeLayoutError = errorMessage;
                 return false;
             }
 
+            mLastBootmodeLayout = layout;
+            mLastBootmodeLayoutError = null;
             return true;
         }
 
         /// <summary>
-        /// Resets bootmode-specific connection state (DeviceID, LastKnownDeviceID, LastKnownFlashDeviceID).
-        /// Called when connection is reset (ConnectionPending, Disconnected after failed connect).
+        /// Clears DeviceID, LastKnownDeviceID, LastKnownFlashDeviceID, and layout cache.
+        /// Called from ConnectionStatus setter when transitioning to ConnectionPending, Disconnected, DisconnectionPending, or CommunicationTerminated.
+        /// FlashingControl also clears its FlashMemoryLayout on disconnect so both caches stay in sync.
         /// </summary>
         private void ResetBootmodeConnectionState()
         {
+            mLastBootmodeLayout = null;
+            mLastBootmodeLayoutError = null;
             if (_DeviceID != 0 || _LastKnownDeviceID != 0 || _LastKnownFlashDeviceID != 0)
             {
                 _DeviceID = 0;
