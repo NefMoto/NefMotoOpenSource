@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2026  Nefarious Motorsports Inc
 
@@ -89,6 +89,7 @@ Contact by Email: tony@nefariousmotorsports.com
             </ComboBox.ItemTemplate>
         </ComboBox>
         <Button Grid.Column="2" Grid.Row="0" Command="{Binding Path=App.RefreshDevicesCommand}" Style="{StaticResource ConnectionButtonsStyle}"/>
+        <ComboBox Grid.Column="0" Grid.Row="1" Style="{StaticResource BaudRateComboBoxStyle}" ItemsSource="{Binding AvailableBootmodeVariants}" DisplayMemberPath="DisplayName" SelectedValuePath="Value" SelectedValue="{Binding DesiredBootmodeVariant, Mode=TwoWay}" ToolTip="ECU variant (ME7, M5.9.x, Simos 3.x, EDC15)"/>
         <Button Grid.Column="1" Grid.Row="1" Style="{StaticResource ConnectButtonStyle}"/>
         <Button Grid.Column="2" Grid.Row="1" Command="{Binding Path=App.CancelCurrentOperationCommand}" Style="{StaticResource ReactiveCommandButtonStyle}"/>
     </Grid>

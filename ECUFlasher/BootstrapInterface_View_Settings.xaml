@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2026  Nefarious Motorsports Inc
 
@@ -78,7 +78,6 @@ Contact by Email: tony@nefariousmotorsports.com
             <!-- Property names still contain "FTDI" for backward compatibility with saved preferences/settings -->
             <Label Grid.Column="0" Grid.Row="1">Device Read Time Out MS</Label>
             <TextBox Grid.Column="1" Grid.Row="1" Text="{Binding Path=CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
 
             <Label Grid.Column="0" Grid.Row="2">Device Write Time Out MS</Label>
             <TextBox Grid.Column="1" Grid.Row="2" Text="{Binding Path=CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />

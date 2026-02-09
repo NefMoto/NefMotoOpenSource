@@ -125,6 +125,7 @@ namespace Communication
         public enum ECUFlashVariant
         {
             ME7,        // ME7.x.x variant - 0x800000 base address
+            M59,        // Motronic 5.9.2 - 0x800000 base, 256KB 29F200, BUSCON 0x04BE/0x04BF
             Simos3,     // Simos 3.x variant - 0x400000 base address
             EDC15       // EDC15 variant - 0x400000 base address (top boot)
         }
@@ -150,6 +151,11 @@ namespace Communication
         private const ushort ADDRSEL1_Data = 0x3803;    // 32KB window starting at 0x380000
         private const ushort ADDRSEL2_Data = 0x2008;    // 1024KB window starting at 0x200000
 
+        // Register values for M5.9.2 (29F200, 256KB) - doc: BUSCON0 0x04BE, BUSCON1 0x04BF
+        private const ushort BUSCON0_M59_Data = 0x04BE;
+        private const ushort BUSCON1_M59_Data = 0x04BF;
+        private const ushort BUSCON0_M59_WriteData = 0x04BE;
+
         // Register values for Simos3 variant
         private const ushort BUSCON0_Simos3_Data = 0x44BE;
         private const ushort BUSCON1_Simos3_Data = 0x848E;
@@ -161,11 +167,13 @@ namespace Communication
 
         // Flash address mappings
         private const uint ExtFlashAddress_ME7 = 0x800000;
+        private const uint ExtFlashAddress_M59 = 0x800000;
         private const uint ExtFlashAddress_Simos3 = 0x400000;
         private const uint ExtFlashAddress_EDC15 = 0x400000;
 
         // Flash write address mappings (same as read addresses)
         private const uint ExtFlashWriteAddress_ME7 = 0x800000;
+        private const uint ExtFlashWriteAddress_M59 = 0x800000;
         private const uint ExtFlashWriteAddress_Simos3 = 0x400000;
         private const uint ExtFlashWriteAddress_EDC15 = 0x400000;
 
@@ -179,6 +187,7 @@ namespace Communication
         private const byte FC_GETSTATE_ADDR_DEVICEID = 0x01;
 
         // Flash device IDs (FC_GETSTATE); see GetFlashSizeFromDeviceID, GenerateMemoryLayoutFromDeviceID
+        private const ushort DEV_ID_F200 = 0x22BA;    // 256KB bottom boot (29F200, M5.9.2)
         private const ushort DEV_ID_F400BB = 0x22AB;  // 512KB bottom boot
         private const ushort DEV_ID_F800BB = 0x2258;  // 1024KB bottom boot
         private const ushort DEV_ID_F400BT = 0x2223;  // 512KB top boot
@@ -259,6 +268,23 @@ namespace Communication
         }
         private ushort _LastKnownFlashDeviceID = 0;
 
+        /// <summary>
+        /// User-selected ECU variant for bootmode (register set and flash base). Used by GetBootmodeFlashLayout when loading driver and reading flash ID.
+        /// </summary>
+        public ECUFlashVariant DesiredBootmodeVariant
+        {
+            get { return _DesiredBootmodeVariant; }
+            set
+            {
+                if (_DesiredBootmodeVariant != value)
+                {
+                    _DesiredBootmodeVariant = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("DesiredBootmodeVariant"));
+                }
+            }
+        }
+        private ECUFlashVariant _DesiredBootmodeVariant = ECUFlashVariant.ME7;
+
         // Layout cache: updated by GetBootmodeFlashLayout on success (layout) or failure (error); cleared by ResetBootmodeConnectionState on disconnect.
         private MemoryLayout mLastBootmodeLayout;
         private string mLastBootmodeLayoutError;
@@ -335,7 +361,7 @@ namespace Communication
                 DeviceID = _DeviceID,
                 LastKnownDeviceID = _LastKnownDeviceID,
                 LastKnownFlashDeviceID = _LastKnownFlashDeviceID,
-                Variant = ECUFlashVariant.ME7
+                Variant = DesiredBootmodeVariant
             };
             state.CoreStatus = (_DeviceID == CORE_ALREADY_RUNNING) ? BootmodeCoreStatus.AlreadyRunning : BootmodeCoreStatus.Uploaded;
             if (_DeviceID == 0 && ConnectionStatus != ConnectionStatusType.Connected)
@@ -346,6 +372,12 @@ namespace Communication
             {
                 state.FlashLayoutStatus = BootmodeFlashLayoutStatus.Available;
                 state.FlashLayout = mLastBootmodeLayout;
+                if (IsM59FlashDevice(_LastKnownFlashDeviceID))
+                    state.Variant = ECUFlashVariant.M59;
+                else if (mLastBootmodeLayout.BaseAddress == 0x400000)
+                    state.Variant = ECUFlashVariant.Simos3;
+                else
+                    state.Variant = ECUFlashVariant.ME7;
             }
             else if (mLastBootmodeLayoutError != null)
             {
@@ -1482,7 +1514,7 @@ namespace Communication
         /// <summary>
         /// Configures registers for external flash read operations.
         /// </summary>
-        /// <param name="variant">ECU/Flash variant (ME7, Simos3, or EDC15)</param>
+        /// <param name="variant">ECU/Flash variant (ME7, M5.9.2, Simos3, or EDC15)</param>
         /// <returns>True if configuration successful, false otherwise</returns>
         public bool ConfigureRegistersForExternalFlashRead(ECUFlashVariant variant)
         {
@@ -1494,7 +1526,11 @@ namespace Communication
                 return false;
             }
 
-            ushort buscon0Value = variant == ECUFlashVariant.Simos3 ? BUSCON0_Simos3_Data : BUSCON0_Data;
+            ushort buscon0Value = BUSCON0_Data;
+            if (variant == ECUFlashVariant.Simos3)
+                buscon0Value = BUSCON0_Simos3_Data;
+            else if (variant == ECUFlashVariant.M59)
+                buscon0Value = BUSCON0_M59_Data;
             if (!MiniMon_WriteWord(BUSCON0_Addr, buscon0Value))
             {
                 DisplayStatusMessage("Failed to configure BUSCON0 register.", StatusMessageType.USER);
@@ -1502,9 +1538,9 @@ namespace Communication
             }
 
             // Configure ADDRSEL registers based on variant
-            if (variant == ECUFlashVariant.ME7)
+            if (variant == ECUFlashVariant.ME7 || variant == ECUFlashVariant.M59)
             {
-                // ME7: ADDRSEL1 and ADDRSEL2
+                // ME7 / M5.9.2: ADDRSEL1 and ADDRSEL2 (same as ME7 per doc)
                 if (!MiniMon_WriteWord(ADDRSEL1_Addr, ADDRSEL1_Data))
                 {
                     DisplayStatusMessage("Failed to configure ADDRSEL1 register.", StatusMessageType.USER);
@@ -1563,14 +1599,18 @@ namespace Communication
             }
 
             // Configure BUSCON registers
-            ushort buscon1Value = variant == ECUFlashVariant.Simos3 ? BUSCON1_Simos3_Data : BUSCON1_Data;
+            ushort buscon1Value = BUSCON1_Data;
+            if (variant == ECUFlashVariant.Simos3)
+                buscon1Value = BUSCON1_Simos3_Data;
+            else if (variant == ECUFlashVariant.M59)
+                buscon1Value = BUSCON1_M59_Data;
             if (!MiniMon_WriteWord(BUSCON1_Addr, buscon1Value))
             {
                 DisplayStatusMessage("Failed to configure BUSCON1 register.", StatusMessageType.USER);
                 return false;
             }
 
-            if (variant == ECUFlashVariant.ME7)
+            if (variant == ECUFlashVariant.ME7 || variant == ECUFlashVariant.M59)
             {
                 if (!MiniMon_WriteWord(BUSCON2_Addr, BUSCON2_Data))
                 {
@@ -1589,7 +1629,7 @@ namespace Communication
             }
 
             // Clear unused BUSCON registers
-            if (variant != ECUFlashVariant.ME7)
+            if (variant != ECUFlashVariant.ME7 && variant != ECUFlashVariant.M59)
             {
                 if (!MiniMon_WriteWord(BUSCON2_Addr, 0))
                 {
@@ -1651,6 +1691,15 @@ namespace Communication
                     !MiniMon_WriteWord(BUSCON0_Addr, BUSCON0_WriteData))
                 {
                     DisplayStatusMessage("Failed to configure ME7 write registers.", StatusMessageType.USER);
+                    return false;
+                }
+            }
+            else if (variant == ECUFlashVariant.M59)
+            {
+                if (!MiniMon_WriteWord(ADDRSEL1_Addr, 0) || !MiniMon_WriteWord(BUSCON1_Addr, 0) ||
+                    !MiniMon_WriteWord(BUSCON0_Addr, BUSCON0_M59_WriteData))
+                {
+                    DisplayStatusMessage("Failed to configure M5.9.2 write registers.", StatusMessageType.USER);
                     return false;
                 }
             }
@@ -1826,7 +1875,7 @@ namespace Communication
                 return false;
             }
 
-            ECUFlashVariant variant = ECUFlashVariant.ME7;
+            ECUFlashVariant variant = DesiredBootmodeVariant;
             uint baseAddress = GetFlashBaseAddress(variant);
             ushort deviceID = 0;
             const byte CORE_ALREADY_RUNNING = 0xAA;
@@ -1851,7 +1900,7 @@ namespace Communication
                 DisplayStatusMessage("Loading flash driver for device identification...", StatusMessageType.USER);
                 if (!LoadFlashDriver(variant))
                 {
-                    errorMessage = "Flash driver load failed. Check ECU variant (ME7/Simos3/EDC15).";
+                    errorMessage = "Flash driver load failed. Check ECU variant (ME7/M5.9.2/Simos3/EDC15).";
                     mLastBootmodeLayout = null;
                     mLastBootmodeLayoutError = errorMessage;
                     return false;
@@ -1905,6 +1954,8 @@ namespace Communication
             {
                 case ECUFlashVariant.ME7:
                     return ExtFlashAddress_ME7;
+                case ECUFlashVariant.M59:
+                    return ExtFlashAddress_M59;
                 case ECUFlashVariant.Simos3:
                     return ExtFlashAddress_Simos3;
                 case ECUFlashVariant.EDC15:
@@ -1917,7 +1968,7 @@ namespace Communication
         /// <summary>
         /// Reads external flash memory.
         /// </summary>
-        /// <param name="variant">ECU/Flash variant (ME7, Simos3, or EDC15)</param>
+        /// <param name="variant">ECU/Flash variant (ME7, M5.9.2, Simos3, or EDC15)</param>
         /// <param name="startAddress">Start address offset from flash base (0-based)</param>
         /// <param name="size">Number of bytes to read</param>
         /// <param name="data">Output buffer for read data</param>
@@ -2029,7 +2080,7 @@ namespace Communication
         /// <summary>
         /// Loads a flash driver into ECU memory.
         /// </summary>
-        /// <param name="variant">ECU/Flash variant (ME7, Simos3, or EDC15)</param>
+        /// <param name="variant">ECU/Flash variant (ME7, M5.9.2, Simos3, or EDC15)</param>
         /// <returns>True if driver loaded successfully, false otherwise</returns>
         public bool LoadFlashDriver(ECUFlashVariant variant)
         {
@@ -2043,6 +2094,7 @@ namespace Communication
             switch (variant)
             {
                 case ECUFlashVariant.ME7:
+                case ECUFlashVariant.M59:
                 case ECUFlashVariant.EDC15:
                     driverData = Properties.Resources.BootmodeFlashDriverME7;
                     break;
@@ -2243,6 +2295,8 @@ namespace Communication
             {
                 case ECUFlashVariant.ME7:
                     return ExtFlashWriteAddress_ME7;
+                case ECUFlashVariant.M59:
+                    return ExtFlashWriteAddress_M59;
                 case ECUFlashVariant.Simos3:
                     return ExtFlashWriteAddress_Simos3;
                 case ECUFlashVariant.EDC15:
@@ -2278,15 +2332,23 @@ namespace Communication
         }
 
         /// <summary>
+        /// Returns true if the flash device ID is the 256KB 29F200 used on M5.9.2.
+        /// </summary>
+        public static bool IsM59FlashDevice(ushort deviceID)
+        {
+            return deviceID == DEV_ID_F200;
+        }
+
+        /// <summary>
         /// Determines if a flash device ID represents a bottom boot or top boot chip.
         /// </summary>
         /// <param name="deviceID">Flash device ID</param>
         /// <returns>True if bottom boot, false if top boot</returns>
         public static bool IsBottomBoot(ushort deviceID)
         {
-            // F400BB and F800BB are bottom boot
+            // F200, F400BB and F800BB are bottom boot
             // F400BT and F800BT are top boot
-            return (deviceID == DEV_ID_F400BB || deviceID == DEV_ID_F800BB);
+            return (deviceID == DEV_ID_F200 || deviceID == DEV_ID_F400BB || deviceID == DEV_ID_F800BB);
         }
 
         /// <summary>
@@ -2298,6 +2360,8 @@ namespace Communication
         {
             switch (deviceID)
             {
+                case DEV_ID_F200:
+                    return 256 * 1024;  // 256KB (29F200, M5.9.2)
                 case DEV_ID_F400BB:
                 case DEV_ID_F400BT:
                     return 512 * 1024;  // 512KB
