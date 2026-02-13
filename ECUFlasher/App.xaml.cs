@@ -99,6 +99,14 @@ namespace ECUFlasher
         {
             try
             {
+                // Migrate settings from previous version when upgrading (runs once per version)
+                if (!ECUFlasher.Properties.Settings.Default.SettingsUpgraded)
+                {
+                    ECUFlasher.Properties.Settings.Default.Upgrade();
+                    ECUFlasher.Properties.Settings.Default.SettingsUpgraded = true;
+                    ECUFlasher.Properties.Settings.Default.Save();
+                }
+
                 mPropertyErrors = new Dictionary<string, string>();
 
                 mLogFileDirectory = GetAppDataDirectory();

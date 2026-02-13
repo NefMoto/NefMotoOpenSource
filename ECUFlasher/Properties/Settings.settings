@@ -1,4 +1,4 @@
-﻿<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='utf-8'?>
 <SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="ECUFlasher.Properties" GeneratedClassName="Settings">
   <Profiles />
   <Settings>
@@ -49,6 +49,9 @@
     </Setting>
     <Setting Name="SupportedKWP2000BaudRates" Type="System.Collections.ArrayList" Scope="User">
       <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SettingsUpgraded" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
     </Setting>
   </Settings>
 </SettingsFile>
