@@ -137,6 +137,9 @@
       <Component Id="ApplicationShared.dll" Guid="d42fabc7-0a7b-48b2-8104-3b8f85d8d525">
         <File Id="ApplicationShared.dll" Name="ApplicationShared.dll" Source="$(var.TargetDir)ApplicationShared.dll" KeyPath="yes" />
       </Component>
+      <Component Id="Checksum.dll" Guid="e5f6a7b8-c9d0-e1f2-3456-789012345678">
+        <File Id="Checksum.dll" Name="Checksum.dll" Source="$(var.TargetDir)Checksum.dll" KeyPath="yes" />
+      </Component>
     </ComponentGroup>
     <ComponentGroup Id="RuntimeDlls" Directory="Net80Folder">
       <Component Id="System.IO.Ports.dll.runtime" Guid="a7b8c9d0-e1f2-3456-7890-123456789abc">
