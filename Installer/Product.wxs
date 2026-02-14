@@ -23,6 +23,7 @@
       <ComponentGroupRef Id="DesktopShortcut" />
     </Feature>
 
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPINSTALLLOCATION" Value="INSTALLFOLDER" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <Property Id="ProductVersionDisplay" Value="$(var.FullVersion)" />
@@ -46,6 +47,12 @@
     <Launch
       Condition="Installed OR DOTNET8STATUS=&quot;0&quot; OR DOTNET8STATUS86=&quot;0&quot;"
       Message="This application requires the .NET 8.0 Runtime. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0" />
+
+    <!-- Remove shortcuts on uninstall (custom action; WiX component removal fails for per-user paths) -->
+    <CustomAction Id="RemoveShortcutsCA" Directory="System6432Folder" ExeCommand="cmd.exe /c del /q &quot;%PUBLIC%\Desktop\NefMotoECUFlasher.lnk&quot; 2&gt;nul &amp; del /q &quot;%USERPROFILE%\Desktop\NefMotoECUFlasher.lnk&quot; 2&gt;nul &amp; rmdir /s /q &quot;%ProgramData%\Microsoft\Windows\Start Menu\Programs\NefMotoECUFlasher&quot; 2&gt;nul &amp; rmdir /s /q &quot;%APPDATA%\Microsoft\Windows\Start Menu\Programs\NefMotoECUFlasher&quot; 2&gt;nul" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveShortcutsCA" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
   </Package>
 
   <Fragment>
@@ -92,6 +99,7 @@
       <Directory Id="ApplicationProgramsFolder" Name="$(var.ProductName)" />
     </StandardDirectory>
     <StandardDirectory Id="DesktopFolder" />
+    <StandardDirectory Id="System6432Folder" />
   </Fragment>
 
   <Fragment>
@@ -112,6 +120,9 @@
         <File Id="$(var.ProductName).exe" Name="$(var.ProductName).exe" Source="$(var.TargetDir)$(var.ProductName).exe" KeyPath="yes">
           <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="$(var.ProductName)" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
         </File>
+        <!-- Remove desktop shortcut on uninstall (fallback; DesktopFolder may resolve to user or Public desktop) -->
+        <RemoveFile Id="RemoveDesktopShortcut" Name="$(var.ProductName).lnk" Directory="DesktopFolder" On="uninstall" />
+        <RemoveFile Id="RemoveCommonDesktopShortcut" Name="$(var.ProductName).lnk" Property="CommonDesktopFolder" On="uninstall" />
       </Component>
       <Component Id="$(var.ProductName).exe.config" Guid="5d029180-2042-4344-b43b-e5b0809e9887">
         <File Id="$(var.ProductName).exe.config" Name="$(var.ProductName).exe.config" Source="ECUFlasher\app.config" KeyPath="yes" />
