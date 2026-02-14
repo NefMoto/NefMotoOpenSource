@@ -52,7 +52,7 @@
     <ComponentGroup Id="ApplicationShortcuts" Directory="ApplicationProgramsFolder">
       <Component Id="ApplicationProgramsFolder" Guid="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
         <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
-        <RegistryValue Root="HKCU" Key="Software\Nefmoto\$(var.ProductName)" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKMU" Key="Software\Nefmoto\$(var.ProductName)" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
   </Fragment>
@@ -99,7 +99,7 @@
     <ComponentGroup Id="DesktopShortcut" Directory="DesktopFolder">
       <Component Id="DesktopShortcutComponent" Guid="f1e2d3c4-b5a6-9780-cdef-123456789abc">
         <Shortcut Id="DesktopShortcut" Name="$(var.ProductName)" Target="[INSTALLFOLDER]$(var.ProductName).exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
-        <RegistryValue Root="HKCU" Key="Software\Nefmoto\$(var.ProductName)" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKMU" Key="Software\Nefmoto\$(var.ProductName)" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
   </Fragment>
