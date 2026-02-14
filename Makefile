@@ -8,14 +8,14 @@ RELEASE_DIR := ECUFlasher/bin/msil/Release/net8.0-windows
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(VERSION).msi
 
-.PHONY: all debug release test clean installer help
+.PHONY: all debug release test clean installer help force
 
 all: debug
 
-debug $(DEBUG_DIR)/NefMotoECUFlasher.exe:
+debug $(DEBUG_DIR)/NefMotoECUFlasher.exe: force
 	@$(MAKE) CONFIG=Debug build
 
-release $(RELEASE_DIR)/NefMotoECUFlasher.exe:
+release $(RELEASE_DIR)/NefMotoECUFlasher.exe: force
 	@$(MAKE) CONFIG=Release build
 
 test: build
