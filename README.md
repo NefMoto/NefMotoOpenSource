@@ -49,7 +49,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### CH340 Devices
 
 - **Slow init is not supported** - CH340 devices cannot reliably generate the 5-baud break signal required for slow init. Use fast init instead.
-- **Bootmode:** Use 57600 baud for best compatibility; 9600/19200 may fail at BUSCON3.
+- **Bootmode:** Use 57600 or 38400 baud for best compatibility. 9600/19200 may fail non-deterministically (wrong ACKs, NAK, readback errors). Likely cause: USB latency/buffering, jitter, or voltage; not baud error. Use FTDI for lower baud rates. See [issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44).
 
 ### Platform
 
