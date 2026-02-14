@@ -86,7 +86,8 @@ jobs:
 
     - name: Build installer
       env:
-        VERSION: ${{ steps.release.outputs.tag }}
+        # NEVER export VERSION, the SDK will use it (incorrectly), expecting a sanitized version like "1.2.3.4"
+        FULL_VERSION: ${{ steps.release.outputs.tag }}
       run: make installer
       shell: bash
 
