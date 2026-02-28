@@ -91,6 +91,12 @@ jobs:
       run: make installer
       shell: bash
 
+    - name: Install git-cliff
+      uses: kenji-miyake/setup-git-cliff@v2
+      with:
+        target-platform: x86_64-pc-windows-msvc
+        archive-extension: zip
+
     - name: Find MSI file
       id: find_msi
       shell: pwsh
@@ -116,56 +122,25 @@ jobs:
         tag="${{ steps.release.outputs.tag }}"
         msiName="${{ steps.find_msi.outputs.msi_name }}"
         msiUrl="https://github.com/${{ github.repository }}/releases/download/${tag}/${msiName}"
-        token="${{ secrets.GITHUB_TOKEN }}"
-        repo="${{ github.repository }}"
         prev_tag="${{ steps.release.outputs.prev_tag }}"
+        prerelease="${{ steps.release.outputs.prerelease }}"
 
-        # Generate standard release notes using GitHub API
-        response=$(curl -s -w "\n%{http_code}" \
-          -X POST \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${token}" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          -H "Content-Type: application/json" \
-          -d "{\"tag_name\":\"${tag}\",\"previous_tag_name\":\"${prev_tag}\",\"target_commitish\":\"${tag}\"}" \
-          "https://api.github.com/repos/${repo}/releases/generate-notes")
-
-        httpCode=$(echo "$response" | tail -n1)
-        body=$(echo "$response" | sed '$d')
-
-        if [ "$httpCode" = "200" ]; then
-          # Extract body from JSON response
-          if command -v jq &> /dev/null; then
-            releaseBody=$(echo "$body" | jq -r '.body')
-          else
-            # Fallback: try to extract body field manually
-            releaseBody=$(echo "$body" | grep -o '"body":"[^"]*"' | sed 's/"body":"\(.*\)"/\1/' | sed 's/\\n/\n/g')
-            if [ -z "$releaseBody" ]; then
-              echo "Warning: Could not parse JSON response, using fallback"
-              releaseBody=""
-            fi
-          fi
-
-          if [ -z "$releaseBody" ]; then
-            echo "Warning: Empty response body, using fallback"
-            releaseBody="## What's Changed"$'\n'$'\n'"Release ${tag}"
-          else
-            echo "Successfully generated release notes"
-          fi
+        # Generate changelog with git-cliff: stable uses -l (since previous stable), RC uses explicit range
+        if [ "$prerelease" = "true" ]; then
+          releaseBody=$(git cliff "$prev_tag..$tag")
         else
-          if [ "$httpCode" = "403" ]; then
-            echo "Warning: Permission denied (403). Token may not have 'repo' scope."
-          else
-            echo "Warning: Failed to generate release notes (HTTP $httpCode)"
-          fi
-          # Fallback if API call fails
+          releaseBody=$(git cliff -l)
+        fi
+
+        # Fallback if git-cliff produced nothing
+        if [ -z "$releaseBody" ]; then
           releaseBody="## What's Changed"$'\n'$'\n'"Release ${tag}"
         fi
 
         # Append MSI download link
         releaseBody="${releaseBody}"$'\n'$'\n'"## Downloads"$'\n'$'\n'"📦 [Download Installer](${msiUrl}) (${msiName})"
 
-        # Use multiline output format
+        # Multiline output for GITHUB_OUTPUT
         {
           echo "body<<EOF"
           echo "$releaseBody"
