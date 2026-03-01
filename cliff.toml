@@ -17,7 +17,7 @@ body = """
   {%- else -%}
     {%- set commit_message = commit.message -%}
   {%- endif %}
-  * {{ commit_message | split(pat="\n") | first | trim | replace_regex(from="(^|[^\\[])#([0-9]+)", to="$1[#$2](https://github.com/NefMoto/NefMotoOpenSource/issues/$2)") }}\
+  * {{ commit_message | split(pat="\n") | first | trim | replace_regex(from="(^|[^\\[])#([0-9]+)", to=["$1[#$2](", self::remote_url(), "/issues/$2)"] | join(sep="")) }}\
     {%- if commit.remote.username %} by @{{ commit.remote.username }}{% endif -%}
     {%- if commit.remote.pr_number %} in [#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }}){% endif %}
 {%- endfor -%}
@@ -96,6 +96,7 @@ commit_parsers = [
   { message = ".*", group = "<!-- 09 -->Other" },
 ]
 # Rewrite commit messages before display: (#123) → link; bare #123 → link (avoids matching inside [...])
+# Note: replace strings are not Tera-evaluated; URLs here stay hardcoded. Template uses remote_url().
 commit_preprocessors = [
   { pattern = '\\(#([0-9]+)\\)', replace = "([#$1](https://github.com/NefMoto/NefMotoOpenSource/issues/$1))" },
   { pattern = "(^|[^\\[])#([0-9]+)", replace = "$1[#$2](https://github.com/NefMoto/NefMotoOpenSource/issues/$2)" },
