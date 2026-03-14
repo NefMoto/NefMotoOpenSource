@@ -66,13 +66,15 @@ split_commits = false
 # Group commits by type. Prefix "<!-- N -->" controls section order (stripped in template).
 commit_parsers = [
   # Dependabot first (before [Ff]ix/[Ii]ssue which match "fix"/"issue" in merge messages)
-  { message = "^Merge pull request.*dependabot", group = "<!-- 10 -->Dependabot" },
+  { message = "^Merge pull request.*dependabot", group = "<!-- 10 -->Dependencies" },
   { message = "^Bump", skip = true },
   # Conventional commits
+  { message = "^deps", group = "<!-- 10 -->Dependencies" },
   { message = "^doc", group = "<!-- 03 -->Documentation" },
   { message = "^refactor", group = "<!-- 04 -->Refactor" },
   { message = "^perf", group = "<!-- 05 -->Performance" },
   { message = "^chore", group = "<!-- 06 -->Chore" },
+  { message = "^ci", group = "<!-- 06 -->Chore" },
   { message = "^cosmetic", group = "<!-- 06 -->Chore" },
   { message = "^style", group = "<!-- 07 -->Styling" },
   { message = "^test", group = "<!-- 08 -->Testing" },
