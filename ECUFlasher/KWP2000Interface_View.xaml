@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -124,11 +124,11 @@ Contact by Email: tony@nefariousmotorsports.com
             </ComboBox.ItemTemplate>
         </ComboBox>
         <Button Grid.Column="3" Grid.Row="0" Command="{Binding Path=App.RefreshDevicesCommand}" Style="{StaticResource ConnectionButtonsStyle}"/>
-        <Button Grid.Column="0" Grid.Row="1" Command="{Binding Path=DetectSupportedBaudRatesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Visibility="Collapsed"/>
-        <ComboBox Grid.Column="1" Grid.Row="1" Name="DesiredConnectionMethodComboBox" Style="{StaticResource ConnectionMethodComboBoxStyle}"
-							ItemsSource="{Binding Source={StaticResource ConnectionMethodEnumValues}}" ToolTip="Desired Connection Method"
+        <ComboBox Grid.Column="0" Grid.Row="1" Name="DesiredConnectionMethodComboBox" Style="{StaticResource ConnectionMethodComboBoxStyle}"
+							ItemsSource="{Binding Source={StaticResource ConnectionMethodEnumValues}}" ToolTip="Desired Connection Method (Slow Init / Fast Init)"
 							SelectedItem="{Binding Path=DesiredConnectionMethod, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
-        <Button Grid.Column="2" Grid.Row="1" Style="{StaticResource ConnectButtonStyle}"/>
+        <Button Grid.Column="1" Grid.Row="1" Style="{StaticResource ConnectButtonStyle}"/>
         <Button Grid.Column="3" Grid.Row="1" Command="{Binding Path=App.CancelCurrentOperationCommand}" Style="{StaticResource ReactiveCommandButtonStyle}"/>
+        <Button Grid.Column="3" Grid.Row="1" Command="{Binding Path=DetectSupportedBaudRatesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Visibility="Collapsed"/>
     </Grid>
 </UserControl>
