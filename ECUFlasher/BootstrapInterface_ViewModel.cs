@@ -44,6 +44,14 @@ namespace ECUFlasher
 			AvailableBaudRates.Add(57600);
 			AvailableBaudRates.Add(124800);
 
+            AvailableBootmodeVariants = new ObservableCollection<BootmodeVariantItem>
+            {
+                new BootmodeVariantItem(BootstrapInterface.ECUFlashVariant.ME7, "ME7"),
+                new BootmodeVariantItem(BootstrapInterface.ECUFlashVariant.M59, "M5.9.x"),
+                new BootmodeVariantItem(BootstrapInterface.ECUFlashVariant.Simos3, "Simos 3.x"),
+                new BootmodeVariantItem(BootstrapInterface.ECUFlashVariant.EDC15, "EDC15")
+            };
+
             // Get the last used baud rate; default to 57600 when 0 or not in list
             var previousRate = ECUFlasher.Properties.Settings.Default.DesiredBootModeBaudRate;
             var matched = AvailableBaudRates.FirstOrDefault(baudRate => (baudRate == previousRate));
@@ -80,6 +88,38 @@ namespace ECUFlasher
         }
 
         public ObservableCollection<uint> AvailableBaudRates { get; private set; }
+
+        public ObservableCollection<BootmodeVariantItem> AvailableBootmodeVariants { get; private set; }
+
+        /// <summary>
+        /// User-selected ECU variant for bootmode (ME7, M5.9.2, Simos3, EDC15). Persisted on BootstrapInterface.
+        /// </summary>
+        public BootstrapInterface.ECUFlashVariant DesiredBootmodeVariant
+        {
+            get { return BootstrapCommInterface != null ? BootstrapCommInterface.DesiredBootmodeVariant : BootstrapInterface.ECUFlashVariant.ME7; }
+            set
+            {
+                if (BootstrapCommInterface != null && BootstrapCommInterface.DesiredBootmodeVariant != value)
+                {
+                    BootstrapCommInterface.DesiredBootmodeVariant = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("DesiredBootmodeVariant"));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pair of ECU flash variant and display name for the bootmode variant dropdown.
+        /// </summary>
+        public sealed class BootmodeVariantItem
+        {
+            public BootstrapInterface.ECUFlashVariant Value { get; }
+            public string DisplayName { get; }
+            public BootmodeVariantItem(BootstrapInterface.ECUFlashVariant value, string displayName)
+            {
+                Value = value;
+                DisplayName = displayName;
+            }
+        }
 
         #region ConnectCommand
         public ReactiveCommand ConnectCommand
