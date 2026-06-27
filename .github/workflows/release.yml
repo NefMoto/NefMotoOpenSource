@@ -48,7 +48,7 @@ jobs:
           isPrerelease="false"
         fi
 
-        # Find previous stable tag (no hyphen) reachable from this tag
+        # Nearest ancestor tag (often the prior RC on the same release line)
         prev_tag=$(git describe --tags --match 'v[0-9]*' --abbrev=0 "${tag}^" 2>/dev/null || true)
         if [ -z "$prev_tag" ]; then
           echo "Error: Could not find previous stable tag before $tag"
@@ -127,7 +127,10 @@ jobs:
 
         # Generate changelog with git-cliff: stable uses -l (since previous stable), RC uses explicit range
         if [ "$prerelease" = "true" ]; then
-          releaseBody=$(git cliff "$prev_tag..$tag")
+          cliffBody=$(git cliff "$prev_tag..$tag")
+          # git-cliff labels range output with last stable tag (tag_pattern), not the range start
+          releaseBody="## What's Changed (since ${prev_tag})"
+          releaseBody="${releaseBody}"$'\n'"$(echo "$cliffBody" | tail -n +2)"
         else
           releaseBody=$(git cliff -l)
         fi

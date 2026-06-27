@@ -60,11 +60,11 @@ To rebuild an existing tag without moving it, use **Actions → Release → Run 
 
 ### What `release.yml` does
 
-1. **Determine tag type** — Tags with a hyphen suffix (e.g. `-rc1`) are pre-releases. Finds `prev_tag` (nearest ancestor tag from the tagged commit’s parent) for RC changelog ranges.
+1. **Determine tag type** — Tags with a hyphen suffix (e.g. `-rc1`) are pre-releases. Finds `prev_tag` (nearest ancestor tag from the tagged commit’s parent, often the prior RC) for RC changelog ranges.
 2. **Build** — `make release`, `make test CONFIG=Release`, `make installer` (WiX 6).
 3. **Release notes** — [git-cliff](https://git-cliff.org) via `kenji-miyake/setup-git-cliff@v2` (version not pinned):
    - **Stable:** `git cliff -l` — changelog since the previous stable tag (`tag_pattern` in `cliff.toml`).
-   - **Pre-release:** `git cliff $prev_tag..$tag` — commits since the previous tag on the line (often the prior RC).
+   - **Pre-release:** `git cliff $prev_tag..$tag` — commits since the previous tag on the line (often the prior RC). CI replaces git-cliff’s first line so the header reads `(since $prev_tag)`; git-cliff alone still prints the last **stable** tag there.
 4. **Publish** — Appends a `## Downloads` section with the MSI link, then creates the GitHub release via `softprops/action-gh-release@v3`.
 
 CI does **not** pass `--offline` to git-cliff so PR titles, issue links, and contributor metadata can resolve through the GitHub API.
@@ -93,10 +93,12 @@ git cliff --offline --unreleased
 git cliff --offline -l
 ```
 
-**Release candidate** (explicit range; RC tags are outside `tag_pattern`):
+**Release candidate** (incremental since the prior tag on the line; RC tags are outside `tag_pattern`):
 
 ```shell
-git cliff --offline v1.9.6.0..v1.9.6.1-rc1
+prev=v1.9.6.1-rc2
+tag=v1.9.6.1-rc3
+git cliff --offline "${prev}..${tag}" | { read -r _; echo "## What's Changed (since ${prev})"; cat; }
 ```
 
-Use the previous tag on the release line — often the last RC or the last stable tag for the first RC of a version.
+Use the previous tag on the release line — the last RC, or the last stable tag for the first RC of a version (e.g. `v1.9.6.0..v1.9.6.1-rc0`). The `{ read …; echo …; cat; }` block matches CI’s header fix; omit it only if you want git-cliff’s default `(since <last stable>)` label.

@@ -4,6 +4,8 @@
 [changelog]
 # Body template: group_by(group) for sections, group_by(message) for dedup.
 # Uses pr_title when available; replace_regex links #N (preprocessors only run on message).
+# Note: for explicit RC ranges (prev-rc..tag), previous.version is still the last stable tag
+# (tag_pattern). release.yml replaces the first line in CI; fix locally when previewing RCs.
 body = """
 ## What's Changed
 
