@@ -150,6 +150,22 @@ jobs:
           echo "EOF"
         } >> $GITHUB_OUTPUT
 
+    - name: Remove existing GitHub release (re-tag / re-run)
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        tag="${{ steps.release.outputs.tag }}"
+        # Deleting/recreating a tag leaves the old release object; create then fails with already_exists.
+        release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+          --jq ".[] | select(.tag_name==\"${tag}\") | .id" | head -1)
+        if [ -n "$release_id" ]; then
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+          echo "Deleted existing release for ${tag} (id ${release_id})"
+        else
+          echo "No existing release for ${tag}"
+        fi
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v3
       with:

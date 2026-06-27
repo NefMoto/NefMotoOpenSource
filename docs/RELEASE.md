@@ -47,7 +47,7 @@ Tag the commit on the branch you intend to ship (usually `main` or your release 
 
 Open **Actions → Release** for the workflow run, then **Releases** for the published asset and notes.
 
-To rebuild an existing tag without moving it, use **Actions → Release → Run workflow** (`workflow_dispatch`) and enter the tag name. The workflow checks out that ref and re-runs the full release job.
+To rebuild an existing tag without moving it, use **Actions → Release → Run workflow** (`workflow_dispatch`) and enter the tag name. The workflow checks out that ref and re-runs the full release job. CI deletes any existing GitHub release for that tag first, then publishes a fresh one (needed when a tag was deleted and recreated).
 
 ## CI workflows
 
@@ -65,7 +65,7 @@ To rebuild an existing tag without moving it, use **Actions → Release → Run 
 3. **Release notes** — [git-cliff](https://git-cliff.org) via `kenji-miyake/setup-git-cliff@v2` (version not pinned):
    - **Stable:** `git cliff -l` — changelog since the previous stable tag (`tag_pattern` in `cliff.toml`).
    - **Pre-release:** `git cliff $prev_tag..$tag` — commits since the previous tag on the line (often the prior RC). CI replaces git-cliff’s first line so the header reads `(since $prev_tag)`; git-cliff alone still prints the last **stable** tag there.
-4. **Publish** — Appends a `## Downloads` section with the MSI link, then creates the GitHub release via `softprops/action-gh-release@v3`.
+4. **Publish** — Deletes any existing GitHub release for the tag (re-tag / re-run), appends a `## Downloads` section with the MSI link, then creates the release via `softprops/action-gh-release@v3`.
 
 CI does **not** pass `--offline` to git-cliff so PR titles, issue links, and contributor metadata can resolve through the GitHub API.
 
