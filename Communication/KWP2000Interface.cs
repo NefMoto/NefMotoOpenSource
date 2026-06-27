@@ -1027,6 +1027,26 @@ namespace Communication
         }
         private KWP2000DiagnosticSessionType _CurrentDiagnosticSessionType = KWP2000DiagnosticSessionType.InternalUndefined;
 
+        internal bool ProgrammingSessionStartPending { get; private set; }
+
+        internal void NotifyProgrammingSessionStartAttempt()
+        {
+            ProgrammingSessionStartPending = true;
+        }
+
+        internal void NotifyProgrammingSessionStartFinished()
+        {
+            ProgrammingSessionStartPending = false;
+        }
+
+        private void LogMe75Pin121HintIfProgrammingSessionStartPending()
+        {
+            if (ProgrammingSessionStartPending)
+            {
+                KWP2000SettingsDefaults.LogMe75Pin121Hint(this);
+            }
+        }
+
         public override ConnectionStatusType ConnectionStatus
         {
             get
@@ -3436,6 +3456,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         if (ReadAndAppendToReceiveBuffer(1) == false)
                         {
                             DisplayStatusMessage("Disconnecting because there was no successful communication within " + CurrentTimingParameters.P3TesterResponseTimeMaxMs + "ms.", StatusMessageType.USER);
+                            LogMe75Pin121HintIfProgrammingSessionStartPending();
                             ConnectionStatus = ConnectionStatusType.Disconnected;
                         }
                     }
@@ -3528,6 +3549,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                             if (!mCurrentMessageReceivedAnyResponses)
                             {
                                 DisplayStatusMessage("Disconnecting because no response was received for the Tester Present message.", StatusMessageType.USER);
+                                LogMe75Pin121HintIfProgrammingSessionStartPending();
                                 //we didn't receive a response to the tester present message, after sending with the default num retries
                                 ConnectionStatus = ConnectionStatusType.Disconnected;
                             }

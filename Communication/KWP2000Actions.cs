@@ -231,10 +231,10 @@ namespace Communication
         {
         }
 
-		public StartDiagnosticSessionAction(KWP2000Interface commInterface, KWP2000DiagnosticSessionType sessionType, uint baudRate)
-			: this(commInterface, sessionType, new List<uint>(){baudRate})
-		{
-		}
+        public StartDiagnosticSessionAction(KWP2000Interface commInterface, KWP2000DiagnosticSessionType sessionType, uint baudRate)
+            : this(commInterface, sessionType, new List<uint>() { baudRate })
+        {
+        }
 
         public StartDiagnosticSessionAction(KWP2000Interface commInterface, KWP2000DiagnosticSessionType sessionType, IEnumerable<uint> baudRates)
             : base(commInterface)
@@ -263,60 +263,60 @@ namespace Communication
 
             if (result)
             {
-				// Handle null baudRates by defaulting to BAUD_UNSPECIFIED (use current/default baud rate)
-				if (mBaudRates == null)
-				{
-					mBaudRates = new List<uint>() { (uint)KWP2000BaudRates.BAUD_UNSPECIFIED };
-				}
-				// Dispose previous enumerator if it exists before creating a new one
-				if (mCurrentBaudRate != null)
-				{
-					mCurrentBaudRate.Dispose();
-				}
-				mCurrentBaudRate = mBaudRates.GetEnumerator();
-				result = mCurrentBaudRate.MoveNext();//move to the first baud rate
+                // Handle null baudRates by defaulting to BAUD_UNSPECIFIED (use current/default baud rate)
+                if (mBaudRates == null)
+                {
+                    mBaudRates = new List<uint>() { (uint)KWP2000BaudRates.BAUD_UNSPECIFIED };
+                }
+                // Dispose previous enumerator if it exists before creating a new one
+                if (mCurrentBaudRate != null)
+                {
+                    mCurrentBaudRate.Dispose();
+                }
+                mCurrentBaudRate = mBaudRates.GetEnumerator();
+                result = mCurrentBaudRate.MoveNext();//move to the first baud rate
 
-				if (result)
-				{
-					if (ShouldStartDiagnosticSession(KWP2000CommInterface, mSessionType, mCurrentBaudRate.Current))
-					{
-						mMessageFormatState = MessageFormatState.SpecificBaudRate;
+                if (result)
+                {
+                    if (ShouldStartDiagnosticSession(KWP2000CommInterface, mSessionType, mCurrentBaudRate.Current))
+                    {
+                        mMessageFormatState = MessageFormatState.SpecificBaudRate;
 
-						uint targetBaudRate = mCurrentBaudRate.Current;
+                        uint targetBaudRate = mCurrentBaudRate.Current;
 
-						//Standard sessions must use BAUD_DEFAULT or BAUD_UNSPECIFIED in the message
-						//Don't change physical baud rate - just use BAUD_UNSPECIFIED in message to satisfy assertion
-						if (mSessionType == KWP2000DiagnosticSessionType.StandardSession && targetBaudRate != (uint)KWP2000BaudRates.BAUD_DEFAULT && targetBaudRate != (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
-						{
-							targetBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
-							mMessageFormatState = MessageFormatState.NoBaudRate;
-						}
-						else if (targetBaudRate == (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
-						{
-							//Standard sessions have to be started with 10400 baud or no baud.
-							//If we aren't connected, use default baud rate.
-							if (!CommInterface.IsConnectionOpen() || (mSessionType == KWP2000DiagnosticSessionType.StandardSession))
-							{
-								targetBaudRate = (uint)KWP2000BaudRates.BAUD_DEFAULT;
-							}
-							else
-							{
-								targetBaudRate = KWP2000CommInterface.DiagnosticSessionBaudRate;
+                        //Standard sessions must use BAUD_DEFAULT or BAUD_UNSPECIFIED in the message
+                        //Don't change physical baud rate - just use BAUD_UNSPECIFIED in message to satisfy assertion
+                        if (mSessionType == KWP2000DiagnosticSessionType.StandardSession && targetBaudRate != (uint)KWP2000BaudRates.BAUD_DEFAULT && targetBaudRate != (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
+                        {
+                            targetBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
+                            mMessageFormatState = MessageFormatState.NoBaudRate;
+                        }
+                        else if (targetBaudRate == (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
+                        {
+                            //Standard sessions have to be started with 10400 baud or no baud.
+                            //If we aren't connected, use default baud rate.
+                            if (!CommInterface.IsConnectionOpen() || (mSessionType == KWP2000DiagnosticSessionType.StandardSession))
+                            {
+                                targetBaudRate = (uint)KWP2000BaudRates.BAUD_DEFAULT;
+                            }
+                            else
+                            {
+                                targetBaudRate = KWP2000CommInterface.DiagnosticSessionBaudRate;
 
-								mMessageFormatState = MessageFormatState.NoBaudRate;
-							}
-						}
+                                mMessageFormatState = MessageFormatState.NoBaudRate;
+                            }
+                        }
 
-						SendStartDiagnosticSessionMessageData(mSessionType, targetBaudRate);
-						DisplayStatusMessage("Starting diagnostic session.", StatusMessageType.USER);
-					}
-					else
-					{
-						ActionCompleted(true);
-					}
+                        SendStartDiagnosticSessionMessageData(mSessionType, targetBaudRate);
+                        DisplayStatusMessage("Starting diagnostic session.", StatusMessageType.USER);
+                    }
+                    else
+                    {
+                        ActionCompleted(true);
+                    }
 
-					result = true;
-				}
+                    result = true;
+                }
             }
 
             return result;
@@ -334,18 +334,48 @@ namespace Communication
                 messageData = new byte[1];
                 messageData[0] = (byte)sessionType;
 
-				DisplayStatusMessage("Starting " + sessionType + " diagnostic session without baud rate.", StatusMessageType.LOG);
+                DisplayStatusMessage("Starting " + sessionType + " diagnostic session without baud rate.", StatusMessageType.LOG);
             }
             else
             {
                 messageData = new byte[2];
                 messageData[0] = (byte)sessionType;
-				messageData[1] = CalculateBaudRateByte(baudRate);
+                messageData[1] = CalculateBaudRateByte(baudRate);
 
-				DisplayStatusMessage("Starting " + sessionType + " diagnostic session with " + baudRate + " baud rate.", StatusMessageType.LOG);
+                DisplayStatusMessage("Starting " + sessionType + " diagnostic session with " + baudRate + " baud rate.", StatusMessageType.LOG);
             }
 
             SendMessage((byte)KWP2000ServiceID.StartDiagnosticSession, messageData);
+
+            if (sessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+            {
+                KWP2000CommInterface.NotifyProgrammingSessionStartAttempt();
+            }
+        }
+
+        protected override void ActionCompletedInternal(bool success, bool communicationError)
+        {
+            if (!IsComplete && mSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+            {
+                KWP2000CommInterface.NotifyProgrammingSessionStartFinished();
+            }
+
+            base.ActionCompletedInternal(success, communicationError);
+        }
+
+        protected override void ResponsesFinishedHandler(KWP2000Interface commInterface, KWP2000Message message, bool sentProperly, bool receivedAnyReplies, bool waitedForAllReplies, uint numRetries)
+        {
+            if (!IsComplete
+                && message.mServiceID == (byte)KWP2000ServiceID.StartDiagnosticSession
+                && mSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+            {
+                DisplayStatusMessage("Programming diagnostic session did not start successfully.", StatusMessageType.USER);
+                KWP2000SettingsDefaults.LogMe75Pin121Hint(CommInterface);
+                ActionCompleted(false);
+                return;
+            }
+
+            base.ResponsesFinishedHandler(commInterface, message, sentProperly, receivedAnyReplies, waitedForAllReplies, numRetries);
         }
 
         protected override bool MessageHandler(KWP2000Interface commInterface, KWP2000Message message)
@@ -401,17 +431,17 @@ namespace Communication
                         }
                     }
 
-					if (sessionTypeOK)
-					{
-						DisplayStatusMessage("Successfully started diagnostic session.", StatusMessageType.USER);
-						ActionCompleted(true);
-					}
-					else
-					{
-						ActionCompleted(false);
-					}
+                    if (sessionTypeOK)
+                    {
+                        DisplayStatusMessage("Successfully started diagnostic session.", StatusMessageType.USER);
+                        ActionCompleted(true);
+                    }
+                    else
+                    {
+                        ActionCompleted(false);
+                    }
                 }
-				else if (KWP2000Interface.IsPositiveResponseToRequest((byte)KWP2000ServiceID.StopDiagnosticSession, message))
+                else if (KWP2000Interface.IsPositiveResponseToRequest((byte)KWP2000ServiceID.StopDiagnosticSession, message))
                 {
                     KWP2000CommInterface.DiagnosticSessionBaudRate = (uint)KWP2000BaudRates.BAUD_DEFAULT;
                     KWP2000CommInterface.CurrentDiagnosticSessionType = KWP2000DiagnosticSessionType.StandardSession;
@@ -429,50 +459,54 @@ namespace Communication
                         ActionCompleted(true);
                     }
                 }
-				else if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.StartDiagnosticSession, message))
-				{
-				    if (message.DataLength >= 2)
-				    {
-				        if (message.mData[1] == (byte)KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested)
-				        {
-				            DisplayStatusMessage("Start diagnostic session failed, ECU reports security access is required.", StatusMessageType.USER);
+                else if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.StartDiagnosticSession, message))
+                {
+                    if (message.DataLength >= 2)
+                    {
+                        if (message.mData[1] == (byte)KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested)
+                        {
+                            DisplayStatusMessage("Start diagnostic session failed, ECU reports security access is required.", StatusMessageType.USER);
+                            if (mSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                            {
+                                KWP2000SettingsDefaults.LogMe75Pin121Hint(CommInterface);
+                            }
 
-				            ActionCompleted(false);
-				            handled = true;
-				        }
-				        else if (message.mData[1] == (byte)KWP2000ResponseCode.NoProgram)
-				        {
-				            if (mSessionType == KWP2000DiagnosticSessionType.StandardSession)
-				            {
-				                DisplayStatusMessage("Start diagnostic session failed, ECU reports NoProgram. Trying to start diagnostic session by stopping current session.", StatusMessageType.LOG);
-				                SendMessage((byte)KWP2000ServiceID.StopDiagnosticSession);
-				                mMessageFormatState = MessageFormatState.StopSession;
-				                handled = true;
-				            }
-				            else
-				            {
-				                giveUpAndTryToUseCurrentSession = true;
-				            }
-				        }
-				        //TODO: should we handle more error responses with different formats?
-				        else if ((message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)//baud rate can cause this
-				                || (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)//not being able to exit programming mode can cause this
-				                || (message.mData[1] == (byte)KWP2000ResponseCode.RequestOutOfRange))//baud rate can cause this
-				        {
+                            ActionCompleted(false);
+                            handled = true;
+                        }
+                        else if (message.mData[1] == (byte)KWP2000ResponseCode.NoProgram)
+                        {
+                            if (mSessionType == KWP2000DiagnosticSessionType.StandardSession)
+                            {
+                                DisplayStatusMessage("Start diagnostic session failed, ECU reports NoProgram. Trying to start diagnostic session by stopping current session.", StatusMessageType.LOG);
+                                SendMessage((byte)KWP2000ServiceID.StopDiagnosticSession);
+                                mMessageFormatState = MessageFormatState.StopSession;
+                                handled = true;
+                            }
+                            else
+                            {
+                                giveUpAndTryToUseCurrentSession = true;
+                            }
+                        }
+                        //TODO: should we handle more error responses with different formats?
+                        else if ((message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)//baud rate can cause this
+                                || (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)//not being able to exit programming mode can cause this
+                                || (message.mData[1] == (byte)KWP2000ResponseCode.RequestOutOfRange))//baud rate can cause this
+                        {
                             switch (mMessageFormatState)
                             {
                                 case MessageFormatState.SpecificBaudRate:
                                 {
-									if (mCurrentBaudRate.MoveNext())
-									{
-										SendStartDiagnosticSessionMessageData(mSessionType, mCurrentBaudRate.Current);
-									}
-									else
-									{
-										mMessageFormatState = MessageFormatState.NoBaudRate;
+                                    if (mCurrentBaudRate.MoveNext())
+                                    {
+                                        SendStartDiagnosticSessionMessageData(mSessionType, mCurrentBaudRate.Current);
+                                    }
+                                    else
+                                    {
+                                        mMessageFormatState = MessageFormatState.NoBaudRate;
 
-										SendStartDiagnosticSessionMessageData(mSessionType, (uint)KWP2000BaudRates.BAUD_UNSPECIFIED);
-									}
+                                        SendStartDiagnosticSessionMessageData(mSessionType, (uint)KWP2000BaudRates.BAUD_UNSPECIFIED);
+                                    }
 
                                     handled = true;
                                     break;
@@ -487,53 +521,54 @@ namespace Communication
                                     }
                                     else
                                     {
-										giveUpAndTryToUseCurrentSession = true;
+                                        giveUpAndTryToUseCurrentSession = true;
                                     }
 
                                     break;
                                 }
                             }
 
-							if (!giveUpAndTryToUseCurrentSession)
-							{
-								if (message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
-								{
-									DisplayStatusMessage("Start diagnostic session failed, ECU reports sub function not supported or invalid format. Trying again with a different format.", StatusMessageType.LOG);
-								}
-								else if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
-								{
-									DisplayStatusMessage("Start diagnostic session failed, ECU reports conditions not correct or sequence error. Trying again with a different format.", StatusMessageType.LOG);
-								}
-								else if (message.mData[1] == (byte)KWP2000ResponseCode.RequestOutOfRange)
-								{
-									DisplayStatusMessage("Start diagnostic session failed, ECU reports request out of range. Trying again with a different format.", StatusMessageType.LOG);
-								}
-							}
-						}
-					}
-				}
-				else if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.StopDiagnosticSession, message))
-				{
-					giveUpAndTryToUseCurrentSession = true;
-				}
+                            if (!giveUpAndTryToUseCurrentSession)
+                            {
+                                if (message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
+                                {
+                                    DisplayStatusMessage("Start diagnostic session failed, ECU reports sub function not supported or invalid format. Trying again with a different format.", StatusMessageType.LOG);
+                                }
+                                else if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
+                                {
+                                    DisplayStatusMessage("Start diagnostic session failed, ECU reports conditions not correct or sequence error. Trying again with a different format.", StatusMessageType.LOG);
+                                }
+                                else if (message.mData[1] == (byte)KWP2000ResponseCode.RequestOutOfRange)
+                                {
+                                    DisplayStatusMessage("Start diagnostic session failed, ECU reports request out of range. Trying again with a different format.", StatusMessageType.LOG);
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.StopDiagnosticSession, message))
+                {
+                    giveUpAndTryToUseCurrentSession = true;
+                }
 
                 if (giveUpAndTryToUseCurrentSession)
                 {
-					handled = true;
+                    handled = true;
 
-					DisplayStatusMessage("Unable to properly start diagnostic session, attempting to continue with current undefined session.", StatusMessageType.USER);
+                    DisplayStatusMessage("Unable to properly start diagnostic session, attempting to continue with current undefined session.", StatusMessageType.USER);
 
-					if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
-					{
-						if (mSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-						{
-							DisplayStatusMessage("This can occur if the security lockout is running, or the engine is running. Please turn off the ignition and retry if this continues to fail.", StatusMessageType.USER);
-						}
-						else
-						{
-							DisplayStatusMessage("Please turn off the ignition and retry if this continues to fail.", StatusMessageType.USER);
-						}
-					}
+                    if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
+                    {
+                        if (mSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                        {
+                            DisplayStatusMessage("This can occur if the security lockout is running, or the engine is running. Please turn off the ignition and retry if this continues to fail.", StatusMessageType.USER);
+                            KWP2000SettingsDefaults.LogMe75Pin121Hint(CommInterface);
+                        }
+                        else
+                        {
+                            DisplayStatusMessage("Please turn off the ignition and retry if this continues to fail.", StatusMessageType.USER);
+                        }
+                    }
 
                     ActionCompleted(true);
                 }
@@ -541,6 +576,10 @@ namespace Communication
                 if (!handled)
                 {
                     DisplayStatusMessage("Failed to start diagnostic session.", StatusMessageType.USER);
+                    if (mSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                    {
+                        KWP2000SettingsDefaults.LogMe75Pin121Hint(CommInterface);
+                    }
 
                     if (message.mServiceID == (byte)KWP2000ServiceID.NegativeResponse)
                     {
@@ -576,7 +615,7 @@ namespace Communication
 
             var baudRate = (uint)((xPow * (yLower + 32) * 6400) / 32);
 
-			//Debug.Assert(CalculateBaudRateByte(baudRate) == baudRateByte);
+            //Debug.Assert(CalculateBaudRateByte(baudRate) == baudRateByte);
 
             return baudRate;
         }
@@ -621,9 +660,9 @@ namespace Communication
 
             var baudRateByte = (byte)(((bestExp & 0x7) << 5) | (z & 0x1F));
 
-			//Debug.Assert(CalculateBaudRateFromByte(baudRateByte) == baudRate);
+            //Debug.Assert(CalculateBaudRateFromByte(baudRateByte) == baudRate);
 
-			return baudRateByte;
+            return baudRateByte;
         }
 
         public enum MessageFormatState
@@ -636,7 +675,7 @@ namespace Communication
         protected MessageFormatState mMessageFormatState;
         protected KWP2000DiagnosticSessionType mSessionType;
         protected IEnumerable<uint> mBaudRates;
-		protected IEnumerator<uint> mCurrentBaudRate;
+        protected IEnumerator<uint> mCurrentBaudRate;
     };
 
     public class StopDiagnosticSessionAction : KWP2000Action

@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: nyet@nyet.org
 */
 
+using Shared;
+
 namespace Communication
 {
     /// <summary>
@@ -55,6 +57,17 @@ namespace Communication
 
         // TimingParameters uses 1000 instead of P2_DEFAULT_ECU_RESPONSE_MAX_TIME so reconnect works after fast timing negotiation
         public const long P2DefaultECUResponseMaxTimeMs = 1000;
+
+        public const string Me75Pin121Hint = "Bench ME7.5 (121-pin ECU): connect pin 121 to +12 V for KWP read/write."
+            + " Use the same switched +12 V as pins 3, 21, and 62. Pin 121 is the top right pin on the small ECU connector.";
+
+        public static void LogMe75Pin121Hint(CommunicationInterface commInterface)
+        {
+            if (commInterface != null)
+            {
+                commInterface.DisplayStatusMessage(Me75Pin121Hint, StatusMessageType.USER);
+            }
+        }
 
         public static TimingParameters CreateDefaultTimingParameters()
         {

@@ -1055,12 +1055,7 @@ namespace ECUFlasher
 
             if (CheckIfFlashMatchesCommand.IsEnabled)
             {
-                string confirmationMessage = "If you are ready to check if flash matches, confirm the following things:";
-                confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
-                confirmationMessage += "\n2) The engine is not running.";
-                confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
-
-                if (App.DisplayUserPrompt("Confirm Check if Flash Matches", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+                if (ConfirmFlashOperation("Confirm Check if Flash Matches", FlashConfirmationKind.CheckIfFlashMatches))
                 {
                     CheckIfFlashMatches();
                 }
@@ -1184,17 +1179,7 @@ namespace ECUFlasher
 
             if (WriteEntireFlashCommand.IsEnabled)
             {
-                string confirmationMessage = "If you are ready to write, confirm the following things:";
-                confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
-                confirmationMessage += "\n2) The engine is not running.";
-                confirmationMessage += "\n3) Battery voltage is at least 12 volts.";
-                confirmationMessage += "\n4) It is OK the ECU adaptation channels will be reset to defaults";
-                confirmationMessage += "\n5) Flashing process can run uninterrupted until complete.";
-                confirmationMessage += "\n6) You agree to release Nefarious Motorsports Inc from all liability.";
-                confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent writing the flash memory.";
-                confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
-
-                if (App.DisplayUserPrompt("Confirm Full Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+                if (ConfirmFlashOperation("Confirm Full Write ECU Flash Memory", FlashConfirmationKind.WriteEntire))
                 {
                     // Force verify to false for bootmode
                     bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
@@ -1295,18 +1280,7 @@ namespace ECUFlasher
 
             if (WriteDiffFlashCommand.IsEnabled)
             {
-                string confirmationMessage = "If you are ready to write, confirm the following things:";
-                confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
-                confirmationMessage += "\n2) The engine is not running.";
-                confirmationMessage += "\n3) Battery voltage is at least 12 volts.";
-                confirmationMessage += "\n4) It is OK the ECU adaptation channels will be reset to defaults";
-                confirmationMessage += "\n5) Flashing process can run uninterrupted until complete.";
-                confirmationMessage += "\n6) You agree to release Nefarious Motorsports Inc from all liability.";
-                confirmationMessage += "\n7) You agree to not use this tool commercially, as the nefmoto karma gods shall smite you if you do.";
-                confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent writing the flash memory.";
-                confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
-
-                if (App.DisplayUserPrompt("Confirm Diff Write ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+                if (ConfirmFlashOperation("Confirm Diff Write ECU Flash Memory", FlashConfirmationKind.WriteDiff))
                 {
                     // Force verify to false for bootmode
                     bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
@@ -1444,13 +1418,7 @@ namespace ECUFlasher
 
             if (ReadEntireFlashCommand.IsEnabled)
             {
-                string confirmationMessage = "If you are ready to read, confirm the following things:";
-                confirmationMessage += "\n1) You have loaded a valid memory layout for the ECU.";
-                confirmationMessage += "\n2) The engine is not running.";
-                confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent reading the flash memory.";
-                confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
-
-                if (App.DisplayUserPrompt("Confirm Full Read ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+                if (ConfirmFlashOperation("Confirm Full Read ECU Flash Memory", FlashConfirmationKind.ReadEntire))
                 {
                     App.OperationInProgress = true;
                     App.PercentOperationComplete = 0.0f;
@@ -1548,14 +1516,7 @@ namespace ECUFlasher
 
             if (ReadDiffFlashCommand.IsEnabled)
             {
-                string confirmationMessage = "If you are ready to read, confirm the following things:";
-                confirmationMessage += "\n1) You have loaded a valid file and memory layout for the ECU.";
-                confirmationMessage += "\n2) The engine is not running.";
-                confirmationMessage += "\nNote: Diff read will only read sectors that differ from the loaded file.";
-                confirmationMessage += "\nNote: Some non-standard flash memory chips may prevent reading the flash memory.";
-                confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
-
-                if (App.DisplayUserPrompt("Confirm Diff Read ECU Flash Memory", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+                if (ConfirmFlashOperation("Confirm Diff Read ECU Flash Memory", FlashConfirmationKind.ReadDiff))
                 {
                     App.OperationInProgress = true;
                     App.PercentOperationComplete = 0.0f;
@@ -2011,5 +1972,106 @@ namespace ECUFlasher
             }
         }
         private MemoryLayout _FlashMemoryLayout;
+
+        private enum FlashConfirmationKind
+        {
+            CheckIfFlashMatches,
+            ReadEntire,
+            ReadDiff,
+            WriteEntire,
+            WriteDiff,
+        }
+
+        private const string Me75BenchPin121Note = KWP2000SettingsDefaults.Me75Pin121Hint;
+
+        private bool ConfirmFlashOperation(string title, FlashConfirmationKind kind)
+        {
+            return App.DisplayUserPrompt(title, BuildFlashConfirmationMessage(kind, App.CommInterface), UserPromptType.OK_CANCEL) == UserPromptResult.OK;
+        }
+
+        private static string BuildFlashConfirmationMessage(FlashConfirmationKind kind, CommunicationInterface commInterface)
+        {
+            var lines = new List<string>();
+
+            switch (kind)
+            {
+                case FlashConfirmationKind.CheckIfFlashMatches:
+                    lines.Add("If you are ready to check if flash matches, confirm the following things:");
+                    lines.Add("1) You have loaded a valid file and memory layout for the ECU.");
+                    lines.Add("2) The engine is not running.");
+                    break;
+
+                case FlashConfirmationKind.ReadEntire:
+                    lines.Add("If you are ready to read, confirm the following things:");
+                    lines.Add("1) You have loaded a valid memory layout for the ECU.");
+                    lines.Add("2) The engine is not running.");
+                    lines.Add("Note: Some non-standard flash memory chips may prevent reading the flash memory.");
+                    AddMe75BenchPin121NoteIfKwp(lines, commInterface);
+                    break;
+
+                case FlashConfirmationKind.ReadDiff:
+                    lines.Add("If you are ready to read, confirm the following things:");
+                    lines.Add("1) You have loaded a valid file and memory layout for the ECU.");
+                    lines.Add("2) The engine is not running.");
+                    lines.Add("Note: Diff read will only read sectors that differ from the loaded file.");
+                    lines.Add("Note: Some non-standard flash memory chips may prevent reading the flash memory.");
+                    AddMe75BenchPin121NoteIfKwp(lines, commInterface);
+                    break;
+
+                case FlashConfirmationKind.WriteEntire:
+                    AddWriteChecklistLines(lines, includeCommercialDisclaimer: false);
+                    lines.Add("Note: Some non-standard flash memory chips may prevent writing the flash memory.");
+                    AddMe75BenchPin121NoteIfKwp(lines, commInterface);
+                    break;
+
+                case FlashConfirmationKind.WriteDiff:
+                    AddWriteChecklistLines(lines, includeCommercialDisclaimer: true);
+                    lines.Add("Note: Some non-standard flash memory chips may prevent writing the flash memory.");
+                    AddMe75BenchPin121NoteIfKwp(lines, commInterface);
+                    break;
+
+                default:
+                    Debug.Fail("Unknown FlashConfirmationKind");
+                    break;
+            }
+
+            AddConfirmationFooter(lines);
+            return JoinConfirmationLines(lines);
+        }
+
+        private static string JoinConfirmationLines(IEnumerable<string> lines)
+        {
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        private static void AddConfirmationFooter(List<string> lines)
+        {
+            lines.Add(string.Empty);
+            lines.Add("Click OK to confirm, otherwise Cancel.");
+        }
+
+        private static void AddWriteChecklistLines(List<string> lines, bool includeCommercialDisclaimer)
+        {
+            lines.Add("If you are ready to write, confirm the following things:");
+            lines.Add("1) You have loaded a valid file and memory layout for the ECU.");
+            lines.Add("2) The engine is not running.");
+            lines.Add("3) Battery voltage is at least 12 volts.");
+            lines.Add("4) It is OK the ECU adaptation channels will be reset to defaults");
+            lines.Add("5) Flashing process can run uninterrupted until complete.");
+            lines.Add("6) You agree to release Nefarious Motorsports Inc from all liability.");
+            if (includeCommercialDisclaimer)
+            {
+                lines.Add("7) You agree to not use this tool commercially, as the nefmoto karma gods shall smite you if you do.");
+            }
+        }
+
+        private static void AddMe75BenchPin121NoteIfKwp(List<string> lines, CommunicationInterface commInterface)
+        {
+            if (commInterface != null && commInterface.CurrentProtocol == CommunicationInterface.Protocol.KWP2000)
+            {
+                lines.Add(string.Empty);
+                lines.Add(Me75BenchPin121Note);
+            }
+        }
     }
 }

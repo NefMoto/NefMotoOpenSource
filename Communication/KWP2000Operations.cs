@@ -1065,6 +1065,10 @@ namespace Communication
                 if (!success && (mState != ReadingState.CompleteFailedReadWithChecksumCalculation))
                 {
                     CommInterface.DisplayStatusMessage("Reading ECU flash memory failed. Trying to force ECU to recognize read operation is complete.", StatusMessageType.USER);
+                    if (KWP2000CommInterface.CurrentDiagnosticSessionType != KWP2000DiagnosticSessionType.ProgrammingSession)
+                    {
+                        KWP2000SettingsDefaults.LogMe75Pin121Hint(CommInterface);
+                    }
 
                     mState = ReadingState.CompleteFailedReadWithChecksumCalculation;
                     success = true;
