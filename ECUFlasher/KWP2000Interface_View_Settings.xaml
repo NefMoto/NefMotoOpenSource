@@ -29,7 +29,7 @@ Contact by Email: tony@nefariousmotorsports.com
              xmlns:Communication="clr-namespace:Communication;assembly=Communication"
              xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
              mc:Ignorable="d"
-             d:DesignHeight="300" d:DesignWidth="300">
+             d:DesignHeight="300" d:DesignWidth="700">
     <UserControl.Resources>
 
         <ObjectDataProvider MethodName="GetValues" ObjectType="{x:Type sys:Enum}" x:Key="AddressModeEnumValues">
@@ -49,6 +49,8 @@ Contact by Email: tony@nefariousmotorsports.com
         </Style>
 
         <Style TargetType="TextBox" BasedOn="{StaticResource ValidationTextBoxStyle}">
+            <Setter Property="Width" Value="72"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Path=App.CommInterface.ConnectionStatus, Converter={StaticResource isConnectionOpenConverter}}" Value="true">
                     <Setter Property="FrameworkElement.IsEnabled" Value="false"/>
@@ -58,8 +60,22 @@ Contact by Email: tony@nefariousmotorsports.com
             </Style.Triggers>
         </Style>
 
-        <Style TargetType="CheckBox" BasedOn="{StaticResource DisconnectedBaseStyle}"/>
+        <Style TargetType="CheckBox" BasedOn="{StaticResource DisconnectedBaseStyle}">
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource ReactiveCommandButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=App.CommInterface.ConnectionStatus, Converter={StaticResource isConnectionOpenConverter}}" Value="true">
+                    <Setter Property="FrameworkElement.IsEnabled" Value="false"/>
+                    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+                    <Setter Property="FrameworkElement.ToolTip" Value="Must be disconnected to change setting"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}">
+            <Setter Property="MinWidth" Value="110"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Path=App.CommInterface.ConnectionStatus, Converter={StaticResource isConnectionOpenConverter}}" Value="true">
                     <Setter Property="FrameworkElement.IsEnabled" Value="false"/>
@@ -69,135 +85,292 @@ Contact by Email: tony@nefariousmotorsports.com
             </Style.Triggers>
         </Style>
 
-        <Style TargetType="Label" BasedOn="{StaticResource {x:Type Label}}">
+        <Style x:Key="SettingLabelStyle" TargetType="Label" BasedOn="{StaticResource {x:Type Label}}">
             <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="Padding" Value="0,2,8,2"/>
+        </Style>
+
+        <Style x:Key="SettingsGroupBoxStyle" TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Padding" Value="8,10,8,8"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" Foreground="{StaticResource ForegroundBrush}" FontWeight="Bold"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupBox">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="1"
+                                    CornerRadius="8"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}"/>
+                            <Border Grid.Row="0"
+                                    Margin="12,0,8,-10"
+                                    Padding="4,0,4,0"
+                                    Background="{StaticResource BackgroundBrush}"
+                                    HorizontalAlignment="Left"
+                                    Panel.ZIndex="1">
+                                <ContentPresenter ContentSource="Header"
+                                                  ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                                  RecognizesAccessKey="True"/>
+                            </Border>
+                            <ContentPresenter Grid.Row="1" Margin="{TemplateBinding Padding}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
     </UserControl.Resources>
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-        <Grid HorizontalAlignment="Left" VerticalAlignment="Top">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="4">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"></ColumnDefinition>
-                <ColumnDefinition Width="Auto" MinWidth="100"></ColumnDefinition>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
-                <RowDefinition></RowDefinition>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-                <Label Grid.Column="0" Grid.Row="0">Connection Address</Label>
-                <TextBox Grid.Column="1" Grid.Row="0" Text="{Binding Path=ConnectAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
+            <StackPanel Grid.Column="0" Grid.Row="0">
+                <GroupBox Header="Connection" Style="{StaticResource SettingsGroupBoxStyle}">
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                <Label Grid.Column="0" Grid.Row="1">Connection Address Mode</Label>
-                <ComboBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding Source={StaticResource AddressModeEnumValues}}"
-                    SelectedItem="{Binding Path=ConnectAddressMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Address"
+                               ToolTip="Connection address (hex). Slow init typically uses 0x11; fast init physical default is 0x01."/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding Path=ConnectAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
 
+                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Address mode"
+                               ToolTip="Physical or functional addressing mode used for fast init."/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Source={StaticResource AddressModeEnumValues}}"
+                                  SelectedItem="{Binding Path=ConnectAddressMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
-                <Label Grid.Column="0" Grid.Row="2">Number of Connection Attempts</Label>
-                <TextBox Grid.Column="1" Grid.Row="2" Text="{Binding Path=CommInterface.NumConnectionAttempts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                        <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Attempts"
+                               ToolTip="Number of connection attempts before giving up."/>
+                        <TextBox Grid.Row="2" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.NumConnectionAttempts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                    </Grid>
+                </GroupBox>
 
+                <GroupBox Header="Init timing" Style="{StaticResource SettingsGroupBoxStyle}">
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                <Label Grid.Column="0" Grid.Row="3">Fast Init Low High Time Offset MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="3" Text="{Binding Path=CommInterface.FastInitLowHighTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Fast init offset (ms)"
+                               ToolTip="Fast init low/high time offset in milliseconds."/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.FastInitLowHighTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
+                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Slow 5-baud offset (ms)"
+                               ToolTip="Five-baud bit time offset used during slow init break timing."/>
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.SlowInitFiveBaudBitTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
-                <Label Grid.Column="0" Grid.Row="4">Slow Init Five Baud Bit Time Offset MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="4" Text="{Binding Path=CommInterface.SlowInitFiveBaudBitTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                        <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Slow init gap (ms)"
+                               ToolTip="Time between slow inits before starting the KWP2000 session."/>
+                        <TextBox Grid.Row="2" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.TimeBetweenSlowInitForKWP2000MS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
+                        <Label Grid.Row="3" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Post slow-init (ms)"
+                               ToolTip="Delay after slow init before sending the start communication message."/>
+                        <TextBox Grid.Row="3" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.TimeAfterSlowInitBeforeStartCommMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                    </Grid>
+                </GroupBox>
 
-                <Label Grid.Column="0" Grid.Row="5">Time Between Slow Inits To Start KWP2000 MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="5" Text="{Binding Path=CommInterface.TimeBetweenSlowInitForKWP2000MS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                <GroupBox Header="Options" Style="{StaticResource SettingsGroupBoxStyle}">
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-
-                <Label Grid.Column="0" Grid.Row="6">Time After Slow Init Before Sending Start Communication Message MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="6" Text="{Binding Path=CommInterface.TimeAfterSlowInitBeforeStartCommMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-
-
-                <Label Grid.Column="0" Grid.Row="7">KWP1281 Tester Min Time Before Sending Byte Complement MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="7" Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendByteComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
-
-                <Label Grid.Column="0" Grid.Row="8">KWP1281 Tester Min Time Before Sending Response Message MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="8" Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendResponseMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
-
-                <Label Grid.Column="0" Grid.Row="9">KWP1281 Tester Min Time Before Sending Next Byte After Receiving Complement MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="9" Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
-
-                <Label Grid.Column="0" Grid.Row="10">Default P1 ECU Max Inter Byte Time MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="10" Text="{Binding Path=DefaultP1ECUInterByteTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
-
-                <Label Grid.Column="0" Grid.Row="11">Default P2 ECU Min Response Time MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="11" Text="{Binding Path=DefaultP2ECUResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
-
-                <Label Grid.Column="0" Grid.Row="12">Default P2 ECU Max Response Time MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="12" Text="{Binding Path=DefaultP2ECUResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-
-
-                <Label Grid.Column="0" Grid.Row="13">Default P3 Tester Min Response Time MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="13" Text="{Binding Path=DefaultP3TesterResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-
-
-                <Label Grid.Column="0" Grid.Row="14">Default P3 Tester Max Response Time MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="14" Text="{Binding Path=DefaultP3TesterResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-
-
-                <Label Grid.Column="0" Grid.Row="15">Default P4 Tester Min Inter Byte Time MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="15" Text="{Binding Path=DefaultP4TesterInterByteTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
-
-
-                <Label Grid.Column="0" Grid.Row="16">P4 Tester Min Inter Byte Time When Connecting MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="16" Text="{Binding Path=CommInterface.P4TesterInterByteTimeMinMsWhenConnecting, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
-
-                <Label Grid.Column="0" Grid.Row="17">Should Verify Cable In Dumb Mode</Label>
-                <CheckBox Grid.Column="1" Grid.Row="17" IsChecked="{Binding Path=CommInterface.ShouldVerifyDumbMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
-
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Verify cable in dumb mode"
+                               ToolTip="Verify the cable is wired correctly when communicating in dumb (KWP1281) mode."/>
+                        <CheckBox Grid.Row="0" Grid.Column="1"
+                                  IsChecked="{Binding Path=CommInterface.ShouldVerifyDumbMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                    </Grid>
+                </GroupBox>
 
                 <!-- Property names still contain "FTDI" for backward compatibility with saved preferences/settings -->
-                <Label Grid.Column="0" Grid.Row="18">Device Read Time Out MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="18" Text="{Binding Path=CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
+                <GroupBox Header="Device" Style="{StaticResource SettingsGroupBoxStyle}">
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Read timeout (ms)"
+                               ToolTip="Serial device read timeout in milliseconds."/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
-                <Label Grid.Column="0" Grid.Row="19">Device Write Time Out MS</Label>
-                <TextBox Grid.Column="1" Grid.Row="19" Text="{Binding Path=CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" />
+                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Write timeout (ms)"
+                               ToolTip="Serial device write timeout in milliseconds."/>
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                    </Grid>
+                </GroupBox>
 
+                <Button Command="{Binding Path=RestoreSettingsToDefaultsCommand}"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,8"/>
+            </StackPanel>
 
-                <Label Grid.Column="0" Grid.Row="20">Security Seed</Label>
-                <TextBox Grid.Column="1" Grid.Row="20" Text="{Binding Path=SeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
+            <StackPanel Grid.Column="2" Grid.Row="0">
+                <GroupBox Header="KWP1281 timing" Style="{StaticResource SettingsGroupBoxStyle}">
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Byte complement (ms)"
+                               ToolTip="Minimum time before the tester sends the byte complement during KWP1281 slow init."/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendByteComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
-                <Label Grid.Column="0" Grid.Row="21">Security Use Extended Seed Request</Label>
-                <CheckBox Grid.Column="1" Grid.Row="21" IsChecked="{Binding Path=ShouldUseExtendedSeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Response (ms)"
+                               ToolTip="Minimum time before the tester sends a response message during KWP1281."/>
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendResponseMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
+                        <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Next byte (ms)"
+                               ToolTip="Minimum time before sending the next byte after receiving the complement during KWP1281."/>
+                        <TextBox Grid.Row="2" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                    </Grid>
+                </GroupBox>
 
-                <Label Grid.Column="0" Grid.Row="22">Security Support Special Key</Label>
-                <CheckBox Grid.Column="1" Grid.Row="22" IsChecked="{Binding Path=ShouldSupportSpecialKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                <GroupBox Header="Default timings (ms)" Style="{StaticResource SettingsGroupBoxStyle}">
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P1 ECU max inter-byte"
+                               ToolTip="Default P1: maximum ECU inter-byte time in milliseconds."/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding Path=DefaultP1ECUInterByteTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P2 ECU min response"
+                               ToolTip="Default P2 minimum: minimum ECU response time in milliseconds."/>
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Text="{Binding Path=DefaultP2ECUResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P2 ECU max response"
+                               ToolTip="Default P2 maximum: maximum ECU response time in milliseconds."/>
+                        <TextBox Grid.Row="2" Grid.Column="1"
+                                 Text="{Binding Path=DefaultP2ECUResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="3" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P3 tester min response"
+                               ToolTip="Default P3 minimum: minimum tester response time in milliseconds."/>
+                        <TextBox Grid.Row="3" Grid.Column="1"
+                                 Text="{Binding Path=DefaultP3TesterResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="4" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P3 tester max response"
+                               ToolTip="Default P3 maximum: maximum tester response time in milliseconds."/>
+                        <TextBox Grid.Row="4" Grid.Column="1"
+                                 Text="{Binding Path=DefaultP3TesterResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="5" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P4 tester min inter-byte"
+                               ToolTip="Default P4 minimum: minimum tester inter-byte time in milliseconds."/>
+                        <TextBox Grid.Row="5" Grid.Column="1"
+                                 Text="{Binding Path=DefaultP4TesterInterByteTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="6" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P4 min when connecting"
+                               ToolTip="P4 minimum inter-byte time used while connecting. Some ECUs need a higher value than the default session timing."/>
+                        <TextBox Grid.Row="6" Grid.Column="1"
+                                 Text="{Binding Path=CommInterface.P4TesterInterByteTimeMinMsWhenConnecting, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox Header="Security access" Style="{StaticResource SettingsGroupBoxStyle}">
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Seed request"
+                               ToolTip="Security access seed request byte (hex) sent to the ECU."/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding Path=SeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Use extended seed request"
+                               ToolTip="Use the extended security access seed request format."/>
+                        <CheckBox Grid.Row="1" Grid.Column="1"
+                                  IsChecked="{Binding Path=ShouldUseExtendedSeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Support special key"
+                               ToolTip="Enable support for ECU-specific special security keys."/>
+                        <CheckBox Grid.Row="2" Grid.Column="1"
+                                  IsChecked="{Binding Path=ShouldSupportSpecialKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                    </Grid>
+                </GroupBox>
+            </StackPanel>
         </Grid>
     </ScrollViewer>
 

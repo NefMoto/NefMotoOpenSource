@@ -180,8 +180,7 @@ namespace ECUFlasher
         }
         private ConnectionMethod _DesiredConnectionMethod = ConnectionMethod.SlowInit;
 
-		private const byte ConnectAddressDefaultValue = KWP2000Interface.DEFAULT_ECU_FASTINIT_KWP2000_PHYSICAL_ADDRESS;
-		[DefaultValue(ConnectAddressDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.ConnectAddress)]
         public byte ConnectAddress
         {
             get
@@ -198,10 +197,9 @@ namespace ECUFlasher
                 }
             }
         }
-		private byte mConnectAddress = ConnectAddressDefaultValue;
+		private byte mConnectAddress = KWP2000SettingsDefaults.ConnectAddress;
 
-		private const KWP2000AddressMode ConnectAddressModeDefaultValue = KWP2000AddressMode.Physical;
-		[DefaultValue(ConnectAddressModeDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.ConnectAddressMode)]
         public KWP2000AddressMode ConnectAddressMode
         {
             get
@@ -218,7 +216,7 @@ namespace ECUFlasher
                 }
             }
         }
-		private KWP2000AddressMode _ConnectAddressMode = ConnectAddressModeDefaultValue;
+		private KWP2000AddressMode _ConnectAddressMode = KWP2000SettingsDefaults.ConnectAddressMode;
         #endregion
 
 		#region DefaultTimingParameters
@@ -425,8 +423,7 @@ namespace ECUFlasher
 
 		#region SecuritySettings
 
-		private const byte SeedRequestDefaultValue = SecurityAccessAction.DEFAULT_REQUEST_SEED;
-		[DefaultValue(SeedRequestDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.SecuritySeedRequest)]
 		public byte SeedRequest
 		{
 			get { return _SeedRequest; }
@@ -439,10 +436,9 @@ namespace ECUFlasher
 				}
 			}
 		}
-		private byte _SeedRequest = SeedRequestDefaultValue;
+		private byte _SeedRequest = KWP2000SettingsDefaults.SecuritySeedRequest;
 
-		private const bool ShouldUseExtendedSeedRequestDefaultValue = false;
-		[DefaultValue(ShouldUseExtendedSeedRequestDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest)]
 		public bool ShouldUseExtendedSeedRequest
 		{
 			get { return _ShouldUseExtendedSeedRequest; }
@@ -455,10 +451,9 @@ namespace ECUFlasher
 				}
 			}
 		}
-		private bool _ShouldUseExtendedSeedRequest = ShouldUseExtendedSeedRequestDefaultValue;
+		private bool _ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
 
-		private const bool ShouldSupportSpecialKeyDefaultValue = false;
-		[DefaultValue(ShouldSupportSpecialKeyDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.SecuritySupportSpecialKey)]
 		public bool ShouldSupportSpecialKey
 		{
 			get { return _ShouldSupportSpecialKey; }
@@ -471,8 +466,58 @@ namespace ECUFlasher
 				}
 			}
 		}
-		private bool _ShouldSupportSpecialKey = ShouldSupportSpecialKeyDefaultValue;
+		private bool _ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;
 
+		#endregion
+
+		#region RestoreSettingsToDefaultsCommand
+		public ReactiveCommand RestoreSettingsToDefaultsCommand
+		{
+			get
+			{
+				if (_RestoreSettingsToDefaultsCommand == null)
+				{
+					_RestoreSettingsToDefaultsCommand = new ReactiveCommand(OnRestoreSettingsToDefaults, RestoreSettingsToDefaultsCommandCanExecute);
+					_RestoreSettingsToDefaultsCommand.Name = "Restore To Defaults";
+					_RestoreSettingsToDefaultsCommand.Description = "Restore KWP2000 settings tab values to their defaults";
+					_RestoreSettingsToDefaultsCommand.AddWatchedProperty(CommInterface, "ConnectionStatus");
+				}
+
+				return _RestoreSettingsToDefaultsCommand;
+			}
+		}
+		private ReactiveCommand _RestoreSettingsToDefaultsCommand;
+
+		private bool RestoreSettingsToDefaultsCommandCanExecute(List<string> reasonsDisabled)
+		{
+			bool result = true;
+
+			if (CommInterface.ConnectionStatus != CommunicationInterface.ConnectionStatusType.CommunicationTerminated)
+			{
+				reasonsDisabled.Add("Must be disconnected to restore settings");
+				result = false;
+			}
+
+			return result;
+		}
+
+		private void OnRestoreSettingsToDefaults()
+		{
+			KWP2000SettingsDefaults.ApplyTo(KWP2000CommInterface);
+
+			ConnectAddress = KWP2000SettingsDefaults.ConnectAddress;
+			ConnectAddressMode = KWP2000SettingsDefaults.ConnectAddressMode;
+			SeedRequest = KWP2000SettingsDefaults.SecuritySeedRequest;
+			ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
+			ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;
+
+			ECUFlasher.Properties.Settings.Default.Save();
+
+			if (App != null)
+			{
+				App.DisplayStatusMessage("KWP2000 settings restored to defaults.", StatusMessageType.USER);
+			}
+		}
 		#endregion
 
 		#region ConnectCommands

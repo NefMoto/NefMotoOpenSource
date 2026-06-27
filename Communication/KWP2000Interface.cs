@@ -51,7 +51,7 @@ namespace Communication
             P1ECUInterByteTimeMaxMs = KWP2000Interface.P1_DEFAULT_ECU_INTERBYTE_MAX_TIME;
             P2ECUResponseTimeMinMs = KWP2000Interface.P2_DEFAULT_ECU_RESPONSE_MIN_TIME;
             //changed this to 1000 because if we negotiate fast timings, then don't cleanly disconnect, we would time out on reconnecting
-            P2ECUResponseTimeMaxMs = 1000;//KWP2000Interface.P2_DEFAULT_ECU_RESPONSE_MAX_TIME;//max time from timings, or longer if response pending
+            P2ECUResponseTimeMaxMs = KWP2000SettingsDefaults.P2DefaultECUResponseMaxTimeMs;//max time from timings, or longer if response pending
             P3TesterResponseTimeMinMs = KWP2000Interface.P3_DEFAULT_TESTER_RESPONSE_MIN_TIME;
             P3TesterResponseTimeMaxMs = KWP2000Interface.P3_DEFAULT_TESTER_RESPONSE_MAX_TIME;
             P4TesterInterByteTimeMinMs = KWP2000Interface.P4_DEFAULT_TESTER_INTERBYTE_MIN_TIME;
@@ -282,10 +282,7 @@ namespace Communication
         private TimingParameters mCurrentTimingParameters;
         private long mP2ECUResponseMaxTimeCurrent = P2_DEFAULT_ECU_RESPONSE_MAX_TIME;//max time from timings, or longer if response pending
 
-		//EDC15 ECUs do not seem to work with the min time of 5ms, at least when connecting
-		//20, 19, 17 worked, 12 didn't work
-		private const long P4TesterInterByteTimeMinMsWhenConnectingDefaultValue = 17;
-		[DefaultValue(P4TesterInterByteTimeMinMsWhenConnectingDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.P4TesterInterByteTimeMinMsWhenConnecting)]
         public long P4TesterInterByteTimeMinMsWhenConnecting
         {
             get
@@ -302,7 +299,7 @@ namespace Communication
                 }
             }
         }
-		private long mP4TesterInterByteTimeMinMsWhenConnecting = P4TesterInterByteTimeMinMsWhenConnectingDefaultValue;
+		private long mP4TesterInterByteTimeMinMsWhenConnecting = KWP2000SettingsDefaults.P4TesterInterByteTimeMinMsWhenConnecting;
 
         public TimingParameters DefaultTimingParameters
         {
@@ -346,14 +343,6 @@ namespace Communication
 
         public bool ConnectToECUSlowInit(byte connectAddress)
         {
-            // CH340 devices do not support slow init (5-baud break signal method)
-            // Fast init works with CH340, so disable slow init for these devices
-            if (SelectedDeviceInfo?.Type == DeviceType.CH340)
-            {
-                DisplayStatusMessage("Slow init is not supported with CH340 devices. Please use fast init instead.", StatusMessageType.USER);
-                return false;
-            }
-
             return ConnectToECU(KWP2000AddressMode.None, connectAddress, KWP2000ConnectionMethod.SlowInit);
         }
 
@@ -506,8 +495,7 @@ namespace Communication
 		}
         private uint mDiagnosticSessionBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
 
-		private const bool ShouldVerifyDumbModeDefaultValue = true;
-		[DefaultValue(ShouldVerifyDumbModeDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.ShouldVerifyDumbMode)]
         public bool ShouldVerifyDumbMode
         {
             get
@@ -524,10 +512,9 @@ namespace Communication
                 }
             }
         }
-		private bool mShouldVerifyDumbMode = ShouldVerifyDumbModeDefaultValue;
+		private bool mShouldVerifyDumbMode = KWP2000SettingsDefaults.ShouldVerifyDumbMode;
 
-		private const uint NumConnectionAttemptsDefaultValue = 3;
-		[DefaultValue(NumConnectionAttemptsDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.NumConnectionAttempts)]
         public uint NumConnectionAttempts
         {
             get
@@ -544,10 +531,9 @@ namespace Communication
                 }
             }
         }
-		private uint _NumConnectionAttempts = NumConnectionAttemptsDefaultValue;
+		private uint _NumConnectionAttempts = KWP2000SettingsDefaults.NumConnectionAttempts;
 
-		private const long TimeBetweenSlowInitForKWP2000MSDefaultValue = 1500;//galletto waits 1.5 seconds after kwp1281
-		[DefaultValue(TimeBetweenSlowInitForKWP2000MSDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.TimeBetweenSlowInitForKWP2000MS)]
         public long TimeBetweenSlowInitForKWP2000MS
         {
             get
@@ -564,10 +550,9 @@ namespace Communication
                 }
             }
         }
-		private long _TimeBetweenSlowInitForKWP2000MS = TimeBetweenSlowInitForKWP2000MSDefaultValue;
+		private long _TimeBetweenSlowInitForKWP2000MS = KWP2000SettingsDefaults.TimeBetweenSlowInitForKWP2000MS;
 
-		private const long TimeAfterSlowInitBeforeStartCommMessageMSDefaultValue = 280;
-		[DefaultValue(TimeAfterSlowInitBeforeStartCommMessageMSDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.TimeAfterSlowInitBeforeStartCommMessageMS)]
         public long TimeAfterSlowInitBeforeStartCommMessageMS
         {
             get
@@ -584,10 +569,9 @@ namespace Communication
                 }
             }
         }
-		private long _TimeAfterSlowInitBeforeStartCommMessageMS = TimeAfterSlowInitBeforeStartCommMessageMSDefaultValue;
+		private long _TimeAfterSlowInitBeforeStartCommMessageMS = KWP2000SettingsDefaults.TimeAfterSlowInitBeforeStartCommMessageMS;
 
-		private const double SlowInitFiveBaudBitTimeOffsetMSDefaultValue = -0.6;
-		[DefaultValue(SlowInitFiveBaudBitTimeOffsetMSDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.SlowInitFiveBaudBitTimeOffsetMS)]
         public double SlowInitFiveBaudBitTimeOffsetMS
         {
             get
@@ -604,10 +588,9 @@ namespace Communication
                 }
             }
         }
-		private double _SlowInitFiveBaudBitTimeOffsetMS = SlowInitFiveBaudBitTimeOffsetMSDefaultValue;
+		private double _SlowInitFiveBaudBitTimeOffsetMS = KWP2000SettingsDefaults.SlowInitFiveBaudBitTimeOffsetMS;
 
-		private const double FastInitLowHighTimeOffsetMSDefaultValue = 0.0;
-		[DefaultValue(FastInitLowHighTimeOffsetMSDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.FastInitLowHighTimeOffsetMS)]
         public double FastInitLowHighTimeOffsetMS
         {
             get
@@ -624,7 +607,7 @@ namespace Communication
                 }
             }
         }
-		private double _FastInitLowHighTimeOffsetMS = FastInitLowHighTimeOffsetMSDefaultValue;
+		private double _FastInitLowHighTimeOffsetMS = KWP2000SettingsDefaults.FastInitLowHighTimeOffsetMS;
 
 		//TODO: get rid of all these send message variations
 		public KWP2000Message SendMessage(byte serviceID)
@@ -1621,8 +1604,7 @@ namespace Communication
             ResponseReadDTCs = 0xFC
         };
 
-		const uint KWP1281_TesterMinTimeToSendByteComplementMSDefaultValue = 2;
-		[DefaultValue(KWP1281_TesterMinTimeToSendByteComplementMSDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendByteComplementMS)]
         public uint KWP1281_TesterMinTimeToSendByteComplementMS
         {
             get
@@ -1640,10 +1622,9 @@ namespace Communication
             }
 
         }
-		private uint _KWP1281_TesterMinTimeToSendByteComplementMS = KWP1281_TesterMinTimeToSendByteComplementMSDefaultValue;
+		private uint _KWP1281_TesterMinTimeToSendByteComplementMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendByteComplementMS;
 
-		private const uint KWP1281_TesterMinTimeToSendResponseMessageMSDefaultValue = 25;//55
-		[DefaultValue(KWP1281_TesterMinTimeToSendResponseMessageMSDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendResponseMessageMS)]
         public uint KWP1281_TesterMinTimeToSendResponseMessageMS
         {
             get
@@ -1660,10 +1641,9 @@ namespace Communication
                 }
             }
         }
-		private uint _KWP1281_TesterMinTimeToSendResponseMessageMS = KWP1281_TesterMinTimeToSendResponseMessageMSDefaultValue;
+		private uint _KWP1281_TesterMinTimeToSendResponseMessageMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendResponseMessageMS;
 
-		private const uint KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMSDefaultValue = 1;
-		[DefaultValue(KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMSDefaultValue)]
+		[DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS)]
         public uint KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS
         {
             get
@@ -1680,7 +1660,7 @@ namespace Communication
                 }
             }
         }
-		private uint _KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS = KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMSDefaultValue;
+		private uint _KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS;
 
         private bool KWP1281ReadByte(out byte readByte, bool sendComp)
         {
