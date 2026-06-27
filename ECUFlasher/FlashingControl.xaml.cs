@@ -1596,7 +1596,7 @@ namespace ECUFlasher
                 }
 
                 App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
-                App.DisplayUserPrompt("Reading ECU Flash Memory Complete", statusMessage, UserPromptType.OK);
+                App.DisplayUserPrompt("Reading ECU Flash Memory Finished", statusMessage, UserPromptType.OK);
 
                 // Clear operation state before showing the modal so user can cancel/close/disconnect
                 // while the completion dialog is open (e.g. after a write failure).
