@@ -70,7 +70,11 @@ See [GitHub Issues](https://github.com/NefMoto/NefMotoOpenSource/issues) for cur
 
 ## Building
 
-See [BUILDING.md](BUILDING.md) for build instructions.
+See [BUILDING.md](docs/BUILDING.md) for build instructions.
+
+## Cutting a Release
+
+See [RELEASE.md](docs/RELEASE.md) for release instructions.
 
 ## Installation
 
