@@ -12,8 +12,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### Connection Methods
 
-- **Fast Init** - Supported on FTDI and CH340 devices
-- **Slow Init** - Supported on FTDI and CH340 devices (5-baud per-bit break timing; use connect address **`0x01`** on ME7 bench)
+- **Slow Init** - The default. More reliable across multiple environments.
+- **Fast Init** - Connects much faster. Use this when you know it works reliably.
 
 ### ECU Operations
 
@@ -29,28 +29,23 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### Supported Hardware
 
-- **FTDI USB-to-Serial adapters** (FT232R, FT2232, etc.)
-  - Full feature support including slow init
-  - Bit-bang mode for 5-baud slow init
-- **CH340 USB-to-Serial adapters**
-  - Slow init and fast init (per-bit break slow init, same path as FTDI)
-  - Standard KWP2000 operations
-  - Some clone adapters or drivers may still fail slow init — use **Slow init timing log** in KWP2000 settings for bench diagnosis
-
-### User Interface
-
-- Tabbed interface for ECU info, flashing, and logging
-- Real-time status messages and logging
-- Configurable communication timeouts and baud rates
-- Memory layout selection and validation
-- Progress indicators for long operations
+- **Dumb-mode K+DCAN or KKL cable** — one unit with USB-to-serial (FTDI or CH340 chipset) and K-line pass-through to the ECU (no protocol translation)
+  - KWP2000 slow init and fast init (same per-bit break timing for slow init on both chipsets)
+  - Bootmode
+- **Legacy Ross-Tech** — discontinued HEX-USB or HEX-USB+CAN only; see [Requirements](#requirements)
+- Some clone adapters or drivers may fail slow init — enable **Slow init timing log** in KWP2000 settings when diagnosing connect issues
 
 ## Limitations
 
-### CH340 Devices
+### USB Adapters (KWP2000)
 
-- **Slow init** uses per-bit `SetBreak` timing (not a single low-baud UART frame). Validated on ME7.1 and ME7.5 bench.
-- **Bootmode:** Use 57600 or 38400 baud for best compatibility. 9600/19200 may fail non-deterministically (wrong ACKs, NAK, readback errors). Likely cause: USB latency/buffering, jitter, or voltage; not baud error. Use FTDI for lower baud rates. See [issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44).
+- Slow init uses per-bit break timing (not a single low-baud UART frame). Validated on ME7.1 and ME7.5 bench with FTDI and CH340.
+- Clone or poor-quality adapters may fail slow init on either chip type; **Slow init timing log** helps compare timing.
+
+### Bootmode
+
+- Use 57600 or 38400 baud for best compatibility. 9600/19200 may fail non-deterministically on CH340 cables (wrong ACKs, NAK, readback errors). Likely cause: USB latency/buffering, jitter, or voltage; not baud error. Prefer FTDI for lower bootmode baud rates. See [issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44).
+- 124800 baud should work on many different ECU/cable combinations, and most reliably on the bench. Use this for best performance once you have verified it is reliable.
 
 ### Platform
 
@@ -59,7 +54,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### ECU Support
 
 - **ME7.x** - Primary target; full KWP2000 and bootmode support
-- **ME7.5 fast init** - Not supported on one bench unit after address and timing sweeps. Use **slow init** at **`0x01`** (FTDI or CH340). Other ME7.5 images may differ. See [docs/KWP2000.md](docs/KWP2000.md)
+- **ME7.5 fast init** - Not supported on one bench unit after address and timing sweeps. Use **slow init** instead. Other ME7.5 images may differ. See [docs/KWP2000.md](docs/KWP2000.md)
 - **Simos 3.x / EDC15** - Bootmode support (layout auto-detect)
 - Memory layouts provided for common flash chips (29F200, 29F400, 29F800 series)
 - Some ECUs may require specific connection parameters or timing adjustments
@@ -83,8 +78,11 @@ Pre-built releases are available at: <https://github.com/NefMoto/NefMotoOpenSour
 ## Requirements
 
 - Windows operating system
-- Compatible USB-to-serial adapter (FTDI or CH340)
-- OBD-II cable in "dumb mode" (no protocol translation)
+- OBD-II/USB cable — **either**:
+  - A dumb-mode K+DCAN or KKL cable: USB-to-serial with an FTDI or CH340 chipset, K-line pass-through to the ECU (no protocol translation), **or**
+  - A legacy Ross-Tech HEX-USB or HEX-USB+CAN with Ross-Tech VCP drivers, dumb K-line pass-through, and smart mode disabled — the interface must show up in NefMoto's device list (install VCP per [Ross-Tech](http://www.ross-tech.com/vag-com/usb/virtual-com-port.php) if it does not)
+
+*Ross-Tech HEX-V2 and HEX-NET are not supported; they lack dumb K-line pass-through. Do not use KII-USB (poor pass-through).*
 
 ## License
 
@@ -96,7 +94,7 @@ See [LICENSE.txt](LICENSE.txt) for details.
 
 - **Latest Release**: <https://github.com/NefMoto/NefMotoOpenSource/releases/latest>
 - **Issues**: <https://github.com/NefMoto/NefMotoOpenSource/issues>
-- **Discussion Thread**: <https://nefariousmotorsports.com/forum/index.php?topic=12861.0title=>
+- **Discussion Thread**: <https://nefariousmotorsports.com/forum/index.php?topic=12861.0>
 
 ## Development
 
