@@ -118,6 +118,8 @@ jobs:
     - name: Generate release notes with MSI link
       id: release_notes
       shell: bash
+      env:
+        GITHUB_REPO: ${{ github.repository }}
       run: |
         tag="${{ steps.release.outputs.tag }}"
         msiName="${{ steps.find_msi.outputs.msi_name }}"
@@ -130,7 +132,7 @@ jobs:
           cliffBody=$(git cliff "$prev_tag..$tag")
           # git-cliff labels range output with last stable tag (tag_pattern), not the range start
           releaseBody="## What's Changed (since ${prev_tag})"
-          releaseBody="${releaseBody}"$'\n'"$(echo "$cliffBody" | tail -n +2)"
+          releaseBody="${releaseBody}"$'\n'"$(echo "$cliffBody" | tail -n +2 | sed "s|^\*\*Full Changelog\*\*:.*|**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${tag}|")"
         else
           releaseBody=$(git cliff -l)
         fi
