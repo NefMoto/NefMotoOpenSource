@@ -20,6 +20,7 @@ Contact by Email: tony@nefariousmotorsports.com
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Shared;
 
 #pragma warning disable CA1416 // Validate platform compatibility - This is Windows-only code
@@ -27,11 +28,12 @@ using Shared;
 namespace Communication
 {
     /// <summary>
-    /// Adapter using System.IO.Ports.SerialPort for CH340. Fast init. KWP2000 slow init uses break signal (no bit-bang).
+    /// KWP2000 slow init and fast init via System.IO.Ports.SerialPort.
+    /// Slow init uses per-bit SetBreak (same algorithm as FTDI); low-baud UART frame is fallback if break send fails.
     /// Bootmode: DTR pulsed (100ms high, 100ms low) then DTR=0, RTS=0. Windows only (WMI for detection).
     /// </summary>
     /// <remarks>
-    /// Limitations: No bit-bang mode; slow init may be less reliable than FTDI. Bootmode baud-rate sensitive:
+    /// Limitations: No bit-bang mode; some CH340 clones/drivers may still fail slow init (enable Slow init timing log for bench diagnosis). Bootmode baud-rate sensitive:
     /// default 57600; use 38400 if 57600 fails; 9600/19200 can give 0xFD or read-back failures.
     /// At 0x00FF18 (BUSCON3) bootmode-only: C_WRITE_WORD can get 0xFD (NAK) where FTDI succeeds.
     /// </remarks>
@@ -50,6 +52,43 @@ namespace Communication
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// KKL-style DTR pulse for CH340 (100 ms high, 100 ms low) then DTR=0, RTS=0. Matches bootmode setup.
+        /// </summary>
+        public static bool ApplyKklDtrPulse(ICommunicationDevice device)
+        {
+            if (device == null || device.Type != DeviceType.CH340)
+            {
+                return true;
+            }
+
+            return device.SetDTR(true)
+                && DelayMs(100)
+                && device.SetDTR(false)
+                && DelayMs(100)
+                && device.SetDTR(false)
+                && device.SetRTS(false);
+        }
+
+        /// <summary>
+        /// Restore KWP2000 connect line states after CH340 KKL DTR pulse.
+        /// </summary>
+        public static bool RestoreKwp2000ControlLines(ICommunicationDevice device)
+        {
+            if (device == null)
+            {
+                return false;
+            }
+
+            return device.SetDTR(true) && device.SetRTS(false) && device.SetBreak(false);
+        }
+
+        private static bool DelayMs(int milliseconds)
+        {
+            Thread.Sleep(milliseconds);
+            return true;
         }
 
         /// <summary>

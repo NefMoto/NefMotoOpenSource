@@ -13,7 +13,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### Connection Methods
 
 - **Fast Init** - Supported on FTDI and CH340 devices
-- **Slow Init** - Supported on FTDI devices only (5-baud initialization)
+- **Slow Init** - Supported on FTDI and CH340 devices (5-baud per-bit break timing; use connect address **`0x01`** on ME7 bench)
 
 ### ECU Operations
 
@@ -33,8 +33,9 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
   - Full feature support including slow init
   - Bit-bang mode for 5-baud slow init
 - **CH340 USB-to-Serial adapters**
-  - Fast init connection method - slow init not supported (hardware limitation)
+  - Slow init and fast init (per-bit break slow init, same path as FTDI)
   - Standard KWP2000 operations
+  - Some clone adapters or drivers may still fail slow init — use **Slow init timing log** in KWP2000 settings for bench diagnosis
 
 ### User Interface
 
@@ -48,7 +49,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### CH340 Devices
 
-- **Slow init is not supported** - CH340 devices cannot reliably generate the 5-baud break signal required for slow init. Use fast init instead.
+- **Slow init** uses per-bit `SetBreak` timing (not a single low-baud UART frame). Validated on ME7.1 and ME7.5 bench.
 - **Bootmode:** Use 57600 or 38400 baud for best compatibility. 9600/19200 may fail non-deterministically (wrong ACKs, NAK, readback errors). Likely cause: USB latency/buffering, jitter, or voltage; not baud error. Use FTDI for lower baud rates. See [issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44).
 
 ### Platform
@@ -58,6 +59,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### ECU Support
 
 - **ME7.x** - Primary target; full KWP2000 and bootmode support
+- **ME7.5 fast init** - Not supported on one bench unit after address and timing sweeps. Use **slow init** at **`0x01`** (FTDI or CH340). Other ME7.5 images may differ. See [docs/KWP2000.md](docs/KWP2000.md)
 - **Simos 3.x / EDC15** - Bootmode support (layout auto-detect)
 - Memory layouts provided for common flash chips (29F200, 29F400, 29F800 series)
 - Some ECUs may require specific connection parameters or timing adjustments

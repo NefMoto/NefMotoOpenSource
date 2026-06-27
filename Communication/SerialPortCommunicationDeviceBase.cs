@@ -291,6 +291,12 @@ namespace Communication
             catch { return false; }
         }
 
+        public bool WaitForTransmitDrain(uint timeoutMs)
+        {
+            if (!CheckIsOpen()) return false;
+            return Win32SerialTransmitDrain.TryWaitForTxEmpty(_serialPort, timeoutMs);
+        }
+
         /// <summary>
         /// Shared enumeration: finds COM ports matching the given USB VID and creates DeviceInfo via the factory.
         /// </summary>

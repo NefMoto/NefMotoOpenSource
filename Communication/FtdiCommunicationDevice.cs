@@ -21,6 +21,8 @@ Contact by Email: tony@nefariousmotorsports.com
 using FTD2XX_NET;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using Shared;
 
 namespace Communication
@@ -427,6 +429,34 @@ namespace Communication
 
             FTD2XX_NET.FTDI.FT_STATUS status = _ftdi.GetTxBytesWaiting(ref bytesWaiting);
             return (status == FTD2XX_NET.FTDI.FT_STATUS.FT_OK);
+        }
+
+        public bool WaitForTransmitDrain(uint timeoutMs)
+        {
+            if (!CheckIsOpen())
+            {
+                return false;
+            }
+
+            Stopwatch watch = Stopwatch.StartNew();
+            while (watch.ElapsedMilliseconds < timeoutMs)
+            {
+                uint txWaiting = 1;
+                if (!GetTxBytesWaiting(ref txWaiting))
+                {
+                    return false;
+                }
+
+                if (txWaiting == 0)
+                {
+                    return true;
+                }
+
+                Thread.Sleep(1);
+            }
+
+            uint finalWaiting = 0;
+            return GetTxBytesWaiting(ref finalWaiting) && finalWaiting == 0;
         }
 
         /// <summary>

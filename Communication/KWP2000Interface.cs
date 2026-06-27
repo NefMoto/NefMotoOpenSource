@@ -154,8 +154,8 @@ namespace Communication
 
         public const byte TESTER_ADDRESS = 0xF1;
 
-        public const byte DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS = 0x01;
-        public const byte DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS = 0x11;//KWP2000 physical address when using slow init
+        public const byte DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS = 0x01;//typical user connect address for slow init (KWP1281-first path)
+        public const byte DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS = 0x11;//KWP2000 address after KWP1281 handoff (Connect_SlowInit retry, Even parity)—not a reliable one-shot user connect on ME7.1 bench
 
         public const byte DEFAULT_ECU_FASTINIT_KWP2000_PHYSICAL_ADDRESS = 0x01;//KWP2000 physical address when using fast init
         public const byte DEFUALT_ECU_FASTINIT_KWP2000_FUNCTIONAL_ADDRESS_EXTERNAL_FLASH = 0xFE;
@@ -513,6 +513,25 @@ namespace Communication
             }
         }
 		private bool mShouldVerifyDumbMode = KWP2000SettingsDefaults.ShouldVerifyDumbMode;
+
+		[DefaultValue(KWP2000SettingsDefaults.EnableSlowInitTimingLog)]
+        public bool EnableSlowInitTimingLog
+        {
+            get
+            {
+                return mEnableSlowInitTimingLog;
+            }
+            set
+            {
+                if (mEnableSlowInitTimingLog != value)
+                {
+                    mEnableSlowInitTimingLog = value;
+
+                    OnPropertyChanged(new PropertyChangedEventArgs("EnableSlowInitTimingLog"));
+                }
+            }
+        }
+		private bool mEnableSlowInitTimingLog = KWP2000SettingsDefaults.EnableSlowInitTimingLog;
 
 		[DefaultValue(KWP2000SettingsDefaults.NumConnectionAttempts)]
         public uint NumConnectionAttempts
@@ -1101,7 +1120,7 @@ namespace Communication
         {
             W0Min = 2,//min bus high idle time before address is sent
             W1Min = 60,//min time before sync byte is sent after last bit of the address byte
-            W1Max = 300,//max time before sync byte is sent after last bit of the address byte
+            W1Max = 450,//max time before sync byte is sent after last bit of the address byte (FTDI ME7 bench ~301 ms; EDC15 reports up to ~405 ms)
             W2Min = 5,//min time between sync byte and first key byte
             W2Max = 20,//max time between sync byte and first key byte
             W3Min = 0,//min time between first and second key bytes
@@ -1110,6 +1129,11 @@ namespace Communication
             W4Max = 50,//max time between last key byte and tester sending last key byte complement, and time between last key byte completement and ECU sending address complement
             W5Min = 300//min idle time before the tester retransmitting an address byte
         };
+
+        private const uint KWP1281_ECU_BYTE_READ_TIMEOUT_MS = 1200;
+        private const uint SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS = 100;//W4Max 50 ms + margin for USB serial (CH340)
+        private const uint DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS = 100;
+        private const uint SLOW_INIT_TX_DRAIN_TIMEOUT_MS = 500;
 
         protected enum SlowInitParity
         {
@@ -1124,7 +1148,101 @@ namespace Communication
             Eight = 8
         };
 
-        protected bool SendSlowInitAddress_FTDI_UsingBreak(byte connectAddress, SlowInitDataBits numDataBits, SlowInitParity parity, out uint numPreceedingBytesToIgnore)
+        private static string FormatSlowInitHexDump(byte[] data, uint length)
+        {
+            if (data == null || length == 0)
+            {
+                return "(none)";
+            }
+
+            var parts = new List<string>();
+            for (uint i = 0; i < length && i < (uint)data.Length; i++)
+            {
+                parts.Add(data[i].ToString("X2"));
+            }
+
+            return string.Join(" ", parts);
+        }
+
+        private void LogSlowInitRxQueue(string context)
+        {
+            if (!EnableSlowInitTimingLog || mCommunicationDevice == null)
+            {
+                return;
+            }
+
+            uint rxAvailable = 0;
+            if (mCommunicationDevice.GetRxBytesAvailable(ref rxAvailable, 1))
+            {
+                DisplayStatusMessage("Slow init RX queue (" + context + "): " + rxAvailable + " byte(s) waiting.", StatusMessageType.LOG);
+            }
+            else
+            {
+                DisplayStatusMessage("Slow init RX queue (" + context + "): unable to query.", StatusMessageType.LOG);
+            }
+        }
+
+        private Stopwatch mSlowInitHandshakePhaseWatch;
+        private bool mSlowInitHandshakePhaseWatchActive;
+        private bool mSlowInitKWP1281FirstByteLogged;
+
+        private void ClearSlowInitHandshakePhaseWatch()
+        {
+            mSlowInitHandshakePhaseWatchActive = false;
+            mSlowInitHandshakePhaseWatch = null;
+            mSlowInitKWP1281FirstByteLogged = false;
+        }
+
+        private void StartSlowInitHandshakePhaseWatch()
+        {
+            mSlowInitHandshakePhaseWatch = Stopwatch.StartNew();
+            mSlowInitHandshakePhaseWatchActive = true;
+            mSlowInitKWP1281FirstByteLogged = false;
+        }
+
+        private void LogSlowInitHandshakePhase(string phase, byte? byteValue = null, bool? success = null)
+        {
+            if (!EnableSlowInitTimingLog || !mSlowInitHandshakePhaseWatchActive || mSlowInitHandshakePhaseWatch == null)
+            {
+                return;
+            }
+
+            string message = "Slow init handshake: " + phase + " at "
+                + mSlowInitHandshakePhaseWatch.ElapsedMilliseconds + " ms since key byte complement"
+                + ", device=" + (mCommunicationDevice?.Type.ToString() ?? "?");
+            if (byteValue.HasValue)
+            {
+                message += ", byte=0x" + byteValue.Value.ToString("X2");
+            }
+            if (success.HasValue)
+            {
+                message += ", success=" + success.Value;
+            }
+
+            DisplayStatusMessage(message + ".", StatusMessageType.LOG);
+        }
+
+        private bool WaitForDeviceTransmitDrain(uint timeoutMs)
+        {
+            if (mCommunicationDevice == null)
+            {
+                return false;
+            }
+
+            return mCommunicationDevice.WaitForTransmitDrain(timeoutMs);
+        }
+
+        private static string SlowInitParityLabel(SlowInitParity parity)
+        {
+            return parity switch
+            {
+                SlowInitParity.Odd => "Odd",
+                SlowInitParity.Even => "Even",
+                _ => "None",
+            };
+        }
+
+        protected bool SendSlowInitAddress_UsingBreak(byte connectAddress, SlowInitDataBits numDataBits, SlowInitParity parity, out uint numPreceedingBytesToIgnore)
         {
             bool success = false;
             numPreceedingBytesToIgnore = 0;
@@ -1134,22 +1252,52 @@ namespace Communication
                 return false;
             }
 
+            string deviceLabel = mCommunicationDevice.Type.ToString();
+
             lock (mCommunicationDevice)
             {
-                DisplayStatusMessage("Sending slow init address byte", StatusMessageType.DEV);
+                DisplayStatusMessage("Sending slow init address byte (" + deviceLabel + " break-toggle)", StatusMessageType.DEV);
+                DisplayStatusMessage("Slow init address send: 0x" + connectAddress.ToString("X2") + " "
+                    + (int)numDataBits + (parity == SlowInitParity.Odd ? "O" : parity == SlowInitParity.Even ? "E" : "N") + "1, "
+                    + "path=break-toggle, bit offset " + SlowInitFiveBaudBitTimeOffsetMS + " ms.", StatusMessageType.LOG);
+
+                success &= WaitForDeviceTransmitDrain(SLOW_INIT_TX_DRAIN_TIMEOUT_MS);
 
                 double TICKS_PER_MS = Stopwatch.Frequency / 1000.0;
                 double TICKS_PER_200_MS = Stopwatch.Frequency / 5.0;
                 long FIVE_BAUD_BIT_TIME_TICKS = (long)(TICKS_PER_200_MS + (TICKS_PER_MS * SlowInitFiveBaudBitTimeOffsetMS));
+                double targetBitPeriodMs = FIVE_BAUD_BIT_TIME_TICKS / TICKS_PER_MS;
+                if (EnableSlowInitTimingLog)
+                {
+                    DisplayStatusMessage(deviceLabel + " slow init bit timing: target period " + targetBitPeriodMs.ToString("F2") + " ms.", StatusMessageType.DEV);
+                }
+
+                Stopwatch watch = new Stopwatch();
+                watch.Start();
+                long previousBitEndMs = 0;
+                void LogSlowInitBitPeriod(string bitLabel, bool lineLow, bool setBreakToggled)
+                {
+                    if (!EnableSlowInitTimingLog)
+                    {
+                        return;
+                    }
+
+                    long elapsedMs = watch.ElapsedMilliseconds;
+                    long periodMs = elapsedMs - previousBitEndMs;
+                    previousBitEndMs = elapsedMs;
+                    DisplayStatusMessage(deviceLabel + " slow init bit " + bitLabel + ": line="
+                        + (lineLow ? "L" : "H")
+                        + ", SetBreak toggled=" + (setBreakToggled ? "yes" : "no")
+                        + ", elapsed=" + elapsedMs + " ms, period=" + periodMs + " ms.", StatusMessageType.DEV);
+                }
 
                 //low start bit
-                Stopwatch watch = new Stopwatch(); watch.Start();
-
                 success = mCommunicationDevice.SetBreak(true);//low
                 bool isLow = true;
 
                 long currentBitEndTime = FIVE_BAUD_BIT_TIME_TICKS;
                 while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
+                LogSlowInitBitPeriod("start", isLow, true);
 
                 int numHighBits = 0;
 
@@ -1157,6 +1305,7 @@ namespace Communication
                 for (int y = 0; y < (int)numDataBits; y++)
                 {
                     bool isHighBit = (connectAddress & (0x01 << y)) != 0;
+                    bool setBreakToggled = false;
 
                     if (isHighBit)
                     {
@@ -1164,6 +1313,7 @@ namespace Communication
                         {
                             success &= mCommunicationDevice.SetBreak(false);//high
                             numPreceedingBytesToIgnore++;
+                            setBreakToggled = true;
                         }
 
                         numHighBits++;
@@ -1174,6 +1324,7 @@ namespace Communication
                         if(!isLow)
                         {
                             success &= mCommunicationDevice.SetBreak(true);//low
+                            setBreakToggled = true;
                         }
 
                         isLow = true;
@@ -1181,16 +1332,20 @@ namespace Communication
 
                     currentBitEndTime += FIVE_BAUD_BIT_TIME_TICKS;
                     while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
+                    LogSlowInitBitPeriod("D" + y + "=" + (isHighBit ? "1" : "0"), isLow, setBreakToggled);
                 }
 
                 if (parity != SlowInitParity.None)
                 {
+                    bool setBreakToggled = false;
+
                     if((int)parity != numHighBits % 2)
                     {
                         if (isLow)
                         {
                             success &= mCommunicationDevice.SetBreak(false);//high
                             numPreceedingBytesToIgnore++;
+                            setBreakToggled = true;
                         }
 
                         isLow = false;
@@ -1200,6 +1355,7 @@ namespace Communication
                         if (!isLow)
                         {
                             success &= mCommunicationDevice.SetBreak(true);//low
+                            setBreakToggled = true;
                         }
 
                         isLow = true;
@@ -1207,21 +1363,37 @@ namespace Communication
 
                     currentBitEndTime += FIVE_BAUD_BIT_TIME_TICKS;
                     while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
+                    LogSlowInitBitPeriod("parity", isLow, setBreakToggled);
                 }
 
                 //high stop bit
+                bool stopSetBreakToggled = false;
                 if (isLow)
                 {
                     success &= mCommunicationDevice.SetBreak(false);//high
                     numPreceedingBytesToIgnore++;
+                    stopSetBreakToggled = true;
+                    isLow = false;
                 }
+
+                LogSlowInitBitPeriod("stop", isLow, stopSetBreakToggled);
 
                 //currentBitEndTime += FIVE_BAUD_BIT_TIME_TICKS;
                 //while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
 
 				//don't purge because that can cause us to miss the sync byte, just use the low to high transitions we counted
 
-                if (!success)
+                if (success)
+                {
+                    success &= WaitForDeviceTransmitDrain(SLOW_INIT_TX_DRAIN_TIMEOUT_MS);
+                }
+
+                if (success)
+                {
+                    DisplayStatusMessage(deviceLabel + " break slow init finished in " + watch.ElapsedMilliseconds + " ms, "
+                        + "preceding echo bytes to ignore: " + numPreceedingBytesToIgnore + ".", StatusMessageType.LOG);
+                }
+                else
                 {
                     DisplayStatusMessage("Failed to send five baud slow init address.", StatusMessageType.LOG);
                 }
@@ -1230,127 +1402,128 @@ namespace Communication
             return success;
         }
 
-        protected bool SendSlowInitAddress_FTDI_UsingBitBang(byte connectAddress)
+        /// <summary>
+        /// CH340 slow init fallback: send the address as a UART frame at low baud (ISO 9141 style).
+        /// Used only when <see cref="SendSlowInitAddress_UsingBreak"/> fails; rarely succeeds on ME7 bench.
+        /// </summary>
+        protected bool SendSlowInitAddress_CH340_UsingLowBaudUart(byte connectAddress, SlowInitDataBits numDataBits, SlowInitParity parity, out uint numPreceedingBytesToIgnore)
         {
+            bool success = false;
+            numPreceedingBytesToIgnore = 0;
+
             if (mCommunicationDevice == null)
             {
                 return false;
             }
 
-            bool success = true;
-
-            const byte HIGH_DATA = 0x01;
-            const byte LOW_DATA = 0x00;
-            const byte BIT_MODE_MASK = 0xFF;//0xFFall pins output, we don't want to receive any data during bit bang. Use 0xFD if you want all outputs except the receive line
-            const uint ADDRESS_BAUD_RATE = 5;
-            const uint NUM_ADDRESS_BITS = 10;//1 start bit, 8 data bits, 1 stop bit
-            const uint BIT_BANG_ADDRESS_BAUD_RATE = DEFAULT_COMMUNICATION_BAUD_RATE;//800;//184 is the min FTDI baud rate
-            const uint BIT_BANG_ADDRESS_BIT_WIDTH = BIT_BANG_ADDRESS_BAUD_RATE / ADDRESS_BAUD_RATE * 4;//divide by 4 makes the times correct :S
-            const uint TOTAL_NUM_BITS = BIT_BANG_ADDRESS_BIT_WIDTH * NUM_ADDRESS_BITS;
-            const uint FIVE_BAUD_SEND_TIME_MS = (uint)((((float)NUM_ADDRESS_BITS) / ((float)ADDRESS_BAUD_RATE)) * 1000);//TOTAL_NUM_BITS / BIT_BANG_ADDRESS_BAUD_RATE * 1000;
-            byte[] addressData = new byte[TOTAL_NUM_BITS];
-            uint numLowAddressEvents = 0;//used by baud rate detection code
-
-//TODO: need to use 7O1 instead of 8N1
-
-            #region CalculateAddressBits
+            DataBits dataBits = numDataBits == SlowInitDataBits.Seven ? DataBits.Bits7 : DataBits.Bits8;
+            Parity lineParity = Parity.None;
+            if (parity == SlowInitParity.Odd)
             {
-                bool lastBitLow = false;
-                int index = 0;
-
-                //start bit
-                numLowAddressEvents++;
-                lastBitLow = true;
-                for (int z = 0; z < BIT_BANG_ADDRESS_BIT_WIDTH; z++)
-                {
-                    addressData[index] = LOW_DATA;
-                    index++;
-                }
-
-                //data bits
-                for (int y = 0; y < 8; y++)
-                {
-                    byte value = HIGH_DATA;
-
-                    if ((connectAddress & (0x01 << y)) == 0)
-                    {
-                        value = LOW_DATA;
-
-                        if (!lastBitLow)
-                        {
-                            numLowAddressEvents++;
-                        }
-                    }
-
-                    lastBitLow = (value == LOW_DATA);
-
-                    for (int z = 0; z < BIT_BANG_ADDRESS_BIT_WIDTH; z++)
-                    {
-                        addressData[index] = value;
-                        index++;
-                    }
-                }
-
-                //stop bit
-                for (int z = 0; z < BIT_BANG_ADDRESS_BIT_WIDTH; z++)
-                {
-                    addressData[index] = HIGH_DATA;
-                    index++;
-                }
+                lineParity = Parity.Odd;
             }
-            #endregion
+            else if (parity == SlowInitParity.Even)
+            {
+                lineParity = Parity.Even;
+            }
+
+            // Try true 5 baud first; CH340/WCH drivers often reject it and accept ~46–110 instead.
+            uint[] baudCandidates = { 5, 50, 46, 75, 110 };
 
             lock (mCommunicationDevice)
             {
-                success &= mCommunicationDevice.SetBitMode(BIT_MODE_MASK, BitMode.AsyncBitBang);
-                success &= mCommunicationDevice.SetBaudRate(BIT_BANG_ADDRESS_BAUD_RATE);
+                DisplayStatusMessage("Sending slow init address byte (CH340 low-baud UART)", StatusMessageType.DEV);
+                DisplayStatusMessage("CH340 slow init address send: 0x" + connectAddress.ToString("X2") + " "
+                    + (int)numDataBits + SlowInitParityLabel(parity).Substring(0, 1) + "1, "
+                    + "baud candidates: " + string.Join(", ", baudCandidates) + ".", StatusMessageType.LOG);
 
-                //give it enough write timeout to send, and a super small read timeout so we get a quick response
-                success &= mCommunicationDevice.SetTimeouts(1, FIVE_BAUD_SEND_TIME_MS * 2);//times 2 to be safe
-
-                if (success)
+                foreach (uint baud in baudCandidates)
                 {
-                    DisplayStatusMessage("Sending slow init address byte", StatusMessageType.DEV);
+                    success = true;
+                    success &= mCommunicationDevice.SetDataCharacteristics(dataBits, StopBits.Bits1, lineParity);
+                    if (!success)
+                    {
+                        DisplayStatusMessage("CH340 slow init: SetDataCharacteristics failed at " + baud + " baud.", StatusMessageType.LOG);
+                        continue;
+                    }
 
-                    Stopwatch watch = new Stopwatch();
-                    watch.Reset(); watch.Start();
+                    success &= mCommunicationDevice.SetBaudRate(baud);
+                    if (!success)
+                    {
+                        DisplayStatusMessage("CH340 slow init: SetBaudRate(" + baud + ") rejected by driver.", StatusMessageType.LOG);
+                        continue;
+                    }
 
-                    //send the connect address at 5 baud
+                    uint numFrameBits = (uint)numDataBits + 2;//start + stop
+                    if (parity != SlowInitParity.None)
+                    {
+                        numFrameBits++;
+                    }
+
+                    uint frameTimeMs = (uint)((numFrameBits * 1000UL) / baud) + 50;
+                    uint writeTimeoutMs = frameTimeMs * 2;
+
+                    DisplayStatusMessage("CH340 slow init trying " + baud + " baud: "
+                        + numFrameBits + " frame bits, frame ~" + frameTimeMs + " ms.", StatusMessageType.LOG);
+
+                    success &= mCommunicationDevice.SetTimeouts(1, writeTimeoutMs);
+                    success &= mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
+                    if (!success)
+                    {
+                        DisplayStatusMessage("CH340 slow init: SetTimeouts/Purge failed at " + baud + " baud.", StatusMessageType.LOG);
+                        continue;
+                    }
+
+                    byte[] address = { connectAddress };
                     uint numBytesWritten = 0;
-                    success &= mCommunicationDevice.Write(addressData, addressData.Length, ref numBytesWritten, 1) && (numBytesWritten == addressData.Length);
+                    success &= mCommunicationDevice.Write(address, address.Length, ref numBytesWritten, writeTimeoutMs)
+                        && (numBytesWritten == address.Length);
+                    if (!success)
+                    {
+                        DisplayStatusMessage("CH340 slow init: Write(0x" + connectAddress.ToString("X2") + ") failed at "
+                            + baud + " baud (wrote " + numBytesWritten + " byte(s)).", StatusMessageType.LOG);
+                        continue;
+                    }
+
+                    Stopwatch watch = Stopwatch.StartNew();
+                    if (!WaitForDeviceTransmitDrain(writeTimeoutMs))
+                    {
+                        DisplayStatusMessage("CH340 slow init: TX drain timed out after "
+                            + watch.ElapsedMilliseconds + " ms at " + baud + " baud.", StatusMessageType.LOG);
+                        continue;
+                    }
+
+                    while (watch.ElapsedMilliseconds < frameTimeMs) ;//busy wait for full frame on wire
+
+                    success &= WaitForDeviceTransmitDrain(SLOW_INIT_TX_DRAIN_TIMEOUT_MS);
+                    success &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                    success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
 
                     if (success)
                     {
-                        //wait for the minimum time to pass
-                        while (watch.ElapsedMilliseconds < FIVE_BAUD_SEND_TIME_MS) ;//busy wait
-                        watch.Stop();
-
-                        //wait for the 5 baud address to send
-                        uint numBytesInSendBuffer = 0;
-                        do
+                        if (mConsumeTransmitEcho)
                         {
-                            success &= mCommunicationDevice.GetTxBytesWaiting(ref numBytesInSendBuffer);
-                        } while (success && (numBytesInSendBuffer > 0));
-
-                        // Reset bit mode and restore baud rate after sending slow init address
-                        if (success)
-                        {
-                            success &= mCommunicationDevice.Purge(PurgeType.TX);
-                            success &= mCommunicationDevice.SetBitMode(0xFF, BitMode.Reset);
-                            success &= mCommunicationDevice.Purge(PurgeType.RX);//TODO: this purge will occasionally make us miss the key byte
-                            success &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
+                            numPreceedingBytesToIgnore = 1;
+                            DisplayStatusMessage("CH340 slow init: expecting 1 dumb-echo byte (address 0x"
+                                + connectAddress.ToString("X2") + ") before ECU sync.", StatusMessageType.LOG);
                         }
+
+                        DisplayStatusMessage("CH340 slow init address sent at " + baud + " baud in "
+                            + watch.ElapsedMilliseconds + " ms (frame wait " + frameTimeMs + " ms).", StatusMessageType.LOG);
+                        LogSlowInitRxQueue("after address send at " + baud + " baud");
+                        return true;
                     }
+
+                    DisplayStatusMessage("CH340 slow init: restore to " + DEFAULT_COMMUNICATION_BAUD_RATE + " baud failed after send at "
+                        + baud + " baud.", StatusMessageType.LOG);
                 }
 
-                if (!success)
-                {
-                    DisplayStatusMessage("Failed to send slow init address byte.", StatusMessageType.LOG);
-                }
+                DisplayStatusMessage("Failed to send CH340 slow init address (no acceptable baud rate).", StatusMessageType.LOG);
             }
 
-            return success;
+            return false;
         }
+
         protected bool SendSlowInit(byte connectAddress, SlowInitDataBits numDataBits, SlowInitParity parity, out byte keyByte1, out byte keyByte2)
         {
             uint PRIMARY_SLOW_INIT_BAUD_RATE = 10400;
@@ -1366,6 +1539,8 @@ namespace Communication
 
             lock (mCommunicationDevice)
             {
+                ClearSlowInitHandshakePhaseWatch();
+
                 uint currentBaudRate = PRIMARY_SLOW_INIT_BAUD_RATE;
 
                 bool success = true;
@@ -1378,14 +1553,72 @@ namespace Communication
                     Stopwatch watch = new Stopwatch();
                     uint numPreceedingBytesToIgnore = 0;
 
-                    if (SendSlowInitAddress_FTDI_UsingBreak(connectAddress, numDataBits, parity, out numPreceedingBytesToIgnore))
+                    string addressSendPath = "break-toggle";
+                    DisplayStatusMessage("Slow init SendSlowInit: device=" + mCommunicationDevice.Type
+                        + ", path=" + addressSendPath
+                        + ", address=0x" + connectAddress.ToString("X2")
+                        + ", format=" + (int)numDataBits + SlowInitParityLabel(parity).Substring(0, 1) + "1"
+                        + ", post-address baud=" + currentBaudRate + ".", StatusMessageType.LOG);
+
+                    bool sentSlowInitAddress;
+                    if (mCommunicationDevice.Type == DeviceType.CH340)
                     {
+                        sentSlowInitAddress = SendSlowInitAddress_UsingBreak(connectAddress, numDataBits, parity, out numPreceedingBytesToIgnore);
+                        if (!sentSlowInitAddress)
+                        {
+                            DisplayStatusMessage("CH340 slow init: break-toggle send failed, trying low-baud UART.", StatusMessageType.LOG);
+                            addressSendPath = "CH340 low-baud UART";
+                            sentSlowInitAddress = SendSlowInitAddress_CH340_UsingLowBaudUart(connectAddress, numDataBits, parity, out numPreceedingBytesToIgnore);
+                        }
+                    }
+                    else
+                    {
+                        sentSlowInitAddress = SendSlowInitAddress_UsingBreak(connectAddress, numDataBits, parity, out numPreceedingBytesToIgnore);
+                    }
+
+                    if (!sentSlowInitAddress)
+                    {
+                        DisplayStatusMessage("Slow init: address send failed via " + addressSendPath + ".", StatusMessageType.LOG);
+                    }
+
+                    if (sentSlowInitAddress)
+                    {
+                        Stopwatch postAddressWatch = EnableSlowInitTimingLog ? Stopwatch.StartNew() : null;
+
+                        DisplayStatusMessage("Slow init: ignoring " + numPreceedingBytesToIgnore
+                            + " preceding byte(s) before sync.", StatusMessageType.LOG);
+                        LogSlowInitRxQueue("before sync read");
+
                         // Some ECUs (e.g. EDC15) send sync byte later than W1Max (e.g. 405ms vs 300ms)
-                        // Consider: SetTimeouts((uint)SlowInitConnectionTiming.W1Max, WriteTimeoutMs) before reading sync byte
-                        //read the sync byte
-                        byte[] syncByte = new byte[1 + numPreceedingBytesToIgnore];
+                        uint syncReadTimeoutMs = (uint)SlowInitConnectionTiming.W1Max;
+                        success &= mCommunicationDevice.SetTimeouts(syncReadTimeoutMs, FTDIDeviceWriteTimeOutMs);
+
+                        // Discard dumb-echo / break-transition bytes before waiting for ECU 0x55
+                        if (numPreceedingBytesToIgnore > 0)
+                        {
+                            byte[] echoDiscard = new byte[numPreceedingBytesToIgnore];
+                            uint numEchoBytesRead = 0;
+                            bool echoReadSuccess = mCommunicationDevice.Read(echoDiscard, numPreceedingBytesToIgnore, ref numEchoBytesRead, syncReadTimeoutMs);
+                            DisplayStatusMessage("Slow init echo discard: success=" + echoReadSuccess
+                                + ", requested=" + numPreceedingBytesToIgnore
+                                + ", read=" + numEchoBytesRead
+                                + ", raw=[" + FormatSlowInitHexDump(echoDiscard, numEchoBytesRead) + "].", StatusMessageType.LOG);
+                            LogSlowInitRxQueue("after echo discard");
+                        }
+
+                        // Read ECU sync byte (0x55) — separate read so we block up to W1Max for ECU response
+                        byte[] syncByte = new byte[1];
                         uint numSyncBytesRead = 0;
-                        bool readSuccess = mCommunicationDevice.Read(syncByte, 1 + numPreceedingBytesToIgnore, ref numSyncBytesRead, 2);
+                        bool readSuccess = mCommunicationDevice.Read(syncByte, 1, ref numSyncBytesRead, syncReadTimeoutMs);
+
+                        DisplayStatusMessage("Slow init sync read: success=" + readSuccess
+                            + ", requested=1, read=" + numSyncBytesRead
+                            + ", raw=[" + FormatSlowInitHexDump(syncByte, numSyncBytesRead) + "].", StatusMessageType.LOG);
+                        if (EnableSlowInitTimingLog)
+                        {
+                            DisplayStatusMessage("Slow init: " + postAddressWatch.ElapsedMilliseconds
+                                + " ms from address send complete to sync read return.", StatusMessageType.DEV);
+                        }
 
                         watch.Reset(); watch.Start();//start timing for first key byte
 
@@ -1395,16 +1628,19 @@ namespace Communication
                         bool readSyncByte = false;
 
                         //check if we read the sync byte
-                        if (readSuccess && (numSyncBytesRead > numPreceedingBytesToIgnore))
+                        if (readSuccess && (numSyncBytesRead > 0))
                         {
                             readSyncByte = true;
 
-                            if (syncByte[numPreceedingBytesToIgnore] != 0x55)
+                            if (syncByte[0] != 0x55)
                             {
                                 currentBaudRate = SECONDARY_SLOW_INIT_BAUD_RATE;
+                                success &= WaitForDeviceTransmitDrain(SLOW_INIT_TX_DRAIN_TIMEOUT_MS);
                                 success &= mCommunicationDevice.SetBaudRate(currentBaudRate);
 
-                                DisplayStatusMessage("Read incorrect sync byte, guessing baud rate is actually " + currentBaudRate + ".", StatusMessageType.LOG);
+                                DisplayStatusMessage("Read incorrect sync byte 0x"
+                                    + syncByte[0].ToString("X2")
+                                    + " (expected 0x55), guessing baud rate is actually " + currentBaudRate + ".", StatusMessageType.LOG);
 
                                 if (!success)
                                 {
@@ -1412,15 +1648,23 @@ namespace Communication
                                     readSyncByte = false;
                                 }
                             }
+                            else
+                            {
+                                DisplayStatusMessage("Slow init sync byte 0x55 OK at " + currentBaudRate + " baud.", StatusMessageType.LOG);
+                            }
                         }
                         else
                         {
                             readSyncByte = true;
 
                             currentBaudRate = SECONDARY_SLOW_INIT_BAUD_RATE;
+                            success &= WaitForDeviceTransmitDrain(SLOW_INIT_TX_DRAIN_TIMEOUT_MS);
                             success &= mCommunicationDevice.SetBaudRate(currentBaudRate);
 
-                            DisplayStatusMessage("Failed to read sync byte, guessing baud rate is actually " + currentBaudRate + ".", StatusMessageType.LOG);
+                            DisplayStatusMessage("Failed to read sync byte (readSuccess=" + readSuccess
+                                + ", read=" + numSyncBytesRead
+                                + "), guessing baud rate is actually " + currentBaudRate + ".", StatusMessageType.LOG);
+                            LogSlowInitRxQueue("after failed sync read");
 
                             if (!success)
                             {
@@ -1435,6 +1679,8 @@ namespace Communication
 
                             if (success)
                             {
+                                LogSlowInitRxQueue("before key bytes at " + currentBaudRate + " baud");
+
                                 //read the key bytes
                                 List<byte> keyBytes = new List<byte>();
                                 uint numBytesRead = 0;
@@ -1467,10 +1713,16 @@ namespace Communication
                                             for (int x = 0; x < numBytesRead; ++x)
                                             {
                                                 keyBytes.Add(keyByteData[x]);
+                                                DisplayStatusMessage("Slow init key byte raw[" + (keyBytes.Count - 1) + "]=0x"
+                                                    + keyByteData[x].ToString("X2") + ".", StatusMessageType.LOG);
                                             }
                                         }
                                     }
                                 } while ( (lastReadTime < keyByteTimeOut) || ((keyBytes.Count < 2) && (lastReadTime < lastChanceKeyByteTimeOut)) );
+
+                                DisplayStatusMessage("Slow init key byte read finished: count=" + keyBytes.Count
+                                    + ", elapsed=" + watch.ElapsedMilliseconds + " ms, raw=["
+                                    + FormatSlowInitHexDump(keyBytes.ToArray(), (uint)keyBytes.Count) + "].", StatusMessageType.LOG);
 
                                 //did we read enough key bytes?
                                 //todo: according to the spec there could be more than two key bytes
@@ -1483,11 +1735,21 @@ namespace Communication
                                     byte[] keyByteComp = new byte[1];
                                     keyByteComp[0] = (byte)~keyBytes[keyBytes.Count - 1];
 
+                                    DisplayStatusMessage("Slow init sending key byte complement 0x"
+                                        + keyByteComp[0].ToString("X2") + " (W4Min wait "
+                                        + (uint)SlowInitConnectionTiming.W4Min + " ms).", StatusMessageType.LOG);
+
                                     //don't reset timer after trying to read last key byte
                                     while (watch.ElapsedMilliseconds < (uint)SlowInitConnectionTiming.W4Min) ;//busy loop
 
                                     uint numBytesWritten = 0;
                                     success &= mCommunicationDevice.Write(keyByteComp, keyByteComp.Length, ref numBytesWritten, 2) && (numBytesWritten == keyByteComp.Length);
+
+                                    if (success && EnableSlowInitTimingLog)
+                                    {
+                                        StartSlowInitHandshakePhaseWatch();
+                                        LogSlowInitHandshakePhase("key byte complement sent");
+                                    }
 
                                     watch.Stop();
 
@@ -1497,7 +1759,7 @@ namespace Communication
 										{
 											//read the echo
 											byte[] echo = new byte[1];
-											success &= mCommunicationDevice.Read(echo, (uint)echo.Length, ref numBytesRead, 2) && (numBytesRead == echo.Length);
+											success &= mCommunicationDevice.Read(echo, (uint)echo.Length, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == echo.Length);
 
 											if (success)
 											{
@@ -1526,6 +1788,10 @@ namespace Communication
 											keyByte1 = (byte)(keyBytes[0] & 0x7F);
 											keyByte2 = (byte)(keyBytes[1] & 0x7F);
 
+											DisplayStatusMessage("Slow init key bytes (7-bit): KB1=0x" + keyByte1.ToString("X2")
+                                                + " KB2=0x" + keyByte2.ToString("X2")
+                                                + ", session baud=" + currentBaudRate + ".", StatusMessageType.LOG);
+
 											DiagnosticSessionBaudRate = currentBaudRate;
 										}
 									}
@@ -1536,7 +1802,10 @@ namespace Communication
                                 }
                                 else
                                 {
-                                    DisplayStatusMessage("Not enough key bytes, read: " + keyBytes.Count, StatusMessageType.LOG);
+                                    DisplayStatusMessage("Not enough key bytes, read: " + keyBytes.Count
+                                        + " at " + currentBaudRate + " baud after "
+                                        + watch.ElapsedMilliseconds + " ms.", StatusMessageType.LOG);
+                                    LogSlowInitRxQueue("after key byte timeout");
                                 }
                             }
                             else
@@ -1560,10 +1829,23 @@ namespace Communication
 						//need to read the address complement if this slow init started a KWP2000 session
 						if (result && IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
 						{
+                            success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
+
+                            LogSlowInitHandshakePhase("address complement read start");
+
 							//read the complement of the address
                             byte[] addressComplement = new byte[1];
 							uint numBytesRead = 0;
-                            success &= mCommunicationDevice.Read(addressComplement, (uint)addressComplement.Length, ref numBytesRead, 2);
+                            success &= mCommunicationDevice.Read(addressComplement, (uint)addressComplement.Length, ref numBytesRead, SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS);
+
+                            LogSlowInitHandshakePhase("address complement read done",
+                                numBytesRead > 0 ? addressComplement[0] : null,
+                                success && (numBytesRead == addressComplement.Length) && (addressComplement[0] == (byte)~connectAddress));
+
+                            DisplayStatusMessage("Slow init address complement read: success=" + success
+                                + ", read=" + numBytesRead
+                                + ", value=0x" + (numBytesRead > 0 ? addressComplement[0].ToString("X2") : "??")
+                                + ", expected=0x" + ((byte)~connectAddress).ToString("X2") + ".", StatusMessageType.LOG);
 
 							if (!success || (numBytesRead != addressComplement.Length) || (addressComplement[0] != (byte)~connectAddress))
 							{
@@ -1571,6 +1853,11 @@ namespace Communication
 								DisplayStatusMessage("Failed to read address complement.", StatusMessageType.LOG);
 							}
 						}
+                        else if (result)
+                        {
+                            DisplayStatusMessage("Slow init: skipping address complement (KWP1281 or invalid KWP2000 key bytes KB1=0x"
+                                + keyByte1.ToString("X2") + " KB2=0x" + keyByte2.ToString("X2") + ").", StatusMessageType.LOG);
+                        }
                     }
                 }
                 else
@@ -1670,7 +1957,15 @@ namespace Communication
             //read the byte
             byte[] tempData = new byte[1];
             uint numBytesRead = 0;
-            bool success = mCommunicationDevice.Read(tempData, 1, ref numBytesRead, 2) && (numBytesRead == 1);
+            bool success = mCommunicationDevice.Read(tempData, 1, ref numBytesRead, KWP1281_ECU_BYTE_READ_TIMEOUT_MS) && (numBytesRead == 1);
+
+            if (mSlowInitHandshakePhaseWatchActive && !mSlowInitKWP1281FirstByteLogged)
+            {
+                mSlowInitKWP1281FirstByteLogged = true;
+                LogSlowInitHandshakePhase("first KWP1281 byte read",
+                    success ? tempData[0] : null,
+                    success);
+            }
 
             stopwatch.Start();
 
@@ -1695,7 +1990,7 @@ namespace Communication
 						{
 							//read the echo
 							byte[] tempDataEcho = new byte[1];
-							success &= mCommunicationDevice.Read(tempDataEcho, 1, ref numBytesRead, 2) && (numBytesRead == 1);
+							success &= mCommunicationDevice.Read(tempDataEcho, 1, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == 1);
 
 							if (success && (numBytesRead == 1) && (tempDataEcho[0] == tempDataComplement[0]))
 							{
@@ -1753,7 +2048,7 @@ namespace Communication
 					//read the echo
 					byte[] tempEchoData = new byte[1];
 					uint numBytesRead = 0;
-					success &= mCommunicationDevice.Read(tempEchoData, 1, ref numBytesRead, 2) && (numBytesRead == 1);
+					success &= mCommunicationDevice.Read(tempEchoData, 1, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == 1);
 
 					if (success && (numBytesRead == 1) && (tempData[0] == tempEchoData[0]))
 					{
@@ -1772,7 +2067,7 @@ namespace Communication
 					//read the complement response
 					byte[] tempDataComplement = new byte[1];
 					uint numBytesRead = 0;
-					success &= mCommunicationDevice.Read(tempDataComplement, 1, ref numBytesRead, 2) && (numBytesRead == 1);
+					success &= mCommunicationDevice.Read(tempDataComplement, 1, ref numBytesRead, KWP1281_ECU_BYTE_READ_TIMEOUT_MS) && (numBytesRead == 1);
 
 					if (success && (numBytesRead == 1) && (tempData[0] == (byte)~tempDataComplement[0]))
 					{
@@ -2054,8 +2349,10 @@ namespace Communication
             bool sendOK = true;
             string ASCIIData = "";
 
-            const uint KWP1281_ECU_MAX_TIME_UNTIL_RESPONSE_MS = 1200;
-            bool success = mCommunicationDevice.SetTimeouts(KWP1281_ECU_MAX_TIME_UNTIL_RESPONSE_MS, FTDIDeviceWriteTimeOutMs);
+            LogSlowInitHandshakePhase("KWP1281 session start");
+
+            bool success = mCommunicationDevice.SetTimeouts(KWP1281_ECU_BYTE_READ_TIMEOUT_MS, FTDIDeviceWriteTimeOutMs);
+            success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
 
             while (sendOK)
             {
@@ -2142,7 +2439,7 @@ namespace Communication
             return sendOK;
         }
 
-        protected bool Connect_SlowInit_FTDI()
+        protected bool Connect_SlowInit()
         {
 			bool slowInitSuccess = false;
             byte keyByte1; byte keyByte2;
@@ -2151,6 +2448,31 @@ namespace Communication
 
             lock(mCommunicationDevice)
             {
+                if (mCommunicationDevice?.Type == DeviceType.CH340)
+                {
+                    DisplayStatusMessage("Slow init: applying CH340 KKL DTR pulse before address send.", StatusMessageType.LOG);
+                    if (!Ch340CommunicationDevice.ApplyKklDtrPulse(mCommunicationDevice)
+                        || !Ch340CommunicationDevice.RestoreKwp2000ControlLines(mCommunicationDevice))
+                    {
+                        DisplayStatusMessage("Slow init: CH340 KKL DTR setup failed.", StatusMessageType.LOG);
+                        return false;
+                    }
+                }
+
+                DisplayStatusMessage("Slow init connect: device=" + (mCommunicationDevice?.Type.ToString() ?? "?")
+                    + ", address=0x" + mConnectAddress.ToString("X2")
+                    + ", KWP1281 addr=0x" + DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS.ToString("X2")
+                    + ", KWP2000 addr=0x" + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + ".", StatusMessageType.LOG);
+                if (mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS)
+                {
+                    DisplayStatusMessage("Slow init: user address 0x01 — KWP1281-first path; app may retry at 0x"
+                        + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + " (Even parity) internally.", StatusMessageType.LOG);
+                }
+                else if (mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS)
+                {
+                    DisplayStatusMessage("Slow init: user address 0x11 — direct one-shot KWP2000 slow init (no KWP1281 first). May fail on ME7 bench; 0x01 is the usual working address.", StatusMessageType.LOG);
+                }
+
                 //wait for the required idle time
                 Stopwatch watch = new Stopwatch(); watch.Start();
                 const uint idleTime = 2600;//VW says they need a min of 2.6 seconds between slow inits//(uint)SlowInitConnectionTiming.W0Min + (uint)SlowInitConnectionTiming.W5Min;
@@ -2170,12 +2492,15 @@ namespace Communication
                     //did the slow init result in a KWP1281 session?
                     if((keyByte1 == KWP_1281_PROTOCOL_KEY_BYTE_1) && (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
                     {
+                        DisplayStatusMessage("Slow init: KWP1281 session detected (KB1=0x01 KB2=0x0A), running short KWP1281 session.", StatusMessageType.LOG);
                         KWP1281RunShortSession();
 
                         //wait additional time to give the ECU time to switch to KWP2000
                         watch.Reset(); watch.Start();
                         while (watch.ElapsedMilliseconds < TimeBetweenSlowInitForKWP2000MS) ;
 
+                        DisplayStatusMessage("Slow init: second attempt after KWP1281, waiting "
+                            + TimeBetweenSlowInitForKWP2000MS + " ms.", StatusMessageType.LOG);
                         DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
                         slowInitSuccess = SendSlowInit(mConnectAddress, SlowInitDataBits.Seven, SlowInitParity.Odd, out keyByte1, out keyByte2);
 
@@ -2203,6 +2528,8 @@ namespace Communication
                     //did the second slow init result in another KWP1281 session?
                     if((mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS) && (keyByte1 == KWP_1281_PROTOCOL_KEY_BYTE_1) && (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
                     {
+                        DisplayStatusMessage("Slow init: KWP1281 at 0x01 again — third attempt at 0x"
+                            + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + " Even parity.", StatusMessageType.LOG);
                         KWP1281RunShortSession();
 
                         //wait additional time to give the ECU time to switch to KWP2000
@@ -2859,7 +3186,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         }
                         else
                         {
-                            sentInit = Connect_SlowInit_FTDI();
+                            sentInit = Connect_SlowInit();
                         }
 
                         if (!sentInit)

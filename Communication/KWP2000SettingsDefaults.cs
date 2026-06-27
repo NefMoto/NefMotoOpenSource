@@ -25,6 +25,7 @@ namespace Communication
     /// </summary>
     public static class KWP2000SettingsDefaults
     {
+        /// <summary>UI/settings default connect address (same as fast-init physical). Slow init on ME7 bench typically uses this (KWP1281-first path).</summary>
         public const byte ConnectAddress = KWP2000Interface.DEFAULT_ECU_FASTINIT_KWP2000_PHYSICAL_ADDRESS;
         public const KWP2000AddressMode ConnectAddressMode = KWP2000AddressMode.Physical;
 
@@ -43,6 +44,7 @@ namespace Communication
         public const long P4TesterInterByteTimeMinMsWhenConnecting = 17;
 
         public const bool ShouldVerifyDumbMode = true;
+        public const bool EnableSlowInitTimingLog = false;
 
         public const uint DeviceReadTimeOutMs = 1000;
         public const uint DeviceWriteTimeOutMs = 1000;
@@ -71,6 +73,7 @@ namespace Communication
             commInterface.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS = KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS;
             commInterface.P4TesterInterByteTimeMinMsWhenConnecting = P4TesterInterByteTimeMinMsWhenConnecting;
             commInterface.ShouldVerifyDumbMode = ShouldVerifyDumbMode;
+            commInterface.EnableSlowInitTimingLog = EnableSlowInitTimingLog;
             commInterface.FTDIDeviceReadTimeOutMs = DeviceReadTimeOutMs;
             commInterface.FTDIDeviceWriteTimeOutMs = DeviceWriteTimeOutMs;
             commInterface.DefaultTimingParameters = CreateDefaultTimingParameters();

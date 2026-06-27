@@ -156,6 +156,18 @@ namespace ECUFlasher.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableSlowInitTimingLog {
+            get {
+                return ((bool)(this["EnableSlowInitTimingLog"]));
+            }
+            set {
+                this["EnableSlowInitTimingLog"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ChecksumLayoutFile {
             get {

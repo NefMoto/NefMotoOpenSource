@@ -392,12 +392,7 @@ namespace Communication
                         // CH340/KKL cables need DTR=0,RTS=0 (matches Python SetAdapterKKL); FTDI uses DTR=1 for self-powered
                         if (mCommunicationDevice.Type == DeviceType.CH340)
                         {
-                            mCommunicationDevice.SetDTR(true);
-                            Thread.Sleep(100);
-                            mCommunicationDevice.SetDTR(false);
-                            Thread.Sleep(100);
-                            setupSuccess &= mCommunicationDevice.SetDTR(false);
-                            setupSuccess &= mCommunicationDevice.SetRTS(false);
+                            setupSuccess &= Ch340CommunicationDevice.ApplyKklDtrPulse(mCommunicationDevice);
                         }
                         else
                         {

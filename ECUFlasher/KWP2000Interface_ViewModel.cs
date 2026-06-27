@@ -94,6 +94,8 @@ namespace ECUFlasher
 
             //get the last used connection method
             DesiredConnectionMethod = ECUFlasher.Properties.Settings.Default.DesiredKWP2000ConnectionMethod;
+
+            EnableSlowInitTimingLog = ECUFlasher.Properties.Settings.Default.EnableSlowInitTimingLog;
         }
 
 		void ConnectionStatusChangedEvent(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
@@ -179,6 +181,22 @@ namespace ECUFlasher
             }
         }
         private ConnectionMethod _DesiredConnectionMethod = ConnectionMethod.SlowInit;
+
+        public bool EnableSlowInitTimingLog
+        {
+            get { return _EnableSlowInitTimingLog; }
+            set
+            {
+                if (_EnableSlowInitTimingLog != value)
+                {
+                    _EnableSlowInitTimingLog = value;
+                    KWP2000CommInterface.EnableSlowInitTimingLog = value;
+                    ECUFlasher.Properties.Settings.Default.EnableSlowInitTimingLog = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("EnableSlowInitTimingLog"));
+                }
+            }
+        }
+        private bool _EnableSlowInitTimingLog;
 
 		[DefaultValue(KWP2000SettingsDefaults.ConnectAddress)]
         public byte ConnectAddress
@@ -507,6 +525,7 @@ namespace ECUFlasher
 
 			ConnectAddress = KWP2000SettingsDefaults.ConnectAddress;
 			ConnectAddressMode = KWP2000SettingsDefaults.ConnectAddressMode;
+			EnableSlowInitTimingLog = KWP2000SettingsDefaults.EnableSlowInitTimingLog;
 			SeedRequest = KWP2000SettingsDefaults.SecuritySeedRequest;
 			ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
 			ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;

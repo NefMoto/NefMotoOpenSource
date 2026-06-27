@@ -162,7 +162,7 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Address"
-                               ToolTip="Connection address (hex). Slow init typically uses 0x11; fast init physical default is 0x01."/>
+                               ToolTip="Connection address (hex). UI default 0x01 — use for slow init on ME7 bench (KWP1281-first path). 0x11 is an internal retry target, not a reliable one-shot slow-init address on ME7.1 bench. Fast init physical default is also 0x01."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
                                  Text="{Binding Path=ConnectAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
 
@@ -221,12 +221,18 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Verify cable in dumb mode"
                                ToolTip="Verify the cable is wired correctly when communicating in dumb (KWP1281) mode."/>
                         <CheckBox Grid.Row="0" Grid.Column="1"
                                   IsChecked="{Binding Path=CommInterface.ShouldVerifyDumbMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+
+                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Slow init timing log"
+                               ToolTip="Log per-bit slow init timing, RX queue depth, and handshake phase deltas to the status log (for bench diagnostics)."/>
+                        <CheckBox Grid.Row="1" Grid.Column="1"
+                                  IsChecked="{Binding Path=EnableSlowInitTimingLog, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
 

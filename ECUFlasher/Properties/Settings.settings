@@ -35,6 +35,9 @@
     <Setting Name="DesiredKWP2000ConnectionMethod" Type="ECUFlasher.KWP2000Interface_ViewModel.ConnectionMethod" Scope="User">
       <Value Profile="(Default)">SlowInit</Value>
     </Setting>
+    <Setting Name="EnableSlowInitTimingLog" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="ChecksumLayoutFile" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

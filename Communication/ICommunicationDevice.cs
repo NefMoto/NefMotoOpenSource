@@ -271,9 +271,17 @@ namespace Communication
         /// <summary>
         /// Gets the number of bytes waiting in the transmit buffer.
         /// Use: wait until 0 before switching baud/mode to ensure TX drain.
+        /// Prefer <see cref="WaitForTransmitDrain"/> before break/baud changes on serial devices.
         /// </summary>
         /// <param name="bytesWaiting">Output parameter for number of bytes waiting</param>
         /// <returns>True if operation successful</returns>
         bool GetTxBytesWaiting(ref uint bytesWaiting);
+
+        /// <summary>
+        /// Waits until the device transmit queue is empty (Win32 WaitCommEvent/ClearCommError on serial; TX queue poll on FTDI).
+        /// </summary>
+        /// <param name="timeoutMs">Maximum wait in milliseconds</param>
+        /// <returns>True if TX queue drained within timeout</returns>
+        bool WaitForTransmitDrain(uint timeoutMs);
     }
 }
