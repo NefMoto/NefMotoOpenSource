@@ -38,7 +38,7 @@ using System.Xml.Serialization;
 namespace Communication
 {
     public class TimingParameters : ICloneable
-	{
+    {
         public long P1ECUInterByteTimeMaxMs;
         public long P2ECUResponseTimeMinMs;
         public long P2ECUResponseTimeMaxMs;
@@ -57,36 +57,36 @@ namespace Communication
             P4TesterInterByteTimeMinMs = KWP2000Interface.P4_DEFAULT_TESTER_INTERBYTE_MIN_TIME;
         }
 
-		public void EnforceTimingIntervalRequirements()
-		{
-			/*
-			Requirements checked by the ecu when setting timing values:
-			P2 min >= P2 min limit
-			*P2 max >= P2 min
-			P2 max <= P2 max limit
-			*P2 max - 12 > P2 min
-			P3 min >= P3 min limit
-			*P3 max >= P3 min
-			P3 max <= P3 max limit
-			*P3 max - 12 > P3 min
-			P4 min >= P4 min limit
-			P4 min <= P4 max limit
-			*/
+        public void EnforceTimingIntervalRequirements()
+        {
+            /*
+            Requirements checked by the ecu when setting timing values:
+            P2 min >= P2 min limit
+            *P2 max >= P2 min
+            P2 max <= P2 max limit
+            *P2 max - 12 > P2 min
+            P3 min >= P3 min limit
+            *P3 max >= P3 min
+            P3 max <= P3 max limit
+            *P3 max - 12 > P3 min
+            P4 min >= P4 min limit
+            P4 min <= P4 max limit
+            */
 
-			//requirements of the KWP2000 protocol
-			// ASSERT Pi_MIN < Pi_MAX
-			// ASSERT P3_MIN > P4_MIN
+            //requirements of the KWP2000 protocol
+            // ASSERT Pi_MIN < Pi_MAX
+            // ASSERT P3_MIN > P4_MIN
             // ASSERT P2_MIN > P1_MAX if end of message is detected by timed out according to ISO14230-2
-			// ASSERT P2_MIN > P4_MAX if end of message is detected by timed out according to ISO14230-2
-			// ASSERT P3_MIN > P2_MAX if functional addressing or data segmentation is used according to ISO14239-2
-			// ASSERT P2_BUSY_MIN = P2_MIN
-			// ASSERT P3_BUSY_MAX = P3_MAX
+            // ASSERT P2_MIN > P4_MAX if end of message is detected by timed out according to ISO14230-2
+            // ASSERT P3_MIN > P2_MAX if functional addressing or data segmentation is used according to ISO14239-2
+            // ASSERT P2_BUSY_MIN = P2_MIN
+            // ASSERT P3_BUSY_MAX = P3_MAX
 
             P2ECUResponseTimeMaxMs = Math.Max(P2ECUResponseTimeMaxMs, P2ECUResponseTimeMinMs + 13);//I think the + 13 is how the ME7 ECU does it
             P3TesterResponseTimeMinMs = Math.Max(P3TesterResponseTimeMinMs, P4TesterInterByteTimeMinMs);
             //P3TesterResponseTimeMinMs = Math.Max(P3TesterResponseTimeMinMs, P2ECUResponseTimeMaxMs);//This should be enabled according spec (if functional addressing or data segmentation is used)
             P3TesterResponseTimeMaxMs = Math.Max(P3TesterResponseTimeMaxMs, P3TesterResponseTimeMinMs + 13);//I think the + 13 is how the ME7 ECU does it
-		}
+        }
 
         public override string ToString()
         {
@@ -136,21 +136,21 @@ namespace Communication
             clonedParams.P4TesterInterByteTimeMinMs = P4TesterInterByteTimeMinMs;
             return clonedParams;
         }
-	};
+    };
 
     public class KWP2000Interface : CommunicationInterface
-	{
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
-		//PUBLIC TYPES
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
+    {
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //PUBLIC TYPES
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-		public enum TimingParameterMode
-		{
-			Default,//timing params are defaults read from ECU
-			Current,//timing params are current read from ECU
-			Limits,//timing params are limits read from ECU
-			Unknown//timing params are not connected to the ECU
-		}
+        public enum TimingParameterMode
+        {
+            Default,//timing params are defaults read from ECU
+            Current,//timing params are current read from ECU
+            Limits,//timing params are limits read from ECU
+            Unknown//timing params are not connected to the ECU
+        }
 
         public const byte TESTER_ADDRESS = 0xF1;
 
@@ -162,7 +162,7 @@ namespace Communication
         public const byte DEFUALT_ECU_FASTINIT_KWP2000_FUNCTIONAL_ADDRESS_EXTERNAL_RAM = 0x02;
         public const byte DEFUALT_ECU_FASTINIT_KWP2000_FUNCTIONAL_ADDRESS_INTERNAL_ROM = 0x10;
 
-		//KWP_1281_KB2_0x0A * 128 + KWP_1281_KB1_0x01 = 1281
+        //KWP_1281_KB2_0x0A * 128 + KWP_1281_KB1_0x01 = 1281
         protected const byte KWP_1281_PROTOCOL_KEY_BYTE_1 = 0x01;//seven data bits, odd parity
         protected const byte KWP_1281_PROTOCOL_KEY_BYTE_2 = 0x0A;//seven data bits, odd parity
 
@@ -192,33 +192,33 @@ namespace Communication
         public const long P4_DEFAULT_TESTER_INTERBYTE_MIN_TIME = 5;
         public const long P4_DEFAULT_TESTER_INTERBYTE_MAX_TIME = 20;
 
-		public enum MessageErrorCode
-		{
-			MessageOK = 0,
-			InvalidChecksum,
-			NotEnoughData,
-			RequestedTooMuchData,
+        public enum MessageErrorCode
+        {
+            MessageOK = 0,
+            InvalidChecksum,
+            NotEnoughData,
+            RequestedTooMuchData,
             MessageContainsNoData,
-			UnknownError
-		};
+            UnknownError
+        };
 
-		public event MessageChangedDelegate ReceivedMessageEvent;
+        public event MessageChangedDelegate ReceivedMessageEvent;
 
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
-		//PUBLIC METHODS
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //PUBLIC METHODS
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-		public KWP2000Interface(DisplayStatusMessageDelegate displayStatusMessage)
-			: base(displayStatusMessage)
-		{
-			mReceiveBuffer = new byte[RECEIVE_BUFFER_SIZE];
-			mMessagesPendingSend = new Queue<KWP2000Message>();
+        public KWP2000Interface(DisplayStatusMessageDelegate displayStatusMessage)
+            : base(displayStatusMessage)
+        {
+            mReceiveBuffer = new byte[RECEIVE_BUFFER_SIZE];
+            mMessagesPendingSend = new Queue<KWP2000Message>();
 
-			mP1ECUResponseInterByteTimeOut = new Stopwatch();
-			mP2ECUResponseTimeOut = new Stopwatch();
-			mP3TesterRequestTimeOut = new Stopwatch();
+            mP1ECUResponseInterByteTimeOut = new Stopwatch();
+            mP2ECUResponseTimeOut = new Stopwatch();
+            mP3TesterRequestTimeOut = new Stopwatch();
             mDisconnectTimeOut = new Stopwatch();
-		}
+        }
 
         public override Protocol CurrentProtocol
         {
@@ -282,7 +282,7 @@ namespace Communication
         private TimingParameters mCurrentTimingParameters;
         private long mP2ECUResponseMaxTimeCurrent = P2_DEFAULT_ECU_RESPONSE_MAX_TIME;//max time from timings, or longer if response pending
 
-		[DefaultValue(KWP2000SettingsDefaults.P4TesterInterByteTimeMinMsWhenConnecting)]
+        [DefaultValue(KWP2000SettingsDefaults.P4TesterInterByteTimeMinMsWhenConnecting)]
         public long P4TesterInterByteTimeMinMsWhenConnecting
         {
             get
@@ -299,7 +299,7 @@ namespace Communication
                 }
             }
         }
-		private long mP4TesterInterByteTimeMinMsWhenConnecting = KWP2000SettingsDefaults.P4TesterInterByteTimeMinMsWhenConnecting;
+        private long mP4TesterInterByteTimeMinMsWhenConnecting = KWP2000SettingsDefaults.P4TesterInterByteTimeMinMsWhenConnecting;
 
         public TimingParameters DefaultTimingParameters
         {
@@ -455,23 +455,23 @@ namespace Communication
             return success;
         }
 
-		public void DisconnectFromECU()
-		{
-			if (ConnectionStatus == ConnectionStatusType.Connected)
-			{
-				ConnectionStatus = ConnectionStatusType.DisconnectionPending;
-				SendMessage((byte)KWP2000ServiceID.StopCommunication);
+        public void DisconnectFromECU()
+        {
+            if (ConnectionStatus == ConnectionStatusType.Connected)
+            {
+                ConnectionStatus = ConnectionStatusType.DisconnectionPending;
+                SendMessage((byte)KWP2000ServiceID.StopCommunication);
 
                 if (!mDisconnectTimeOut.IsRunning)
                 {
                     mDisconnectTimeOut.Reset();
                     mDisconnectTimeOut.Start();
                 }
-			}
-		}
+            }
+        }
 
-		public uint DiagnosticSessionBaudRate
-		{
+        public uint DiagnosticSessionBaudRate
+        {
             get
             {
                 return mDiagnosticSessionBaudRate;
@@ -492,10 +492,10 @@ namespace Communication
                 mDiagnosticSessionBaudRate = value;
                 OnPropertyChanged(new PropertyChangedEventArgs("DiagnosticSessionBaudRate"));
             }
-		}
+        }
         private uint mDiagnosticSessionBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
 
-		[DefaultValue(KWP2000SettingsDefaults.ShouldVerifyDumbMode)]
+        [DefaultValue(KWP2000SettingsDefaults.ShouldVerifyDumbMode)]
         public bool ShouldVerifyDumbMode
         {
             get
@@ -512,9 +512,9 @@ namespace Communication
                 }
             }
         }
-		private bool mShouldVerifyDumbMode = KWP2000SettingsDefaults.ShouldVerifyDumbMode;
+        private bool mShouldVerifyDumbMode = KWP2000SettingsDefaults.ShouldVerifyDumbMode;
 
-		[DefaultValue(KWP2000SettingsDefaults.EnableSlowInitTimingLog)]
+        [DefaultValue(KWP2000SettingsDefaults.EnableSlowInitTimingLog)]
         public bool EnableSlowInitTimingLog
         {
             get
@@ -531,9 +531,9 @@ namespace Communication
                 }
             }
         }
-		private bool mEnableSlowInitTimingLog = KWP2000SettingsDefaults.EnableSlowInitTimingLog;
+        private bool mEnableSlowInitTimingLog = KWP2000SettingsDefaults.EnableSlowInitTimingLog;
 
-		[DefaultValue(KWP2000SettingsDefaults.NumConnectionAttempts)]
+        [DefaultValue(KWP2000SettingsDefaults.NumConnectionAttempts)]
         public uint NumConnectionAttempts
         {
             get
@@ -550,9 +550,9 @@ namespace Communication
                 }
             }
         }
-		private uint _NumConnectionAttempts = KWP2000SettingsDefaults.NumConnectionAttempts;
+        private uint _NumConnectionAttempts = KWP2000SettingsDefaults.NumConnectionAttempts;
 
-		[DefaultValue(KWP2000SettingsDefaults.TimeBetweenSlowInitForKWP2000MS)]
+        [DefaultValue(KWP2000SettingsDefaults.TimeBetweenSlowInitForKWP2000MS)]
         public long TimeBetweenSlowInitForKWP2000MS
         {
             get
@@ -569,9 +569,9 @@ namespace Communication
                 }
             }
         }
-		private long _TimeBetweenSlowInitForKWP2000MS = KWP2000SettingsDefaults.TimeBetweenSlowInitForKWP2000MS;
+        private long _TimeBetweenSlowInitForKWP2000MS = KWP2000SettingsDefaults.TimeBetweenSlowInitForKWP2000MS;
 
-		[DefaultValue(KWP2000SettingsDefaults.TimeAfterSlowInitBeforeStartCommMessageMS)]
+        [DefaultValue(KWP2000SettingsDefaults.TimeAfterSlowInitBeforeStartCommMessageMS)]
         public long TimeAfterSlowInitBeforeStartCommMessageMS
         {
             get
@@ -588,9 +588,9 @@ namespace Communication
                 }
             }
         }
-		private long _TimeAfterSlowInitBeforeStartCommMessageMS = KWP2000SettingsDefaults.TimeAfterSlowInitBeforeStartCommMessageMS;
+        private long _TimeAfterSlowInitBeforeStartCommMessageMS = KWP2000SettingsDefaults.TimeAfterSlowInitBeforeStartCommMessageMS;
 
-		[DefaultValue(KWP2000SettingsDefaults.SlowInitFiveBaudBitTimeOffsetMS)]
+        [DefaultValue(KWP2000SettingsDefaults.SlowInitFiveBaudBitTimeOffsetMS)]
         public double SlowInitFiveBaudBitTimeOffsetMS
         {
             get
@@ -607,9 +607,9 @@ namespace Communication
                 }
             }
         }
-		private double _SlowInitFiveBaudBitTimeOffsetMS = KWP2000SettingsDefaults.SlowInitFiveBaudBitTimeOffsetMS;
+        private double _SlowInitFiveBaudBitTimeOffsetMS = KWP2000SettingsDefaults.SlowInitFiveBaudBitTimeOffsetMS;
 
-		[DefaultValue(KWP2000SettingsDefaults.FastInitLowHighTimeOffsetMS)]
+        [DefaultValue(KWP2000SettingsDefaults.FastInitLowHighTimeOffsetMS)]
         public double FastInitLowHighTimeOffsetMS
         {
             get
@@ -626,13 +626,13 @@ namespace Communication
                 }
             }
         }
-		private double _FastInitLowHighTimeOffsetMS = KWP2000SettingsDefaults.FastInitLowHighTimeOffsetMS;
+        private double _FastInitLowHighTimeOffsetMS = KWP2000SettingsDefaults.FastInitLowHighTimeOffsetMS;
 
-		//TODO: get rid of all these send message variations
-		public KWP2000Message SendMessage(byte serviceID)
-		{
-			return SendMessage(serviceID, null);
-		}
+        //TODO: get rid of all these send message variations
+        public KWP2000Message SendMessage(byte serviceID)
+        {
+            return SendMessage(serviceID, null);
+        }
 
         public KWP2000Message SendMessage(byte serviceID, uint maxNumRetries)
         {
@@ -648,39 +648,39 @@ namespace Communication
             return message;
         }
 
-		public KWP2000Message SendMessage(byte serviceID, byte[] data)
-		{
+        public KWP2000Message SendMessage(byte serviceID, byte[] data)
+        {
             var message = new KWP2000Message(KWP2000AddressMode.Physical, TESTER_ADDRESS, CommunicationAddress, serviceID, data);
 
-			SendMessage(message);
+            SendMessage(message);
 
             return message;
-		}
+        }
 
-		public KWP2000Message SendMessage(KWP2000Message message)
-		{
-			if (message != null)
-			{
-				lock (mMessagesPendingSend)
-				{
-					mMessagesPendingSend.Enqueue(message);
-				}
-			}
+        public KWP2000Message SendMessage(KWP2000Message message)
+        {
+            if (message != null)
+            {
+                lock (mMessagesPendingSend)
+                {
+                    mMessagesPendingSend.Enqueue(message);
+                }
+            }
 
             return message;
-		}
+        }
 
         public static byte GetPositiveResponseForRequest(byte request)
-		{
-			Debug.Assert(IsServiceIDRequest(request), "request is not a request service id");
+        {
+            Debug.Assert(IsServiceIDRequest(request), "request is not a request service id");
 
-			return (byte)(request | 0x40);
-		}
+            return (byte)(request | 0x40);
+        }
 
         public static bool IsServiceIDRequest(byte serviceID)
-		{
-			return (serviceID & 0x40) == 0;
-		}
+        {
+            return (serviceID & 0x40) == 0;
+        }
 
         public static bool IsServiceIDResponse(byte serviceID)
         {
@@ -695,11 +695,11 @@ namespace Communication
             return (requestServiceID | 0x40) == response.mServiceID;
         }
 
-		public static bool IsNegativeResponseToRequest(byte requestServiceID, KWP2000Message response)
-		{
-			byte responseCode;
-			return IsNegativeResponseToRequest(requestServiceID, response, out responseCode);
-		}
+        public static bool IsNegativeResponseToRequest(byte requestServiceID, KWP2000Message response)
+        {
+            byte responseCode;
+            return IsNegativeResponseToRequest(requestServiceID, response, out responseCode);
+        }
 
         public static bool IsNegativeResponseToRequest(byte requestServiceID, KWP2000Message response, out byte responseCode)
         {
@@ -707,25 +707,25 @@ namespace Communication
             Debug.Assert(IsServiceIDResponse(response.mServiceID));
 
             bool result = false;
-			responseCode = 0;
+            responseCode = 0;
 
             if ((response.mServiceID == (byte)KWP2000ServiceID.NegativeResponse) && (response.mData != null) && (response.DataLength > 0))
             {
                 result = (requestServiceID == response.mData[0]);
 
-				if (response.DataLength > 1)
-				{
-					responseCode = response.mData[1];
-				}
+                if (response.DataLength > 1)
+                {
+                    responseCode = response.mData[1];
+                }
             }
 
             return result;
         }
 
-		public static bool IsResponseToRequest(byte requestServiceID, KWP2000Message response)
-		{
+        public static bool IsResponseToRequest(byte requestServiceID, KWP2000Message response)
+        {
             return IsPositiveResponseToRequest(requestServiceID, response) || IsNegativeResponseToRequest(requestServiceID, response);
-		}
+        }
 
         public static bool DoesRequestResponseUseDataSegmentation(byte serviceID)
         {
@@ -822,42 +822,42 @@ namespace Communication
             return true;
         }
 
-		public bool IsLengthInfoInFormatByteSupported()
-		{
+        public bool IsLengthInfoInFormatByteSupported()
+        {
             return (CommunicationKeyByte1 & (byte)KeyByte1.LengthInFormatByteSupported) != 0;
-		}
+        }
 
-		public bool IsAdditionalLengthByteSupported()
-		{
+        public bool IsAdditionalLengthByteSupported()
+        {
             return (CommunicationKeyByte1 & (byte)KeyByte1.AdditionalLengthByteSupported) != 0;
-		}
+        }
 
-		public bool IsOneByteHeaderSupported()
-		{
+        public bool IsOneByteHeaderSupported()
+        {
             return (CommunicationKeyByte1 & (byte)KeyByte1.OneByteHeaderSupported) != 0;
-		}
+        }
 
-		public bool IsTargetSourceAddressInHeaderSupported()
-		{
+        public bool IsTargetSourceAddressInHeaderSupported()
+        {
             return (CommunicationKeyByte1 & (byte)KeyByte1.TargetSourceAddressInHeaderSupported) != 0;
-		}
+        }
 
-		//todo: respect this setting
-		public bool IsExtendedTimingParameterSet()
-		{
+        //todo: respect this setting
+        public bool IsExtendedTimingParameterSet()
+        {
             bool extendedSet = (CommunicationKeyByte1 & (byte)KeyByte1.ExtendedTimingParameterSet) != 0;
 
-			Debug.Assert(extendedSet != IsNormalTimingParameterSet());
+            Debug.Assert(extendedSet != IsNormalTimingParameterSet());
 
-			return extendedSet;
-		}
+            return extendedSet;
+        }
 
-		//todo: respect this setting (code currently only supports this setting)
-		public bool IsNormalTimingParameterSet()
-		{
+        //todo: respect this setting (code currently only supports this setting)
+        public bool IsNormalTimingParameterSet()
+        {
             bool normalSet = (CommunicationKeyByte1 & (byte)KeyByte1.NormalTimingParameterSet) != 0;
 
-			Debug.Assert(normalSet != IsExtendedTimingParameterSet());
+            Debug.Assert(normalSet != IsExtendedTimingParameterSet());
 
             if (!normalSet)
             {
@@ -865,34 +865,34 @@ namespace Communication
                 normalSet = (CommunicationKeyByte1 & (byte)(KeyByte1.NormalTimingParameterSet | KeyByte1.ExtendedTimingParameterSet)) == 0;
             }
 
-			return normalSet;
-		}
+            return normalSet;
+        }
 
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
-		//PROTECTED TYPES
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //PROTECTED TYPES
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-		protected const uint MAX_CONNECTION_TIMING_OFFSET = 4;
-		protected const uint DEFAULT_COMMUNICATION_BAUD_RATE = 10400;
+        protected const uint MAX_CONNECTION_TIMING_OFFSET = 4;
+        protected const uint DEFAULT_COMMUNICATION_BAUD_RATE = 10400;
 
         protected const uint MAX_MESSAGE_SIZE = MAX_MESSAGE_DATA_SIZE_WITH_LENGTH_BYTE + 5;
         protected const uint RECEIVE_BUFFER_SIZE = MAX_MESSAGE_SIZE * 20;
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
-		//PROTECTED MEMBERS
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //PROTECTED MEMBERS
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         protected KWP2000AddressMode        mConnectAddressMode = KWP2000AddressMode.Physical;
-        protected KWP2000ConnectionMethod	mConnectionType = KWP2000ConnectionMethod.SlowInit;
+        protected KWP2000ConnectionMethod    mConnectionType = KWP2000ConnectionMethod.SlowInit;
         protected byte                      mConnectAddress;
 
-		protected byte[] mReceiveBuffer = null;
-		protected uint mNumBytesInReceiveBuffer = 0;
+        protected byte[] mReceiveBuffer = null;
+        protected uint mNumBytesInReceiveBuffer = 0;
         protected bool mReceiveBufferIsDirty = false;
         protected uint mNumPreceedingEchoBytesToIgnore = 0;
         protected byte[] mOutstandingEchoBytes = null;
 
         //data for message pending send
-		protected Queue<KWP2000Message> mMessagesPendingSend;
+        protected Queue<KWP2000Message> mMessagesPendingSend;
         protected int mNumSendAttemptsForCurrentMessage = 0;
         protected bool mCurrentMessageSentProperly = false;//this currently just means that all bytes in the message were sent, it does not check anything else
         protected bool mCurrentMessageReceivedAnyResponses = false;
@@ -904,49 +904,49 @@ namespace Communication
 
 
 
-		protected Stopwatch mP1ECUResponseInterByteTimeOut;
-		protected Stopwatch mP2ECUResponseTimeOut;
-		protected Stopwatch mP3TesterRequestTimeOut;
+        protected Stopwatch mP1ECUResponseInterByteTimeOut;
+        protected Stopwatch mP2ECUResponseTimeOut;
+        protected Stopwatch mP3TesterRequestTimeOut;
         protected Stopwatch mDisconnectTimeOut;
         protected uint mNumConnectionAttemptsRemaining = 0;
 
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
-		//PROTECTED METHODS
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //PROTECTED METHODS
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-		protected void SetCommunicationPhysicalAddressAndKeyBytes(byte address, byte keyByte1, byte keyByte2)
-		{
+        protected void SetCommunicationPhysicalAddressAndKeyBytes(byte address, byte keyByte1, byte keyByte2)
+        {
             //remove the MSB from the key bytes since they are 7 data with parity
             keyByte1 &= 0x7F;
             keyByte2 &= 0x7F;
 
-			if ((CommunicationAddress != address) || (CommunicationKeyByte1 != keyByte1) || (CommunicationKeyByte2 != keyByte2))
-			{
-				DisplayStatusMessage("Setting Address: 0x" + address.ToString("X2") + " KeyByte1: 0x" + keyByte1.ToString("X2") + " KeyByte2: 0x" + keyByte2.ToString("X2"), StatusMessageType.LOG);
+            if ((CommunicationAddress != address) || (CommunicationKeyByte1 != keyByte1) || (CommunicationKeyByte2 != keyByte2))
+            {
+                DisplayStatusMessage("Setting Address: 0x" + address.ToString("X2") + " KeyByte1: 0x" + keyByte1.ToString("X2") + " KeyByte2: 0x" + keyByte2.ToString("X2"), StatusMessageType.LOG);
 
-				if ((CommunicationKeyByte1 != keyByte1) || (CommunicationKeyByte2 != keyByte2))
-				{
-					if ((keyByte1 == KWP_1281_PROTOCOL_KEY_BYTE_1) && (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
-					{
-						DisplayStatusMessage("Switching to KWP1281 session.", StatusMessageType.USER);
-					}
-					else if (keyByte2 == KWP_2000_PROTOCOL_KEY_BYTE_2)
-					{
-						DisplayStatusMessage("Switching to KWP2000 session.", StatusMessageType.USER);
-					}
-					else
-					{
-						keyByte2 = KWP_2000_PROTOCOL_KEY_BYTE_2;
-						DisplayStatusMessage("Unknown protocol, switching to KWP2000 session.", StatusMessageType.USER);
-					}
+                if ((CommunicationKeyByte1 != keyByte1) || (CommunicationKeyByte2 != keyByte2))
+                {
+                    if ((keyByte1 == KWP_1281_PROTOCOL_KEY_BYTE_1) && (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
+                    {
+                        DisplayStatusMessage("Switching to KWP1281 session.", StatusMessageType.USER);
+                    }
+                    else if (keyByte2 == KWP_2000_PROTOCOL_KEY_BYTE_2)
+                    {
+                        DisplayStatusMessage("Switching to KWP2000 session.", StatusMessageType.USER);
+                    }
+                    else
+                    {
+                        keyByte2 = KWP_2000_PROTOCOL_KEY_BYTE_2;
+                        DisplayStatusMessage("Unknown protocol, switching to KWP2000 session.", StatusMessageType.USER);
+                    }
 
-					CommunicationKeyByte1 = keyByte1;
-					CommunicationKeyByte2 = keyByte2;
-				}
+                    CommunicationKeyByte1 = keyByte1;
+                    CommunicationKeyByte2 = keyByte2;
+                }
 
-				CommunicationAddress = address;
-			}
-		}
+                CommunicationAddress = address;
+            }
+        }
 
         [XmlIgnore]
         public byte CommunicationKeyByte1
@@ -1074,12 +1074,12 @@ namespace Communication
                         //no more connection attempts
                         mNumConnectionAttemptsRemaining = 0;
 
-						//if no message timers are running, maybe because we didn't start a start communication message, start the message timers
-						if (!mP1ECUResponseInterByteTimeOut.IsRunning && !mP2ECUResponseTimeOut.IsRunning && !mP3TesterRequestTimeOut.IsRunning && IsConnectionOpen())
-						{
-							mP2ECUResponseTimeOut.Start();
-							mP3TesterRequestTimeOut.Start();
-						}
+                        //if no message timers are running, maybe because we didn't start a start communication message, start the message timers
+                        if (!mP1ECUResponseInterByteTimeOut.IsRunning && !mP2ECUResponseTimeOut.IsRunning && !mP3TesterRequestTimeOut.IsRunning && IsConnectionOpen())
+                        {
+                            mP2ECUResponseTimeOut.Start();
+                            mP3TesterRequestTimeOut.Start();
+                        }
 
 //Test hack for EDC15
 //StartDiagnosticSessionAction.SendStartDiagnosticSessionMessageData(this, KWP2000DiagnosticSessionType.StandardSession, (uint)KWP2000BaudRates.BAUD_UNSPECIFIED);
@@ -1123,18 +1123,18 @@ namespace Communication
             return mNumConnectionAttemptsRemaining;
         }
 
-		protected void ClearMessageBuffers()
-		{
-			lock (mMessagesPendingSend)
-			{
-				mMessagesPendingSend.Clear();
-			}
+        protected void ClearMessageBuffers()
+        {
+            lock (mMessagesPendingSend)
+            {
+                mMessagesPendingSend.Clear();
+            }
 
             ClearQueuedEvents();
             RemoveAllBytesFromReceiveBuffer();
             mNumPreceedingEchoBytesToIgnore = 0;
             mOutstandingEchoBytes = null;
-		}
+        }
 
         private enum SlowInitConnectionTiming : uint
         {
@@ -1401,7 +1401,7 @@ namespace Communication
                 //currentBitEndTime += FIVE_BAUD_BIT_TIME_TICKS;
                 //while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
 
-				//don't purge because that can cause us to miss the sync byte, just use the low to high transitions we counted
+                //don't purge because that can cause us to miss the sync byte, just use the low to high transitions we counted
 
                 if (success)
                 {
@@ -1708,7 +1708,7 @@ namespace Communication
                                 uint numKeyBytesToRead = 2;//try to read two key bytes to start
 
                                 long lastReadTime = 0;
-								uint keyByteTimeOut = (uint)SlowInitConnectionTiming.W2Max;
+                                uint keyByteTimeOut = (uint)SlowInitConnectionTiming.W2Max;
                                 uint lastChanceKeyByteTimeOut = keyByteTimeOut * 2;
                                 //keep reading key bytes until we hit the time out, but if we don't have at least 2 keep reading until double the time out
                                 do
@@ -1774,47 +1774,47 @@ namespace Communication
                                     watch.Stop();
 
                                     if (success)
-									{
-										if (mConsumeTransmitEcho)
-										{
-											//read the echo
-											byte[] echo = new byte[1];
-											success &= mCommunicationDevice.Read(echo, (uint)echo.Length, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == echo.Length);
+                                    {
+                                        if (mConsumeTransmitEcho)
+                                        {
+                                            //read the echo
+                                            byte[] echo = new byte[1];
+                                            success &= mCommunicationDevice.Read(echo, (uint)echo.Length, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == echo.Length);
 
-											if (success)
-											{
-												if (echo[0] == keyByteComp[0])
-												{
-													result = true;
-												}
-												else
-												{
-													DisplayStatusMessage("Key byte complement echo didn't match.", StatusMessageType.LOG);
-												}
-											}
-											else
-											{
-												DisplayStatusMessage("Failed to read echo of key byte complement.", StatusMessageType.LOG);
-											}
-										}
-										else
-										{
-											result = true;
-										}
+                                            if (success)
+                                            {
+                                                if (echo[0] == keyByteComp[0])
+                                                {
+                                                    result = true;
+                                                }
+                                                else
+                                                {
+                                                    DisplayStatusMessage("Key byte complement echo didn't match.", StatusMessageType.LOG);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                DisplayStatusMessage("Failed to read echo of key byte complement.", StatusMessageType.LOG);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            result = true;
+                                        }
 
-										if(result)
-										{
-											//remove the MSB from the key bytes since they are 7 data with parity
-											keyByte1 = (byte)(keyBytes[0] & 0x7F);
-											keyByte2 = (byte)(keyBytes[1] & 0x7F);
+                                        if(result)
+                                        {
+                                            //remove the MSB from the key bytes since they are 7 data with parity
+                                            keyByte1 = (byte)(keyBytes[0] & 0x7F);
+                                            keyByte2 = (byte)(keyBytes[1] & 0x7F);
 
-											DisplayStatusMessage("Slow init key bytes (7-bit): KB1=0x" + keyByte1.ToString("X2")
+                                            DisplayStatusMessage("Slow init key bytes (7-bit): KB1=0x" + keyByte1.ToString("X2")
                                                 + " KB2=0x" + keyByte2.ToString("X2")
                                                 + ", session baud=" + currentBaudRate + ".", StatusMessageType.LOG);
 
-											DiagnosticSessionBaudRate = currentBaudRate;
-										}
-									}
+                                            DiagnosticSessionBaudRate = currentBaudRate;
+                                        }
+                                    }
                                     else
                                     {
                                         DisplayStatusMessage("Failed to write key byte complement.", StatusMessageType.LOG);
@@ -1846,16 +1846,16 @@ namespace Communication
                             }
                         }
 
-						//need to read the address complement if this slow init started a KWP2000 session
-						if (result && IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
-						{
+                        //need to read the address complement if this slow init started a KWP2000 session
+                        if (result && IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
+                        {
                             success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
 
                             LogSlowInitHandshakePhase("address complement read start");
 
-							//read the complement of the address
+                            //read the complement of the address
                             byte[] addressComplement = new byte[1];
-							uint numBytesRead = 0;
+                            uint numBytesRead = 0;
                             success &= mCommunicationDevice.Read(addressComplement, (uint)addressComplement.Length, ref numBytesRead, SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS);
 
                             LogSlowInitHandshakePhase("address complement read done",
@@ -1867,12 +1867,12 @@ namespace Communication
                                 + ", value=0x" + (numBytesRead > 0 ? addressComplement[0].ToString("X2") : "??")
                                 + ", expected=0x" + ((byte)~connectAddress).ToString("X2") + ".", StatusMessageType.LOG);
 
-							if (!success || (numBytesRead != addressComplement.Length) || (addressComplement[0] != (byte)~connectAddress))
-							{
-								result = false;
-								DisplayStatusMessage("Failed to read address complement.", StatusMessageType.LOG);
-							}
-						}
+                            if (!success || (numBytesRead != addressComplement.Length) || (addressComplement[0] != (byte)~connectAddress))
+                            {
+                                result = false;
+                                DisplayStatusMessage("Failed to read address complement.", StatusMessageType.LOG);
+                            }
+                        }
                         else if (result)
                         {
                             DisplayStatusMessage("Slow init: skipping address complement (KWP1281 or invalid KWP2000 key bytes KB1=0x"
@@ -1911,7 +1911,7 @@ namespace Communication
             ResponseReadDTCs = 0xFC
         };
 
-		[DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendByteComplementMS)]
+        [DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendByteComplementMS)]
         public uint KWP1281_TesterMinTimeToSendByteComplementMS
         {
             get
@@ -1929,9 +1929,9 @@ namespace Communication
             }
 
         }
-		private uint _KWP1281_TesterMinTimeToSendByteComplementMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendByteComplementMS;
+        private uint _KWP1281_TesterMinTimeToSendByteComplementMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendByteComplementMS;
 
-		[DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendResponseMessageMS)]
+        [DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendResponseMessageMS)]
         public uint KWP1281_TesterMinTimeToSendResponseMessageMS
         {
             get
@@ -1948,9 +1948,9 @@ namespace Communication
                 }
             }
         }
-		private uint _KWP1281_TesterMinTimeToSendResponseMessageMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendResponseMessageMS;
+        private uint _KWP1281_TesterMinTimeToSendResponseMessageMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendResponseMessageMS;
 
-		[DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS)]
+        [DefaultValue(KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS)]
         public uint KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS
         {
             get
@@ -1967,7 +1967,7 @@ namespace Communication
                 }
             }
         }
-		private uint _KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS;
+        private uint _KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS = KWP2000SettingsDefaults.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS;
 
         private bool KWP1281ReadByte(out byte readByte, bool sendComp)
         {
@@ -2006,25 +2006,25 @@ namespace Communication
 
                     if (success)
                     {
-						if (mConsumeTransmitEcho)
-						{
-							//read the echo
-							byte[] tempDataEcho = new byte[1];
-							success &= mCommunicationDevice.Read(tempDataEcho, 1, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == 1);
+                        if (mConsumeTransmitEcho)
+                        {
+                            //read the echo
+                            byte[] tempDataEcho = new byte[1];
+                            success &= mCommunicationDevice.Read(tempDataEcho, 1, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == 1);
 
-							if (success && (numBytesRead == 1) && (tempDataEcho[0] == tempDataComplement[0]))
-							{
-								result = true;
-							}
-							else
-							{
-								DisplayStatusMessage("Failed to read KWP1281 byte complement echo.", StatusMessageType.DEV);
-							}
-						}
-						else
-						{
-							result = true;
-						}
+                            if (success && (numBytesRead == 1) && (tempDataEcho[0] == tempDataComplement[0]))
+                            {
+                                result = true;
+                            }
+                            else
+                            {
+                                DisplayStatusMessage("Failed to read KWP1281 byte complement echo.", StatusMessageType.DEV);
+                            }
+                        }
+                        else
+                        {
+                            result = true;
+                        }
                     }
                     else
                     {
@@ -2063,45 +2063,45 @@ namespace Communication
 
             if (success)
             {
-				if(mConsumeTransmitEcho)
-				{
-					//read the echo
-					byte[] tempEchoData = new byte[1];
-					uint numBytesRead = 0;
-					success &= mCommunicationDevice.Read(tempEchoData, 1, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == 1);
+                if(mConsumeTransmitEcho)
+                {
+                    //read the echo
+                    byte[] tempEchoData = new byte[1];
+                    uint numBytesRead = 0;
+                    success &= mCommunicationDevice.Read(tempEchoData, 1, ref numBytesRead, DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS) && (numBytesRead == 1);
 
-					if (success && (numBytesRead == 1) && (tempData[0] == tempEchoData[0]))
-					{
-						result = true;
-					}
-					else
-					{
-						DisplayStatusMessage("Failed to read byte echo", StatusMessageType.DEV);
-					}
-				}
+                    if (success && (numBytesRead == 1) && (tempData[0] == tempEchoData[0]))
+                    {
+                        result = true;
+                    }
+                    else
+                    {
+                        DisplayStatusMessage("Failed to read byte echo", StatusMessageType.DEV);
+                    }
+                }
 
-				if (requireComp)
-				{
-					result = false;
+                if (requireComp)
+                {
+                    result = false;
 
-					//read the complement response
-					byte[] tempDataComplement = new byte[1];
-					uint numBytesRead = 0;
-					success &= mCommunicationDevice.Read(tempDataComplement, 1, ref numBytesRead, KWP1281_ECU_BYTE_READ_TIMEOUT_MS) && (numBytesRead == 1);
+                    //read the complement response
+                    byte[] tempDataComplement = new byte[1];
+                    uint numBytesRead = 0;
+                    success &= mCommunicationDevice.Read(tempDataComplement, 1, ref numBytesRead, KWP1281_ECU_BYTE_READ_TIMEOUT_MS) && (numBytesRead == 1);
 
-					if (success && (numBytesRead == 1) && (tempData[0] == (byte)~tempDataComplement[0]))
-					{
-						result = true;
-					}
-					else
-					{
-						DisplayStatusMessage("Failed to read byte complement", StatusMessageType.DEV);
-					}
-				}
-				else
-				{
-					result = true;
-				}
+                    if (success && (numBytesRead == 1) && (tempData[0] == (byte)~tempDataComplement[0]))
+                    {
+                        result = true;
+                    }
+                    else
+                    {
+                        DisplayStatusMessage("Failed to read byte complement", StatusMessageType.DEV);
+                    }
+                }
+                else
+                {
+                    result = true;
+                }
             }
             else
             {
@@ -2461,7 +2461,7 @@ namespace Communication
 
         protected bool Connect_SlowInit()
         {
-			bool slowInitSuccess = false;
+            bool slowInitSuccess = false;
             byte keyByte1; byte keyByte2;
 
             DisplayStatusMessage("Starting slow init connection.", StatusMessageType.USER);
@@ -2578,7 +2578,7 @@ namespace Communication
                     mConnectAddress = connectAddressOverride;
                     SetCommunicationPhysicalAddressAndKeyBytes(mConnectAddress, keyByte1, keyByte2);
 
-					slowInitSuccess = false;
+                    slowInitSuccess = false;
 
                     //did the slow init result in something other than a KWP1281 session?
                     if(keyByte2 != KWP_1281_PROTOCOL_KEY_BYTE_2)//EDC15 sends a strange key byte 2 for KWP2000 fast init it seems
@@ -2586,30 +2586,30 @@ namespace Communication
                         if (IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
                         {
 #if SEND_START_COMM_AFTER_SLOW_INIT
-							{
-								watch.Reset(); watch.Start();
+                            {
+                                watch.Reset(); watch.Start();
 
-								var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, KWP2000ServiceID.StartCommunication, 0, null);
-								SendMessage(startCommMessage);//queue the message, so we know to expect a response
+                                var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, KWP2000ServiceID.StartCommunication, 0, null);
+                                SendMessage(startCommMessage);//queue the message, so we know to expect a response
 
-								while (watch.ElapsedMilliseconds < TimeAfterSlowInitBeforeStartCommMessageMS) ;//busy loop, give the ecu time to get ready to receive the message, Galletto waits 280ms
+                                while (watch.ElapsedMilliseconds < TimeAfterSlowInitBeforeStartCommMessageMS) ;//busy loop, give the ecu time to get ready to receive the message, Galletto waits 280ms
 
-								slowInitSuccess = TransmitMessage(startCommMessage, false, 0);
+                                slowInitSuccess = TransmitMessage(startCommMessage, false, 0);
 
-								if (slowInitSuccess)
-								{
-									DisplayStatusMessage("Sending start communication request.", StatusMessageType.USER);
-								}
-								else
-								{
-									DisplayStatusMessage("Failed to transmit KWP2000 StartCommunication message.", StatusMessageType.LOG);
-								}
-							}
+                                if (slowInitSuccess)
+                                {
+                                    DisplayStatusMessage("Sending start communication request.", StatusMessageType.USER);
+                                }
+                                else
+                                {
+                                    DisplayStatusMessage("Failed to transmit KWP2000 StartCommunication message.", StatusMessageType.LOG);
+                                }
+                            }
 #else
-							{
-								slowInitSuccess = true;
-								ConnectionStatus = ConnectionStatusType.Connected;
-							}
+                            {
+                                slowInitSuccess = true;
+                                ConnectionStatus = ConnectionStatusType.Connected;
+                            }
 #endif
                         }
                         else
@@ -2625,10 +2625,10 @@ namespace Communication
                 }
             }
 
-			return slowInitSuccess;
+            return slowInitSuccess;
         }
 
-		protected void OLD_ConnectionThread_FastInit_FTDI_UsingBitBang()
+        protected void OLD_ConnectionThread_FastInit_FTDI_UsingBitBang()
         {
             const long idleTime = 325;//300 min
             const float lowTime = 0.025f;
@@ -2641,7 +2641,7 @@ namespace Communication
             const uint numLowBits = (uint)(lowTime / BAUD_RATE_BIT_TIME);
             const uint numHighBits = (uint)(highTime / BAUD_RATE_BIT_TIME);
 
-			var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, (byte)KWP2000ServiceID.StartCommunication, 0, null);
+            var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, (byte)KWP2000ServiceID.StartCommunication, 0, null);
             byte[] startCommMessageBytes = startCommMessage.GetMessageDataBytes(this);
             const uint MESSAGE_BIT_WIDTH = (BIT_BANG_BAUD_RATE / DEFAULT_COMMUNICATION_BAUD_RATE);
             uint numMessageBits = (uint)startCommMessageBytes.Length * 10 * MESSAGE_BIT_WIDTH;//1 start, 8 data, 1 stop
@@ -2739,7 +2739,7 @@ namespace Communication
                     //wait for the required idle time
                     watch.Reset(); watch.Start();
                     Thread.Sleep((int)idleTime);
-					while (watch.ElapsedMilliseconds < idleTime);//busy wait
+                    while (watch.ElapsedMilliseconds < idleTime);//busy wait
                     watch.Stop();
 
                     success &= mCommunicationDevice.SetBitMode(BIT_MODE_MASK, BitMode.AsyncBitBang);
@@ -2805,7 +2805,7 @@ namespace Communication
 
                         lock (mCommunicationDevice)
                         {
-							if (!IsCurrentMessagePendingSend((byte)KWP2000ServiceID.StartCommunication) || (ConnectionStatus != ConnectionStatusType.ConnectionPending))
+                            if (!IsCurrentMessagePendingSend((byte)KWP2000ServiceID.StartCommunication) || (ConnectionStatus != ConnectionStatusType.ConnectionPending))
                             {
                                 break;
                             }
@@ -2840,34 +2840,34 @@ namespace Communication
             }
         }
 
-		protected void OLD_ConnectionThread_FastInit_FTDI_Using360Baud()
-		{
-			long offset = 0;
+        protected void OLD_ConnectionThread_FastInit_FTDI_Using360Baud()
+        {
+            long offset = 0;
             const long idleTime = 325;//300 min
-			const long connectTime = 50;//25ms low, then 25ms high
+            const long connectTime = 50;//25ms low, then 25ms high
 
-			KWP2000Message startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, (byte)KWP2000ServiceID.StartCommunication, 0, null);
+            KWP2000Message startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, (byte)KWP2000ServiceID.StartCommunication, 0, null);
 
             const UInt32 CONNECTION_BAUD_RATE = 360; //N, 8, 1 (9/360 = 0.025), one low start bit, eight data bits, one high stop bit
 
-			byte[] lowBuffer = { 0x00 };
+            byte[] lowBuffer = { 0x00 };
 
             uint connectionAttempt = 0;
 
-			//while ((Math.Abs(offset) < MAX_CONNECTION_TIMING_OFFSET) && (ConnectionStatus != ConnectionStatusType.Connected) && success)
-			{
-				long connectStartTime = 0;
-				long connectEndTime = 0;
-				long idleEndTime = 0;
+            //while ((Math.Abs(offset) < MAX_CONNECTION_TIMING_OFFSET) && (ConnectionStatus != ConnectionStatusType.Connected) && success)
+            {
+                long connectStartTime = 0;
+                long connectEndTime = 0;
+                long idleEndTime = 0;
                 long messageSendTime = 0;
                 long messageSendFinishTime = 0;
                 DateTime watchStartTime = DateTime.Now;
-				bool waitingForConnect = false;
+                bool waitingForConnect = false;
 
-				Stopwatch watch = new Stopwatch();
+                Stopwatch watch = new Stopwatch();
 
-				lock (mCommunicationDevice)
-				{
+                lock (mCommunicationDevice)
+                {
                     Debug.Assert(!AnyMessagesPendingSend());
 
                     connectionAttempt++;
@@ -2877,10 +2877,10 @@ namespace Communication
                     watch.Reset(); watch.Start();
                     watchStartTime = DateTime.Now;
 
-					//wait for the required idle time
-					idleEndTime = watch.ElapsedMilliseconds + idleTime;
+                    //wait for the required idle time
+                    idleEndTime = watch.ElapsedMilliseconds + idleTime;
                     Thread.Sleep((int)idleTime);
-					while (watch.ElapsedMilliseconds < idleEndTime);//busy wait
+                    while (watch.ElapsedMilliseconds < idleEndTime);//busy wait
                     bool success = true;
 
                     //set the baud rate and purge the device
@@ -2900,7 +2900,7 @@ namespace Communication
                         success &= wroteBytes;
 
                         if (wroteBytes)
-						{
+                        {
                             byte[] tempBuffer = new byte[1];
                             uint numBytesRead = 0;
                             success &= mCommunicationDevice.Read(tempBuffer, 1, ref numBytesRead, 2) && (numBytesRead == 1);
@@ -2936,35 +2936,35 @@ connectEndTime = connectStartTime + connectTime + 3;
                             }
 
                             messageSendFinishTime = watch.ElapsedMilliseconds;
-						}
-						else
-						{
-							DisplayStatusMessage("Failed to write low byte to device", StatusMessageType.LOG);
-						}
-					}
-					else
-					{
-						DisplayStatusMessage("Failed to set baud rate on device.", StatusMessageType.LOG);
-					}
+                        }
+                        else
+                        {
+                            DisplayStatusMessage("Failed to write low byte to device", StatusMessageType.LOG);
+                        }
+                    }
+                    else
+                    {
+                        DisplayStatusMessage("Failed to set baud rate on device.", StatusMessageType.LOG);
+                    }
 
-					if (!waitingForConnect)
-					{
-						//failed to connect so purge the buffers
+                    if (!waitingForConnect)
+                    {
+                        //failed to connect so purge the buffers
                         ClearMessageBuffers();
-						mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
-					}
-				}
+                        mCommunicationDevice.Purge(PurgeType.RX | PurgeType.TX);
+                    }
+                }
 
                 DisplayStatusMessage(string.Format("Idle end: {0}ms Connect start: {1}ms Connect end: {2}ms Message Send Time: {3}ms Message Send Finish Time: {4}ms", idleEndTime, connectStartTime, connectEndTime, messageSendTime, messageSendFinishTime), StatusMessageType.LOG);
                 DisplayStatusMessage("Time base: " + watchStartTime.ToString("hh:mm:ss.fff"), StatusMessageType.LOG);
 
                 // Alternate flow: StartSendReceiveThread, poll until !IsCurrentMessagePendingSend(StartCommunication) or ConnectionStatus != ConnectionPending; on failure KillSendReceiveThread and retry with offset
-				watch.Stop();
-			}
+                watch.Stop();
+            }
 
             lock (mCommunicationDevice)
             {
-               mCommunicationDevice.SetDTR(true); //enable receive on self powered devices
+                mCommunicationDevice.SetDTR(true); //enable receive on self powered devices
 
                 if (ConnectionStatus != ConnectionStatusType.Connected)
                 {
@@ -2974,10 +2974,10 @@ connectEndTime = connectStartTime + connectTime + 3;
                     ConnectionStatus = ConnectionStatusType.Disconnected;
                 }
             }
-		}
+        }
 
-		protected bool Connect_FastInit_FTDI_UsingBreak()
-		{
+        protected bool Connect_FastInit_FTDI_UsingBreak()
+        {
             const long idleTimeMS = 2600;//VW needs 2.6 seconds between inits//325;//300 min
             long lowTimeTicks = (long)(Stopwatch.Frequency * (25.0 + FastInitLowHighTimeOffsetMS) / 1000.0);//25ms
             long highTimeTicks = (long)(Stopwatch.Frequency * (25.0 + FastInitLowHighTimeOffsetMS) / 1000.0);//25ms
@@ -2986,8 +2986,8 @@ connectEndTime = connectStartTime + connectTime + 3;
 
             DisplayStatusMessage("Starting fast init connection.", StatusMessageType.USER);
 
-			lock (mCommunicationDevice)
-			{
+            lock (mCommunicationDevice)
+            {
                 DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
 
                 if (mCommunicationDevice.SetBaudRate((uint)KWP2000BaudRates.BAUD_DEFAULT))
@@ -2998,7 +2998,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                     //DisplayStatusMessage(string.Format("Timer is high resolution: {0}", Stopwatch.IsHighResolution));
                     //DisplayStatusMessage(string.Format("Timer frequency: {0}", Stopwatch.Frequency));
 
-					var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, (byte)KWP2000ServiceID.StartCommunication, 0, null);
+                    var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, (byte)KWP2000ServiceID.StartCommunication, 0, null);
                     SendMessage(startCommMessage);//queue the message
 
                     byte[] startCommMessageDataBytes = startCommMessage.GetMessageDataBytes(this);
@@ -3064,7 +3064,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                 }
 
                 mCommunicationDevice.SetDTR(true); //enable receive on self powered devices
-			}
+            }
 
             if (waitingForConnect)
             {
@@ -3076,7 +3076,7 @@ connectEndTime = connectStartTime + connectTime + 3;
             }
 
             return waitingForConnect;
-		}
+        }
 
         protected uint GetRemainingSpaceInReceiveBuffer()
         {
@@ -3096,22 +3096,22 @@ connectEndTime = connectStartTime + connectTime + 3;
             }
 
 #if LOG_RECEIVED_DATA
-    		//string fileName = "CommunicationLogReceived.bin";
-    		string fileName = "CommunicationLog.bin";
-    		System.IO.FileStream stream = null;
+            //string fileName = "CommunicationLogReceived.bin";
+            string fileName = "CommunicationLog.bin";
+            System.IO.FileStream stream = null;
 
-    		if (!System.IO.File.Exists(fileName))
-    		{
-    			stream = System.IO.File.Create(fileName);
-    		}
-    		else
-    		{
-    			stream = System.IO.File.OpenWrite(fileName);
-    		}
+            if (!System.IO.File.Exists(fileName))
+            {
+                stream = System.IO.File.Create(fileName);
+            }
+            else
+            {
+                stream = System.IO.File.OpenWrite(fileName);
+            }
 
-    		stream.Seek(0, System.IO.SeekOrigin.End);
-    		stream.Write(bytesReadBuffer, 0, (int)numBytesRead);
-    		stream.Close();
+            stream.Seek(0, System.IO.SeekOrigin.End);
+            stream.Write(bytesReadBuffer, 0, (int)numBytesRead);
+            stream.Close();
 #endif
             Buffer.BlockCopy(newBytes, 0, mReceiveBuffer, (int)mNumBytesInReceiveBuffer, (int)numBytes);
             mNumBytesInReceiveBuffer += numBytes;
@@ -3140,7 +3140,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
             if (numBytesToReceive > 0)
             {
-    	    	LogKWP2000Performance("Read message bytes");
+                LogKWP2000Performance("Read message bytes");
 
                 uint numBytesRead = 0;
                 byte[] bytesReadBuffer = new byte[numBytesToReceive];
@@ -3169,17 +3169,17 @@ connectEndTime = connectStartTime + connectTime + 3;
             return readMoreData;
         }
 
-		protected void SendReceiveThread()
-		{
+        protected void SendReceiveThread()
+        {
             DisplayStatusMessage("Send receive thread now started.", StatusMessageType.LOG);
             ConnectionStatus = ConnectionStatusType.Disconnected;
 
             bool p1TimerExpiredFlushReceiveBuffer = false;
 
             while ((ConnectionStatus != ConnectionStatusType.Disconnected) || (mNumConnectionAttemptsRemaining > 0))
-			{
-				lock (mCommunicationDevice)
-				{
+            {
+                lock (mCommunicationDevice)
+                {
                     #region HandleConnecting
                     while ((ConnectionStatus == ConnectionStatusType.Disconnected) && (mNumConnectionAttemptsRemaining > 0))
                     {
@@ -3219,7 +3219,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                     if (p1TimerExpiredFlushReceiveBuffer)
                     {
                         //stop the inter byte timer because we are no longer waiting for more bytes
-						//we reset it here, because we use this timer running to prevent p2 and p3 from checking time outs
+                        //we reset it here, because we use this timer running to prevent p2 and p3 from checking time outs
                         mP1ECUResponseInterByteTimeOut.Reset();
                     }
 
@@ -3232,10 +3232,10 @@ connectEndTime = connectStartTime + connectTime + 3;
                     uint numBytesToReceive = 0;
                     bool success = mCommunicationDevice.GetRxBytesAvailable(ref numBytesToReceive, 4);
 
-    				LogKWP2000Performance("Checked read queue, " + numBytesToReceive + " bytes in queue");
+                    LogKWP2000Performance("Checked read queue, " + numBytesToReceive + " bytes in queue");
 
                     while ((numBytesToReceive > 0) || mReceiveBufferIsDirty || p1TimerExpiredFlushReceiveBuffer)
-    				{
+                    {
                         //update timers because we are reading
                         //updated in reverse order of sensitivity
                         p3TimeAtLastRead = mP3TesterRequestTimeOut.IsRunning ? mP3TesterRequestTimeOut.ElapsedMilliseconds : 0;
@@ -3324,7 +3324,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                             p1TimerExpiredFlushReceiveBuffer = false;
                         }
-    				}
+                    }
 
                     #region HandleP1TimeOut
                     //we check a copy of the time from when we did the read in case we stalled between the read and this time out check
@@ -3338,7 +3338,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         //make sure there isn't any more data coming by trying to read one more byte
                         if (ReadAndAppendToReceiveBuffer(1) == false)
                         {
-							//we don't stop the p1 timer here because we use it to prevent p2 and p3 from checking time outs
+                            //we don't stop the p1 timer here because we use it to prevent p2 and p3 from checking time outs
                             p1TimerExpiredFlushReceiveBuffer = true;
                         }
 
@@ -3348,12 +3348,12 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                     #region HandleP2TimeOut
                     //The p2 time out should be checked after anything could stop the timer, but before anything could start the timer.
-					//This timer starts when we finshed sending or receiving a message and stops when we start sending or receiving a message
-					//We use the time of p2 at the last read because that is the last time we actually read from the ecu, incase there is a still in between the read and this check
+                    //This timer starts when we finshed sending or receiving a message and stops when we start sending or receiving a message
+                    //We use the time of p2 at the last read because that is the last time we actually read from the ecu, incase there is a still in between the read and this check
 
 //TODO: remove the times 2 once we find the issue with response latency
                     if (!mP1ECUResponseInterByteTimeOut.IsRunning && (p2TimeAtLastRead > mP2ECUResponseMaxTimeCurrent * 2))
-					{
+                    {
                         Debug.Assert(!mP1ECUResponseInterByteTimeOut.IsRunning);
                         Debug.Assert(mP2ECUResponseTimeOut.IsRunning);
                         Debug.Assert(mP3TesterRequestTimeOut.IsRunning);
@@ -3382,14 +3382,14 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                     #region HandleSendingMessages
                     //The p3 timeout should be checked after anything can stop the timer, but before the timer could be started
-					//p3 is stopped when we start receiving a message, and restarted when we finish sending a message or finish receiving a message
+                    //p3 is stopped when we start receiving a message, and restarted when we finish sending a message or finish receiving a message
 
-					//don't send messages until we have finished waiting for the ecu to respond, and min time for a response has passed
-					//remember it is possible that the p2 timer is using the extra long busy time which is longer than the p3 min time
+                    //don't send messages until we have finished waiting for the ecu to respond, and min time for a response has passed
+                    //remember it is possible that the p2 timer is using the extra long busy time which is longer than the p3 min time
                     if (!mP1ECUResponseInterByteTimeOut.IsRunning && (p3TimeAtLastRead >= CurrentTimingParameters.P3TesterResponseTimeMinMs)
                             && (ConnectionStatus != ConnectionStatusType.Disconnected) && !IsExpectingResponses())
-					{
-						LogKWP2000Performance("P3 past min time");
+                    {
+                        LogKWP2000Performance("P3 past min time");
 
                         if (IsOutstandingEcho())
                         {
@@ -3400,19 +3400,19 @@ connectEndTime = connectStartTime + connectTime + 3;
                         }
 
                         //if we are approaching the max time between responses, and no messages are pending, insert a tester present, but only if fully connected
-						if ((p3TimeAtLastRead > (CurrentTimingParameters.P3TesterResponseTimeMaxMs * 0.5)) && !AnyMessagesPendingSend() && (ConnectionStatus == ConnectionStatusType.Connected))
-						{
+                        if ((p3TimeAtLastRead > (CurrentTimingParameters.P3TesterResponseTimeMaxMs * 0.5)) && !AnyMessagesPendingSend() && (ConnectionStatus == ConnectionStatusType.Connected))
+                        {
                             //01 response required, 02 response not required
                             byte[] testerPresentData = { 0x01 };
-							SendMessage((byte)KWP2000ServiceID.TesterPresent, testerPresentData);
-						}
+                            SendMessage((byte)KWP2000ServiceID.TesterPresent, testerPresentData);
+                        }
 
                         LogKWP2000Performance("Any messages pending send: " + AnyMessagesPendingSend());
                         LogKWP2000Performance("Is expecting responses: " + IsExpectingResponses());
 
                         //are any messages pending send?
                         while (AnyMessagesPendingSend() && (ConnectionStatus != ConnectionStatusType.Disconnected) && !IsExpectingResponses())
-						{
+                        {
                             var nextMessage = mMessagesPendingSend.Peek();
 
                             //is it OK to try to send the message (again) ?
@@ -3441,7 +3441,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                                 //The message may have failed to send or may have not received any response.
                                 FinishedSendingCurrentMessage();
                             }
-						}
+                        }
                     }
                     #endregion
 
@@ -3492,14 +3492,14 @@ connectEndTime = connectStartTime + connectTime + 3;
                 Thread.Sleep(2);
 
                 //TODO: see if increasing this sleep time reduces the frequenecy of FT_IO_ERROR since FTDI seems to like 5ms sleeps for updating the receive queue status
-			}
+            }
 
             ConnectionStatus = ConnectionStatusType.CommunicationTerminated;//we need to do this to ensure any operations or actions fail due to disconnection
             CloseCommunicationDevice();
-			mSendReceiveThread = null;
+            mSendReceiveThread = null;
 
             DisplayStatusMessage("Send receive thread now terminated.", StatusMessageType.LOG);
-		}
+        }
 
         protected void FinishedSendingCurrentMessage()
         {
@@ -3519,7 +3519,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                 {
                     switch (finishedMessage.mServiceID)
                     {
-						case (byte)KWP2000ServiceID.StartCommunication:
+                        case (byte)KWP2000ServiceID.StartCommunication:
                         {
                             if (!mCurrentMessageReceivedAnyResponses)
                             {
@@ -3532,7 +3532,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                             break;
                         }
-						case (byte)KWP2000ServiceID.StopCommunication:
+                        case (byte)KWP2000ServiceID.StopCommunication:
                         {
                             if (!mCurrentMessageReceivedAnyResponses)
                             {
@@ -3544,7 +3544,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                             break;
                         }
-						case (byte)KWP2000ServiceID.TesterPresent:
+                        case (byte)KWP2000ServiceID.TesterPresent:
                         {
                             if (!mCurrentMessageReceivedAnyResponses)
                             {
@@ -3558,33 +3558,33 @@ connectEndTime = connectStartTime + connectTime + 3;
                         }
                     }
 
-					var messageResponsesFinishedEvent = finishedMessage.GetResponsesFinishedEvent();
+                    var messageResponsesFinishedEvent = finishedMessage.GetResponsesFinishedEvent();
 
-					if (messageResponsesFinishedEvent != null)
-					{
-						QueueAndTriggerEvent(new FinishedReceivingResponsesEventHolder(messageResponsesFinishedEvent, finishedMessage, mCurrentMessageSentProperly, mCurrentMessageReceivedAnyResponses, mCurrentMessageWaitedForAllReplies, (uint)(mNumSendAttemptsForCurrentMessage - 1)));
-					}
+                    if (messageResponsesFinishedEvent != null)
+                    {
+                        QueueAndTriggerEvent(new FinishedReceivingResponsesEventHolder(messageResponsesFinishedEvent, finishedMessage, mCurrentMessageSentProperly, mCurrentMessageReceivedAnyResponses, mCurrentMessageWaitedForAllReplies, (uint)(mNumSendAttemptsForCurrentMessage - 1)));
+                    }
                 }
 
                 if (mCurrentMessageReceivedAnyResponses)
-				{
+                {
                     mNumConsecutiveSentMessagesWithoutResponses = 0;
                 }
-				else
+                else
                 {
-					//this will also catch messages that weren't sent properly, but I think that is OK
+                    //this will also catch messages that weren't sent properly, but I think that is OK
 
                     mNumConsecutiveSentMessagesWithoutResponses++;
 
-					if ((mNumConsecutiveSentMessagesWithoutResponses >= 3) && (ConnectionStatus != ConnectionStatusType.Disconnected))
-					{
-						//for detecting baud rates we send lots of start diagnostic session messages and they may not receive responses
-						if (finishedMessage == null || finishedMessage.mServiceID != (byte)KWP2000ServiceID.StartDiagnosticSession)
-						{
-							DisplayStatusMessage("Disconnecting because there were too many consecutive messages with no response.", StatusMessageType.USER);
-							ConnectionStatus = ConnectionStatusType.Disconnected;
-						}
-					}
+                    if ((mNumConsecutiveSentMessagesWithoutResponses >= 3) && (ConnectionStatus != ConnectionStatusType.Disconnected))
+                    {
+                        //for detecting baud rates we send lots of start diagnostic session messages and they may not receive responses
+                        if (finishedMessage == null || finishedMessage.mServiceID != (byte)KWP2000ServiceID.StartDiagnosticSession)
+                        {
+                            DisplayStatusMessage("Disconnecting because there were too many consecutive messages with no response.", StatusMessageType.USER);
+                            ConnectionStatus = ConnectionStatusType.Disconnected;
+                        }
+                    }
                 }
 
                 mCurrentMessageSentProperly = false;
@@ -3657,22 +3657,22 @@ connectEndTime = connectStartTime + connectTime + 3;
                     if (bytesInReceiveQueue == 0)
                     {
 #if LOG_SENT_MESSAGE_DATA
-		                //string fileName = "CommunicationLogSent.bin";
-		                string fileName = "CommunicationLog.bin";
-		                System.IO.FileStream stream = null;
+                        //string fileName = "CommunicationLogSent.bin";
+                        string fileName = "CommunicationLog.bin";
+                        System.IO.FileStream stream = null;
 
-		                if (!System.IO.File.Exists(fileName))
-		                {
-			                stream = System.IO.File.Create(fileName);
-		                }
-		                else
-		                {
-			                stream = System.IO.File.OpenWrite(fileName);
-		                }
+                        if (!System.IO.File.Exists(fileName))
+                        {
+                            stream = System.IO.File.Create(fileName);
+                        }
+                        else
+                        {
+                            stream = System.IO.File.OpenWrite(fileName);
+                        }
 
-		                stream.Seek(0, System.IO.SeekOrigin.End);
-		                stream.Write(messageBytes, 0, messageBytes.Length);
-		                stream.Close();
+                        stream.Seek(0, System.IO.SeekOrigin.End);
+                        stream.Write(messageBytes, 0, messageBytes.Length);
+                        stream.Close();
 #endif
                         uint totalBytesWritten = TransmitBytes(currentMessageDataBytes);
 
@@ -3970,16 +3970,16 @@ connectEndTime = connectStartTime + connectTime + 3;
         }
 
         protected bool ProcessReceiveBuffer(out uint additionalBytesNeededToCompleteMessage, bool searchAllOffsets)
-		{
+        {
             additionalBytesNeededToCompleteMessage = 0;
 
             bool foundAnyMessage = false;//should be true even if the message is invalid
-			bool keepLookingForMessage = true;
+            bool keepLookingForMessage = true;
             uint receiveBufferOffset = 0;
 
-			while (keepLookingForMessage)
-			{
-				KWP2000Message message;
+            while (keepLookingForMessage)
+            {
+                KWP2000Message message;
                 var messageErrorCode = ReadMessageFromReceiveBuffer(receiveBufferOffset, out message, out additionalBytesNeededToCompleteMessage);
 
                 #region receivedNewMessage
@@ -4018,7 +4018,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                             switch (message.mServiceID)
                             {
                                 #region StartCommunication
-								case (byte)KWP2000ServiceID.StartCommunicationPositiveResponse:
+                                case (byte)KWP2000ServiceID.StartCommunicationPositiveResponse:
                                 {
                                     if (ConnectionStatus != ConnectionStatusType.ConnectionPending)
                                     {
@@ -4054,21 +4054,21 @@ connectEndTime = connectStartTime + connectTime + 3;
                                 }
                                 #endregion
                                 #region StopCommunication
-								case (byte)KWP2000ServiceID.StopCommunicationPositiveResponse:
+                                case (byte)KWP2000ServiceID.StopCommunicationPositiveResponse:
                                 {
                                     ConnectionStatus = ConnectionStatusType.Disconnected;
                                     break;
                                 }
                                 #endregion
                                 #region TesterPresent
-								case (byte)KWP2000ServiceID.TesterPresentPositiveReponse:
+                                case (byte)KWP2000ServiceID.TesterPresentPositiveReponse:
                                 {
                                     shouldTriggerMessageHandler = false;
                                     break;
                                 }
                                 #endregion
                                 #region NegativeResponse
-								case (byte)KWP2000ServiceID.NegativeResponse:
+                                case (byte)KWP2000ServiceID.NegativeResponse:
                                 {
                                     if (message.DataLength == 2)
                                     {
@@ -4094,23 +4094,23 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                                             DisplayStatusMessage("ECU was too busy to receive message, resending.", StatusMessageType.LOG);
                                         }
-										else if (message.mData[0] == (byte)KWP2000ServiceID.StartCommunication)
-										{
-											shouldTriggerMessageHandler = false;
-										}
-										else if (message.mData[0] == (byte)KWP2000ServiceID.TesterPresent)
-										{
-											shouldTriggerMessageHandler = false;
-										}
-										else if (message.mData[0] == (byte)KWP2000ServiceID.StopCommunication)
-										{
-											shouldTriggerMessageHandler = false;
+                                        else if (message.mData[0] == (byte)KWP2000ServiceID.StartCommunication)
+                                        {
+                                            shouldTriggerMessageHandler = false;
+                                        }
+                                        else if (message.mData[0] == (byte)KWP2000ServiceID.TesterPresent)
+                                        {
+                                            shouldTriggerMessageHandler = false;
+                                        }
+                                        else if (message.mData[0] == (byte)KWP2000ServiceID.StopCommunication)
+                                        {
+                                            shouldTriggerMessageHandler = false;
 
-											//I don't care, disconnect anyway
-											DisplayStatusMessage("Received negative response to StopCommunication request, disconnecting anyway.", StatusMessageType.USER);
+                                            //I don't care, disconnect anyway
+                                            DisplayStatusMessage("Received negative response to StopCommunication request, disconnecting anyway.", StatusMessageType.USER);
 
-											ConnectionStatus = ConnectionStatusType.Disconnected;
-										}
+                                            ConnectionStatus = ConnectionStatusType.Disconnected;
+                                        }
                                     }
                                     else
                                     {
@@ -4207,9 +4207,9 @@ connectEndTime = connectStartTime + connectTime + 3;
                 #endregion
                 #region didntReceiveMessage
                 else
-				{
-					if(messageErrorCode == MessageErrorCode.NotEnoughData)
-					{
+                {
+                    if(messageErrorCode == MessageErrorCode.NotEnoughData)
+                    {
                         if (searchAllOffsets)
                         {
                             receiveBufferOffset++;
@@ -4219,7 +4219,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         {
                             keepLookingForMessage = false;
                         }
-					}
+                    }
                     else if (   (messageErrorCode == MessageErrorCode.InvalidChecksum)
                             || (messageErrorCode == MessageErrorCode.RequestedTooMuchData)
                             || (messageErrorCode == MessageErrorCode.MessageContainsNoData) )
@@ -4264,7 +4264,7 @@ connectEndTime = connectStartTime + connectTime + 3;
             mReceiveBufferIsDirty = false;
 
             return foundAnyMessage;
-		}
+        }
 
         protected bool DetermineReceiveBufferMessageRequirements(uint bufferOffset, out byte numHeaderBytes, out byte addressMode, out byte numDataBytes, out byte numChecksumBytes)
         {
@@ -4312,11 +4312,11 @@ connectEndTime = connectStartTime + connectTime + 3;
             return dataValid;
         }
 
-		protected MessageErrorCode ReadMessageFromReceiveBuffer(uint bufferOffset, out KWP2000Message message, out uint additionalBytesNeeded)
-		{
-			message = null;
+        protected MessageErrorCode ReadMessageFromReceiveBuffer(uint bufferOffset, out KWP2000Message message, out uint additionalBytesNeeded)
+        {
+            message = null;
             additionalBytesNeeded = 0;
-			MessageErrorCode errorCode = MessageErrorCode.UnknownError;
+            MessageErrorCode errorCode = MessageErrorCode.UnknownError;
 
             byte numHeaderBytes = 0;
             byte numDataBytes = 0;
@@ -4324,7 +4324,7 @@ connectEndTime = connectStartTime + connectTime + 3;
             byte addressMode = 0;
 
             if (DetermineReceiveBufferMessageRequirements(bufferOffset, out numHeaderBytes, out addressMode, out numDataBytes, out numChecksumBytes))
-			{
+            {
                 uint totalDataLength = (uint)(numHeaderBytes + numDataBytes + numChecksumBytes);
 
                 //setup current values in case message doesn't contain address info
@@ -4372,24 +4372,24 @@ connectEndTime = connectStartTime + connectTime + 3;
                                         message = new KWP2000Message((KWP2000AddressMode)addressMode, source, destination, serviceID, messageData);
 
     #if LOG_RECEIVED_MESSAGE_DATA
-					                                                                                                                                                                                                        //string fileName = "CommunicationLogReceived.bin";
-								string fileName = "CommunicationLog.bin";
-								System.IO.FileStream stream = null;
+                                                                                                                                                                                                                            //string fileName = "CommunicationLogReceived.bin";
+                                string fileName = "CommunicationLog.bin";
+                                System.IO.FileStream stream = null;
 
-								if (!System.IO.File.Exists(fileName))
-								{
-									stream = System.IO.File.Create(fileName);
-								}
-								else
-								{
-									stream = System.IO.File.OpenWrite(fileName);
-								}
+                                if (!System.IO.File.Exists(fileName))
+                                {
+                                    stream = System.IO.File.Create(fileName);
+                                }
+                                else
+                                {
+                                    stream = System.IO.File.OpenWrite(fileName);
+                                }
 
-								stream.Seek(0, System.IO.SeekOrigin.End);
-								stream.WriteByte(0x88);
-								stream.WriteByte(0x88);
-								stream.Write(mReceiveBuffer, 0, (int)startOfNextMessage);
-								stream.Close();
+                                stream.Seek(0, System.IO.SeekOrigin.End);
+                                stream.WriteByte(0x88);
+                                stream.WriteByte(0x88);
+                                stream.Write(mReceiveBuffer, 0, (int)startOfNextMessage);
+                                stream.Close();
     #endif
                                         if (bufferOffset > 0)
                                         {
@@ -4433,52 +4433,54 @@ connectEndTime = connectStartTime + connectTime + 3;
                     additionalBytesNeeded = totalDataLength - mNumBytesInReceiveBuffer;
                     errorCode = MessageErrorCode.NotEnoughData;
                 }
-			}
-			else
-			{
+            }
+            else
+            {
                 additionalBytesNeeded = 1;//read one more to get a better idea of how much we need
-				errorCode = MessageErrorCode.NotEnoughData;
-			}
+                errorCode = MessageErrorCode.NotEnoughData;
+            }
 
-			return errorCode;
-		}
+            return errorCode;
+        }
 
-		public string GetServiceIDString(byte serviceID)
-		{
-			if(Enum.IsDefined(typeof(KWP2000ServiceID), serviceID))
-			{
-				return Enum.GetName(typeof(KWP2000ServiceID), serviceID);
-			}
-			else
-			{
-				return "0x" + serviceID.ToString("X2");
-			}
-		}
+        public string GetServiceIDString(byte serviceID)
+        {
+            if(Enum.IsDefined(typeof(KWP2000ServiceID), serviceID))
+            {
+                return Enum.GetName(typeof(KWP2000ServiceID), serviceID);
+            }
+            else
+            {
+                return "0x" + serviceID.ToString("X2");
+            }
+        }
 
-		public string GetResponseCodeString(byte responseCode)
-		{
-			if (Enum.IsDefined(typeof(KWP2000ResponseCode), responseCode))
-			{
-				return Enum.GetName(typeof(KWP2000ResponseCode), responseCode);
-			}
-			else
-			{
-				return "0x" + responseCode.ToString("X2");
-			}
-		}
+        public string GetResponseCodeString(byte responseCode)
+        {
+            if (Enum.IsDefined(typeof(KWP2000ResponseCode), responseCode))
+            {
+                return Enum.GetName(typeof(KWP2000ResponseCode), responseCode);
+            }
+            else
+            {
+                return "0x" + responseCode.ToString("X2");
+            }
+        }
 
         protected string GetMessageErrorCodeString(MessageErrorCode errorCode)
-		{
+        {
             //todo: get rid of this function and use an extension method that reads description attributes
 
-			if (Enum.IsDefined(errorCode.GetType(), errorCode))
-			{
-				return Enum.GetName(errorCode.GetType(), errorCode);
-			}
-			else
-			{
-				return "Unknown message error code: 0x" + ((byte)errorCode).ToString("X2");
-			}
-		}
-	}
+            if (Enum.IsDefined(errorCode.GetType(), errorCode))
+            {
+                return Enum.GetName(errorCode.GetType(), errorCode);
+            }
+            else
+            {
+                return "Unknown message error code: 0x" + ((byte)errorCode).ToString("X2");
+            }
+        }
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

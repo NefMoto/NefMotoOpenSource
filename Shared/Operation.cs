@@ -37,9 +37,9 @@ namespace Shared
 
         public void Start()
         {
-			bool canStart = CanOperationStart();
+            bool canStart = CanOperationStart();
 
-			IsRunning = true;//need to set this early in case the first action started calls action completed
+            IsRunning = true;//need to set this early in case the first action started calls action completed
 
             if (canStart)
             {
@@ -74,18 +74,18 @@ namespace Shared
 
         protected void OperationCompleted(bool success)
         {
-			if (IsRunning)
-			{
-				mOperationEndTime = DateTime.Now;
-				IsRunning = false;//must set to false before calling OnOperationCompleted to prevent re-entry
+            if (IsRunning)
+            {
+                mOperationEndTime = DateTime.Now;
+                IsRunning = false;//must set to false before calling OnOperationCompleted to prevent re-entry
 
-				success = OnOperationCompleted(success);
+                success = OnOperationCompleted(success);
 
-				if (CompletedOperationEvent != null)
-				{
-					CompletedOperationEvent(this, success);
-				}
-			}
+                if (CompletedOperationEvent != null)
+                {
+                    CompletedOperationEvent(this, success);
+                }
+            }
         }
 
         protected virtual bool OnOperationCompleted(bool success)
@@ -122,3 +122,5 @@ namespace Shared
         private DateTime mOperationEndTime;
     };
 }
+
+// vi: set sw=4 ts=8 expandtab:

@@ -34,17 +34,17 @@ using Shared;
 
 namespace Communication
 {
-	public abstract class KWP2000Operation : CommunicationOperation
-	{
-		public const byte DEFAULT_MAX_BLOCK_SIZE = 254;
+    public abstract class KWP2000Operation : CommunicationOperation
+    {
+        public const byte DEFAULT_MAX_BLOCK_SIZE = 254;
 
-		public KWP2000Operation(KWP2000Interface commInterface)
+        public KWP2000Operation(KWP2000Interface commInterface)
             : base(commInterface)
-		{
+        {
             mShouldAutoNegotiateTiming = false;
             mShouldAutoStartDiagnosticSession = false;
             mDesiredDiagnosticSessionType = (uint)KWP2000DiagnosticSessionType.InternalUndefined;
-		}
+        }
 
         protected override void ResetOperation()
         {
@@ -68,14 +68,14 @@ namespace Communication
                     {
                         case State.Begin:
                         {
-							uint desiredBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
+                            uint desiredBaudRate = (uint)KWP2000BaudRates.BAUD_UNSPECIFIED;
 
-							if (mShouldAutoStartDiagnosticSession && (mDesiredBaudRates != null))
-							{
-								desiredBaudRate = mDesiredBaudRates.First();
-							}
+                            if (mShouldAutoStartDiagnosticSession && (mDesiredBaudRates != null))
+                            {
+                                desiredBaudRate = mDesiredBaudRates.First();
+                            }
 
-							if (mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate))
+                            if (mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate))
                             {
                                 if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
                                 {
@@ -90,14 +90,14 @@ namespace Communication
                             {
                                 if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
                                 {
-									//fall through
-									mState = State.CheckProgrammingSessionPreconditions;
+                                    //fall through
+                                    mState = State.CheckProgrammingSessionPreconditions;
                                     goto case State.CheckProgrammingSessionPreconditions;
                                 }
                                 else
                                 {
-									//fall through
-									mState = State.StartDiagnosticSession;
+                                    //fall through
+                                    mState = State.StartDiagnosticSession;
                                     goto case State.StartDiagnosticSession;
                                 }
                             }
@@ -111,14 +111,14 @@ namespace Communication
                         }
                         case State.SwitchToDefaultTimingForProgrammingSession:
                         {
-							if (mShouldAutoNegotiateSecurity)
-							{
-								mState = State.PreNegotiateSecurityForProgrammingSession;
-							}
-							else
-							{
-								mState = State.StartDiagnosticSession;
-							}
+                            if (mShouldAutoNegotiateSecurity)
+                            {
+                                mState = State.PreNegotiateSecurityForProgrammingSession;
+                            }
+                            else
+                            {
+                                mState = State.StartDiagnosticSession;
+                            }
                             break;
                         }
                         case State.PreNegotiateSecurityForProgrammingSession:
@@ -193,119 +193,119 @@ namespace Communication
                         }
                         case State.NegotiateSecurity:
                         {
-							nextAction = new SecurityAccessAction(KWP2000CommInterface, mSecuritySettings);
+                            nextAction = new SecurityAccessAction(KWP2000CommInterface, mSecuritySettings);
                             break;
                         }
                     }
                 }
             }
 
-			mMyLastStartedAction = nextAction;
+            mMyLastStartedAction = nextAction;
 
             return nextAction;
         }
 
         protected override void OnActionCompleted(CommunicationAction action, bool success)
         {
-			if (action == mMyLastStartedAction)
-			{
-				#region CheckProgrammingSessionPreconditions
-				if (mState == State.CheckProgrammingSessionPreconditions)
-				{
-					if (success)
-					{
-						#region ReadECUIdentification
-						if (action is ReadECUIdentificationAction)
-						{
-							var readIdentAction = action as ReadECUIdentificationAction;
+            if (action == mMyLastStartedAction)
+            {
+                #region CheckProgrammingSessionPreconditions
+                if (mState == State.CheckProgrammingSessionPreconditions)
+                {
+                    if (success)
+                    {
+                        #region ReadECUIdentification
+                        if (action is ReadECUIdentificationAction)
+                        {
+                            var readIdentAction = action as ReadECUIdentificationAction;
 
-							if (readIdentAction.IdentificationOption == (byte)KWP2000IdentificationOption.calibrationEquipmentSoftwareNumber)
-							{
-								unsafe
-								{
-									if (readIdentAction.IdentificationData.Length >= sizeof(KWP2000FlashStatus))
-									{
-										var flashStatus = new KWP2000FlashStatus(readIdentAction.IdentificationData);
+                            if (readIdentAction.IdentificationOption == (byte)KWP2000IdentificationOption.calibrationEquipmentSoftwareNumber)
+                            {
+                                unsafe
+                                {
+                                    if (readIdentAction.IdentificationData.Length >= sizeof(KWP2000FlashStatus))
+                                    {
+                                        var flashStatus = new KWP2000FlashStatus(readIdentAction.IdentificationData);
 
-										//check if flash preconditions have been met
-										if (flashStatus.mProgrammingSessionPreconditions != 0)
-										{
-											string warning = "ECU reports programming session preconditions have not been met.";
-											string reasons = "Reasons preconditions failed:";
+                                        //check if flash preconditions have been met
+                                        if (flashStatus.mProgrammingSessionPreconditions != 0)
+                                        {
+                                            string warning = "ECU reports programming session preconditions have not been met.";
+                                            string reasons = "Reasons preconditions failed:";
 
-											CommInterface.DisplayStatusMessage(warning, StatusMessageType.USER);
-											CommInterface.DisplayStatusMessage(reasons, StatusMessageType.USER);
+                                            CommInterface.DisplayStatusMessage(warning, StatusMessageType.USER);
+                                            CommInterface.DisplayStatusMessage(reasons, StatusMessageType.USER);
 
-											foreach (KWP2000FlashStatus.ProgrammingSessionPreconditions precondition in System.Enum.GetValues(typeof(KWP2000FlashStatus.ProgrammingSessionPreconditions)))
-											{
-												if ((((byte)flashStatus.mProgrammingSessionPreconditions) & ((byte)precondition)) != 0)
-												{
-													string reasonDescription = "-" + DescriptionAttributeConverter.GetDescriptionAttribute(precondition);
-													CommInterface.DisplayStatusMessage(reasonDescription, StatusMessageType.USER);
+                                            foreach (KWP2000FlashStatus.ProgrammingSessionPreconditions precondition in System.Enum.GetValues(typeof(KWP2000FlashStatus.ProgrammingSessionPreconditions)))
+                                            {
+                                                if ((((byte)flashStatus.mProgrammingSessionPreconditions) & ((byte)precondition)) != 0)
+                                                {
+                                                    string reasonDescription = "-" + DescriptionAttributeConverter.GetDescriptionAttribute(precondition);
+                                                    CommInterface.DisplayStatusMessage(reasonDescription, StatusMessageType.USER);
 
-													reasons += "\n" + reasonDescription;
-												}
-											}
+                                                    reasons += "\n" + reasonDescription;
+                                                }
+                                            }
 
-											var promptResult = CommInterface.DisplayUserPrompt("Programming Session Preconditions Not Met", warning + "\n" + reasons + "\n\n Do you want to attempt to continue?", UserPromptType.OK_CANCEL);
+                                            var promptResult = CommInterface.DisplayUserPrompt("Programming Session Preconditions Not Met", warning + "\n" + reasons + "\n\n Do you want to attempt to continue?", UserPromptType.OK_CANCEL);
 
-											if (promptResult == UserPromptResult.OK)
-											{
-												success = true;
-												CommInterface.DisplayStatusMessage("Continuing despite programming session preconditions not being met.", StatusMessageType.USER);
-											}
-											else
-											{
-												CommInterface.DisplayStatusMessage("Stopping because programming session preconditions have not been met.", StatusMessageType.USER);
-											}
-										}
-										else
-										{
-											CommInterface.DisplayStatusMessage("ECU reports programming session preconditions have been met.", StatusMessageType.USER);
-										}
-									}
-								}
-							}
-						}
-						#endregion
-					}
-					else if (action.CompletedWithoutCommunicationError)
-					{
-						CommInterface.DisplayStatusMessage("Unable to validate programming session preconditions, attempting to continue.", StatusMessageType.USER);
+                                            if (promptResult == UserPromptResult.OK)
+                                            {
+                                                success = true;
+                                                CommInterface.DisplayStatusMessage("Continuing despite programming session preconditions not being met.", StatusMessageType.USER);
+                                            }
+                                            else
+                                            {
+                                                CommInterface.DisplayStatusMessage("Stopping because programming session preconditions have not been met.", StatusMessageType.USER);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            CommInterface.DisplayStatusMessage("ECU reports programming session preconditions have been met.", StatusMessageType.USER);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        #endregion
+                    }
+                    else if (action.CompletedWithoutCommunicationError)
+                    {
+                        CommInterface.DisplayStatusMessage("Unable to validate programming session preconditions, attempting to continue.", StatusMessageType.USER);
 
-						success = true;
-					}
-				}
-				#endregion
-				#region PreNegotiateSecurityForProgrammingSession
-				else if (mState == State.PreNegotiateSecurityForProgrammingSession)
-				{
-					success = action.CompletedWithoutCommunicationError;
-				}
-				#endregion
-				#region NegotiateTiming SwitchToDefaultTimingForProgrammingSession
-				else if ((mState == State.NegotiateTiming) || (mState == State.SwitchToDefaultTimingForProgrammingSession))
-				{
-					success = action.CompletedWithoutCommunicationError;
-				}
-				#endregion
-			}
+                        success = true;
+                    }
+                }
+                #endregion
+                #region PreNegotiateSecurityForProgrammingSession
+                else if (mState == State.PreNegotiateSecurityForProgrammingSession)
+                {
+                    success = action.CompletedWithoutCommunicationError;
+                }
+                #endregion
+                #region NegotiateTiming SwitchToDefaultTimingForProgrammingSession
+                else if ((mState == State.NegotiateTiming) || (mState == State.SwitchToDefaultTimingForProgrammingSession))
+                {
+                    success = action.CompletedWithoutCommunicationError;
+                }
+                #endregion
+            }
 
-			mMyLastStartedAction = null;
+            mMyLastStartedAction = null;
 
             base.OnActionCompleted(action, success);
         }
 
-		protected void EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType sessionType, IEnumerable<uint> baudRates)
-		{
-			mDesiredDiagnosticSessionType = sessionType;
-			mDesiredBaudRates = baudRates;
-			mShouldAutoStartDiagnosticSession = true;
-		}
+        protected void EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType sessionType, IEnumerable<uint> baudRates)
+        {
+            mDesiredDiagnosticSessionType = sessionType;
+            mDesiredBaudRates = baudRates;
+            mShouldAutoStartDiagnosticSession = true;
+        }
 
         protected void EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType sessionType, uint baudRate)
         {
-			EnableAutoStartDiagnosticSession(sessionType, new List<uint>() { baudRate });
+            EnableAutoStartDiagnosticSession(sessionType, new List<uint>() { baudRate });
         }
 
         protected void EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget target)
@@ -318,7 +318,7 @@ namespace Communication
         {
             mShouldAutoNegotiateSecurity = true;
 
-			mSecuritySettings = settings;
+            mSecuritySettings = settings;
         }
 
         private enum State
@@ -354,28 +354,28 @@ namespace Communication
         private NegotiateTimingParameters.NegotiationTarget mTimingTarget;
 
         private bool mShouldAutoNegotiateSecurity;
-		private SecurityAccessAction.SecurityAccessSettings mSecuritySettings;
+        private SecurityAccessAction.SecurityAccessSettings mSecuritySettings;
 
-		private CommunicationAction mMyLastStartedAction;
-	};
+        private CommunicationAction mMyLastStartedAction;
+    };
 
-	public abstract class KWP2000SequencialOperation : KWP2000Operation
-	{
-		public KWP2000SequencialOperation(KWP2000Interface commInterface)
-			: base(commInterface)
-		{
-			mCurrentActionIndex = -1;
-		}
+    public abstract class KWP2000SequencialOperation : KWP2000Operation
+    {
+        public KWP2000SequencialOperation(KWP2000Interface commInterface)
+            : base(commInterface)
+        {
+            mCurrentActionIndex = -1;
+        }
 
-		protected override void ResetOperation()
-		{
-			mCurrentActionIndex = -1;
+        protected override void ResetOperation()
+        {
+            mCurrentActionIndex = -1;
 
             base.ResetOperation();
-		}
+        }
 
-		protected override CommunicationAction NextAction()
-		{
+        protected override CommunicationAction NextAction()
+        {
             var nextAction = base.NextAction();
 
             if (nextAction == null)
@@ -389,176 +389,176 @@ namespace Communication
             }
 
             return nextAction;
-		}
+        }
 
-		protected KWP2000Action[] mActionArray;
-		private int mCurrentActionIndex;
-	}
+        protected KWP2000Action[] mActionArray;
+        private int mCurrentActionIndex;
+    }
 
-	public class ReadMemoryOperation : KWP2000SequencialOperation
-	{
-		public ReadMemoryOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, uint numBytes, byte maxBlockSize)
-			: base(commInterface)
-		{
+    public class ReadMemoryOperation : KWP2000SequencialOperation
+    {
+        public ReadMemoryOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, uint numBytes, byte maxBlockSize)
+            : base(commInterface)
+        {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
-			mReadMemory = null;
+            mReadMemory = null;
 
-			mReadMemoryAction = new ReadMemoryAction(commInterface, startAddress, numBytes, maxBlockSize, null);
+            mReadMemoryAction = new ReadMemoryAction(commInterface, startAddress, numBytes, maxBlockSize, null);
 
-			mActionArray = new KWP2000Action[1];
-			mActionArray[0] = mReadMemoryAction;
-		}
+            mActionArray = new KWP2000Action[1];
+            mActionArray[0] = mReadMemoryAction;
+        }
 
-		protected override bool OnOperationCompleted(bool success)
-		{
-			if (success)
-			{
-				mReadMemory = new MemoryImage(mReadMemoryAction.ReadData, mReadMemoryAction.mStartAddress);
-			}
+        protected override bool OnOperationCompleted(bool success)
+        {
+            if (success)
+            {
+                mReadMemory = new MemoryImage(mReadMemoryAction.ReadData, mReadMemoryAction.mStartAddress);
+            }
 
-			return base.OnOperationCompleted(success);
-		}
+            return base.OnOperationCompleted(success);
+        }
 
-		public MemoryImage mReadMemory;
-		protected ReadMemoryAction mReadMemoryAction;
-	};
+        public MemoryImage mReadMemory;
+        protected ReadMemoryAction mReadMemoryAction;
+    };
 
-	public class WriteMemoryOperation : KWP2000SequencialOperation
-	{
-		public WriteMemoryOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, byte maxBlockSize, byte[] dataToWrite)
-			: base(commInterface)
-		{
+    public class WriteMemoryOperation : KWP2000SequencialOperation
+    {
+        public WriteMemoryOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, byte maxBlockSize, byte[] dataToWrite)
+            : base(commInterface)
+        {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
-			mActionArray = new KWP2000Action[1];
-			mActionArray[0] = new WriteMemoryAction(commInterface, startAddress, maxBlockSize, dataToWrite, null);
-		}
-	};
+            mActionArray = new KWP2000Action[1];
+            mActionArray[0] = new WriteMemoryAction(commInterface, startAddress, maxBlockSize, dataToWrite, null);
+        }
+    };
 
-	public class ReadEntireSerialEEPROMOperation : ReadMemoryOperation
-	{
-		public static readonly UInt32 SERIAL_EEPROM_SIZE = 512;
-		public static readonly UInt32 SERIAL_EEPROM_START_ADDR = 0x600000;
+    public class ReadEntireSerialEEPROMOperation : ReadMemoryOperation
+    {
+        public static readonly UInt32 SERIAL_EEPROM_SIZE = 512;
+        public static readonly UInt32 SERIAL_EEPROM_START_ADDR = 0x600000;
 
-		public ReadEntireSerialEEPROMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
-			: base(commInterface, baudRates, SERIAL_EEPROM_START_ADDR, SERIAL_EEPROM_SIZE, 16)
-		{
-		}
-	};
+        public ReadEntireSerialEEPROMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
+            : base(commInterface, baudRates, SERIAL_EEPROM_START_ADDR, SERIAL_EEPROM_SIZE, 16)
+        {
+        }
+    };
 
-	//todo - need to match and replace the 16 byte pages individually
-	public class WriteEntireSerialEEPROMOperation : KWP2000SequencialOperation
-	{
-		public static readonly UInt32 EXTERNAL_RAM_SIZE = 0x8000;
-		public static readonly UInt32 EXTERNAL_RAM_START_ADDRESS = 0x380000;
-		public static readonly UInt32 SERIAL_EEPROM_SIZE = 512;
-		public static readonly UInt32 SERIAL_EEPROM_START_ADDRESS = 0x600000;
+    //todo - need to match and replace the 16 byte pages individually
+    public class WriteEntireSerialEEPROMOperation : KWP2000SequencialOperation
+    {
+        public static readonly UInt32 EXTERNAL_RAM_SIZE = 0x8000;
+        public static readonly UInt32 EXTERNAL_RAM_START_ADDRESS = 0x380000;
+        public static readonly UInt32 SERIAL_EEPROM_SIZE = 512;
+        public static readonly UInt32 SERIAL_EEPROM_START_ADDRESS = 0x600000;
 
-		public WriteEntireSerialEEPROMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, byte[] dataToWrite)
-			: base(commInterface)
-		{
+        public WriteEntireSerialEEPROMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, byte[] dataToWrite)
+            : base(commInterface)
+        {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
-			mReadRAMAction = new ReadMemoryAction(commInterface, EXTERNAL_RAM_START_ADDRESS, EXTERNAL_RAM_SIZE, DEFAULT_MAX_BLOCK_SIZE, null);
-			mReadSerialEEPROMAction = new ReadMemoryAction(commInterface, SERIAL_EEPROM_START_ADDRESS, SERIAL_EEPROM_SIZE, 16, null);
-			mWriteRAMAction = new WriteMemoryAction(commInterface, 0, 0, dataToWrite, null);
+            mReadRAMAction = new ReadMemoryAction(commInterface, EXTERNAL_RAM_START_ADDRESS, EXTERNAL_RAM_SIZE, DEFAULT_MAX_BLOCK_SIZE, null);
+            mReadSerialEEPROMAction = new ReadMemoryAction(commInterface, SERIAL_EEPROM_START_ADDRESS, SERIAL_EEPROM_SIZE, 16, null);
+            mWriteRAMAction = new WriteMemoryAction(commInterface, 0, 0, dataToWrite, null);
 
-			mActionArray = new KWP2000Action[3];
-			mActionArray[0] = mReadRAMAction;
-			mActionArray[1] = mReadSerialEEPROMAction;
-			mActionArray[2] = mWriteRAMAction;
-		}
+            mActionArray = new KWP2000Action[3];
+            mActionArray[0] = mReadRAMAction;
+            mActionArray[1] = mReadSerialEEPROMAction;
+            mActionArray[2] = mWriteRAMAction;
+        }
 
-		protected override void OnActionCompleted(CommunicationAction action, bool success)
-		{
-			if (success)
-			{
-				if (action == mReadSerialEEPROMAction)
-				{
-					bool matched = true;
-					UInt32 x = 0;
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            if (success)
+            {
+                if (action == mReadSerialEEPROMAction)
+                {
+                    bool matched = true;
+                    UInt32 x = 0;
 
-					for (x = (EXTERNAL_RAM_SIZE - SERIAL_EEPROM_SIZE); x >= 0;  x--)
-					{
-						matched = true;
+                    for (x = (EXTERNAL_RAM_SIZE - SERIAL_EEPROM_SIZE); x >= 0;  x--)
+                    {
+                        matched = true;
 
-						for (UInt32 y = 0; y < SERIAL_EEPROM_SIZE; y++)
-						{
-							if (mReadRAMAction.ReadData[x + y] != mReadSerialEEPROMAction.ReadData[y])
-							{
-								matched = false;
-								break;
-							}
-						}
+                        for (UInt32 y = 0; y < SERIAL_EEPROM_SIZE; y++)
+                        {
+                            if (mReadRAMAction.ReadData[x + y] != mReadSerialEEPROMAction.ReadData[y])
+                            {
+                                matched = false;
+                                break;
+                            }
+                        }
 
-						if (matched)
-						{
-							break;
-						}
-					}
+                        if (matched)
+                        {
+                            break;
+                        }
+                    }
 
-					if (matched)
-					{
-						mWriteRAMAction.SetStartAddressAndNumBytes(x + EXTERNAL_RAM_START_ADDRESS, SERIAL_EEPROM_SIZE);
-					}
-					else
-					{
-						CommInterface.DisplayStatusMessage("Could not locate serial eeprom data in RAM", StatusMessageType.USER);
-						success = false;
-					}
-				}
-			}
+                    if (matched)
+                    {
+                        mWriteRAMAction.SetStartAddressAndNumBytes(x + EXTERNAL_RAM_START_ADDRESS, SERIAL_EEPROM_SIZE);
+                    }
+                    else
+                    {
+                        CommInterface.DisplayStatusMessage("Could not locate serial eeprom data in RAM", StatusMessageType.USER);
+                        success = false;
+                    }
+                }
+            }
 
-			base.OnActionCompleted(action, success);
-		}
+            base.OnActionCompleted(action, success);
+        }
 
-		protected ReadMemoryAction mReadRAMAction;
-		protected ReadMemoryAction mReadSerialEEPROMAction;
-		protected WriteMemoryAction mWriteRAMAction;
-		protected UInt32 mSerialEEPROMBackupAddress;
-	};
+        protected ReadMemoryAction mReadRAMAction;
+        protected ReadMemoryAction mReadSerialEEPROMAction;
+        protected WriteMemoryAction mWriteRAMAction;
+        protected UInt32 mSerialEEPROMBackupAddress;
+    };
 
-	public class ReadEntireExternalRAMOperation : ReadMemoryOperation
-	{
-		public ReadEntireExternalRAMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
-			: base(commInterface, baudRates, 0x380000, 0x8000, DEFAULT_MAX_BLOCK_SIZE)
-		{
-		}
-	};
+    public class ReadEntireExternalRAMOperation : ReadMemoryOperation
+    {
+        public ReadEntireExternalRAMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
+            : base(commInterface, baudRates, 0x380000, 0x8000, DEFAULT_MAX_BLOCK_SIZE)
+        {
+        }
+    };
 
     public class ReadExternalFlashOperationWithBackDoor : KWP2000SequencialOperation
-	{
-		//TODO: should this be removed?
+    {
+        //TODO: should this be removed?
 
-		public ReadExternalFlashOperationWithBackDoor(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, uint size, PercentCompleteDelegate percentComplete)
-			: base(commInterface)
-		{
+        public ReadExternalFlashOperationWithBackDoor(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, uint size, PercentCompleteDelegate percentComplete)
+            : base(commInterface)
+        {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
-			mExternalFlashMemory = null;
-			mStartAddress = startAddress;
+            mExternalFlashMemory = null;
+            mStartAddress = startAddress;
 
             mPercentCompleteDel = percentComplete;
 
             const uint ADDRESS_TO_CHANGE = 0xE048;
             //why are we setting 8 bytes, shouldn't it just be 4 bytes?
-			mOriginalMemoryContents = new byte[]{ 0xF6, 0x25, 0x06, 0x02, 0xF6, 0x25, 0x06, 0x02 };
+            mOriginalMemoryContents = new byte[]{ 0xF6, 0x25, 0x06, 0x02, 0xF6, 0x25, 0x06, 0x02 };
 
             //TODO: validate flash start and end addresses
 
-			mActionArray = new KWP2000Action[4];
-			mReadOriginalMemoryAciton = new ReadMemoryAction(commInterface, ADDRESS_TO_CHANGE, (uint)mOriginalMemoryContents.Length, DEFAULT_MAX_BLOCK_SIZE, null);
-			mActionArray[0] = mReadOriginalMemoryAciton;
-			mActionArray[1] = new WriteMemoryAction(commInterface, ADDRESS_TO_CHANGE, DEFAULT_MAX_BLOCK_SIZE, mOriginalMemoryContents, null);
+            mActionArray = new KWP2000Action[4];
+            mReadOriginalMemoryAciton = new ReadMemoryAction(commInterface, ADDRESS_TO_CHANGE, (uint)mOriginalMemoryContents.Length, DEFAULT_MAX_BLOCK_SIZE, null);
+            mActionArray[0] = mReadOriginalMemoryAciton;
+            mActionArray[1] = new WriteMemoryAction(commInterface, ADDRESS_TO_CHANGE, DEFAULT_MAX_BLOCK_SIZE, mOriginalMemoryContents, null);
             mReadFlashMemoryAction = new ReadMemoryAction(commInterface, mStartAddress, size, DEFAULT_MAX_BLOCK_SIZE, this.BytesReadHandler);
-			mActionArray[2] = mReadFlashMemoryAction;
-			mActionArray[3] = new WriteMemoryAction(commInterface, ADDRESS_TO_CHANGE, DEFAULT_MAX_BLOCK_SIZE, mOriginalMemoryContents, null);
-		}
+            mActionArray[2] = mReadFlashMemoryAction;
+            mActionArray[3] = new WriteMemoryAction(commInterface, ADDRESS_TO_CHANGE, DEFAULT_MAX_BLOCK_SIZE, mOriginalMemoryContents, null);
+        }
 
         private bool BytesReadHandler(uint numRead, uint totalRead, uint totalToRead, ReadMemoryAction runningAction)
         {
@@ -567,54 +567,54 @@ namespace Communication
                 mPercentCompleteDel(((float)totalRead / (float)totalToRead) * 100.0f);
             }
 
-			return true;//keep the action reading memory until it completes
+            return true;//keep the action reading memory until it completes
         }
 
         protected override void OnActionCompleted(CommunicationAction action, bool success)
-		{
-			if (action == mReadOriginalMemoryAciton)
-			{
-				mOriginalMemoryContents = mReadOriginalMemoryAciton.ReadData;
-			}
+        {
+            if (action == mReadOriginalMemoryAciton)
+            {
+                mOriginalMemoryContents = mReadOriginalMemoryAciton.ReadData;
+            }
 
-			base.OnActionCompleted(action, success);
-		}
+            base.OnActionCompleted(action, success);
+        }
 
-		protected override bool OnOperationCompleted(bool success)
-		{
-			if (success)
-			{
-				mExternalFlashMemory = new MemoryImage(mReadFlashMemoryAction.ReadData, mStartAddress);
-			}
+        protected override bool OnOperationCompleted(bool success)
+        {
+            if (success)
+            {
+                mExternalFlashMemory = new MemoryImage(mReadFlashMemoryAction.ReadData, mStartAddress);
+            }
 
-			return base.OnOperationCompleted(success);
-		}
+            return base.OnOperationCompleted(success);
+        }
 
-		public MemoryImage mExternalFlashMemory;
-		protected ReadMemoryAction mReadFlashMemoryAction;
-		protected ReadMemoryAction mReadOriginalMemoryAciton;
-		protected byte[] mOriginalMemoryContents;
-		protected UInt32 mStartAddress;
+        public MemoryImage mExternalFlashMemory;
+        protected ReadMemoryAction mReadFlashMemoryAction;
+        protected ReadMemoryAction mReadOriginalMemoryAciton;
+        protected byte[] mOriginalMemoryContents;
+        protected UInt32 mStartAddress;
         protected PercentCompleteDelegate mPercentCompleteDel;
-	};
+    };
 
     public class ReadExternalFlashOperation : KWP2000Operation
     {
-		public class ReadExternalFlashSettings
-		{
-			public bool CheckIfSectorReadRequired = true;
-			public bool OnlyReadNonMatchingSectors = false;
-			public bool VerifyReadData = true;
+        public class ReadExternalFlashSettings
+        {
+            public bool CheckIfSectorReadRequired = true;
+            public bool OnlyReadNonMatchingSectors = false;
+            public bool VerifyReadData = true;
 
-			public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
-		}
+            public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
+        }
 
-		public ReadExternalFlashOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, ReadExternalFlashSettings readSettings, IEnumerable<MemoryImage> flashBlockList)
+        public ReadExternalFlashOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, ReadExternalFlashSettings readSettings, IEnumerable<MemoryImage> flashBlockList)
             : base(commInterface)
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-			EnableAutoNegotiateSecurity(readSettings.SecuritySettings);
+            EnableAutoNegotiateSecurity(readSettings.SecuritySettings);
 
             mFlashBlockList = flashBlockList;
             mCurrentBlock = mFlashBlockList.GetEnumerator();
@@ -624,24 +624,24 @@ namespace Communication
             mEncryptionType = TransferDataAction.EncryptionType.Unencrypted;
             mCompressionType = TransferDataAction.CompressionType.Uncompressed;
 
-			mHasVerfiedRequestUploadSupported = false;
+            mHasVerfiedRequestUploadSupported = false;
 
-			mState = ReadingState.Start;
+            mState = ReadingState.Start;
 
-			bool shouldValidateMemoryLayout = true;
+            bool shouldValidateMemoryLayout = true;
 
-			if (shouldValidateMemoryLayout)
-			{
-				mState = ReadingState.ValidateMemoryLayout;
-			}
+            if (shouldValidateMemoryLayout)
+            {
+                mState = ReadingState.ValidateMemoryLayout;
+            }
 
-			CheckIfSectorsRequireRead = readSettings.CheckIfSectorReadRequired;
-			OnlyReadRequiredSectors = readSettings.OnlyReadNonMatchingSectors;
-			ShouldVerifyReadSectors = readSettings.VerifyReadData;
+            CheckIfSectorsRequireRead = readSettings.CheckIfSectorReadRequired;
+            OnlyReadRequiredSectors = readSettings.OnlyReadNonMatchingSectors;
+            ShouldVerifyReadSectors = readSettings.VerifyReadData;
 
             ElapsedTimeReadingUnrequiredSectors = TimeSpan.Zero;
-			ElapsedTimeCheckingIfSectorsRequireReading = TimeSpan.Zero;
-			ElapsedTimeVerifyingReadSectors = TimeSpan.Zero;
+            ElapsedTimeCheckingIfSectorsRequireReading = TimeSpan.Zero;
+            ElapsedTimeVerifyingReadSectors = TimeSpan.Zero;
 
             mTotalBytesValidated = 0;
             mTotalBytesToRead = 0;
@@ -656,13 +656,13 @@ namespace Communication
             }
         }
 
-		public bool CheckIfSectorsRequireRead { get; private set; }
-		public bool OnlyReadRequiredSectors { get; private set; }
-		public bool ShouldVerifyReadSectors { get; private set; }
+        public bool CheckIfSectorsRequireRead { get; private set; }
+        public bool OnlyReadRequiredSectors { get; private set; }
+        public bool ShouldVerifyReadSectors { get; private set; }
 
-		public TimeSpan ElapsedTimeReadingUnrequiredSectors { get; private set; }
-		public TimeSpan ElapsedTimeCheckingIfSectorsRequireReading { get; private set; }
-		public TimeSpan ElapsedTimeVerifyingReadSectors { get; private set; }
+        public TimeSpan ElapsedTimeReadingUnrequiredSectors { get; private set; }
+        public TimeSpan ElapsedTimeCheckingIfSectorsRequireReading { get; private set; }
+        public TimeSpan ElapsedTimeVerifyingReadSectors { get; private set; }
 
         public IEnumerable<MemoryImage> FlashBlockList
         {
@@ -683,18 +683,18 @@ namespace Communication
                     {
                         CommInterface.DisplayStatusMessage("Starting to read data block.", StatusMessageType.USER);
 
-						mCurrentSectorRequiresRead = true;
+                        mCurrentSectorRequiresRead = true;
 
-						//we can only do checksum calculations if we are sure we can do a successful request upload.
-						//otherwise we can cause a "Programming Not Finished" error code to be stored by an incorrect checksum calculation.
-						if (CheckIfSectorsRequireRead && mHasVerfiedRequestUploadSupported)
-						{
-							mState = ReadingState.CheckIfReadRequired;
-						}
-						else
-						{
-							mState = ReadingState.RequestUpload;
-						}
+                        //we can only do checksum calculations if we are sure we can do a successful request upload.
+                        //otherwise we can cause a "Programming Not Finished" error code to be stored by an incorrect checksum calculation.
+                        if (CheckIfSectorsRequireRead && mHasVerfiedRequestUploadSupported)
+                        {
+                            mState = ReadingState.CheckIfReadRequired;
+                        }
+                        else
+                        {
+                            mState = ReadingState.RequestUpload;
+                        }
                     }
 
                     switch (mState)
@@ -773,26 +773,26 @@ namespace Communication
                     }
                     else
                     {
-						switch (mState)
-						{
-							case ReadingState.CheckIfReadRequired:
-							{
-								ElapsedTimeCheckingIfSectorsRequireReading += action.ActionElapsedTime;
+                        switch (mState)
+                        {
+                            case ReadingState.CheckIfReadRequired:
+                            {
+                                ElapsedTimeCheckingIfSectorsRequireReading += action.ActionElapsedTime;
 
-								if (!mCurrentSectorRequiresRead)
-								{
-									ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-								}
+                                if (!mCurrentSectorRequiresRead)
+                                {
+                                    ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
+                                }
 
-								break;
-							}
-							case ReadingState.ValidateReadData:
-							{
-								ElapsedTimeVerifyingReadSectors += action.ActionElapsedTime;
+                                break;
+                            }
+                            case ReadingState.ValidateReadData:
+                            {
+                                ElapsedTimeVerifyingReadSectors += action.ActionElapsedTime;
 
-								break;
-							}
-						}
+                                break;
+                            }
+                        }
 
                         bool currentBlockFinished = false;
 
@@ -870,7 +870,7 @@ namespace Communication
                         {
                             if (currentBlockFinished)
                             {
-								mState = ReadingState.FinishedBlock;
+                                mState = ReadingState.FinishedBlock;
                             }
                             else
                             {
@@ -881,16 +881,16 @@ namespace Communication
                 }
                 else if (action is RequestUploadFromECUAction)
                 {
-					if (!mCurrentSectorRequiresRead)
-					{
-						ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-					}
+                    if (!mCurrentSectorRequiresRead)
+                    {
+                        ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
+                    }
 
                     mCurrentBlockBytesRead = 0;
 
                     if (success)
                     {
-						mHasVerfiedRequestUploadSupported = true;
+                        mHasVerfiedRequestUploadSupported = true;
 
                         mMaxBlockSize = ((RequestUploadFromECUAction)action).GetMaxBlockSize();
 
@@ -899,10 +899,10 @@ namespace Communication
                 }
                 else if (action is TransferDataAction)
                 {
-					if (!mCurrentSectorRequiresRead)
-					{
-						ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-					}
+                    if (!mCurrentSectorRequiresRead)
+                    {
+                        ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
+                    }
 
                     if (success)
                     {
@@ -911,31 +911,31 @@ namespace Communication
                 }
                 else if (action is RequestTransferExitAction)
                 {
-					if (!mCurrentSectorRequiresRead)
-					{
-						ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-					}
+                    if (!mCurrentSectorRequiresRead)
+                    {
+                        ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
+                    }
 
                     mCurrentBlockBytesRead = 0;
 
                     if (success)
                     {
-						if (ShouldVerifyReadSectors)
-						{
-							mState = ReadingState.ValidateReadData;
-						}
-						else
-						{
-							mState = ReadingState.FinishedBlock;
-						}
+                        if (ShouldVerifyReadSectors)
+                        {
+                            mState = ReadingState.ValidateReadData;
+                        }
+                        else
+                        {
+                            mState = ReadingState.FinishedBlock;
+                        }
                     }
                 }
                 else if (action is ValidateStartAndEndAddressesWithRequestUploadDownloadAction)
                 {
-					bool validationCompleted = true;
-					bool layoutIsValid = false;
+                    bool validationCompleted = true;
+                    bool layoutIsValid = false;
 
-					string validationMesage = null;
+                    string validationMesage = null;
 
                     if (success)
                     {
@@ -943,7 +943,7 @@ namespace Communication
 
                         if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
                         {
-							layoutIsValid = true;
+                            layoutIsValid = true;
                             validationMesage = "Memory layout is valid.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
@@ -964,7 +964,7 @@ namespace Communication
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
                         {
-							validationCompleted = false;
+                            validationCompleted = false;
                             validationMesage = "Validation did not complete.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
@@ -972,66 +972,66 @@ namespace Communication
                             || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
                             || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
                         {
-							validationCompleted = false;
+                            validationCompleted = false;
                             validationMesage = "Validation did not complete.";
                         }
                         else
                         {
                             Debug.Fail("Unknown memory layout validation result");
 
-							validationCompleted = false;
+                            validationCompleted = false;
                             validationMesage = "Unknown validation result.";
                         }
                     }
                     else if (action.CompletedWithoutCommunicationError)
                     {
-						validationCompleted = false;
+                        validationCompleted = false;
 
-						validationMesage = "Memory layout validation failed.";
+                        validationMesage = "Memory layout validation failed.";
                     }
 
-					if (validationMesage != null)
-					{
-						CommInterface.DisplayStatusMessage(validationMesage, StatusMessageType.USER);
-					}
+                    if (validationMesage != null)
+                    {
+                        CommInterface.DisplayStatusMessage(validationMesage, StatusMessageType.USER);
+                    }
 
-					success = validationCompleted && layoutIsValid;
+                    success = validationCompleted && layoutIsValid;
 
                     if (!success)
                     {
-						var promptResult = UserPromptResult.CANCEL;
-						string promptTitle = "Unable to validate memory layout";
-						string promptBody = "Unable to validate memory layout. Do you want to continue reading flash memory without validating the memory layout?";
+                        var promptResult = UserPromptResult.CANCEL;
+                        string promptTitle = "Unable to validate memory layout";
+                        string promptBody = "Unable to validate memory layout. Do you want to continue reading flash memory without validating the memory layout?";
 
-						if (!validationCompleted)
-						{
-							var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-							if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-							{
-								promptTitle = "RequestUpload is not supported";
-								promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
-							}
-							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
-							{
-								promptTitle = "RequestUpload was rejected";
-								promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
-							}
-							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
-							{
-								promptTitle = "RequestDownload is not supported";
-								promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue reading flash memory without validating the memory layout?";
-							}
-							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-							{
-								promptTitle = "RequestDownload was rejected";
-								promptBody = "The ECU rejected the RequestDownload service. Do you want to continue reading flash memory without validating the memory layout?";
-							}
-							promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
-						}
-						else if (!layoutIsValid)
-						{
-							promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue reading flash memory?", UserPromptType.OK_CANCEL);
-						}
+                        if (!validationCompleted)
+                        {
+                            var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                            if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                            {
+                                promptTitle = "RequestUpload is not supported";
+                                promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
+                            }
+                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
+                            {
+                                promptTitle = "RequestUpload was rejected";
+                                promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
+                            }
+                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
+                            {
+                                promptTitle = "RequestDownload is not supported";
+                                promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue reading flash memory without validating the memory layout?";
+                            }
+                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+                            {
+                                promptTitle = "RequestDownload was rejected";
+                                promptBody = "The ECU rejected the RequestDownload service. Do you want to continue reading flash memory without validating the memory layout?";
+                            }
+                            promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
+                        }
+                        else if (!layoutIsValid)
+                        {
+                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue reading flash memory?", UserPromptType.OK_CANCEL);
+                        }
 
                         if (promptResult == UserPromptResult.OK)
                         {
@@ -1045,22 +1045,22 @@ namespace Communication
                     }
                 }
 
-				if (mState == ReadingState.FinishedBlock)
-				{
-					mTotalBytesValidated += mCurrentBlock.Current.Size;
-					OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToRead) * 100.0f);
+                if (mState == ReadingState.FinishedBlock)
+                {
+                    mTotalBytesValidated += mCurrentBlock.Current.Size;
+                    OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToRead) * 100.0f);
 
-					mNumAttemptsForCurrentBlock = 0;
+                    mNumAttemptsForCurrentBlock = 0;
 
-					if (!mCurrentBlock.MoveNext())
-					{
-						mState = ReadingState.FinishedAll;
-					}
-					else
-					{
-						mState = ReadingState.Start;
-					}
-				}
+                    if (!mCurrentBlock.MoveNext())
+                    {
+                        mState = ReadingState.FinishedAll;
+                    }
+                    else
+                    {
+                        mState = ReadingState.Start;
+                    }
+                }
 
                 if (!success && (mState != ReadingState.CompleteFailedReadWithChecksumCalculation))
                 {
@@ -1096,7 +1096,7 @@ namespace Communication
             TransferData,
             ExitTransfer,
             ValidateReadData,
-			FinishedBlock,
+            FinishedBlock,
             FinishedAll,
             CompleteFailedReadWithChecksumCalculation
         }
@@ -1106,7 +1106,7 @@ namespace Communication
         private IEnumerable<MemoryImage> mFlashBlockList;
         private IEnumerator<MemoryImage> mCurrentBlock;
         private byte mMaxBlockSize;
-		private bool mHasVerfiedRequestUploadSupported;
+        private bool mHasVerfiedRequestUploadSupported;
         private int mNumAttemptsForCurrentBlock;
         private uint mCurrentBlockBytesRead;
         private uint mTotalBytesToRead;
@@ -1119,71 +1119,71 @@ namespace Communication
 
     public class WriteExternalFlashOperation : KWP2000Operation
     {
-		public class WriteExternalFlashSettings
-		{
-			public bool CheckIfWriteRequired = true;
-			public bool OnlyWriteNonMatchingSectors = false;
-			public bool VerifyWrittenData = true;
-			public bool EraseEntireFlashAtOnce = false;
+        public class WriteExternalFlashSettings
+        {
+            public bool CheckIfWriteRequired = true;
+            public bool OnlyWriteNonMatchingSectors = false;
+            public bool VerifyWrittenData = true;
+            public bool EraseEntireFlashAtOnce = false;
 
-			public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
-		}
+            public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
+        }
 
-		public WriteExternalFlashOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, WriteExternalFlashSettings writeSettings, IEnumerable<MemoryImage> sectorImages)
-			: base(commInterface)
-		{
+        public WriteExternalFlashOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, WriteExternalFlashSettings writeSettings, IEnumerable<MemoryImage> sectorImages)
+            : base(commInterface)
+        {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-			EnableAutoNegotiateSecurity(writeSettings.SecuritySettings);
+            EnableAutoNegotiateSecurity(writeSettings.SecuritySettings);
 
             WasFailureCausedByPreviousIncompleteDownload = false;
 
-			ShouldCheckIfFlashRequired = writeSettings.CheckIfWriteRequired;
-			OnlyFlashRequiredSectors = writeSettings.OnlyWriteNonMatchingSectors;
-			ShouldVerifyFlashedSectors = writeSettings.VerifyWrittenData;
+            ShouldCheckIfFlashRequired = writeSettings.CheckIfWriteRequired;
+            OnlyFlashRequiredSectors = writeSettings.OnlyWriteNonMatchingSectors;
+            ShouldVerifyFlashedSectors = writeSettings.VerifyWrittenData;
 
-			mTotalBytesToFlash = 0;
-			mTotalBytesValidated = 0;
+            mTotalBytesToFlash = 0;
+            mTotalBytesValidated = 0;
 
-			mFlashBlockList = new List<FlashBlock>();
+            mFlashBlockList = new List<FlashBlock>();
 
-			foreach (var image in sectorImages)
+            foreach (var image in sectorImages)
             {
-				Debug.Assert(image.StartAddress % 2 == 0, "start address is not a multiple of 2");
-				Debug.Assert(image.Size > 0, "size is zero");
-				Debug.Assert(image.Size % 2 == 0, "size is not a multiple of 2");
+                Debug.Assert(image.StartAddress % 2 == 0, "start address is not a multiple of 2");
+                Debug.Assert(image.Size > 0, "size is zero");
+                Debug.Assert(image.Size % 2 == 0, "size is not a multiple of 2");
 
                 var block = new FlashBlock();
                 block.mMemoryImage = image;
                 block.mFlashingIsRequired = !ShouldCheckIfFlashRequired;
-				block.mWasErased = false;
+                block.mWasErased = false;
                 block.mFlashComplete = false;
                 block.mFlashSuccessful = false;
                 block.mNumFlashAttempts = 0;
                 block.mNumBytesFlashed = 0;
 
                 mFlashBlockList.Add(block);
-				mTotalBytesToFlash += image.Size;
+                mTotalBytesToFlash += image.Size;
             }
 
             mCurrentBlock = mFlashBlockList.First();
 
-			bool shouldValidateMemoryLayout = true;
+            bool shouldValidateMemoryLayout = true;
 
-			mState = shouldValidateMemoryLayout ? FlashingState.ValidateStartAndEndAddresses : FlashingState.StartBlock;
+            mState = shouldValidateMemoryLayout ? FlashingState.ValidateStartAndEndAddresses : FlashingState.StartBlock;
 
             mMaxBlockSize = TransferDataAction.DEFAULT_MAX_BLOCK_SIZE;
-			mEraseEntireFlashAtOnce = writeSettings.EraseEntireFlashAtOnce;
+            mEraseEntireFlashAtOnce = writeSettings.EraseEntireFlashAtOnce;
             mValidatedEraseMode = false;
             mEncryptionType = TransferDataAction.EncryptionType.Bosch;
             mCompressionType = TransferDataAction.CompressionType.Bosch;
 
-			ElapsedTimeFlashingUnrequiredSectors = TimeSpan.Zero;
-			ElapsedTimeCheckingIfSectorsRequireFlashing = TimeSpan.Zero;
-			ElapsedTimeVerifyingWrittenSectors = TimeSpan.Zero;
+            ElapsedTimeFlashingUnrequiredSectors = TimeSpan.Zero;
+            ElapsedTimeCheckingIfSectorsRequireFlashing = TimeSpan.Zero;
+            ElapsedTimeVerifyingWrittenSectors = TimeSpan.Zero;
 
             Debug.Assert(!mEraseEntireFlashAtOnce || (mFlashBlockList.Count == 1));
-		}
+        }
 
         protected void RestartFlashingProcessAndEraseEntireFlashAtOnce()
         {
@@ -1198,7 +1198,7 @@ namespace Communication
             foreach (var block in mFlashBlockList)
             {
                 block.mFlashingIsRequired = !ShouldCheckIfFlashRequired;
-				block.mWasErased = false;
+                block.mWasErased = false;
                 block.mFlashComplete = false;
                 block.mFlashSuccessful = false;
                 block.mNumFlashAttempts = 0;
@@ -1208,9 +1208,9 @@ namespace Communication
             mCurrentBlock = mFlashBlockList.First();
         }
 
-		public bool OnlyFlashRequiredSectors { get; private set; }
-		public bool ShouldCheckIfFlashRequired { get; private set; }
-		public bool ShouldVerifyFlashedSectors { get; private set; }
+        public bool OnlyFlashRequiredSectors { get; private set; }
+        public bool ShouldCheckIfFlashRequired { get; private set; }
+        public bool ShouldVerifyFlashedSectors { get; private set; }
 
         public int NumSectors { get { return mFlashBlockList.Count; } }
         public int NumSuccessfullyFlashedSectors
@@ -1230,9 +1230,9 @@ namespace Communication
             }
         }
 
-		public TimeSpan ElapsedTimeFlashingUnrequiredSectors { get; private set; }
-		public TimeSpan ElapsedTimeCheckingIfSectorsRequireFlashing { get; private set; }
-		public TimeSpan ElapsedTimeVerifyingWrittenSectors { get; private set; }
+        public TimeSpan ElapsedTimeFlashingUnrequiredSectors { get; private set; }
+        public TimeSpan ElapsedTimeCheckingIfSectorsRequireFlashing { get; private set; }
+        public TimeSpan ElapsedTimeVerifyingWrittenSectors { get; private set; }
 
         public bool WasFailureCausedByPreviousIncompleteDownload { get; private set; }
 
@@ -1325,7 +1325,7 @@ namespace Communication
                                 blankData[x] = 0xFF;
                             }
 
-							nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, firstBlock.mMemoryImage.StartAddress, blankData);
+                            nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, firstBlock.mMemoryImage.StartAddress, blankData);
                             break;
                         }
                         case FlashingState.CheckIfFlashRequired:
@@ -1347,20 +1347,20 @@ namespace Communication
                             }
                             break;
                         }
-						case FlashingState.VerifyErase:
-						{
-							var blankData = new byte[mCurrentBlock.mMemoryImage.Size];
+                        case FlashingState.VerifyErase:
+                        {
+                            var blankData = new byte[mCurrentBlock.mMemoryImage.Size];
 
-							for (int x = 0; x < blankData.Length; x++)
-							{
-								blankData[x] = 0xFF;
-							}
+                            for (int x = 0; x < blankData.Length; x++)
+                            {
+                                blankData[x] = 0xFF;
+                            }
 
-							uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length;
-							CommInterface.DisplayStatusMessage("Calculating flash checksum to verify if erase was successful for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
-							nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, blankData);
-							break;
-						}
+                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length;
+                            CommInterface.DisplayStatusMessage("Calculating flash checksum to verify if erase was successful for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
+                            nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, blankData);
+                            break;
+                        }
                         case FlashingState.RequestDownload:
                         {
                             nextAction = new RequestDownloadToECUAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, (uint)mCurrentBlock.mMemoryImage.RawData.Length, mCompressionType, mEncryptionType);
@@ -1368,7 +1368,7 @@ namespace Communication
                         }
                         case FlashingState.TransferDataToFailTransfer:
                         {
-							uint blankLength = mTotalBytesToFlash;
+                            uint blankLength = mTotalBytesToFlash;
                             blankLength += blankLength / 16;//send more than max data to ensure the transfer is considered invalid
 
                             byte[] blankData = new byte[blankLength];
@@ -1477,7 +1477,7 @@ namespace Communication
                     }
                     else if (mState == FlashingState.CheckIfFlashRequired)
                     {
-						ElapsedTimeCheckingIfSectorsRequireFlashing += action.ActionElapsedTime;
+                        ElapsedTimeCheckingIfSectorsRequireFlashing += action.ActionElapsedTime;
 
                         //goto programming state unless something else happens
                         mState = FlashingState.StartProgrammingBlock;
@@ -1512,69 +1512,69 @@ namespace Communication
                             success = true;
                         }
                     }
-					else if (mState == FlashingState.ValidateFlashedData)
-					{
-						ElapsedTimeVerifyingWrittenSectors += action.ActionElapsedTime;
+                    else if (mState == FlashingState.ValidateFlashedData)
+                    {
+                        ElapsedTimeVerifyingWrittenSectors += action.ActionElapsedTime;
 
-						if (!mCurrentBlock.mFlashingIsRequired)
-						{
-							ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
-						}
+                        if (!mCurrentBlock.mFlashingIsRequired)
+                        {
+                            ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
+                        }
 
-						mState = FlashingState.FinishedBlock;
+                        mState = FlashingState.FinishedBlock;
 
-						if (success)
-						{
-							if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
-							{
-								CommInterface.DisplayStatusMessage("Flash checksum matches new data, flashing was successful.", StatusMessageType.USER);
-								mCurrentBlock.mFlashComplete = true;
-								//request transfer exit sets the mFlashSuccessful to true
-							}
-							else
-							{
-								CommInterface.DisplayStatusMessage("Flash checksum does not match new data.", StatusMessageType.USER);
-								mCurrentBlock.mFlashSuccessful = false;//need to set back to false, because request transfer exit sets it to true
-								//will retry if we haven't reached the limit of flashing attempts
-							}
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches new data, assuming flashing was successful.", StatusMessageType.USER);
-							mCurrentBlock.mFlashComplete = true;
-							//request transfer exit sets the mFlashSuccessful to true
-							success = true;
-						}
-					}
-					else//FlashingState.VerifyErase
-					{
-						Debug.Assert(mState == FlashingState.VerifyErase);
+                        if (success)
+                        {
+                            if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
+                            {
+                                CommInterface.DisplayStatusMessage("Flash checksum matches new data, flashing was successful.", StatusMessageType.USER);
+                                mCurrentBlock.mFlashComplete = true;
+                                //request transfer exit sets the mFlashSuccessful to true
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Flash checksum does not match new data.", StatusMessageType.USER);
+                                mCurrentBlock.mFlashSuccessful = false;//need to set back to false, because request transfer exit sets it to true
+                                //will retry if we haven't reached the limit of flashing attempts
+                            }
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches new data, assuming flashing was successful.", StatusMessageType.USER);
+                            mCurrentBlock.mFlashComplete = true;
+                            //request transfer exit sets the mFlashSuccessful to true
+                            success = true;
+                        }
+                    }
+                    else//FlashingState.VerifyErase
+                    {
+                        Debug.Assert(mState == FlashingState.VerifyErase);
 
-						if (!mCurrentBlock.mFlashingIsRequired)
-						{
-							ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
-						}
+                        if (!mCurrentBlock.mFlashingIsRequired)
+                        {
+                            ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
+                        }
 
-						if (success)
-						{
-							if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
-							{
-								CommInterface.DisplayStatusMessage("Verified the memory sector was erased properly.", StatusMessageType.USER);
-							}
-							else
-							{
-								CommInterface.DisplayStatusMessage("The memory sector was NOT erased properly, will continue and attempt to write memory sector.", StatusMessageType.USER);
-							}
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to verify if the memory sector was erased properly, assuming erase was successful.", StatusMessageType.USER);
-							success = true;
-						}
+                        if (success)
+                        {
+                            if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
+                            {
+                                CommInterface.DisplayStatusMessage("Verified the memory sector was erased properly.", StatusMessageType.USER);
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("The memory sector was NOT erased properly, will continue and attempt to write memory sector.", StatusMessageType.USER);
+                            }
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to verify if the memory sector was erased properly, assuming erase was successful.", StatusMessageType.USER);
+                            success = true;
+                        }
 
-						mCurrentBlock.mWasErased = true;
-						mState = FlashingState.RequestDownload;
-					}
+                        mCurrentBlock.mWasErased = true;
+                        mState = FlashingState.RequestDownload;
+                    }
                 }
                 #endregion
                 #region EraseFlash
@@ -1582,14 +1582,14 @@ namespace Communication
                 {
                     mCurrentBlock.mNumBytesFlashed = 0;
 
-					if (!mCurrentBlock.mFlashingIsRequired)
-					{
-						ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
-					}
+                    if (!mCurrentBlock.mFlashingIsRequired)
+                    {
+                        ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
+                    }
 
                     if (success)
                     {
-						mCurrentBlock.mWasErased = true;
+                        mCurrentBlock.mWasErased = true;
                         mState = FlashingState.RequestDownload;
                     }
                     else if (action.CompletedWithoutCommunicationError)
@@ -1622,54 +1622,54 @@ namespace Communication
                                     success = true;
                                 }
                             }
-							else//regular failure
-							{
-								CommInterface.DisplayStatusMessage("Sector erase reported as failed. Calculating checksum to verify erase.", StatusMessageType.USER);
+                            else//regular failure
+                            {
+                                CommInterface.DisplayStatusMessage("Sector erase reported as failed. Calculating checksum to verify erase.", StatusMessageType.USER);
 
-								mState = FlashingState.VerifyErase;
-								success = true;
-							}
+                                mState = FlashingState.VerifyErase;
+                                success = true;
+                            }
                         }
                     }
                 }
-				#endregion
-				#region RequestDownload
-				else if (action is RequestDownloadToECUAction)
-				{
-					if (!mCurrentBlock.mFlashingIsRequired)
-					{
-						ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
-					}
+                #endregion
+                #region RequestDownload
+                else if (action is RequestDownloadToECUAction)
+                {
+                    if (!mCurrentBlock.mFlashingIsRequired)
+                    {
+                        ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
+                    }
 
-					if (success)
-					{
-						mMaxBlockSize = ((RequestDownloadToECUAction)action).GetMaxBlockSize();
-						mState = FlashingState.TransferData;
-					}
-					else if (action.CompletedWithoutCommunicationError)
-					{
-						if (mState == FlashingState.RequestDownload)
-						{
-							if (((RequestDownloadToECUAction)action).WasFailureCausedByPreviousIncompleteDownload)
-							{
-								CommInterface.DisplayStatusMessage("A previous flash programming attempt was not completed. Transfering invalid data to force the previous incomplete operation to fail.", StatusMessageType.USER);
+                    if (success)
+                    {
+                        mMaxBlockSize = ((RequestDownloadToECUAction)action).GetMaxBlockSize();
+                        mState = FlashingState.TransferData;
+                    }
+                    else if (action.CompletedWithoutCommunicationError)
+                    {
+                        if (mState == FlashingState.RequestDownload)
+                        {
+                            if (((RequestDownloadToECUAction)action).WasFailureCausedByPreviousIncompleteDownload)
+                            {
+                                CommInterface.DisplayStatusMessage("A previous flash programming attempt was not completed. Transfering invalid data to force the previous incomplete operation to fail.", StatusMessageType.USER);
 
-								WasFailureCausedByPreviousIncompleteDownload = true;
-								mState = FlashingState.TransferDataToFailTransfer;
-								success = true;
-							}
-							//else
-							//{
-							//    //don't think we can do anything besides fail
-							//}
-						}
-						//else
-						//{
-						//    //don't think we can do anything besides fail
-						//}
-					}
-				}
-				#endregion
+                                WasFailureCausedByPreviousIncompleteDownload = true;
+                                mState = FlashingState.TransferDataToFailTransfer;
+                                success = true;
+                            }
+                            //else
+                            //{
+                            //    //don't think we can do anything besides fail
+                            //}
+                        }
+                        //else
+                        //{
+                        //    //don't think we can do anything besides fail
+                        //}
+                    }
+                }
+                #endregion
                 #region TransferData
                 else if (action is TransferDataAction)
                 {
@@ -1683,12 +1683,12 @@ namespace Communication
                     }
                     else //handle regular transfer data completing
                     {
-						Debug.Assert(mState == FlashingState.TransferData);
+                        Debug.Assert(mState == FlashingState.TransferData);
 
-						if (!mCurrentBlock.mFlashingIsRequired)
-						{
-							ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
-						}
+                        if (!mCurrentBlock.mFlashingIsRequired)
+                        {
+                            ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
+                        }
 
                         if (action.CompletedWithoutCommunicationError)
                         {
@@ -1742,36 +1742,36 @@ namespace Communication
                     }
                     else//handle regular request transfer exit completing
                     {
-						Debug.Assert(mState == FlashingState.ExitTransfer);
+                        Debug.Assert(mState == FlashingState.ExitTransfer);
 
-						if (!mCurrentBlock.mFlashingIsRequired)
-						{
-							ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
-						}
+                        if (!mCurrentBlock.mFlashingIsRequired)
+                        {
+                            ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
+                        }
 
                         if (success)
                         {
                             //at this point begin assuming that the sector was flashed correctly
                             mCurrentBlock.mFlashSuccessful = true;
 
-							if (ShouldVerifyFlashedSectors)
-							{
-								mState = FlashingState.ValidateFlashedData;
-							}
-							else
-							{
-								mState = FlashingState.FinishedBlock;
+                            if (ShouldVerifyFlashedSectors)
+                            {
+                                mState = FlashingState.ValidateFlashedData;
+                            }
+                            else
+                            {
+                                mState = FlashingState.FinishedBlock;
 
-								mCurrentBlock.mFlashComplete = true;
-							}
+                                mCurrentBlock.mFlashComplete = true;
+                            }
                         }
                         else if(action.CompletedWithoutCommunicationError)
                         {
-						    CommInterface.DisplayStatusMessage("Failed to properly exit flash transfer. Transfering invalid data to force flashing to fail.", StatusMessageType.USER);
+                            CommInterface.DisplayStatusMessage("Failed to properly exit flash transfer. Transfering invalid data to force flashing to fail.", StatusMessageType.USER);
 
-						    mState = FlashingState.TransferDataToFailTransfer;
+                            mState = FlashingState.TransferDataToFailTransfer;
 
-						    success = true;
+                            success = true;
                         }
                         //else
                         //{
@@ -1783,112 +1783,112 @@ namespace Communication
                 #region ValidateStartAndEndAddresses
                 else if (action is ValidateStartAndEndAddressesWithRequestUploadDownloadAction)
                 {
-					bool validationCompleted = true;
-					bool layoutIsValid = false;
+                    bool validationCompleted = true;
+                    bool layoutIsValid = false;
 
-					string validationMesage = null;
+                    string validationMesage = null;
 
-					if (success)
-					{
-						var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                    if (success)
+                    {
+                        var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
 
-						if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
-						{
-							layoutIsValid = true;
-							validationMesage = "Memory layout is valid.";
-						}
-						else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
-						{
-							validationMesage = "Start address is not a valid address in flash memory.";
-						}
-						else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
-						{
-							validationMesage = "End address is not a valid address in flash memory.";
-						}
-						else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
-						{
-							validationMesage = "Start address is not the start of flash memory.";
-						}
-						else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
-						{
-							validationMesage = "End address is not the end of flash memory.";
-						}
-						else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
-						{
-							validationCompleted = false;
-							validationMesage = "Validation did not complete.";
-						}
-						else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
-							|| validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
-							|| validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
-							|| validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-						{
-							validationCompleted = false;
-							validationMesage = "Validation did not complete.";
-						}
-						else
-						{
-							Debug.Fail("Unknown memory layout validation result");
+                        if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
+                        {
+                            layoutIsValid = true;
+                            validationMesage = "Memory layout is valid.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
+                        {
+                            validationMesage = "Start address is not a valid address in flash memory.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
+                        {
+                            validationMesage = "End address is not a valid address in flash memory.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
+                        {
+                            validationMesage = "Start address is not the start of flash memory.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
+                        {
+                            validationMesage = "End address is not the end of flash memory.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
+                        {
+                            validationCompleted = false;
+                            validationMesage = "Validation did not complete.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
+                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
+                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
+                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+                        {
+                            validationCompleted = false;
+                            validationMesage = "Validation did not complete.";
+                        }
+                        else
+                        {
+                            Debug.Fail("Unknown memory layout validation result");
 
-							validationCompleted = false;
-							validationMesage = "Unknown validation result.";
-						}
-					}
-					else if (action.CompletedWithoutCommunicationError)
-					{
-						validationCompleted = false;
+                            validationCompleted = false;
+                            validationMesage = "Unknown validation result.";
+                        }
+                    }
+                    else if (action.CompletedWithoutCommunicationError)
+                    {
+                        validationCompleted = false;
 
-						validationMesage = "Memory layout validation failed.";
-					}
+                        validationMesage = "Memory layout validation failed.";
+                    }
 
-					if (validationMesage != null)
-					{
-						CommInterface.DisplayStatusMessage(validationMesage, StatusMessageType.USER);
-					}
+                    if (validationMesage != null)
+                    {
+                        CommInterface.DisplayStatusMessage(validationMesage, StatusMessageType.USER);
+                    }
 
-					success = validationCompleted && layoutIsValid;
+                    success = validationCompleted && layoutIsValid;
 
-					if (!success)
-					{
-						var promptResult = UserPromptResult.CANCEL;
-						string promptTitle = "Unable to validate memory layout";
-						string promptBody = "Unable to validate memory layout. Do you want to continue writing flash memory without validating the memory layout?";
+                    if (!success)
+                    {
+                        var promptResult = UserPromptResult.CANCEL;
+                        string promptTitle = "Unable to validate memory layout";
+                        string promptBody = "Unable to validate memory layout. Do you want to continue writing flash memory without validating the memory layout?";
 
-						if (!validationCompleted)
-						{
-							var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-							if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-							{
-								promptTitle = "RequestUpload is not supported";
-								promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
-							}
-							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
-							{
-								promptTitle = "RequestUpload was rejected";
-								promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
-							}
-							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
-							{
-								promptTitle = "RequestDownload is not supported";
-								promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue writing flash memory without validating the memory layout?";
-							}
-							else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-							{
-								promptTitle = "RequestDownload was rejected";
-								promptBody = "The ECU rejected the RequestDownload service. Do you want to continue writing flash memory without validating the memory layout?";
-							}
-							promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
-						}
-						else if (!layoutIsValid)
-						{
-							promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue writing flash memory?", UserPromptType.OK_CANCEL);
-						}
+                        if (!validationCompleted)
+                        {
+                            var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                            if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                            {
+                                promptTitle = "RequestUpload is not supported";
+                                promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
+                            }
+                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
+                            {
+                                promptTitle = "RequestUpload was rejected";
+                                promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
+                            }
+                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
+                            {
+                                promptTitle = "RequestDownload is not supported";
+                                promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue writing flash memory without validating the memory layout?";
+                            }
+                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+                            {
+                                promptTitle = "RequestDownload was rejected";
+                                promptBody = "The ECU rejected the RequestDownload service. Do you want to continue writing flash memory without validating the memory layout?";
+                            }
+                            promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
+                        }
+                        else if (!layoutIsValid)
+                        {
+                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue writing flash memory?", UserPromptType.OK_CANCEL);
+                        }
 
-						if (promptResult == UserPromptResult.OK)
-						{
-							success = true;
-						}
-					}
+                        if (promptResult == UserPromptResult.OK)
+                        {
+                            success = true;
+                        }
+                    }
 
                     if (success)
                     {
@@ -1924,7 +1924,7 @@ namespace Communication
 
                         if (!mEraseEntireFlashAtOnce && !mValidatedEraseMode && mCurrentBlock.mWasErased && (mCurrentBlock != mFlashBlockList.First()))
                         {
-							mState = FlashingState.CheckIfFirstBlockAccidentallyErased;
+                            mState = FlashingState.CheckIfFirstBlockAccidentallyErased;
                         }
                     }
                 }
@@ -1947,7 +1947,7 @@ namespace Communication
             {
                 base.OnActionCompleted(action, success);
             }
-		}
+        }
 
         bool mWaitingToReconnect = false;
         bool mUserPromptedToContinueAfterCommunicationFailure = false;
@@ -2045,7 +2045,7 @@ namespace Communication
             CheckIfFlashRequired,
             StartProgrammingBlock,//intermediate state
             EraseFlash,
-			VerifyErase,
+            VerifyErase,
             RequestDownload,
             TransferDataToFailTransfer,
             TransferData,
@@ -2059,7 +2059,7 @@ namespace Communication
         {
             public MemoryImage mMemoryImage;
             public bool mFlashingIsRequired;
-			public bool mWasErased;
+            public bool mWasErased;
             public bool mFlashComplete;
             public bool mFlashSuccessful;
             public int mNumFlashAttempts;
@@ -2080,25 +2080,25 @@ namespace Communication
         private TransferDataAction.EncryptionType mEncryptionType;
 
         private TransferDataAction mTransferDataActionToResume;
-	};
+    };
 
-	public delegate void MemoryRegionsRead(IEnumerable<TaggedMemoryImage> regionsRead);
+    public delegate void MemoryRegionsRead(IEnumerable<TaggedMemoryImage> regionsRead);
 
-	public interface ITrackedMemoryRegionsOperation
-	{
-		event MemoryRegionsRead RegionsRead;
+    public interface ITrackedMemoryRegionsOperation
+    {
+        event MemoryRegionsRead RegionsRead;
 
-		void AddMemoryRegion(uint startAddress, uint numBytes, object userTag);
-		void RemoveMemoryRegion(object userTag);
-		void RemoveAllMemoryRegions();
+        void AddMemoryRegion(uint startAddress, uint numBytes, object userTag);
+        void RemoveMemoryRegion(object userTag);
+        void RemoveAllMemoryRegions();
 
-		float MaxReadsPerSecond { get; set; }
-		byte MaxVariableReadsPerTick { get; set; }
-		byte MaxNumBytesPerRead { get; set; }
-	}
+        float MaxReadsPerSecond { get; set; }
+        byte MaxVariableReadsPerTick { get; set; }
+        byte MaxNumBytesPerRead { get; set; }
+    }
 
-	public class SynchronizeRAMRegionsOperation : KWP2000Operation, ITrackedMemoryRegionsOperation
-	{
+    public class SynchronizeRAMRegionsOperation : KWP2000Operation, ITrackedMemoryRegionsOperation
+    {
         private class SynchronizedMemoryRegion : TaggedMemoryImage
         {
             public uint ReferenceCount
@@ -2108,43 +2108,43 @@ namespace Communication
             }
 
             public SynchronizedMemoryRegion(uint numBytes, uint startAddress, object userTag)
-				: base(numBytes, startAddress, userTag)
+                : base(numBytes, startAddress, userTag)
             {
                 ReferenceCount = 1;
             }
         }
 
-		public SynchronizeRAMRegionsOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, bool readRegionsInBlocks)
-			: base(commInterface)
-		{
+        public SynchronizeRAMRegionsOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, bool readRegionsInBlocks)
+            : base(commInterface)
+        {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
-			mRegionsPendingRead = new List<SynchronizedMemoryRegion>();
-			mNewlyReadRegions = new List<SynchronizedMemoryRegion>();
+            mRegionsPendingRead = new List<SynchronizedMemoryRegion>();
+            mNewlyReadRegions = new List<SynchronizedMemoryRegion>();
 
             mReadRegionsInBlocks = readRegionsInBlocks;
-			mMode = SynchronizationMode.READ;
+            mMode = SynchronizationMode.READ;
 
             mLastReadMemoryImage = null;
 
-			mReadAction = new ReadMemoryAction(commInterface, 0, 0, DEFAULT_MAX_BLOCK_SIZE, null);
+            mReadAction = new ReadMemoryAction(commInterface, 0, 0, DEFAULT_MAX_BLOCK_SIZE, null);
 
-			mLastReadStartTime = DateTime.Now;
-			MaxReadsPerSecond = 20;
+            mLastReadStartTime = DateTime.Now;
+            MaxReadsPerSecond = 20;
 
-			//254 byte fixed size at timing limits and 128400 baud caused the engine to lock up at 4000rpm
-			//128 byte region size at timing limtis and 128400 baud caused the engine to lock up at 4000rpm
-			//64 byte region size at timing limtis and 128400 baud causes no lock ups
-			//engine resets at high rpm appear to be caused by transmitting a large amount of data at a high baud rate
-			MaxNumBytesPerRead = 64;
-		}
+            //254 byte fixed size at timing limits and 128400 baud caused the engine to lock up at 4000rpm
+            //128 byte region size at timing limtis and 128400 baud caused the engine to lock up at 4000rpm
+            //64 byte region size at timing limtis and 128400 baud causes no lock ups
+            //engine resets at high rpm appear to be caused by transmitting a large amount of data at a high baud rate
+            MaxNumBytesPerRead = 64;
+        }
 
-		public float MaxReadsPerSecond { get; set; }
-		public byte MaxVariableReadsPerTick { get; set; }//not used
-		public byte MaxNumBytesPerRead { get; set; }
+        public float MaxReadsPerSecond { get; set; }
+        public byte MaxVariableReadsPerTick { get; set; }//not used
+        public byte MaxNumBytesPerRead { get; set; }
 
-		public event MemoryRegionsRead RegionsRead;
+        public event MemoryRegionsRead RegionsRead;
 
         public void AddMemoryRegion(uint startAddress, uint numBytes, object userTag)
         {
@@ -2156,7 +2156,7 @@ namespace Communication
             }
             else
             {
-				mSynchronizedRegions.Add(new SynchronizedMemoryRegion(numBytes, startAddress, userTag));
+                mSynchronizedRegions.Add(new SynchronizedMemoryRegion(numBytes, startAddress, userTag));
                 mRegionIterator = null;
                 mAreRegionsSorted = false;
             }
@@ -2198,19 +2198,19 @@ namespace Communication
             if (!mAreRegionsSorted)
             {
                 mSynchronizedRegions.Sort(delegate(SynchronizedMemoryRegion x, SynchronizedMemoryRegion y)
-				{
-					if (x.StartAddress < y.StartAddress)
-					{
-						return -1;
-					}
+                {
+                    if (x.StartAddress < y.StartAddress)
+                    {
+                        return -1;
+                    }
 
-					if (x.StartAddress > y.StartAddress)
-					{
-						return 1;
-					}
+                    if (x.StartAddress > y.StartAddress)
+                    {
+                        return 1;
+                    }
 
-					return 0;
-				});
+                    return 0;
+                });
 
                 mRegionIterator = mSynchronizedRegions.GetEnumerator();
 
@@ -2222,22 +2222,22 @@ namespace Communication
         private IEnumerator<SynchronizedMemoryRegion> mRegionIterator;
         private bool mAreRegionsSorted = false;
 
-		protected override void ResetOperation()
-		{
+        protected override void ResetOperation()
+        {
             mMode = SynchronizationMode.READ;
 
             mRegionIterator = mSynchronizedRegions.GetEnumerator();
             mCurrentRegion = null;
 
             base.ResetOperation();
-		}
+        }
 
-		protected override CommunicationAction NextAction()
-		{
-			var currentTime = DateTime.Now;
+        protected override CommunicationAction NextAction()
+        {
+            var currentTime = DateTime.Now;
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("NextAction started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
+            CommInterface.DisplayStatusMessage("NextAction started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             var nextAction = base.NextAction();
 
@@ -2245,24 +2245,24 @@ namespace Communication
             {
                 if (mMode == SynchronizationMode.READ)
                 {
-					{
-						var minTimeBetweenReads = TimeSpan.FromMilliseconds(1000.0f / MaxReadsPerSecond);
-						var nextReadTime = mLastReadStartTime + minTimeBetweenReads;
-						var timeUntilNextRead = nextReadTime - currentTime;
+                    {
+                        var minTimeBetweenReads = TimeSpan.FromMilliseconds(1000.0f / MaxReadsPerSecond);
+                        var nextReadTime = mLastReadStartTime + minTimeBetweenReads;
+                        var timeUntilNextRead = nextReadTime - currentTime;
 
-						if (timeUntilNextRead.TotalMilliseconds > 0)
-						{
-							Thread.Sleep(timeUntilNextRead);
-							while (DateTime.Now < nextReadTime) ;
-						}
+                        if (timeUntilNextRead.TotalMilliseconds > 0)
+                        {
+                            Thread.Sleep(timeUntilNextRead);
+                            while (DateTime.Now < nextReadTime) ;
+                        }
 
-						mLastReadStartTime = nextReadTime;
-					}
+                        mLastReadStartTime = nextReadTime;
+                    }
 
                     //clear the previous pending regions
                     mRegionsPendingRead.Clear();
 
-					uint numBytesToRead = MaxNumBytesPerRead;
+                    uint numBytesToRead = MaxNumBytesPerRead;
                     uint addressToRead = 0;
 
                     if (mCurrentRegion == null)
@@ -2308,17 +2308,17 @@ namespace Communication
             }
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("NextAction finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
+            CommInterface.DisplayStatusMessage("NextAction finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
-			return nextAction;
-		}
+            return nextAction;
+        }
 
         protected override void OnActionStarted(CommunicationAction action)
-		{
+        {
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionStarted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
+            CommInterface.DisplayStatusMessage("OnActionStarted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
-			base.OnActionStarted(action);
+            base.OnActionStarted(action);
 
             //ignore actions not started by this code
             if (action == mMyLastStartedAction)
@@ -2326,18 +2326,18 @@ namespace Communication
                 //done after the ActionCompletedHandler so the next message is sent before we process all the region updates.
                 if ((mNewlyReadRegions.Count > 0) && (mLastReadMemoryImage != null))
                 {
-					var regionsReadCopy = RegionsRead;
+                    var regionsReadCopy = RegionsRead;
 
-					if (regionsReadCopy != null)
-					{
-						//update newly read regions
-						foreach (var curRegion in mNewlyReadRegions)
-						{
-							Buffer.BlockCopy(mLastReadMemoryImage.RawData, (int)(curRegion.StartAddress - mLastReadMemoryImage.StartAddress), curRegion.RawData, 0, (int)curRegion.Size);
-						}
+                    if (regionsReadCopy != null)
+                    {
+                        //update newly read regions
+                        foreach (var curRegion in mNewlyReadRegions)
+                        {
+                            Buffer.BlockCopy(mLastReadMemoryImage.RawData, (int)(curRegion.StartAddress - mLastReadMemoryImage.StartAddress), curRegion.RawData, 0, (int)curRegion.Size);
+                        }
 
-						regionsReadCopy(mNewlyReadRegions.Cast<TaggedMemoryImage>());
-					}
+                        regionsReadCopy(mNewlyReadRegions.Cast<TaggedMemoryImage>());
+                    }
 
                     mNewlyReadRegions.Clear();
                     mLastReadMemoryImage = null;
@@ -2345,14 +2345,14 @@ namespace Communication
             }
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionStarted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
+            CommInterface.DisplayStatusMessage("OnActionStarted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
-		}
+        }
 
-		protected override void OnActionCompleted(CommunicationAction action, bool success)
-		{
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionCompleted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
+            CommInterface.DisplayStatusMessage("OnActionCompleted started at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
             //ignore actions not started by this code
             if (action == mMyLastStartedAction)
@@ -2400,15 +2400,15 @@ namespace Communication
 
             mMyLastStartedAction = null;
 
-			base.OnActionCompleted(action, success);
+            base.OnActionCompleted(action, success);
 
 #if LOG_PERFORMANCE
-			CommInterface.DisplayStatusMessage("OnActionCompleted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
+            CommInterface.DisplayStatusMessage("OnActionCompleted finished at " + DateTime.Now.ToString("hh:mm:ss.fff"), StatusMessageType.DEV);
 #endif
-		}
+        }
 
-		private bool MoveToNextRegion()
-		{
+        private bool MoveToNextRegion()
+        {
             SortRegions();
 
             mCurrentRegion = null;
@@ -2427,44 +2427,44 @@ namespace Communication
                 }
             }
 
-			return (mCurrentRegion != null);
-		}
+            return (mCurrentRegion != null);
+        }
 
-		private SynchronizedMemoryRegion mCurrentRegion;
-		private List<SynchronizedMemoryRegion> mRegionsPendingRead;
-		private List<SynchronizedMemoryRegion> mNewlyReadRegions;
+        private SynchronizedMemoryRegion mCurrentRegion;
+        private List<SynchronizedMemoryRegion> mRegionsPendingRead;
+        private List<SynchronizedMemoryRegion> mNewlyReadRegions;
 
-		private ReadMemoryAction mReadAction;
-		private SynchronizationMode mMode;
+        private ReadMemoryAction mReadAction;
+        private SynchronizationMode mMode;
         private bool mReadRegionsInBlocks;
 
-		private MemoryImage mLastReadMemoryImage;
-		private DateTime mLastReadStartTime;
+        private MemoryImage mLastReadMemoryImage;
+        private DateTime mLastReadStartTime;
 
         private CommunicationAction mMyLastStartedAction;
 
 //TODO: we can support writing of regions as long as we write them individually and not as blocks
-		private enum SynchronizationMode
-		{
-			READ,
-			FINISHED
-		};
-	};
+        private enum SynchronizationMode
+        {
+            READ,
+            FINISHED
+        };
+    };
 
     public class ReadAllECUIdentificationOptionsOperation : KWP2000Operation
-	{
-		public ReadAllECUIdentificationOptionsOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, KWP2000DiagnosticSessionType sessionType)
-			: base(commInterface)
-		{
-			mCurrentIdentOptionIndex = 0;
+    {
+        public ReadAllECUIdentificationOptionsOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, KWP2000DiagnosticSessionType sessionType)
+            : base(commInterface)
+        {
+            mCurrentIdentOptionIndex = 0;
 
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
-			if (sessionType != KWP2000DiagnosticSessionType.InternalUndefined)
-			{
-				EnableAutoStartDiagnosticSession(sessionType, baudRates);
-			}
-		}
+            if (sessionType != KWP2000DiagnosticSessionType.InternalUndefined)
+            {
+                EnableAutoStartDiagnosticSession(sessionType, baudRates);
+            }
+        }
 
         public KWP2000IdentificationInfo ECUInfo
         {
@@ -2480,17 +2480,17 @@ namespace Communication
         }
         private KWP2000IdentificationInfo _ECUInfo;
 
-		protected override void ResetOperation()
-		{
+        protected override void ResetOperation()
+        {
             mState = State.ReadScalingTable;
 
-			ECUInfo.Clear();
+            ECUInfo.Clear();
 
             base.ResetOperation();
-		}
+        }
 
-		protected override CommunicationAction NextAction()
-		{
+        protected override CommunicationAction NextAction()
+        {
             var nextAction = base.NextAction();
 
             if (nextAction == null)
@@ -2504,7 +2504,7 @@ namespace Communication
                     }
                     case State.ReadIdentificationOptions:
                     {
-						nextAction = new ReadECUIdentificationAction(KWP2000CommInterface, mIdentOptionsInScalingTable[mCurrentIdentOptionIndex]);
+                        nextAction = new ReadECUIdentificationAction(KWP2000CommInterface, mIdentOptionsInScalingTable[mCurrentIdentOptionIndex]);
                         break;
                     }
                 }
@@ -2512,11 +2512,11 @@ namespace Communication
                 mMyLastStartedAction = nextAction;
             }
 
-			return nextAction;
-		}
+            return nextAction;
+        }
 
         protected override void OnActionCompleted(CommunicationAction action, bool success)
-		{
+        {
             //ignore actions not started by this code
             if (action == mMyLastStartedAction)
             {
@@ -2524,11 +2524,11 @@ namespace Communication
                 {
                     if (action is ReadECUIdentificationAction)
                     {
-						var identAction = action as ReadECUIdentificationAction;
+                        var identAction = action as ReadECUIdentificationAction;
 
                         if (mState == State.ReadScalingTable)
                         {
-							ECUInfo.ScalingTable.ScalingTableData = identAction.IdentificationData;
+                            ECUInfo.ScalingTable.ScalingTableData = identAction.IdentificationData;
 
                             mCurrentIdentOptionIndex = 0;
 
@@ -2564,25 +2564,25 @@ namespace Communication
 
             mMyLastStartedAction = null;
 
-			base.OnActionCompleted(action, success);
-		}
+            base.OnActionCompleted(action, success);
+        }
 
-		private enum State
-		{
-			ReadScalingTable,
-			ReadIdentificationOptions,
-			Finished
-		}
+        private enum State
+        {
+            ReadScalingTable,
+            ReadIdentificationOptions,
+            Finished
+        }
 
         private CommunicationAction mMyLastStartedAction;
-		private State mState;
-		private int mCurrentIdentOptionIndex;
-		private byte[] mIdentOptionsInScalingTable;
-	};
+        private State mState;
+        private int mCurrentIdentOptionIndex;
+        private byte[] mIdentOptionsInScalingTable;
+    };
 
     public class ReadDiagnosticTroubleCodesOperation : KWP2000SequencialOperation
     {
-		public ReadDiagnosticTroubleCodesOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
+        public ReadDiagnosticTroubleCodesOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
             : base(commInterface)
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.StandardSession, baudRates);
@@ -2609,7 +2609,7 @@ namespace Communication
 
     public class ClearDiagnosticInformationOperation : KWP2000SequencialOperation
     {
-		public ClearDiagnosticInformationOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
+        public ClearDiagnosticInformationOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
             : base(commInterface)
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.StandardSession, baudRates);
@@ -2622,17 +2622,17 @@ namespace Communication
 
     public class DoesFlashChecksumMatchOperation : KWP2000SequencialOperation
     {
-		public class DoesFlashChecksumMatchSettings
-		{
-			public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
-		}
+        public class DoesFlashChecksumMatchSettings
+        {
+            public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
+        }
 
-		public DoesFlashChecksumMatchOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, DoesFlashChecksumMatchSettings checkSettings, uint startAddress, byte[] data)
+        public DoesFlashChecksumMatchOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, DoesFlashChecksumMatchSettings checkSettings, uint startAddress, byte[] data)
             : base(commInterface)
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-			EnableAutoNegotiateSecurity(checkSettings.SecuritySettings);
+            EnableAutoNegotiateSecurity(checkSettings.SecuritySettings);
 
             mValidateAction = new ValidateFlashChecksumAction(commInterface, startAddress, data);
 
@@ -2677,7 +2677,7 @@ namespace Communication
 
     public class ReadAllLocalIdentifiersOperation : KWP2000Operation
     {
-		public ReadAllLocalIdentifiersOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
+        public ReadAllLocalIdentifiersOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
             : base(commInterface)
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.StandardSession, baudRates);
@@ -2729,7 +2729,7 @@ namespace Communication
 
     public class ReadAllCommonIdentifiersOperation : KWP2000Operation
     {
-		public ReadAllCommonIdentifiersOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
+        public ReadAllCommonIdentifiersOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
             : base(commInterface)
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.StandardSession, baudRates);
@@ -2777,588 +2777,590 @@ namespace Communication
         private CommunicationAction mMyLastStartedAction;
     }
 
-	public class RelocateMessageHandlingTableOperation : KWP2000Operation
-	{
-		public RelocateMessageHandlingTableOperation(KWP2000Interface commInterface, List<uint> baudRates)
-			: base(commInterface)
-		{
-			EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
-
-			mRedirectFunctionData = Communication.Properties.Resources.KWP2000RedirectionFunction;
-
-			ShouldRelocateMessageHandlingTable = true;
-		}
-
-		protected bool ShouldRelocateMessageHandlingTable
-		{
-			get
-			{
-				return _ShouldRelocateMessageHandlingTable;
-			}
-			set
-			{
-				if (_ShouldRelocateMessageHandlingTable != value)
-				{
-					_ShouldRelocateMessageHandlingTable = value;
-
-					if (_ShouldRelocateMessageHandlingTable)
-					{
-						mRelocateState = (RelocateState)(Enum.GetValues(typeof(RelocateState)).GetValue(0));
-					}
-					else
-					{
-						mRelocateState = RelocateState.Finished;
-					}
-				}
-			}
-		}
-		private bool _ShouldRelocateMessageHandlingTable;
-
-		protected override CommunicationAction NextAction()
-		{
-			var nextAction = base.NextAction();
-
-			if (nextAction == null)
-			{
-				switch (mRelocateState)
-				{
-					case RelocateState.LocateHandlerIndexAndFunctionTablePointers:
-					{
-						CommInterface.DisplayStatusMessage("Locating important KWP2000 addresses in the ECU.", StatusMessageType.USER);
-
-						//read 4 bytes at 0xE1B0
-						nextAction = new ReadMemoryAction(KWP2000CommInterface, 0xE1B0, 4, DEFAULT_MAX_BLOCK_SIZE, null);
-						break;
-					}
-					case RelocateState.ReadHandlerIndexAndFunctionTablePointers:
-					{
-						CommInterface.DisplayStatusMessage("Reading current KWP2000 message handling configuration in the ECU.", StatusMessageType.USER);
-
-						//Read 8 bytes at 0xE228
-						nextAction = new ReadMemoryAction(KWP2000CommInterface, mIndexAndFunctionTablePointerAddress, 8, DEFAULT_MAX_BLOCK_SIZE, null);
-						break;
-					}
-					case RelocateState.ReadCurrentEnabledServiceIDsTable:
-					{
-						CommInterface.DisplayStatusMessage("Reading current KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
-
-						//Read 16 bytes at 0xE210
-						nextAction = new ReadMemoryAction(KWP2000CommInterface, mEnabledServiceIDsTableAddress, 16, DEFAULT_MAX_BLOCK_SIZE, null);
-						break;
-					}
-					case RelocateState.LocateEmptyRAM:
-					{
-						CommInterface.DisplayStatusMessage("Locating empty RAM in the ECU for new KWP2000 configuration.", StatusMessageType.USER);
-
-						mEmptyRAMStartAddress = 0;
-						mEmptyRAMNumBytes = 0;
-
-						mRequiredSizeForRelocatedFunctionData = (uint)GetRelocatedData(0).Length;//determine how much empty space we need by asking to get the relocated data based at address zero
-						mRequiredSizeForRelocatedFunctionData += 1;//add one incase empty ram starts at an odd address and we need to offset by one to start
-
-						//Read 0x8000 bytes at 0x380000
-						nextAction = new ReadMemoryAction(KWP2000CommInterface, 0x380000, 0x8000, DEFAULT_MAX_BLOCK_SIZE, this.LookingForEmptyRAMCallback);
-						break;
-					}
-					case RelocateState.WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM:
-					{
-						CommInterface.DisplayStatusMessage("Writing new KWP2000 message handling configuration to empty RAM.", StatusMessageType.USER);
-
-						uint targetAddress = mEmptyRAMStartAddress + (mEmptyRAMStartAddress % 2);//make sure the address is even
-						var relocatedData = GetRelocatedData(targetAddress);
-
-						if (relocatedData.Length <= (mEmptyRAMNumBytes - (targetAddress - mEmptyRAMStartAddress)))
-						{
-							CommInterface.DisplayStatusMessage("Writing new KWP2000 message handling configuration to address 0x" + mNewFunctionTableAddress.ToString("X") + " with size 0x" + relocatedData.Length.ToString("X"), StatusMessageType.DEV_USER);
-
-							nextAction = new WriteMemoryAction(KWP2000CommInterface, targetAddress, DEFAULT_MAX_BLOCK_SIZE, relocatedData, null);
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to write new KWP2000 message handling configuration because there is not enough empty RAM.", StatusMessageType.USER);
-							OperationCompleted(false);
-						}
-						break;
-					}
-					case RelocateState.WriteNewEnabledServiceIDsTable:
-					{
-						CommInterface.DisplayStatusMessage("Writing new KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
-
-						nextAction = new WriteMemoryAction(KWP2000CommInterface, mEnabledServiceIDsTableAddress, DEFAULT_MAX_BLOCK_SIZE, mEnabledServiceIDs, null);
-						break;
-					}
-					case RelocateState.ChangeHandlerIndexAndFunctionTablePointers:
-					{
-						CommInterface.DisplayStatusMessage("Changing KWP2000 addresses in the ECU to use new message handling configuration.", StatusMessageType.USER);
-
-						//Write 8 bytes at 0xE228
-						var newPointerData = new byte[8];
-
-						var newFunctionTablePointerAddress = (UInt16)(mNewFunctionTableAddress & 0x3FFF);
-						var newFunctionTablePointerPage = (UInt16)((mNewFunctionTableAddress >> 14) & 0x3FF);
-						var newIndexTablePointerAddress = (UInt16)(mNewIndexTableAddress & 0x3FFF);
-						var newIndexTablePointerPage = (UInt16)((mNewIndexTableAddress >> 14) & 0x3FF);
-
-						BitConverter.GetBytes(newFunctionTablePointerAddress).CopyTo(newPointerData, 0);
-						BitConverter.GetBytes(newFunctionTablePointerPage).CopyTo(newPointerData, 2);
-						BitConverter.GetBytes(newIndexTablePointerAddress).CopyTo(newPointerData, 4);
-						BitConverter.GetBytes(newIndexTablePointerPage).CopyTo(newPointerData, 6);
-
-						nextAction = new WriteMemoryAction(KWP2000CommInterface, mIndexAndFunctionTablePointerAddress, DEFAULT_MAX_BLOCK_SIZE, newPointerData, null);
-						break;
-					}
-				}
-
-				mMyLastStartedAction = nextAction;
-			}
-
-			return nextAction;
-		}
-
-		private byte[] GetRelocatedData(uint targetAddress)
-		{
-			Debug.Assert(targetAddress % 2 == 0);//this function assumes an even start address
-
-			//Write 128 bytes for index table
-			var tempIndexTable = new byte[128];
-			for (int x = 0; x < tempIndexTable.Length; x++)
-			{
-				tempIndexTable[x] = 0;//point all entries to the zero index for the redirect function
-			}
-
-			var relocatedServiceIDs = GetRelocatedServiceIDs();
-			byte numRelocatedFunctions = 0;
-
-			if (relocatedServiceIDs != null)
-			{
-				numRelocatedFunctions = (byte)relocatedServiceIDs.Count;
-
-				byte functionIndex = 1;
-
-				foreach (var serviceID in relocatedServiceIDs)
-				{
-					var indexTableEntry = ((serviceID & 0x80) >> 1) | (serviceID & 0x3F);
-
-					tempIndexTable[indexTableEntry] = functionIndex;
-
-					mEnabledServiceIDs[(indexTableEntry >> 3) & 0x1F] |= (byte)(0x01 << (indexTableEntry & 0x7));
-
-					functionIndex++;
-				}
-			}
-
-			//Write 4 x N bytes at empty RAM location
-			mNewFunctionTableMaxEntries = (byte)(numRelocatedFunctions + 1);
-			mNewFunctionTableNumEntries = mNewFunctionTableMaxEntries;
-			var newFunctionTableData = new byte[mNewFunctionTableMaxEntries * 4];
-
-			mNewIndexTableAddress = targetAddress;
-			mNewIndexTableAddress += 4;//add two for the marker word, and add two for the size of the injected code
-
-			mNewFunctionTableAddress = mNewIndexTableAddress + 2 + (uint)tempIndexTable.Length;//plus two for num entries byte and max entries byte
-			mNewFunctionTableAddress += (mNewFunctionTableAddress % 2);//make sure address is even
-
-			uint redirectFunctionAddress = mNewFunctionTableAddress + (uint)newFunctionTableData.Length;
-			redirectFunctionAddress += (redirectFunctionAddress % 2);//make sure address is even
-
-			//make all entries point at the redirect function by default
-			{
-				var functionPointerBytes = BitConverter.GetBytes(redirectFunctionAddress);
-				Debug.Assert(functionPointerBytes.Length == 4);
-
-				for (int x = 0; x < mNewFunctionTableMaxEntries; x++)
-				{
-					functionPointerBytes.CopyTo(newFunctionTableData, x * 4);
-				}
-			}
-
-			//create the redirect function data
-			var patchedRedirectFunctionData = new byte[mRedirectFunctionData.Length];
-			mRedirectFunctionData.CopyTo(patchedRedirectFunctionData, 0);
-			{
-				var originalFunctionTablePointerAddress = (UInt16)(mOriginalFunctionTableAddress & 0x3FFF);
-				var originalFunctionTablePointerPage = (UInt16)((mOriginalFunctionTableAddress >> 14) & 0x03FF);
-				var originalIndexTablePointerAddress = (UInt16)(mOriginalIndexTableAddress & 0x3FFF);
-				var originalIndexTablePointerPage = (UInt16)((mOriginalIndexTableAddress >> 14) & 0x03FF);
-
-				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x06) == 0xDEAD);
-				BitConverter.GetBytes(mCurrentServiceIDAddress).CopyTo(patchedRedirectFunctionData, 0x06);
-
-				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x12) == 0x03EF);
-				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x16) == 0xDEAD);
-				BitConverter.GetBytes(originalIndexTablePointerPage).CopyTo(patchedRedirectFunctionData, 0x12);
-				BitConverter.GetBytes(originalIndexTablePointerAddress).CopyTo(patchedRedirectFunctionData, 0x16);
-
-				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x22) == 0x03EF);
-				Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x1E) == 0xDEAD);
-				BitConverter.GetBytes(originalFunctionTablePointerPage).CopyTo(patchedRedirectFunctionData, 0x22);
-				BitConverter.GetBytes(originalFunctionTablePointerAddress).CopyTo(patchedRedirectFunctionData, 0x1E);
-			}
-
-			uint relocatedFunctionStartAddress = redirectFunctionAddress + (uint)patchedRedirectFunctionData.Length;
-			relocatedFunctionStartAddress += (relocatedFunctionStartAddress % 2);//make sure address is even
-			uint nextRelocatedFunctionAddress = relocatedFunctionStartAddress;
-
-			byte[] relocatedFunctionData = null;
-
-			if (relocatedServiceIDs != null)
-			{
-				//function index 0 is the redirect function
-				int functionIndex = 1;
-
-				foreach (var serviceID in relocatedServiceIDs)
-				{
-					uint offsetToFunction = 0;
-					var functionData = GetRelocatedFunctionData(serviceID, nextRelocatedFunctionAddress, out offsetToFunction);
-
-					if (functionData != null)
-					{
-						var functionPointerBytes = BitConverter.GetBytes(nextRelocatedFunctionAddress + offsetToFunction);
-						Debug.Assert(functionPointerBytes.Length == 4);
-						functionPointerBytes.CopyTo(newFunctionTableData, functionIndex * 4);
-
-						if (relocatedFunctionData == null)
-						{
-							relocatedFunctionData = new byte[functionData.Length];
-							functionData.CopyTo(relocatedFunctionData, 0);
-						}
-						else
-						{
-							var newRelocatedFunctionData = new byte[relocatedFunctionData.Length + functionData.Length];
-							relocatedFunctionData.CopyTo(newRelocatedFunctionData, 0);
-							functionData.CopyTo(newRelocatedFunctionData, relocatedFunctionData.Length);
-							relocatedFunctionData = newRelocatedFunctionData;
-						}
-
-						nextRelocatedFunctionAddress += (uint)functionData.Length;
-						nextRelocatedFunctionAddress += (nextRelocatedFunctionAddress % 2);//make sure address is even
-						functionIndex++;
-					}
-				}
-			}
-
-			var writeMessageAddress = mNewIndexTableAddress - 4;//minus two to include the start marker, and minus two to include the injected code size
-			var messageData = new byte[nextRelocatedFunctionAddress - writeMessageAddress + 2];//plus two for the end marker
-
-			uint curDataIndex = 0;
-
-			//write the start marker 0xDEAD
-			BitConverter.GetBytes((UInt16)0xDEAD).CopyTo(messageData, curDataIndex);
-			curDataIndex += 2;
-
-			var relocatedCodeSize = (UInt16)(messageData.Length - 6);//minus 6 to skip the start and end marker and the code size
-			BitConverter.GetBytes(relocatedCodeSize).CopyTo(messageData, curDataIndex);
-			curDataIndex += 2;
-
-			tempIndexTable.CopyTo(messageData, curDataIndex);
-			curDataIndex += (uint)tempIndexTable.Length;
-
-			//write the function table max num entries
-			messageData[curDataIndex] = mNewFunctionTableMaxEntries;
-			curDataIndex++;
-
-			//write the function table current num entries
-			messageData[curDataIndex] = mNewFunctionTableNumEntries;
-
-			curDataIndex = mNewFunctionTableAddress - writeMessageAddress;
-			newFunctionTableData.CopyTo(messageData, curDataIndex);
-
-			curDataIndex = redirectFunctionAddress - writeMessageAddress;
-			patchedRedirectFunctionData.CopyTo(messageData, curDataIndex);
-
-			if (relocatedFunctionData != null)
-			{
-				curDataIndex = relocatedFunctionStartAddress - writeMessageAddress;
-				relocatedFunctionData.CopyTo(messageData, curDataIndex);
-			}
-
-			//write the end marker 0xBEEF
-			BitConverter.GetBytes((UInt16)0xBEEF).CopyTo(messageData, messageData.Length - 2);
-
-			return messageData;
-		}
-
-		private bool LookingForEmptyRAMCallback(uint numRead, uint totalRead, uint totalToRead, ReadMemoryAction runningAction)
-		{
-			//TODO: don't search the entire range every time, just continue from where we left off....
-
-			for (uint x = 0; x < totalRead; x++)
-			{
-				uint y = x;
-
-				for (; y < totalRead; y++)
-				{
-					if (runningAction.ReadData[y] != 0)
-					{
-						bool foundRelocatedCode = false;
-
-						if (y < totalRead - 1)
-						{
-							if ((BitConverter.ToUInt16(runningAction.ReadData, (int)y) == 0xDEAD) && (y < totalRead - 3))
-							{
-								var relocatedCodeSize = BitConverter.ToUInt16(runningAction.ReadData, (int)y + 2);
-								var endMarkerAddress = relocatedCodeSize + y + 4;
-
-								if (endMarkerAddress < totalRead - 1)
-								{
-									if (BitConverter.ToUInt16(runningAction.ReadData, (int)endMarkerAddress) == 0xBEEF)
-									{
-										y = endMarkerAddress + 1;
-										foundRelocatedCode = true;
-									}
-								}
-							}
-						}
-
-						if (!foundRelocatedCode)
-						{
-							break;
-						}
-					}
-				}
-
-				var numEmptyBytes = y - x;
-
-				if ((numEmptyBytes > 0) && (numEmptyBytes > mEmptyRAMNumBytes))
-				{
-					mEmptyRAMNumBytes = numEmptyBytes;
-					mEmptyRAMStartAddress = runningAction.mStartAddress + x;
-				}
-
-				x = y;
-			}
-
-			//return true until we have found enough empty RAM to keep the read action from stopping early
-			return (mEmptyRAMNumBytes < mRequiredSizeForRelocatedFunctionData);
-		}
-
-		protected override void OnActionCompleted(CommunicationAction action, bool success)
-		{
-			if (action == mMyLastStartedAction)
-			{
-				switch (mRelocateState)
-				{
-					case RelocateState.LocateHandlerIndexAndFunctionTablePointers:
-					{
-						//setzi62's notes:
-						//The message handler table pointer is stored at a fixed address, which only depends on the bootrom version, for 05.XX it is at 0xE228, for 06.xx it is at 0xE226.
-						//At 0xE1B2 is the pointer to the header decoding function for bootrom 05.xx And at 0xE1B0 is the pointer for bootrom version 06.xx
-						//The header decoding function is included in the bootrom and has a fixed address for all ecus with the same bootrom version.
-						//By reading at 0xE1B0 and 0xE1B2 I can determine the used bootrom version of the ecu.
-
-						success &= (action is ReadMemoryAction);
-
-						if (success)
-						{
-							var readAction = action as ReadMemoryAction;
-
-							//does address 0xE1B2 contain the function pointer of the KWP2000 header decoder function?
-							if (BitConverter.ToUInt16(readAction.ReadData, 2) == 0x2B86)
-							{
-								//bootrom 05.xx
-
-								mCommunicationFlagsAddress = 0xE074;
-								mCurrentMessageNumDataBytesAddress = 0xE1CA;
-								mCurrentMessageFirstDataByteAddress = 0xE1CE;
-								mCurrentServiceIDAddress = 0xE1D0;
-								mEnabledServiceIDsTableAddress = 0xE210;
-								mIndexAndFunctionTablePointerAddress = 0xE228;
-							}
-							//does address 0xE1B0 contain the function pointer of the KWP2000 header decoder function?
-							else if((BitConverter.ToUInt16(readAction.ReadData, 0) == 0x0260) || (BitConverter.ToUInt16(readAction.ReadData, 0) == 0x3D62))
-							{
-								//bootrom 06.xx
-
-								mCommunicationFlagsAddress = 0xE074;
-								mCurrentMessageNumDataBytesAddress = 0xE1C8;
-								mCurrentMessageFirstDataByteAddress = 0xE1CC;
-								mCurrentServiceIDAddress = 0xE1CE;
-								mEnabledServiceIDsTableAddress = 0xE20E;
-								mIndexAndFunctionTablePointerAddress = 0xE226;
-							}
-							else
-							{
-								CommInterface.DisplayStatusMessage("Unable to determine ME7 boot rom version from KWP2000 address data: 0x" + BitConverter.ToUInt32(readAction.ReadData, 0).ToString("X"), StatusMessageType.USER);
-								success = false;
-							}
-
-							mRelocateState = RelocateState.ReadHandlerIndexAndFunctionTablePointers;
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to locate important KWP2000 addresses in the ECU.", StatusMessageType.USER);
-						}
-
-						break;
-					}
-					case RelocateState.ReadHandlerIndexAndFunctionTablePointers:
-					{
-						success &= (action is ReadMemoryAction);
-
-						if (success)
-						{
-							var readAction = action as ReadMemoryAction;
-
-							var functionTableAddress = BitConverter.ToUInt16(readAction.ReadData, 0);
-							var functionTablePage = BitConverter.ToUInt16(readAction.ReadData, 2);
-							mOriginalFunctionTableAddress = (uint)(functionTablePage << 14) | functionTableAddress;
-							Debug.Assert(mOriginalFunctionTableAddress == 0x81A762);
-
-							var indexTableAddress = BitConverter.ToUInt16(readAction.ReadData, 4);
-							var indexTablePage = BitConverter.ToUInt16(readAction.ReadData, 6);
-							mOriginalIndexTableAddress = (uint)(indexTablePage << 14) | indexTableAddress;
-							Debug.Assert(mOriginalIndexTableAddress == 0x81A7FA);
-
-							if ((mOriginalFunctionTableAddress >= 0x380000) && (mOriginalFunctionTableAddress < 0x388000)
-								&& (mOriginalIndexTableAddress >= 0x380000) && (mOriginalIndexTableAddress < 0x388000))
-							{
-								CommInterface.DisplayStatusMessage("Failed to relocate KWP2000 message handling configuration because it is already relocated.", StatusMessageType.USER);
-								OperationCompleted(true);
-							}
-							else
-							{
-								mRelocateState = RelocateState.ReadCurrentEnabledServiceIDsTable;
-							}
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to read current KWP2000 message handling configuration in the ECU.", StatusMessageType.USER);
-						}
-
-						break;
-					}
-					case RelocateState.ReadCurrentEnabledServiceIDsTable:
-					{
-						success &= (action is ReadMemoryAction);
-
-						if (success)
-						{
-							var readAction = action as ReadMemoryAction;
-
-							mEnabledServiceIDs = readAction.ReadData;
-
-							mRelocateState = RelocateState.LocateEmptyRAM;
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to read current KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
-						}
-
-						break;
-					}
-					case RelocateState.LocateEmptyRAM:
-					{
-						success &= (action is ReadMemoryAction);
-
-						if (success)
-						{
-							CommInterface.DisplayStatusMessage("Located " + mEmptyRAMNumBytes + " bytes of empty RAM at 0x" + mEmptyRAMStartAddress.ToString("X"), StatusMessageType.DEV_USER);
-
-							mRelocateState = RelocateState.WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM;
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to locate empty RAM in the ECU for new KWP2000 configuration.", StatusMessageType.USER);
-						}
-
-						break;
-					}
-					case RelocateState.WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM:
-					{
-						if (success)
-						{
-							mRelocateState = RelocateState.WriteNewEnabledServiceIDsTable;
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to write new KWP2000 message handling configuration to empty RAM.", StatusMessageType.USER);
-						}
-
-						break;
-					}
-					case RelocateState.WriteNewEnabledServiceIDsTable:
-					{
-						if (success)
-						{
-							mRelocateState = RelocateState.ChangeHandlerIndexAndFunctionTablePointers;
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to write new KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
-						}
-
-						break;
-					}
-					case RelocateState.ChangeHandlerIndexAndFunctionTablePointers:
-					{
-						if (success)
-						{
-							mRelocateState = RelocateState.Finished;
-						}
-						else
-						{
-							CommInterface.DisplayStatusMessage("Failed to change KWP2000 addresses in the ECU to use new message handling configuration.", StatusMessageType.USER);
-						}
-
-						break;
-					}
-				}
-			}
-
-			mMyLastStartedAction = null;
-
-			base.OnActionCompleted(action, success);
-		}
-
-		private enum RelocateState
-		{
-			LocateHandlerIndexAndFunctionTablePointers,
-			ReadHandlerIndexAndFunctionTablePointers,
-			ReadCurrentEnabledServiceIDsTable,
-			LocateEmptyRAM,
-			WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM,
-			WriteNewEnabledServiceIDsTable,
-			ChangeHandlerIndexAndFunctionTablePointers,
-			Finished
-		}
-
-		protected virtual List<byte> GetRelocatedServiceIDs()
-		{
-			return null;
-		}
-
-		protected virtual byte[] GetRelocatedFunctionData(byte serviceID, uint destinationAddress, out uint offsetToFunction)
-		{
-			offsetToFunction = 0;
-
-			return null;
-		}
-
-		private RelocateState mRelocateState;
-		private CommunicationAction mMyLastStartedAction;
-
-		private uint mEnabledServiceIDsTableAddress;
-		private byte[] mEnabledServiceIDs;
-		private uint mIndexAndFunctionTablePointerAddress;
-
-		private uint mOriginalIndexTableAddress;
-		private uint mOriginalFunctionTableAddress;
-
-		protected UInt16 mCurrentServiceIDAddress;
-		protected UInt16 mCurrentMessageFirstDataByteAddress;
-		protected UInt16 mCurrentMessageNumDataBytesAddress;
-		protected UInt16 mCommunicationFlagsAddress;
-
-		//TODO: could have a list of empty RAM areas
-		private uint mEmptyRAMStartAddress;
-		private uint mEmptyRAMNumBytes;
-		private uint mRequiredSizeForRelocatedFunctionData;
-
-		private uint mNewIndexTableAddress;
-		private uint mNewFunctionTableAddress;
-		private byte mNewFunctionTableNumEntries;
-		private byte mNewFunctionTableMaxEntries;
-
-		private byte[] mRedirectFunctionData;
-	}
+    public class RelocateMessageHandlingTableOperation : KWP2000Operation
+    {
+        public RelocateMessageHandlingTableOperation(KWP2000Interface commInterface, List<uint> baudRates)
+            : base(commInterface)
+        {
+            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
+
+            mRedirectFunctionData = Communication.Properties.Resources.KWP2000RedirectionFunction;
+
+            ShouldRelocateMessageHandlingTable = true;
+        }
+
+        protected bool ShouldRelocateMessageHandlingTable
+        {
+            get
+            {
+                return _ShouldRelocateMessageHandlingTable;
+            }
+            set
+            {
+                if (_ShouldRelocateMessageHandlingTable != value)
+                {
+                    _ShouldRelocateMessageHandlingTable = value;
+
+                    if (_ShouldRelocateMessageHandlingTable)
+                    {
+                        mRelocateState = (RelocateState)(Enum.GetValues(typeof(RelocateState)).GetValue(0));
+                    }
+                    else
+                    {
+                        mRelocateState = RelocateState.Finished;
+                    }
+                }
+            }
+        }
+        private bool _ShouldRelocateMessageHandlingTable;
+
+        protected override CommunicationAction NextAction()
+        {
+            var nextAction = base.NextAction();
+
+            if (nextAction == null)
+            {
+                switch (mRelocateState)
+                {
+                    case RelocateState.LocateHandlerIndexAndFunctionTablePointers:
+                    {
+                        CommInterface.DisplayStatusMessage("Locating important KWP2000 addresses in the ECU.", StatusMessageType.USER);
+
+                        //read 4 bytes at 0xE1B0
+                        nextAction = new ReadMemoryAction(KWP2000CommInterface, 0xE1B0, 4, DEFAULT_MAX_BLOCK_SIZE, null);
+                        break;
+                    }
+                    case RelocateState.ReadHandlerIndexAndFunctionTablePointers:
+                    {
+                        CommInterface.DisplayStatusMessage("Reading current KWP2000 message handling configuration in the ECU.", StatusMessageType.USER);
+
+                        //Read 8 bytes at 0xE228
+                        nextAction = new ReadMemoryAction(KWP2000CommInterface, mIndexAndFunctionTablePointerAddress, 8, DEFAULT_MAX_BLOCK_SIZE, null);
+                        break;
+                    }
+                    case RelocateState.ReadCurrentEnabledServiceIDsTable:
+                    {
+                        CommInterface.DisplayStatusMessage("Reading current KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
+
+                        //Read 16 bytes at 0xE210
+                        nextAction = new ReadMemoryAction(KWP2000CommInterface, mEnabledServiceIDsTableAddress, 16, DEFAULT_MAX_BLOCK_SIZE, null);
+                        break;
+                    }
+                    case RelocateState.LocateEmptyRAM:
+                    {
+                        CommInterface.DisplayStatusMessage("Locating empty RAM in the ECU for new KWP2000 configuration.", StatusMessageType.USER);
+
+                        mEmptyRAMStartAddress = 0;
+                        mEmptyRAMNumBytes = 0;
+
+                        mRequiredSizeForRelocatedFunctionData = (uint)GetRelocatedData(0).Length;//determine how much empty space we need by asking to get the relocated data based at address zero
+                        mRequiredSizeForRelocatedFunctionData += 1;//add one incase empty ram starts at an odd address and we need to offset by one to start
+
+                        //Read 0x8000 bytes at 0x380000
+                        nextAction = new ReadMemoryAction(KWP2000CommInterface, 0x380000, 0x8000, DEFAULT_MAX_BLOCK_SIZE, this.LookingForEmptyRAMCallback);
+                        break;
+                    }
+                    case RelocateState.WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM:
+                    {
+                        CommInterface.DisplayStatusMessage("Writing new KWP2000 message handling configuration to empty RAM.", StatusMessageType.USER);
+
+                        uint targetAddress = mEmptyRAMStartAddress + (mEmptyRAMStartAddress % 2);//make sure the address is even
+                        var relocatedData = GetRelocatedData(targetAddress);
+
+                        if (relocatedData.Length <= (mEmptyRAMNumBytes - (targetAddress - mEmptyRAMStartAddress)))
+                        {
+                            CommInterface.DisplayStatusMessage("Writing new KWP2000 message handling configuration to address 0x" + mNewFunctionTableAddress.ToString("X") + " with size 0x" + relocatedData.Length.ToString("X"), StatusMessageType.DEV_USER);
+
+                            nextAction = new WriteMemoryAction(KWP2000CommInterface, targetAddress, DEFAULT_MAX_BLOCK_SIZE, relocatedData, null);
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to write new KWP2000 message handling configuration because there is not enough empty RAM.", StatusMessageType.USER);
+                            OperationCompleted(false);
+                        }
+                        break;
+                    }
+                    case RelocateState.WriteNewEnabledServiceIDsTable:
+                    {
+                        CommInterface.DisplayStatusMessage("Writing new KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
+
+                        nextAction = new WriteMemoryAction(KWP2000CommInterface, mEnabledServiceIDsTableAddress, DEFAULT_MAX_BLOCK_SIZE, mEnabledServiceIDs, null);
+                        break;
+                    }
+                    case RelocateState.ChangeHandlerIndexAndFunctionTablePointers:
+                    {
+                        CommInterface.DisplayStatusMessage("Changing KWP2000 addresses in the ECU to use new message handling configuration.", StatusMessageType.USER);
+
+                        //Write 8 bytes at 0xE228
+                        var newPointerData = new byte[8];
+
+                        var newFunctionTablePointerAddress = (UInt16)(mNewFunctionTableAddress & 0x3FFF);
+                        var newFunctionTablePointerPage = (UInt16)((mNewFunctionTableAddress >> 14) & 0x3FF);
+                        var newIndexTablePointerAddress = (UInt16)(mNewIndexTableAddress & 0x3FFF);
+                        var newIndexTablePointerPage = (UInt16)((mNewIndexTableAddress >> 14) & 0x3FF);
+
+                        BitConverter.GetBytes(newFunctionTablePointerAddress).CopyTo(newPointerData, 0);
+                        BitConverter.GetBytes(newFunctionTablePointerPage).CopyTo(newPointerData, 2);
+                        BitConverter.GetBytes(newIndexTablePointerAddress).CopyTo(newPointerData, 4);
+                        BitConverter.GetBytes(newIndexTablePointerPage).CopyTo(newPointerData, 6);
+
+                        nextAction = new WriteMemoryAction(KWP2000CommInterface, mIndexAndFunctionTablePointerAddress, DEFAULT_MAX_BLOCK_SIZE, newPointerData, null);
+                        break;
+                    }
+                }
+
+                mMyLastStartedAction = nextAction;
+            }
+
+            return nextAction;
+        }
+
+        private byte[] GetRelocatedData(uint targetAddress)
+        {
+            Debug.Assert(targetAddress % 2 == 0);//this function assumes an even start address
+
+            //Write 128 bytes for index table
+            var tempIndexTable = new byte[128];
+            for (int x = 0; x < tempIndexTable.Length; x++)
+            {
+                tempIndexTable[x] = 0;//point all entries to the zero index for the redirect function
+            }
+
+            var relocatedServiceIDs = GetRelocatedServiceIDs();
+            byte numRelocatedFunctions = 0;
+
+            if (relocatedServiceIDs != null)
+            {
+                numRelocatedFunctions = (byte)relocatedServiceIDs.Count;
+
+                byte functionIndex = 1;
+
+                foreach (var serviceID in relocatedServiceIDs)
+                {
+                    var indexTableEntry = ((serviceID & 0x80) >> 1) | (serviceID & 0x3F);
+
+                    tempIndexTable[indexTableEntry] = functionIndex;
+
+                    mEnabledServiceIDs[(indexTableEntry >> 3) & 0x1F] |= (byte)(0x01 << (indexTableEntry & 0x7));
+
+                    functionIndex++;
+                }
+            }
+
+            //Write 4 x N bytes at empty RAM location
+            mNewFunctionTableMaxEntries = (byte)(numRelocatedFunctions + 1);
+            mNewFunctionTableNumEntries = mNewFunctionTableMaxEntries;
+            var newFunctionTableData = new byte[mNewFunctionTableMaxEntries * 4];
+
+            mNewIndexTableAddress = targetAddress;
+            mNewIndexTableAddress += 4;//add two for the marker word, and add two for the size of the injected code
+
+            mNewFunctionTableAddress = mNewIndexTableAddress + 2 + (uint)tempIndexTable.Length;//plus two for num entries byte and max entries byte
+            mNewFunctionTableAddress += (mNewFunctionTableAddress % 2);//make sure address is even
+
+            uint redirectFunctionAddress = mNewFunctionTableAddress + (uint)newFunctionTableData.Length;
+            redirectFunctionAddress += (redirectFunctionAddress % 2);//make sure address is even
+
+            //make all entries point at the redirect function by default
+            {
+                var functionPointerBytes = BitConverter.GetBytes(redirectFunctionAddress);
+                Debug.Assert(functionPointerBytes.Length == 4);
+
+                for (int x = 0; x < mNewFunctionTableMaxEntries; x++)
+                {
+                    functionPointerBytes.CopyTo(newFunctionTableData, x * 4);
+                }
+            }
+
+            //create the redirect function data
+            var patchedRedirectFunctionData = new byte[mRedirectFunctionData.Length];
+            mRedirectFunctionData.CopyTo(patchedRedirectFunctionData, 0);
+            {
+                var originalFunctionTablePointerAddress = (UInt16)(mOriginalFunctionTableAddress & 0x3FFF);
+                var originalFunctionTablePointerPage = (UInt16)((mOriginalFunctionTableAddress >> 14) & 0x03FF);
+                var originalIndexTablePointerAddress = (UInt16)(mOriginalIndexTableAddress & 0x3FFF);
+                var originalIndexTablePointerPage = (UInt16)((mOriginalIndexTableAddress >> 14) & 0x03FF);
+
+                Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x06) == 0xDEAD);
+                BitConverter.GetBytes(mCurrentServiceIDAddress).CopyTo(patchedRedirectFunctionData, 0x06);
+
+                Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x12) == 0x03EF);
+                Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x16) == 0xDEAD);
+                BitConverter.GetBytes(originalIndexTablePointerPage).CopyTo(patchedRedirectFunctionData, 0x12);
+                BitConverter.GetBytes(originalIndexTablePointerAddress).CopyTo(patchedRedirectFunctionData, 0x16);
+
+                Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x22) == 0x03EF);
+                Debug.Assert(BitConverter.ToUInt16(patchedRedirectFunctionData, 0x1E) == 0xDEAD);
+                BitConverter.GetBytes(originalFunctionTablePointerPage).CopyTo(patchedRedirectFunctionData, 0x22);
+                BitConverter.GetBytes(originalFunctionTablePointerAddress).CopyTo(patchedRedirectFunctionData, 0x1E);
+            }
+
+            uint relocatedFunctionStartAddress = redirectFunctionAddress + (uint)patchedRedirectFunctionData.Length;
+            relocatedFunctionStartAddress += (relocatedFunctionStartAddress % 2);//make sure address is even
+            uint nextRelocatedFunctionAddress = relocatedFunctionStartAddress;
+
+            byte[] relocatedFunctionData = null;
+
+            if (relocatedServiceIDs != null)
+            {
+                //function index 0 is the redirect function
+                int functionIndex = 1;
+
+                foreach (var serviceID in relocatedServiceIDs)
+                {
+                    uint offsetToFunction = 0;
+                    var functionData = GetRelocatedFunctionData(serviceID, nextRelocatedFunctionAddress, out offsetToFunction);
+
+                    if (functionData != null)
+                    {
+                        var functionPointerBytes = BitConverter.GetBytes(nextRelocatedFunctionAddress + offsetToFunction);
+                        Debug.Assert(functionPointerBytes.Length == 4);
+                        functionPointerBytes.CopyTo(newFunctionTableData, functionIndex * 4);
+
+                        if (relocatedFunctionData == null)
+                        {
+                            relocatedFunctionData = new byte[functionData.Length];
+                            functionData.CopyTo(relocatedFunctionData, 0);
+                        }
+                        else
+                        {
+                            var newRelocatedFunctionData = new byte[relocatedFunctionData.Length + functionData.Length];
+                            relocatedFunctionData.CopyTo(newRelocatedFunctionData, 0);
+                            functionData.CopyTo(newRelocatedFunctionData, relocatedFunctionData.Length);
+                            relocatedFunctionData = newRelocatedFunctionData;
+                        }
+
+                        nextRelocatedFunctionAddress += (uint)functionData.Length;
+                        nextRelocatedFunctionAddress += (nextRelocatedFunctionAddress % 2);//make sure address is even
+                        functionIndex++;
+                    }
+                }
+            }
+
+            var writeMessageAddress = mNewIndexTableAddress - 4;//minus two to include the start marker, and minus two to include the injected code size
+            var messageData = new byte[nextRelocatedFunctionAddress - writeMessageAddress + 2];//plus two for the end marker
+
+            uint curDataIndex = 0;
+
+            //write the start marker 0xDEAD
+            BitConverter.GetBytes((UInt16)0xDEAD).CopyTo(messageData, curDataIndex);
+            curDataIndex += 2;
+
+            var relocatedCodeSize = (UInt16)(messageData.Length - 6);//minus 6 to skip the start and end marker and the code size
+            BitConverter.GetBytes(relocatedCodeSize).CopyTo(messageData, curDataIndex);
+            curDataIndex += 2;
+
+            tempIndexTable.CopyTo(messageData, curDataIndex);
+            curDataIndex += (uint)tempIndexTable.Length;
+
+            //write the function table max num entries
+            messageData[curDataIndex] = mNewFunctionTableMaxEntries;
+            curDataIndex++;
+
+            //write the function table current num entries
+            messageData[curDataIndex] = mNewFunctionTableNumEntries;
+
+            curDataIndex = mNewFunctionTableAddress - writeMessageAddress;
+            newFunctionTableData.CopyTo(messageData, curDataIndex);
+
+            curDataIndex = redirectFunctionAddress - writeMessageAddress;
+            patchedRedirectFunctionData.CopyTo(messageData, curDataIndex);
+
+            if (relocatedFunctionData != null)
+            {
+                curDataIndex = relocatedFunctionStartAddress - writeMessageAddress;
+                relocatedFunctionData.CopyTo(messageData, curDataIndex);
+            }
+
+            //write the end marker 0xBEEF
+            BitConverter.GetBytes((UInt16)0xBEEF).CopyTo(messageData, messageData.Length - 2);
+
+            return messageData;
+        }
+
+        private bool LookingForEmptyRAMCallback(uint numRead, uint totalRead, uint totalToRead, ReadMemoryAction runningAction)
+        {
+            //TODO: don't search the entire range every time, just continue from where we left off....
+
+            for (uint x = 0; x < totalRead; x++)
+            {
+                uint y = x;
+
+                for (; y < totalRead; y++)
+                {
+                    if (runningAction.ReadData[y] != 0)
+                    {
+                        bool foundRelocatedCode = false;
+
+                        if (y < totalRead - 1)
+                        {
+                            if ((BitConverter.ToUInt16(runningAction.ReadData, (int)y) == 0xDEAD) && (y < totalRead - 3))
+                            {
+                                var relocatedCodeSize = BitConverter.ToUInt16(runningAction.ReadData, (int)y + 2);
+                                var endMarkerAddress = relocatedCodeSize + y + 4;
+
+                                if (endMarkerAddress < totalRead - 1)
+                                {
+                                    if (BitConverter.ToUInt16(runningAction.ReadData, (int)endMarkerAddress) == 0xBEEF)
+                                    {
+                                        y = endMarkerAddress + 1;
+                                        foundRelocatedCode = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!foundRelocatedCode)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                var numEmptyBytes = y - x;
+
+                if ((numEmptyBytes > 0) && (numEmptyBytes > mEmptyRAMNumBytes))
+                {
+                    mEmptyRAMNumBytes = numEmptyBytes;
+                    mEmptyRAMStartAddress = runningAction.mStartAddress + x;
+                }
+
+                x = y;
+            }
+
+            //return true until we have found enough empty RAM to keep the read action from stopping early
+            return (mEmptyRAMNumBytes < mRequiredSizeForRelocatedFunctionData);
+        }
+
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            if (action == mMyLastStartedAction)
+            {
+                switch (mRelocateState)
+                {
+                    case RelocateState.LocateHandlerIndexAndFunctionTablePointers:
+                    {
+                        //setzi62's notes:
+                        //The message handler table pointer is stored at a fixed address, which only depends on the bootrom version, for 05.XX it is at 0xE228, for 06.xx it is at 0xE226.
+                        //At 0xE1B2 is the pointer to the header decoding function for bootrom 05.xx And at 0xE1B0 is the pointer for bootrom version 06.xx
+                        //The header decoding function is included in the bootrom and has a fixed address for all ecus with the same bootrom version.
+                        //By reading at 0xE1B0 and 0xE1B2 I can determine the used bootrom version of the ecu.
+
+                        success &= (action is ReadMemoryAction);
+
+                        if (success)
+                        {
+                            var readAction = action as ReadMemoryAction;
+
+                            //does address 0xE1B2 contain the function pointer of the KWP2000 header decoder function?
+                            if (BitConverter.ToUInt16(readAction.ReadData, 2) == 0x2B86)
+                            {
+                                //bootrom 05.xx
+
+                                mCommunicationFlagsAddress = 0xE074;
+                                mCurrentMessageNumDataBytesAddress = 0xE1CA;
+                                mCurrentMessageFirstDataByteAddress = 0xE1CE;
+                                mCurrentServiceIDAddress = 0xE1D0;
+                                mEnabledServiceIDsTableAddress = 0xE210;
+                                mIndexAndFunctionTablePointerAddress = 0xE228;
+                            }
+                            //does address 0xE1B0 contain the function pointer of the KWP2000 header decoder function?
+                            else if((BitConverter.ToUInt16(readAction.ReadData, 0) == 0x0260) || (BitConverter.ToUInt16(readAction.ReadData, 0) == 0x3D62))
+                            {
+                                //bootrom 06.xx
+
+                                mCommunicationFlagsAddress = 0xE074;
+                                mCurrentMessageNumDataBytesAddress = 0xE1C8;
+                                mCurrentMessageFirstDataByteAddress = 0xE1CC;
+                                mCurrentServiceIDAddress = 0xE1CE;
+                                mEnabledServiceIDsTableAddress = 0xE20E;
+                                mIndexAndFunctionTablePointerAddress = 0xE226;
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Unable to determine ME7 boot rom version from KWP2000 address data: 0x" + BitConverter.ToUInt32(readAction.ReadData, 0).ToString("X"), StatusMessageType.USER);
+                                success = false;
+                            }
+
+                            mRelocateState = RelocateState.ReadHandlerIndexAndFunctionTablePointers;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to locate important KWP2000 addresses in the ECU.", StatusMessageType.USER);
+                        }
+
+                        break;
+                    }
+                    case RelocateState.ReadHandlerIndexAndFunctionTablePointers:
+                    {
+                        success &= (action is ReadMemoryAction);
+
+                        if (success)
+                        {
+                            var readAction = action as ReadMemoryAction;
+
+                            var functionTableAddress = BitConverter.ToUInt16(readAction.ReadData, 0);
+                            var functionTablePage = BitConverter.ToUInt16(readAction.ReadData, 2);
+                            mOriginalFunctionTableAddress = (uint)(functionTablePage << 14) | functionTableAddress;
+                            Debug.Assert(mOriginalFunctionTableAddress == 0x81A762);
+
+                            var indexTableAddress = BitConverter.ToUInt16(readAction.ReadData, 4);
+                            var indexTablePage = BitConverter.ToUInt16(readAction.ReadData, 6);
+                            mOriginalIndexTableAddress = (uint)(indexTablePage << 14) | indexTableAddress;
+                            Debug.Assert(mOriginalIndexTableAddress == 0x81A7FA);
+
+                            if ((mOriginalFunctionTableAddress >= 0x380000) && (mOriginalFunctionTableAddress < 0x388000)
+                                && (mOriginalIndexTableAddress >= 0x380000) && (mOriginalIndexTableAddress < 0x388000))
+                            {
+                                CommInterface.DisplayStatusMessage("Failed to relocate KWP2000 message handling configuration because it is already relocated.", StatusMessageType.USER);
+                                OperationCompleted(true);
+                            }
+                            else
+                            {
+                                mRelocateState = RelocateState.ReadCurrentEnabledServiceIDsTable;
+                            }
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to read current KWP2000 message handling configuration in the ECU.", StatusMessageType.USER);
+                        }
+
+                        break;
+                    }
+                    case RelocateState.ReadCurrentEnabledServiceIDsTable:
+                    {
+                        success &= (action is ReadMemoryAction);
+
+                        if (success)
+                        {
+                            var readAction = action as ReadMemoryAction;
+
+                            mEnabledServiceIDs = readAction.ReadData;
+
+                            mRelocateState = RelocateState.LocateEmptyRAM;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to read current KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
+                        }
+
+                        break;
+                    }
+                    case RelocateState.LocateEmptyRAM:
+                    {
+                        success &= (action is ReadMemoryAction);
+
+                        if (success)
+                        {
+                            CommInterface.DisplayStatusMessage("Located " + mEmptyRAMNumBytes + " bytes of empty RAM at 0x" + mEmptyRAMStartAddress.ToString("X"), StatusMessageType.DEV_USER);
+
+                            mRelocateState = RelocateState.WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to locate empty RAM in the ECU for new KWP2000 configuration.", StatusMessageType.USER);
+                        }
+
+                        break;
+                    }
+                    case RelocateState.WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM:
+                    {
+                        if (success)
+                        {
+                            mRelocateState = RelocateState.WriteNewEnabledServiceIDsTable;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to write new KWP2000 message handling configuration to empty RAM.", StatusMessageType.USER);
+                        }
+
+                        break;
+                    }
+                    case RelocateState.WriteNewEnabledServiceIDsTable:
+                    {
+                        if (success)
+                        {
+                            mRelocateState = RelocateState.ChangeHandlerIndexAndFunctionTablePointers;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to write new KWP2000 enabled message types in the ECU.", StatusMessageType.USER);
+                        }
+
+                        break;
+                    }
+                    case RelocateState.ChangeHandlerIndexAndFunctionTablePointers:
+                    {
+                        if (success)
+                        {
+                            mRelocateState = RelocateState.Finished;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to change KWP2000 addresses in the ECU to use new message handling configuration.", StatusMessageType.USER);
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            mMyLastStartedAction = null;
+
+            base.OnActionCompleted(action, success);
+        }
+
+        private enum RelocateState
+        {
+            LocateHandlerIndexAndFunctionTablePointers,
+            ReadHandlerIndexAndFunctionTablePointers,
+            ReadCurrentEnabledServiceIDsTable,
+            LocateEmptyRAM,
+            WriteAndVerifyHandlerIndexAndFunctionTablesAndRedirectFunctionToRAM,
+            WriteNewEnabledServiceIDsTable,
+            ChangeHandlerIndexAndFunctionTablePointers,
+            Finished
+        }
+
+        protected virtual List<byte> GetRelocatedServiceIDs()
+        {
+            return null;
+        }
+
+        protected virtual byte[] GetRelocatedFunctionData(byte serviceID, uint destinationAddress, out uint offsetToFunction)
+        {
+            offsetToFunction = 0;
+
+            return null;
+        }
+
+        private RelocateState mRelocateState;
+        private CommunicationAction mMyLastStartedAction;
+
+        private uint mEnabledServiceIDsTableAddress;
+        private byte[] mEnabledServiceIDs;
+        private uint mIndexAndFunctionTablePointerAddress;
+
+        private uint mOriginalIndexTableAddress;
+        private uint mOriginalFunctionTableAddress;
+
+        protected UInt16 mCurrentServiceIDAddress;
+        protected UInt16 mCurrentMessageFirstDataByteAddress;
+        protected UInt16 mCurrentMessageNumDataBytesAddress;
+        protected UInt16 mCommunicationFlagsAddress;
+
+        //TODO: could have a list of empty RAM areas
+        private uint mEmptyRAMStartAddress;
+        private uint mEmptyRAMNumBytes;
+        private uint mRequiredSizeForRelocatedFunctionData;
+
+        private uint mNewIndexTableAddress;
+        private uint mNewFunctionTableAddress;
+        private byte mNewFunctionTableNumEntries;
+        private byte mNewFunctionTableMaxEntries;
+
+        private byte[] mRedirectFunctionData;
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

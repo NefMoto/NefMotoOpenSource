@@ -14,3 +14,5 @@ using System.Runtime.InteropServices;
 
 // SuppressIldasmAttribute is obsolete in .NET 6.0+ and has no effect
 // [assembly: SuppressIldasmAttribute()]
+
+// vi: set sw=4 ts=8 expandtab:

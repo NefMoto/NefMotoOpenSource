@@ -75,101 +75,101 @@ namespace Communication
     {
         BAUD_UNSPECIFIED = 0,
 
-		BAUD_9600 = 9600,
+        BAUD_9600 = 9600,
         BAUD_10400 = 10400,
-		BAUD_38400 = 38400,
-		BAUD_52800 = 52800,
-		BAUD_124800 = 124800,
+        BAUD_38400 = 38400,
+        BAUD_52800 = 52800,
+        BAUD_124800 = 124800,
 
         BAUD_DEFAULT = BAUD_10400
     };
 
-	//From setzis tests
-	//public enum KWP2000CommonSupportedBaudRateBytes : byte
-	//{
-	//    000,
-	//    001,
-	//    002,
-	//    003,
-	//    004,
-	//    005,
-	//    006,
-	//    007,
-	//    008,
-	//    009,
-	//    010,
-	//    011,
-	//    012,
-	//    013,
-	//    014,
-	//    015,
-	//    016,
-	//    017,
-	//    018,
-	//    019,
-	//    020,
-	//    021,
-	//    022,
-	//    023,
-	//    024,
-	//    025,
-	//    026,
-	//    027,
-	//    028,
-	//    029,
-	//    030,
-	//    031,
-	//    032,
-	//    033,
-	//    034,
-	//    035,
-	//    036,
-	//    037,
-	//    038,
-	//    039,
-	//    040,
-	//    041,
-	//    042,
-	//    043,
-	//    044,
-	//    045,
-	//    046,
-	//    047,
-	//    048,
-	//    049,
-	//    050,
-	//    051,
-	//    052,
-	//    053,
-	//    054,
-	//    055,
-	//    056,
-	//    057,
-	//    058,
-	//    060,
-	//    061,
-	//    062,
-	//    063,
-	//    065,
-	//    066,
-	//    067,
-	//    068,
-	//    069,
-	//    071,
-	//    073,
-	//    075,
-	//    076,
-	//    079,
-	//    080,
-	//    081,
-	//    084,
-	//    087,
-	//    088,
-	//    089,
-	//    097,
-	//    107,
-	//    135
-	//}
+    //From setzis tests
+    //public enum KWP2000CommonSupportedBaudRateBytes : byte
+    //{
+    //    000,
+    //    001,
+    //    002,
+    //    003,
+    //    004,
+    //    005,
+    //    006,
+    //    007,
+    //    008,
+    //    009,
+    //    010,
+    //    011,
+    //    012,
+    //    013,
+    //    014,
+    //    015,
+    //    016,
+    //    017,
+    //    018,
+    //    019,
+    //    020,
+    //    021,
+    //    022,
+    //    023,
+    //    024,
+    //    025,
+    //    026,
+    //    027,
+    //    028,
+    //    029,
+    //    030,
+    //    031,
+    //    032,
+    //    033,
+    //    034,
+    //    035,
+    //    036,
+    //    037,
+    //    038,
+    //    039,
+    //    040,
+    //    041,
+    //    042,
+    //    043,
+    //    044,
+    //    045,
+    //    046,
+    //    047,
+    //    048,
+    //    049,
+    //    050,
+    //    051,
+    //    052,
+    //    053,
+    //    054,
+    //    055,
+    //    056,
+    //    057,
+    //    058,
+    //    060,
+    //    061,
+    //    062,
+    //    063,
+    //    065,
+    //    066,
+    //    067,
+    //    068,
+    //    069,
+    //    071,
+    //    073,
+    //    075,
+    //    076,
+    //    079,
+    //    080,
+    //    081,
+    //    084,
+    //    087,
+    //    088,
+    //    089,
+    //    097,
+    //    107,
+    //    135
+    //}
 
     public enum KWP2000ConnectionMethod : uint
     {
@@ -319,53 +319,53 @@ UnknownEDC15ResponseCode = 0x13,
 
     public enum KWP2000IdentificationOption : byte
     {
-		[Description("ECU Identification Data Table")]
+        [Description("ECU Identification Data Table")]
         ECUIdentificationDataTable = 0x80,//supported//gets a table containing identification options 82 to BF
-		[Description("ECU Identification Scaling Table")]
+        [Description("ECU Identification Scaling Table")]
         ECUIdentificationScalingTable = 0x81,//supported
         vehicleManufacturerSpecific = 0x86,//not supported//Extended ECU identification number, serial number? SCA insertion requires this field
-		[Description("Vehicle Manufacturer Spare Part Number")]
+        [Description("Vehicle Manufacturer Spare Part Number")]
         vehicleManufacturerSparePartNumber = 0x87,
-		[Description("Vehicle Manufacturer ECU Software Number")]
+        [Description("Vehicle Manufacturer ECU Software Number")]
         vehicleManufacturerECUSoftwareNumber = 0x88,
-		[Description("Vehicle Manufacturer ECU Software Version Number")]
+        [Description("Vehicle Manufacturer ECU Software Version Number")]
         vehicleManufacturerECUSoftwareVersionNumber = 0x89,
-		[Description("System Supplier")]
+        [Description("System Supplier")]
         systemSupplier = 0x8A,
-		[Description("ECU Manufacturing Date")]
+        [Description("ECU Manufacturing Date")]
         ECUManufacturingDate = 0x8B,
-		[Description("ECU Serial Number")]
+        [Description("ECU Serial Number")]
         ECUSerialNumber = 0x8C,
         systemSupplierSpecific1 = 0x8D,
         systemSupplierSpecific2 = 0x8E,
         systemSupplierSpecific3 = 0x8F,
-		[Description("Vehicle Identification Number")]
+        [Description("Vehicle Identification Number")]
         vehicleIdentificationNumber = 0x90,//supported, not set
-		[Description("Vehicle Manufacturer ECU Hardware Number")]
+        [Description("Vehicle Manufacturer ECU Hardware Number")]
         vehicleManufacturerECUHardwareNumber = 0x91,//supported, sometimes set, depending on ECU version and diagnostic mode?
-		[Description("System Supplier ECU Hardware Number")]
+        [Description("System Supplier ECU Hardware Number")]
         systemSupplierECUHardwareNumber = 0x92,//supported, set
-		[Description("System Supplier ECU Hardware Version Number")]
+        [Description("System Supplier ECU Hardware Version Number")]
         systemSupplierECUHardwareVersionNumber = 0x93,//supported, not set
-		[Description("System Supplier ECU Software Number")]
+        [Description("System Supplier ECU Software Number")]
         systemSupplierECUSoftwareNumber = 0x94,//supported, set
-		[Description("System Supplier ECU Software Version Number")]
+        [Description("System Supplier ECU Software Version Number")]
         systemSupplierECUSoftwareVersionNumber = 0x95,//supported, not set
-		[Description("Exhaust Regulation or Type Approval Number")]
+        [Description("Exhaust Regulation or Type Approval Number")]
         exhaustRegulationOrTypeApprovalNumber = 0x96,//supported, not set
-		[Description("System Name or Engine Type")]
+        [Description("System Name or Engine Type")]
         systemNameOrEngineType = 0x97,//supported, not set
-		[Description("Repair Shop Code or Tester Serial Number")]
+        [Description("Repair Shop Code or Tester Serial Number")]
         repairShopCodeOrTesterSerialNumber = 0x98,//supported, not set
-		[Description("Programming Date")]
+        [Description("Programming Date")]
         programmingDate = 0x99,//supported, not set
-		[Description("Calibration Repair Shop Code or Calibration Equipment Serial Number")]
+        [Description("Calibration Repair Shop Code or Calibration Equipment Serial Number")]
         calibrationRepairShopCodeOrCalibrationEquipmentSerialNumber = 0x9A,
-		[Description("Calibration Date")]
+        [Description("Calibration Date")]
         calibrationDate = 0x9B,//supported//ECU identification number.  SCA insertion requires this field
-		[Description("Calibration Equiment Software Number")]
+        [Description("Calibration Equiment Software Number")]
         calibrationEquipmentSoftwareNumber = 0x9C,//supported//flash status -  byte:flash status, byte:num flash attempts, byte:num successful flash attempts, byte:status of flash preconditions
-		[Description("ECU Installation Date")]
+        [Description("ECU Installation Date")]
         ECUInstallationDate = 0x9D,
         vehicleManufacturerSpecific1 = 0x9E,
         vehicleManufacturerSpecific2 = 0x9F,
@@ -409,3 +409,5 @@ UnknownEDC15ResponseCode = 0x13,
         ValidateFlashChecksum = 0xC5
     };
 }
+
+// vi: set sw=4 ts=8 expandtab:

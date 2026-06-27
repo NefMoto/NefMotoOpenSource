@@ -25,39 +25,39 @@ using Shared;
 
 namespace ECUFlasher
 {
-	/// <summary>
-	/// Interaction logic for MainWindow.xaml
-	/// </summary>
-	public partial class MainWindow : Window
-	{
-		public MainWindow()
-		{
-			App = (App)Application.Current;
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            App = (App)Application.Current;
             Title = App.GetApplicationName();
 
             InitializeComponent();
 
-			Loaded += OnLoaded;
-		}
+            Loaded += OnLoaded;
+        }
 
-		void OnLoaded(object sender, RoutedEventArgs e)
-		{
-			Window parentWindow = Window.GetWindow(this);
+        void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            Window parentWindow = Window.GetWindow(this);
 
-			if (parentWindow != null)
-			{
-				parentWindow.Closing += delegate(object closingSender, CancelEventArgs closingArgs)
-				{
-					if ((App != null) && App.OperationInProgress)
-					{
-						closingArgs.Cancel = (App.DisplayUserPrompt("Operation in Progress", "An operation is in progress. Press OK to abort the operation and quit, or Cancel otherwise.", UserPromptType.OK_CANCEL) == UserPromptResult.CANCEL);
-					}
-				};
-			}
-		}
+            if (parentWindow != null)
+            {
+                parentWindow.Closing += delegate(object closingSender, CancelEventArgs closingArgs)
+                {
+                    if ((App != null) && App.OperationInProgress)
+                    {
+                        closingArgs.Cancel = (App.DisplayUserPrompt("Operation in Progress", "An operation is in progress. Press OK to abort the operation and quit, or Cancel otherwise.", UserPromptType.OK_CANCEL) == UserPromptResult.CANCEL);
+                    }
+                };
+            }
+        }
 
-		public App App { get; private set; }
-	}
+        public App App { get; private set; }
+    }
 }
 
 internal static class NativeMethods
@@ -71,3 +71,5 @@ internal static class NativeMethods
     public const uint ES_DISPLAY_REQUIRED =     0x00000002;
     public const uint ES_USER_PRESENT =         0x00000004;
 }
+
+// vi: set sw=4 ts=8 expandtab:

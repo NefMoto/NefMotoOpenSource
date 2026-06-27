@@ -26,7 +26,7 @@ using System.Xml.Schema;
 
 namespace Shared
 {
-	[Serializable]
+    [Serializable]
     [XmlInclude(typeof(ScaleOffsetMemoryVariableValueConverter))]
     public abstract class VariableValueConverter : INotifyPropertyChanged
     {
@@ -137,16 +137,16 @@ namespace Shared
                 }
                 try
                 {
-					var bitmaskString = reader.ReadElementString("BitMask");
+                    var bitmaskString = reader.ReadElementString("BitMask");
 
-					if (bitmaskString.StartsWith("0x"))
-					{
-						BitMask = DataUtils.ReadHexString(bitmaskString);
-					}
-					else
-					{
-						BitMask = uint.Parse(bitmaskString);
-					}
+                    if (bitmaskString.StartsWith("0x"))
+                    {
+                        BitMask = DataUtils.ReadHexString(bitmaskString);
+                    }
+                    else
+                    {
+                        BitMask = uint.Parse(bitmaskString);
+                    }
                 }
                 catch
                 {
@@ -200,3 +200,5 @@ namespace Shared
         private uint _BitMask = 0xFFFFFFFF;
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

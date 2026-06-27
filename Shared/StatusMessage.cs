@@ -25,17 +25,17 @@ using System.Text;
 
 namespace Shared
 {
-	public enum StatusMessageType
-	{
-		USER,
-		LOG,
+    public enum StatusMessageType
+    {
+        USER,
+        LOG,
         DEV,
-		DEV_USER
-	};
+        DEV_USER
+    };
 
     public enum UserPromptType
     {
-		OK,
+        OK,
         OK_CANCEL,
         YES_NO_CANCEL
     };
@@ -49,6 +49,8 @@ namespace Shared
         NO
     };
 
-	public delegate void DisplayStatusMessageDelegate(string message, StatusMessageType messageType);
-	public delegate UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType);
+    public delegate void DisplayStatusMessageDelegate(string message, StatusMessageType messageType);
+    public delegate UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType);
 }
+
+// vi: set sw=4 ts=8 expandtab:

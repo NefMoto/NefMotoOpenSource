@@ -28,157 +28,159 @@ using Shared;
 
 namespace Checksum
 {
-	public class RollingChecksums : BaseChecksum
-	{
-		public RollingChecksums(uint seedAddress)
-		{
-			mSeedAddress = seedAddress;
+    public class RollingChecksums : BaseChecksum
+    {
+        public RollingChecksums(uint seedAddress)
+        {
+            mSeedAddress = seedAddress;
 
-			mUseChaining = false;
-			mAddressRanges = new List<IEnumerable<AddressRange>>();
-			mRangeChecksumAddresses = new List<uint>();
-			mRangeChecksums = new List<uint>();
-		}
+            mUseChaining = false;
+            mAddressRanges = new List<IEnumerable<AddressRange>>();
+            mRangeChecksumAddresses = new List<uint>();
+            mRangeChecksums = new List<uint>();
+        }
 
-		public void EnableInitRange(uint startAddress, uint numBytes)
-		{
-			mUseChaining = true;
-			mInitAddressRange = new AddressRange(startAddress, numBytes);
-		}
+        public void EnableInitRange(uint startAddress, uint numBytes)
+        {
+            mUseChaining = true;
+            mInitAddressRange = new AddressRange(startAddress, numBytes);
+        }
 
-		public void AddAddressRange(IEnumerable<AddressRange> addressRanges, uint checksumAddress)
-		{
-			mAddressRanges.Add(addressRanges);
-			mRangeChecksumAddresses.Add(checksumAddress);
-		}
+        public void AddAddressRange(IEnumerable<AddressRange> addressRanges, uint checksumAddress)
+        {
+            mAddressRanges.Add(addressRanges);
+            mRangeChecksumAddresses.Add(checksumAddress);
+        }
 
-		public override bool LoadChecksum()
-		{
-			bool result = true;
+        public override bool LoadChecksum()
+        {
+            bool result = true;
 
-			mRangeChecksums.Clear();
+            mRangeChecksums.Clear();
 
-			if ((mMemory != null) && (mMemory.Size > 0))
-			{
-				foreach (var checksumAddress in mRangeChecksumAddresses)
-				{
-					uint checksum;
-					result &= mMemory.ReadRawIntValueByType(out checksum, DataUtils.DataType.UInt32, checksumAddress);
-					mRangeChecksums.Add(~checksum);//checksums are stored inverted
-				}
-			}
+            if ((mMemory != null) && (mMemory.Size > 0))
+            {
+                foreach (var checksumAddress in mRangeChecksumAddresses)
+                {
+                    uint checksum;
+                    result &= mMemory.ReadRawIntValueByType(out checksum, DataUtils.DataType.UInt32, checksumAddress);
+                    mRangeChecksums.Add(~checksum);//checksums are stored inverted
+                }
+            }
 
-			return result;
-		}
-		public override bool UpdateChecksum(bool outputMessage)
-		{
-			bool result = true;
+            return result;
+        }
+        public override bool UpdateChecksum(bool outputMessage)
+        {
+            bool result = true;
 
-			mRangeChecksums.Clear();
+            mRangeChecksums.Clear();
 
-			uint calculatedChecksum = 0xFFFFFFFF;
+            uint calculatedChecksum = 0xFFFFFFFF;
 
-			if (mUseChaining)
-			{
-				result &= CalculateRollingChecksumForRange(mInitAddressRange.StartAddress, mInitAddressRange.NumBytes, mSeedAddress, ref calculatedChecksum);
-			}
+            if (mUseChaining)
+            {
+                result &= CalculateRollingChecksumForRange(mInitAddressRange.StartAddress, mInitAddressRange.NumBytes, mSeedAddress, ref calculatedChecksum);
+            }
 
-			foreach (var ranges in mAddressRanges)
-			{
-				if (!mUseChaining)
-				{
-					calculatedChecksum = 0xFFFFFFFF;
-				}
+            foreach (var ranges in mAddressRanges)
+            {
+                if (!mUseChaining)
+                {
+                    calculatedChecksum = 0xFFFFFFFF;
+                }
 
-				foreach (var range in ranges)
-				{
-					result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);
-				}
+                foreach (var range in ranges)
+                {
+                    result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);
+                }
 
-				mRangeChecksums.Add(calculatedChecksum);
+                mRangeChecksums.Add(calculatedChecksum);
 
-				if (!result)
-				{
-					return false;
-				}
-			}
+                if (!result)
+                {
+                    return false;
+                }
+            }
 
-			return result;
-		}
-		public override bool IsCorrect(bool outputMessage)
-		{
-			bool result = true;
+            return result;
+        }
+        public override bool IsCorrect(bool outputMessage)
+        {
+            bool result = true;
 
-			uint calculatedChecksum = 0xFFFFFFFF;
+            uint calculatedChecksum = 0xFFFFFFFF;
 
-			if (mUseChaining)
-			{
-				result &= CalculateRollingChecksumForRange(mInitAddressRange.StartAddress, mInitAddressRange.NumBytes, mSeedAddress, ref calculatedChecksum);
-			}
+            if (mUseChaining)
+            {
+                result &= CalculateRollingChecksumForRange(mInitAddressRange.StartAddress, mInitAddressRange.NumBytes, mSeedAddress, ref calculatedChecksum);
+            }
 
-			if (mAddressRanges.Count() != mRangeChecksums.Count())
-			{
-				return false;
-			}
+            if (mAddressRanges.Count() != mRangeChecksums.Count())
+            {
+                return false;
+            }
 
-			var checksumIter = mRangeChecksums.GetEnumerator();
+            var checksumIter = mRangeChecksums.GetEnumerator();
 
-			foreach (var ranges in mAddressRanges)
-			{
-				checksumIter.MoveNext();
+            foreach (var ranges in mAddressRanges)
+            {
+                checksumIter.MoveNext();
 
-				if (!mUseChaining)
-				{
-					calculatedChecksum = 0xFFFFFFFF;
-				}
+                if (!mUseChaining)
+                {
+                    calculatedChecksum = 0xFFFFFFFF;
+                }
 
-				foreach (var range in ranges)
-				{
-					result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);
-				}
+                foreach (var range in ranges)
+                {
+                    result &= CalculateRollingChecksumForRange(range.StartAddress, range.NumBytes, mSeedAddress, ref calculatedChecksum);
+                }
 
-				if (!result || (calculatedChecksum != checksumIter.Current))
-				{
-					return false;
-				}
-			}
+                if (!result || (calculatedChecksum != checksumIter.Current))
+                {
+                    return false;
+                }
+            }
 
-			return result;
-		}
-		public override bool CommitChecksum()
-		{
-			bool result = false;
+            return result;
+        }
+        public override bool CommitChecksum()
+        {
+            bool result = false;
 
-			if ((mMemory != null) && (mMemory.Size > 0))
-			{
-				if (mRangeChecksums.Count() != mRangeChecksumAddresses.Count())
-				{
-					return false;
-				}
+            if ((mMemory != null) && (mMemory.Size > 0))
+            {
+                if (mRangeChecksums.Count() != mRangeChecksumAddresses.Count())
+                {
+                    return false;
+                }
 
-				var checksumIter = mRangeChecksums.GetEnumerator();
+                var checksumIter = mRangeChecksums.GetEnumerator();
 
-				result = true;
+                result = true;
 
-				foreach (var checksumAddress in mRangeChecksumAddresses)
-				{
-					checksumIter.MoveNext();
+                foreach (var checksumAddress in mRangeChecksumAddresses)
+                {
+                    checksumIter.MoveNext();
 
-					uint checksum = ~checksumIter.Current;//checksums are stored inverted
-					result &= mMemory.WriteRawIntValueByType(checksum, DataUtils.DataType.UInt32, checksumAddress);
-				}
-			}
+                    uint checksum = ~checksumIter.Current;//checksums are stored inverted
+                    result &= mMemory.WriteRawIntValueByType(checksum, DataUtils.DataType.UInt32, checksumAddress);
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		private uint mSeedAddress;
+        private uint mSeedAddress;
 
-		private bool mUseChaining;
-		private AddressRange mInitAddressRange;
+        private bool mUseChaining;
+        private AddressRange mInitAddressRange;
 
-		private List<IEnumerable<AddressRange>> mAddressRanges;
-		private List<uint> mRangeChecksumAddresses;
-		private List<uint> mRangeChecksums;
-	}
+        private List<IEnumerable<AddressRange>> mAddressRanges;
+        private List<uint> mRangeChecksumAddresses;
+        private List<uint> mRangeChecksums;
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

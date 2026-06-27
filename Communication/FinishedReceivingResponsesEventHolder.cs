@@ -71,3 +71,5 @@ namespace Communication
         protected uint mNumRetries;
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

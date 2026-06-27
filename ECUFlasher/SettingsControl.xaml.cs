@@ -239,3 +239,5 @@ namespace ECUFlasher
         private long _DefaultP4TesterInterByteTimeMinMS;
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

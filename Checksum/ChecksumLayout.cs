@@ -136,3 +136,5 @@ namespace Checksum
         public List<RollingChecksumAddressRange> RollingChecksumAddressRanges { get; set; }
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

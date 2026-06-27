@@ -26,14 +26,14 @@ namespace Communication
 {
     public class KWP2000DTCInfo
     {
-		public ushort DTC { get; set; }
-		public byte Status { get; set; }
+        public ushort DTC { get; set; }
+        public byte Status { get; set; }
     };
 
     [Flags]
     public enum KWP2000DTCStatus : byte
     {
-		//I think the user may only need to see the messages for bits that are set. Need to double check the flow chart to investigate more.
+        //I think the user may only need to see the messages for bits that are set. Need to double check the flow chart to investigate more.
 
         [ValueMappedDescriptionAttribute(true, "Pending fault currently present")]
         [ValueMappedDescriptionAttribute(false, "Pending fault not currently present")]
@@ -267,13 +267,13 @@ namespace Communication
             DTCStrings.Add(0x0604, "Internal Control Module Random Access Memory (RAM) Error");
             DTCStrings.Add(0x0605, "Internal Control Module ROM Test Error");
             DTCStrings.Add(0x0606, "ECM/PCM Processor");
-			DTCStrings.Add(0x0638, "Throttle Actuator Control Range/Performance");
+            DTCStrings.Add(0x0638, "Throttle Actuator Control Range/Performance");
             DTCStrings.Add(0x0642, "Knock Control Control Module Malfunction");
             DTCStrings.Add(0x0645, "A/C Clutch Relay Control Circuit");
             DTCStrings.Add(0x0650, "MIL Control Circuit Electrical Fault in Circuit");
             DTCStrings.Add(0x0654, "Engine RPM Output Circuit Electrical Fault in Circuit");
             DTCStrings.Add(0x0656, "Fuel Level Output Circuit Electrical Fault in Circuit");
-			DTCStrings.Add(0x0686, "Engine Control Module Power Relay Control Circuit Low");
+            DTCStrings.Add(0x0686, "Engine Control Module Power Relay Control Circuit Low");
             DTCStrings.Add(0x0700, "Transmission Control System Malfunction");
             DTCStrings.Add(0x0702, "Transmission Control System Electrical");
             DTCStrings.Add(0x0703, "Torque Converter/Brake Switch B Circuit Malfunction");
@@ -860,3 +860,5 @@ namespace Communication
         }
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

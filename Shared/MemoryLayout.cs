@@ -28,26 +28,26 @@ using System.Reflection;
 
 namespace Shared
 {
-	[Serializable]
-	public class MemoryLayout : IDataErrorInfo
-	{
-		public const string MEMORY_LAYOUT_FILE_SHORT_EXT = ".xml";
-		public const string MEMORY_LAYOUT_FILE_EXT = ".MemoryLayout" + MEMORY_LAYOUT_FILE_SHORT_EXT;
-		public const string MEMORY_LAYOUT_FILE_FILTER = "Memory Layout (*" + MEMORY_LAYOUT_FILE_EXT + ")|*" + MEMORY_LAYOUT_FILE_EXT;
+    [Serializable]
+    public class MemoryLayout : IDataErrorInfo
+    {
+        public const string MEMORY_LAYOUT_FILE_SHORT_EXT = ".xml";
+        public const string MEMORY_LAYOUT_FILE_EXT = ".MemoryLayout" + MEMORY_LAYOUT_FILE_SHORT_EXT;
+        public const string MEMORY_LAYOUT_FILE_FILTER = "Memory Layout (*" + MEMORY_LAYOUT_FILE_EXT + ")|*" + MEMORY_LAYOUT_FILE_EXT;
 
-		public MemoryLayout()
-			: this(0, 0, new List<uint>())
-		{
-		}
+        public MemoryLayout()
+            : this(0, 0, new List<uint>())
+        {
+        }
 
-		public MemoryLayout(uint baseAddress, uint size, List<uint> sectorSizes)
-		{
+        public MemoryLayout(uint baseAddress, uint size, List<uint> sectorSizes)
+        {
             BaseAddress = baseAddress;
             Size = size;
             SectorSizes = sectorSizes;
-			mPropertyErrors = new Dictionary<string, string>();
+            mPropertyErrors = new Dictionary<string, string>();
             Validate();
-		}
+        }
 
         public void Reset()
         {
@@ -57,22 +57,22 @@ namespace Shared
             Validate();
         }
 
-		public uint BaseAddress { get; set; }
+        public uint BaseAddress { get; set; }
         public uint Size { get; set; }
 
-		private bool ValidateBaseAddress()
-		{
-			string error = null;
+        private bool ValidateBaseAddress()
+        {
+            string error = null;
 
-			if (BaseAddress % 2 != 0)
-			{
-				error = "BaseAddress must be an even number";
-			}
+            if (BaseAddress % 2 != 0)
+            {
+                error = "BaseAddress must be an even number";
+            }
 
-			this["BaseAddress"] = error;
+            this["BaseAddress"] = error;
 
-			return (error == null);
-		}
+            return (error == null);
+        }
 
         private bool ValidateSize()
         {
@@ -88,40 +88,40 @@ namespace Shared
             return (error == null);
         }
 
-		public uint EndAddress
-		{
-			get
-			{
+        public uint EndAddress
+        {
+            get
+            {
                 return BaseAddress + Size;
-			}
-		}
+            }
+        }
 
-		private bool ValidateSectorSizes()
-		{
-			string error = null;
+        private bool ValidateSectorSizes()
+        {
+            string error = null;
 
-			if (SectorSizes == null)
-			{
+            if (SectorSizes == null)
+            {
                 error = "SectorSizes is null";
-			}
+            }
             else if (SectorSizes.Count == 0)
-			{
+            {
                 error = "SectorSizes is empty";
-			}
-			else
-			{
+            }
+            else
+            {
                 uint totalSize = 0;
 
                 foreach (uint size in SectorSizes)
-				{
-					if (size % 2 != 0)
-					{
+                {
+                    if (size % 2 != 0)
+                    {
                         error = "All SectorSizes must be even numbers";
-						break;
-					}
+                        break;
+                    }
 
                     totalSize += size;
-				}
+                }
 
                 if (error == null)
                 {
@@ -130,55 +130,55 @@ namespace Shared
                         error = "Sum of SectorSizes does not match Size";
                     }
                 }
-			}
+            }
 
             this["SectorSizes"] = error;
 
-			return (error == null);
-		}
+            return (error == null);
+        }
 
-		public bool Validate()
-		{
-			bool isValid = ValidateBaseAddress();
+        public bool Validate()
+        {
+            bool isValid = ValidateBaseAddress();
             isValid &= ValidateSize();
-			isValid &= ValidateSectorSizes();
+            isValid &= ValidateSectorSizes();
 
-			return isValid;
-		}
+            return isValid;
+        }
 
-		public string Error
-		{
-			get
-			{
-				string error = null;
+        public string Error
+        {
+            get
+            {
+                string error = null;
 
-				foreach (string propertyName in mPropertyErrors.Keys)
-				{
-					error = mPropertyErrors[propertyName];
+                foreach (string propertyName in mPropertyErrors.Keys)
+                {
+                    error = mPropertyErrors[propertyName];
 
-					if (error != null)
-					{
-						break;
-					}
-				}
+                    if (error != null)
+                    {
+                        break;
+                    }
+                }
 
-				return error;
-			}
-		}
+                return error;
+            }
+        }
 
-		public string this[string columnName]
-		{
-			get
-			{
-				string error = null;
+        public string this[string columnName]
+        {
+            get
+            {
+                string error = null;
 
-				if (mPropertyErrors.ContainsKey(columnName))
-				{
-					error = mPropertyErrors[columnName];
-				}
+                if (mPropertyErrors.ContainsKey(columnName))
+                {
+                    error = mPropertyErrors[columnName];
+                }
 
-				return error;
-			}
+                return error;
+            }
 
             private set
             {
@@ -187,13 +187,13 @@ namespace Shared
                     mPropertyErrors[columnName] = value;
                 }
             }
-		}
+        }
 
         public List<uint> SectorSizes { get; set; }
 
-		[NonSerialized]
-		private Dictionary<string, string> mPropertyErrors;
-	}
+        [NonSerialized]
+        private Dictionary<string, string> mPropertyErrors;
+    }
 
     public class MemoryUtils
     {
@@ -221,7 +221,7 @@ namespace Shared
         public static bool CombineMemorySectorsIntoImage(IEnumerable<byte[]> sectorData, MemoryLayout layout, out MemoryImage combinedData)
         {
             bool success = true;
-			combinedData = new MemoryImage(layout.Size, layout.BaseAddress);
+            combinedData = new MemoryImage(layout.Size, layout.BaseAddress);
 
             int curIndex = 0;
 
@@ -277,7 +277,7 @@ namespace Shared
 
                 if (readLength == stream.Length)
                 {
-					//TODO - load hex file
+                    //TODO - load hex file
 
                     retVal = true;
                 }
@@ -287,3 +287,5 @@ namespace Shared
         }
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

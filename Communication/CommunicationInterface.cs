@@ -49,8 +49,8 @@ namespace Communication
         {
             bool result = false;
 
-			mActionStartTime = DateTime.Now;
-			mActionEndTime = mActionStartTime;
+            mActionStartTime = DateTime.Now;
+            mActionEndTime = mActionStartTime;
 
             if (IsComplete)
             {
@@ -83,7 +83,7 @@ namespace Communication
         {
             if (!IsComplete)
             {
-				mActionEndTime = DateTime.Now;
+                mActionEndTime = DateTime.Now;
 
                 IsComplete = true;
                 CompletedSuccessfully = success;
@@ -108,23 +108,23 @@ namespace Communication
         protected CommunicationInterface CommInterface { get; set; }
         public event CompletedActionDelegate ActionCompletedEvent;
 
-		public TimeSpan ActionElapsedTime
-		{
-			get
-			{
-				if (!IsComplete)
-				{
-					return DateTime.Now - mActionStartTime;
-				}
-				else
-				{
-					return mActionEndTime - mActionStartTime;
-				}
-			}
-		}
+        public TimeSpan ActionElapsedTime
+        {
+            get
+            {
+                if (!IsComplete)
+                {
+                    return DateTime.Now - mActionStartTime;
+                }
+                else
+                {
+                    return mActionEndTime - mActionStartTime;
+                }
+            }
+        }
 
-		private DateTime mActionStartTime;
-		private DateTime mActionEndTime;
+        private DateTime mActionStartTime;
+        private DateTime mActionEndTime;
     }
 
     public abstract class CommunicationOperation : Operation
@@ -187,33 +187,33 @@ namespace Communication
         //return true unless we try to start an action and fail
         protected bool StartNextAction()
         {
-			bool success = false;
+            bool success = false;
 
-			try
-			{
-				CurrentAction = NextAction();
+            try
+            {
+                CurrentAction = NextAction();
 
-				success = true;
+                success = true;
 
-				if (CurrentAction != null)
-				{
-					CurrentAction.ActionCompletedEvent += this.ActionCompletedHandler;
-					success = CurrentAction.Start();
+                if (CurrentAction != null)
+                {
+                    CurrentAction.ActionCompletedEvent += this.ActionCompletedHandler;
+                    success = CurrentAction.Start();
 
-					if (success)
-					{
-						OnActionStarted(CurrentAction);
-					}
-					else
-					{
-						AbortCurrentAction();
-					}
-				}
-			}
-			catch
-			{
-				Debug.Fail("Failed to start action");
-			}
+                    if (success)
+                    {
+                        OnActionStarted(CurrentAction);
+                    }
+                    else
+                    {
+                        AbortCurrentAction();
+                    }
+                }
+            }
+            catch
+            {
+                Debug.Fail("Failed to start action");
+            }
 
             return success;
         }
@@ -225,18 +225,18 @@ namespace Communication
 
         protected override bool OnOperationCompleted(bool success)
         {
-			bool wasRunning = IsRunning;
+            bool wasRunning = IsRunning;
 
             bool result = base.OnOperationCompleted(success);
 
-			if(wasRunning)
-			{
-				CommInterface.ConnectionStatusChangedEvent -= this.ConnectionChangedHandler;
+            if(wasRunning)
+            {
+                CommInterface.ConnectionStatusChangedEvent -= this.ConnectionChangedHandler;
 
-				AbortCurrentAction();
-			}
+                AbortCurrentAction();
+            }
 
-			return result;
+            return result;
         }
 
         private void ActionCompletedHandler(CommunicationAction action, bool success)
@@ -339,8 +339,8 @@ namespace Communication
         public delegate void ConnectionStatusChangedDelegate(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect);
         public event ConnectionStatusChangedDelegate ConnectionStatusChangedEvent;
 
-		private const uint FTDIDeviceReadTimeOutMsDefaultValue = 1000;
-		[DefaultValue(FTDIDeviceReadTimeOutMsDefaultValue)]
+        private const uint FTDIDeviceReadTimeOutMsDefaultValue = 1000;
+        [DefaultValue(FTDIDeviceReadTimeOutMsDefaultValue)]
         public uint FTDIDeviceReadTimeOutMs
         {
             get
@@ -357,10 +357,10 @@ namespace Communication
                 }
             }
         }
-		private uint _FTDIDeviceReadTimeOutMs = FTDIDeviceReadTimeOutMsDefaultValue;
+        private uint _FTDIDeviceReadTimeOutMs = FTDIDeviceReadTimeOutMsDefaultValue;
 
-		private const uint FTDIDeviceWriteTimeOutMsDefaultValue = 1000;
-		[DefaultValue(FTDIDeviceWriteTimeOutMsDefaultValue)]
+        private const uint FTDIDeviceWriteTimeOutMsDefaultValue = 1000;
+        [DefaultValue(FTDIDeviceWriteTimeOutMsDefaultValue)]
         public uint FTDIDeviceWriteTimeOutMs
         {
             get
@@ -377,7 +377,7 @@ namespace Communication
                 }
             }
         }
-		private uint _FTDIDeviceWriteTimeOutMs = FTDIDeviceWriteTimeOutMsDefaultValue;
+        private uint _FTDIDeviceWriteTimeOutMs = FTDIDeviceWriteTimeOutMsDefaultValue;
 
         public DeviceInfo SelectedDeviceInfo { get; set; }
 
@@ -640,7 +640,7 @@ namespace Communication
 
                             if (invocationList != null)
                             {
-								//it is OK to have more than one delegate in the invocation list, specifically for the connection changed events there may be multiple disconnection event listeners
+                                //it is OK to have more than one delegate in the invocation list, specifically for the connection changed events there may be multiple disconnection event listeners
                                 Debug.Assert(invocationList.Length > 0);//debug test to make sure nothing weird is happening
 
                                 for (int x = 0; x < invocationList.Length; x++)
@@ -809,3 +809,5 @@ namespace Communication
         }
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

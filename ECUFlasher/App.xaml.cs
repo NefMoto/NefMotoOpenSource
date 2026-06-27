@@ -54,7 +54,7 @@ namespace ECUFlasher
         {
             string appDataDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string companyDirectory = appDataDirectory + "\\" + ECUFlasher.Properties.Resources.CompanyName;
-			string applicationDirectory = companyDirectory + "\\" + ECUFlasher.Properties.Resources.ApplicationName;
+            string applicationDirectory = companyDirectory + "\\" + ECUFlasher.Properties.Resources.ApplicationName;
 
             return applicationDirectory;
         }
@@ -110,7 +110,7 @@ namespace ECUFlasher
                 mPropertyErrors = new Dictionary<string, string>();
 
                 mLogFileDirectory = GetAppDataDirectory();
-				mLogFileName =  Path.Combine ( mLogFileDirectory , ECUFlasher.Properties.Resources.ApplicationName + "Log.txt");
+                mLogFileName =  Path.Combine ( mLogFileDirectory , ECUFlasher.Properties.Resources.ApplicationName + "Log.txt");
                 CreateLogFile();
 
                 DisplayStatusMessage("Opening " + GetApplicationName(), StatusMessageType.LOG);
@@ -145,8 +145,8 @@ namespace ECUFlasher
 
             try
             {
-				//trigger the creation of the comm interface
-				DesiredProtocol = CommunicationInterface.Protocol.KWP2000;
+                //trigger the creation of the comm interface
+                DesiredProtocol = CommunicationInterface.Protocol.KWP2000;
             }
             catch(Exception e)
             {
@@ -328,11 +328,11 @@ namespace ECUFlasher
 
             switch (promptType)
             {
-				case UserPromptType.OK:
-				{
-					button = MessageBoxButton.OK;
-					break;
-				}
+                case UserPromptType.OK:
+                {
+                    button = MessageBoxButton.OK;
+                    break;
+                }
                 case UserPromptType.OK_CANCEL:
                 {
                     button = MessageBoxButton.OKCancel;
@@ -405,7 +405,7 @@ namespace ECUFlasher
 #else
                 if ((messageType != StatusMessageType.DEV) && (messageType != StatusMessageType.DEV_USER))
 #endif
-				{
+                {
                     try
                     {
                         //display status message can be called from multiple threads
@@ -469,8 +469,8 @@ namespace ECUFlasher
                 const int MAX_FILE_SIZE_MEGS = 10;
                 const int TRUNCATION_RATIO = 4;
 
-				var timer = new Stopwatch();
-				timer.Start();
+                var timer = new Stopwatch();
+                timer.Start();
 
                 if (mLogFileSize > 1024 * 1024 * MAX_FILE_SIZE_MEGS)
                 {
@@ -500,7 +500,7 @@ namespace ECUFlasher
                                 DisplayStatusMessage("Deleted log file because it was larger than " + MAX_FILE_SIZE_MEGS + " megabytes.", StatusMessageType.USER);
                             }
 
-							DisplayStatusMessage("Log file truncation took: " + timer.Elapsed, StatusMessageType.LOG);
+                            DisplayStatusMessage("Log file truncation took: " + timer.Elapsed, StatusMessageType.LOG);
                         }
                         catch
                         {
@@ -509,7 +509,7 @@ namespace ECUFlasher
                     }
                 }
 
-				timer.Stop();
+                timer.Stop();
             }
         }
 
@@ -1041,3 +1041,5 @@ namespace ECUFlasher
         public ObservableCollection<DeviceInfo> Devices { get; private set; }
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

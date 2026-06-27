@@ -57,7 +57,7 @@ namespace Communication
         {
             lock (this)//lock to ensure we don't accidentally get other callbacks while handling this one
             {
-				message.ResponsesFinishedEvent -= this.FinishedReceivingResponsesHandler;
+                message.ResponsesFinishedEvent -= this.FinishedReceivingResponsesHandler;
 
                 if (!IsComplete)//always need to check this in case we are getting callbacks after we complete
                 {
@@ -89,27 +89,27 @@ namespace Communication
             {
                 if (!IsComplete)//always need to check this in case we are getting callbacks after we complete
                 {
-					try
-					{
-						bool handledMessage = MessageHandler(commInterface, message);
+                    try
+                    {
+                        bool handledMessage = MessageHandler(commInterface, message);
 
-						if (!handledMessage)
-						{
-							DisplayStatusMessage("Received unhandled message with service ID: " + KWP2000CommInterface.GetServiceIDString(message.mServiceID), StatusMessageType.LOG);
+                        if (!handledMessage)
+                        {
+                            DisplayStatusMessage("Received unhandled message with service ID: " + KWP2000CommInterface.GetServiceIDString(message.mServiceID), StatusMessageType.LOG);
 
-							if (message.mServiceID == (byte)KWP2000ServiceID.NegativeResponse)
-							{
-								if (message.DataLength >= 2)
-								{
-									DisplayStatusMessage("Unhandled negative response, request ID: " + KWP2000CommInterface.GetServiceIDString(message.mData[0]) + " response code: " + KWP2000CommInterface.GetResponseCodeString(message.mData[1]), StatusMessageType.LOG);
-								}
-							}
-						}
-					}
-					catch (Exception e)
-					{
-						Debug.Fail("Exception: " + e.Message);
-					}
+                            if (message.mServiceID == (byte)KWP2000ServiceID.NegativeResponse)
+                            {
+                                if (message.DataLength >= 2)
+                                {
+                                    DisplayStatusMessage("Unhandled negative response, request ID: " + KWP2000CommInterface.GetServiceIDString(message.mData[0]) + " response code: " + KWP2000CommInterface.GetResponseCodeString(message.mData[1]), StatusMessageType.LOG);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.Fail("Exception: " + e.Message);
+                    }
                 }
             }
         }
@@ -125,17 +125,17 @@ namespace Communication
                     handled = true;
                     break;
                 }
-				case (byte)KWP2000ServiceID.StopCommunicationPositiveResponse:
+                case (byte)KWP2000ServiceID.StopCommunicationPositiveResponse:
                 {
                     handled = true;
                     break;
                 }
-				case (byte)KWP2000ServiceID.TesterPresentPositiveReponse:
+                case (byte)KWP2000ServiceID.TesterPresentPositiveReponse:
                 {
                     handled = true;
                     break;
                 }
-				case (byte)KWP2000ServiceID.NegativeResponse:
+                case (byte)KWP2000ServiceID.NegativeResponse:
                 {
                     if (message.DataLength >= 2)
                     {
@@ -174,41 +174,41 @@ namespace Communication
             }
         }
 
-		protected KWP2000Message SendMessage(byte serviceID)
-		{
-			var message = KWP2000CommInterface.SendMessage(serviceID);
+        protected KWP2000Message SendMessage(byte serviceID)
+        {
+            var message = KWP2000CommInterface.SendMessage(serviceID);
 
-			if (message != null)
-			{
-				message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
-			}
+            if (message != null)
+            {
+                message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
+            }
 
-			return message;
-		}
+            return message;
+        }
 
-		protected KWP2000Message SendMessage(byte serviceID, byte[] data)
-		{
-			var message = KWP2000CommInterface.SendMessage(serviceID, data);
+        protected KWP2000Message SendMessage(byte serviceID, byte[] data)
+        {
+            var message = KWP2000CommInterface.SendMessage(serviceID, data);
 
-			if (message != null)
-			{
-				message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
-			}
+            if (message != null)
+            {
+                message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
+            }
 
-			return message;
-		}
+            return message;
+        }
 
-		protected KWP2000Message SendMessage(byte serviceID, uint maxNumRetries, byte[] data)
-		{
-			var message = KWP2000CommInterface.SendMessage(serviceID, maxNumRetries, data);
+        protected KWP2000Message SendMessage(byte serviceID, uint maxNumRetries, byte[] data)
+        {
+            var message = KWP2000CommInterface.SendMessage(serviceID, maxNumRetries, data);
 
-			if (message != null)
-			{
-				message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
-			}
+            if (message != null)
+            {
+                message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
+            }
 
-			return message;
-		}
+            return message;
+        }
 
         protected KWP2000Interface KWP2000CommInterface
         {
@@ -684,7 +684,7 @@ namespace Communication
             : base(commInterface)
         {
 
-		}
+        }
 
         public override bool Start()
         {
@@ -858,14 +858,14 @@ namespace Communication
 
         public static byte[] CreateMessageData(TimingParameterIdentifier tpi, TimingParameters param = null)
         {
-			if (param == null)
-			{
-				param = new TimingParameters();
-			}
+            if (param == null)
+            {
+                param = new TimingParameters();
+            }
 
-			//Note: we always need to send 6 bytes, even when reading defaults, reading limits, going to defaults, etc.
-			var data = new byte[6];
-			GetDataFromTimingParams(param, data);
+            //Note: we always need to send 6 bytes, even when reading defaults, reading limits, going to defaults, etc.
+            var data = new byte[6];
+            GetDataFromTimingParams(param, data);
 
             data[0] = (byte)tpi;
 
@@ -908,11 +908,11 @@ namespace Communication
                 }
                 case NegotiationTarget.Limits:
                 {
-					return (commInterface.CurrentTimingParameterMode != KWP2000Interface.TimingParameterMode.Limits);
+                    return (commInterface.CurrentTimingParameterMode != KWP2000Interface.TimingParameterMode.Limits);
                 }
                 case NegotiationTarget.Current:
                 {
-					return (commInterface.CurrentTimingParameterMode != KWP2000Interface.TimingParameterMode.Current);
+                    return (commInterface.CurrentTimingParameterMode != KWP2000Interface.TimingParameterMode.Current);
                 }
             }
 
@@ -961,7 +961,7 @@ namespace Communication
 
                         DisplayStatusMessage("Read current timings: " + mCurrentTimingParams.ToString(), StatusMessageType.DEV);
 
-						KWP2000CommInterface.CurrentTimingParameterMode = KWP2000Interface.TimingParameterMode.Current;
+                        KWP2000CommInterface.CurrentTimingParameterMode = KWP2000Interface.TimingParameterMode.Current;
                         KWP2000CommInterface.CurrentTimingParameters = mCurrentTimingParams;
 
                         if (mTarget == NegotiationTarget.Limits)
@@ -1013,11 +1013,11 @@ namespace Communication
 
                         if (mTarget == NegotiationTarget.Default)
                         {
-							KWP2000CommInterface.CurrentTimingParameterMode = KWP2000Interface.TimingParameterMode.Default;
+                            KWP2000CommInterface.CurrentTimingParameterMode = KWP2000Interface.TimingParameterMode.Default;
                         }
                         else if (mTarget == NegotiationTarget.Limits)
                         {
-							KWP2000CommInterface.CurrentTimingParameterMode = KWP2000Interface.TimingParameterMode.Limits;
+                            KWP2000CommInterface.CurrentTimingParameterMode = KWP2000Interface.TimingParameterMode.Limits;
                         }
 
                         KWP2000CommInterface.CurrentTimingParameters = mCurrentTimingParams;
@@ -1197,10 +1197,10 @@ namespace Communication
                         {
                             success = (message.mData[1] == 0);
 
-							if (!success)
-							{
-								DisplayStatusMessage("Received unsuccessful response to erase flash request: 0x" + message.mData[1].ToString("X2"), StatusMessageType.LOG);
-							}
+                            if (!success)
+                            {
+                                DisplayStatusMessage("Received unsuccessful response to erase flash request: 0x" + message.mData[1].ToString("X2"), StatusMessageType.LOG);
+                            }
                         }
                         else
                         {
@@ -1775,12 +1775,12 @@ namespace Communication
                         {
                             if((message.mData[1] == (byte)KWP2000ResponseCode.ServiceNotSupported) || (message.mData[1] == (byte)KWP2000ResponseCode.NoProgram))
                             {
-								if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+                                if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestDownload service is not supported.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestDownloadNotSupported;
                                 }
-								else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
+                                else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestUpload service is not supported. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestUploadNotSupported;
@@ -1795,12 +1795,12 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.GeneralReject)
                             {
-								if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+                                if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestDownload was rejected.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestDownloadRejected;
                                 }
-								else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
+                                else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestUpload was rejected. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestUploadRejected;
@@ -1873,7 +1873,7 @@ namespace Communication
         {
             byte dataFormat = 0;
 
-			if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+            if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
             {
                 dataFormat = TransferDataAction.GetDataFormatByte(TransferDataAction.CompressionType.Bosch, TransferDataAction.EncryptionType.Bosch);
             }
@@ -1888,7 +1888,7 @@ namespace Communication
             {
                 case ValidationState.Range:
                 {
-					if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+                    if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                     {
                         KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mStartAddress, size, dataFormat);
                     }
@@ -1900,7 +1900,7 @@ namespace Communication
                 }
                 case ValidationState.BeforeStart:
                 {
-					if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+                    if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                     {
                         KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mStartAddress - 2, size + 2, dataFormat);
                     }
@@ -1912,7 +1912,7 @@ namespace Communication
                 }
                 case ValidationState.AfterEnd:
                 {
-					if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+                    if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                     {
                         KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mStartAddress, size + 2, dataFormat);
                     }
@@ -2147,7 +2147,7 @@ namespace Communication
 
     public class ReadMemoryAction : ReadWriteMemoryActionBase
     {
-		//return false to stop the action from reading any further
+        //return false to stop the action from reading any further
         public delegate bool NotifyBytesReadDelegate(uint newAmountRead, uint totalRead, uint totalToRead, ReadMemoryAction runningAction);
 
         public ReadMemoryAction(KWP2000Interface commInterface, uint startAddress, uint numBytes, byte maxBlockSize, NotifyBytesReadDelegate readDel)
@@ -2188,30 +2188,30 @@ namespace Communication
 
                     mCurrentAddress += (uint)message.mData.Length;
 
-					var keepRunning = true;
+                    var keepRunning = true;
 
                     if (mNotifyReadDel != null)
                     {
                         keepRunning = mNotifyReadDel((uint)message.mData.Length, mCurrentAddress - mStartAddress, (uint)ReadData.Length, this);
                     }
 
-					if (keepRunning)
-					{
-						SendMemoryRequest();
-					}
-					else
-					{
-						ActionCompleted(true);
-					}
+                    if (keepRunning)
+                    {
+                        SendMemoryRequest();
+                    }
+                    else
+                    {
+                        ActionCompleted(true);
+                    }
 
                     handled = true;
                 }
                 else
                 {
-					byte responseCode;
-					if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.ReadMemoryByAddress, message, out responseCode))
+                    byte responseCode;
+                    if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.ReadMemoryByAddress, message, out responseCode))
                     {
-						FailureResponseCode = responseCode;
+                        FailureResponseCode = responseCode;
                     }
                 }
 
@@ -2227,7 +2227,7 @@ namespace Communication
 
         protected override void SendMemoryRequest()
         {
-			//minus 4 for the address and size data
+            //minus 4 for the address and size data
             mCurrentBlockSize = (byte)Math.Min(mMaxBlockSize - 4, mEndAddress - mCurrentAddress);
 
             if (mCurrentBlockSize > 0)
@@ -2291,15 +2291,15 @@ namespace Communication
             {
                 if (message.mServiceID == (byte)KWP2000ServiceID.WriteMemoryByAddressPositiveResponse)
                 {
-					uint bytesWritten = mCurrentBlockSize;
+                    uint bytesWritten = mCurrentBlockSize;
 
-					mCurrentAddress += bytesWritten;
+                    mCurrentAddress += bytesWritten;
 
                     SendMemoryRequest();
 
                     if (mNotifyWriteDel != null)
                     {
-						mNotifyWriteDel(bytesWritten, mCurrentAddress - mStartAddress, (uint)mDataToWrite.Length);
+                        mNotifyWriteDel(bytesWritten, mCurrentAddress - mStartAddress, (uint)mDataToWrite.Length);
                     }
 
                     handled = true;
@@ -2330,7 +2330,7 @@ namespace Communication
 
         protected override void SendMemoryRequest()
         {
-			//minus 4 for the address and size data
+            //minus 4 for the address and size data
             mCurrentBlockSize = (byte)Math.Min(mMaxBlockSize - 4, mEndAddress - mCurrentAddress);
 
             if (mCurrentBlockSize > 0)
@@ -2375,7 +2375,7 @@ namespace Communication
             {
                 byte[] tempData = { IdentificationOption };
                 SendMessage((byte)KWP2000ServiceID.ReadECUIdentification, tempData);
-				DisplayStatusMessage("Reading ECU identification option: 0x" + IdentificationOption.ToString("X2"), StatusMessageType.LOG);
+                DisplayStatusMessage("Reading ECU identification option: 0x" + IdentificationOption.ToString("X2"), StatusMessageType.LOG);
 
                 result = true;
             }
@@ -2397,7 +2397,7 @@ namespace Communication
                         IdentificationData = new byte[message.mData.Length - 1];
                         Buffer.BlockCopy(message.mData, 1, IdentificationData, 0, message.mData.Length - 1);
 
-						DisplayStatusMessage("Read ECU identification option: 0x" + IdentificationOption.ToString("X2"), StatusMessageType.LOG);
+                        DisplayStatusMessage("Read ECU identification option: 0x" + IdentificationOption.ToString("X2"), StatusMessageType.LOG);
 
                         DisplayStatusMessage("Successfully read ECU identification information", StatusMessageType.LOG);
                         ActionCompleted(true);
@@ -2436,12 +2436,12 @@ namespace Communication
 
     public class SecurityAccessAction : KWP2000Action
     {
-		public class SecurityAccessSettings
-		{
-			public byte RequestSeed = SecurityAccessAction.DEFAULT_REQUEST_SEED;
-			public bool SupportSpecialKey = false;
-			public bool UseExtendedSeedRequest = false;
-		}
+        public class SecurityAccessSettings
+        {
+            public byte RequestSeed = SecurityAccessAction.DEFAULT_REQUEST_SEED;
+            public bool SupportSpecialKey = false;
+            public bool UseExtendedSeedRequest = false;
+        }
 
         //external RAM requires 4 byte sendkey (service id, sendkey(2), 4 byte key)
         //internal ROM requires 4 byte sendkey (service id, sendkey(2), 4 byte key)
@@ -2451,45 +2451,45 @@ namespace Communication
 
         public const byte DEFAULT_REQUEST_SEED = 0x01;//0x7F doesn't work for 2003 Audi A4
         public const byte INTERNAL_ROM_REQUEST_SEED = 0x77;//0x77 to 0x7F will work
-		public const byte EXTERNAL_RAM_REQUEST_SEED = 0x7F;
+        public const byte EXTERNAL_RAM_REQUEST_SEED = 0x7F;
 
         //this does not appear to work with the 2003 A4
-		public const byte EXTERNAL_RAM_SPECIAL_REQUEST_SEED = 0x03;//used when trying to login with (seed + 0x11223344)
+        public const byte EXTERNAL_RAM_SPECIAL_REQUEST_SEED = 0x03;//used when trying to login with (seed + 0x11223344)
 
-		public const byte DEFAULT_NUM_LOOPS = 5;//5 should work for internal ROM and external RAM
-		public const byte EXTERNAL_RAM_NUM_LOOPS = 5;
+        public const byte DEFAULT_NUM_LOOPS = 5;//5 should work for internal ROM and external RAM
+        public const byte EXTERNAL_RAM_NUM_LOOPS = 5;
 
-		public const Int16 DEFAULT_KEY_INDEX = 0x3F;//This key index appears to work for 2000 to 2003 VW/Audi
+        public const Int16 DEFAULT_KEY_INDEX = 0x3F;//This key index appears to work for 2000 to 2003 VW/Audi
 
         public SecurityAccessAction(KWP2000Interface commInterface, SecurityAccessSettings settings)
             : base(commInterface)
         {
-			Debug.Assert(settings != null);
+            Debug.Assert(settings != null);
 
-			if (settings == null)
-			{
-				settings = new SecurityAccessSettings();
-			}
+            if (settings == null)
+            {
+                settings = new SecurityAccessSettings();
+            }
 
-			mSupportSpecialSeed = settings.SupportSpecialKey;
-			mSendExtendedSeedRequest = settings.UseExtendedSeedRequest;
+            mSupportSpecialSeed = settings.SupportSpecialKey;
+            mSendExtendedSeedRequest = settings.UseExtendedSeedRequest;
 
-			mRequestSeed = settings.RequestSeed;
+            mRequestSeed = settings.RequestSeed;
             Debug.Assert(mRequestSeed % 2 == 1, "Request seed must be odd");
-			mRequestSeed += (byte)(1 - (mRequestSeed % 2));//if the seed is even, add one
+            mRequestSeed += (byte)(1 - (mRequestSeed % 2));//if the seed is even, add one
 
-			mSendKey = (byte)(mRequestSeed + 1);
+            mSendKey = (byte)(mRequestSeed + 1);
 
             mRequestSeedNumLoops = DEFAULT_NUM_LOOPS;
 
             mExternalRAMKeyTable = new uint[64]{0x0A221289, 0x144890A1, 0x24212491, 0x290A0285, 0x42145091, 0x504822C1, 0x0A24C4C1, 0x14252229,
-			        0x24250525, 0x2510A491, 0x28488863, 0x29148885, 0x422184A5, 0x49128521, 0x50844A85, 0x620CC211,
-			        0x124452A9, 0x18932251, 0x2424A459, 0x29149521, 0x42352621, 0x4A512289, 0x52A48911, 0x11891475,
-			        0x22346523, 0x4A3118D1, 0x64497111, 0x0AE34529, 0x15398989, 0x22324A67, 0x2D12B489, 0x132A4A75,
-			        0x19B13469, 0x25D2C453, 0x4949349B, 0x524E9259, 0x1964CA6B, 0x24F5249B, 0x28979175, 0x352A5959,
-			        0x3A391749, 0x51D44EA9, 0x564A4F25, 0x6AD52649, 0x76493925, 0x25DE52C9, 0x332E9333, 0x68D64997,
-			        0x494947FB, 0x33749ACF, 0x5AD55B5D, 0x7F272A4F, 0x35BD5B75, 0x3F5AD55D, 0x5B5B6DAD, 0x6B5DAD6B,
-			        0x75B57AD5, 0x5DBAD56F, 0x6DBF6AAD, 0x75775EB5, 0x5AEDFED5, 0x6B5F7DD5, 0x6F757B6B, 0x5FBD5DBD};
+                    0x24250525, 0x2510A491, 0x28488863, 0x29148885, 0x422184A5, 0x49128521, 0x50844A85, 0x620CC211,
+                    0x124452A9, 0x18932251, 0x2424A459, 0x29149521, 0x42352621, 0x4A512289, 0x52A48911, 0x11891475,
+                    0x22346523, 0x4A3118D1, 0x64497111, 0x0AE34529, 0x15398989, 0x22324A67, 0x2D12B489, 0x132A4A75,
+                    0x19B13469, 0x25D2C453, 0x4949349B, 0x524E9259, 0x1964CA6B, 0x24F5249B, 0x28979175, 0x352A5959,
+                    0x3A391749, 0x51D44EA9, 0x564A4F25, 0x6AD52649, 0x76493925, 0x25DE52C9, 0x332E9333, 0x68D64997,
+                    0x494947FB, 0x33749ACF, 0x5AD55B5D, 0x7F272A4F, 0x35BD5B75, 0x3F5AD55D, 0x5B5B6DAD, 0x6B5DAD6B,
+                    0x75B57AD5, 0x5DBAD56F, 0x6DBF6AAD, 0x75775EB5, 0x5AEDFED5, 0x6B5F7DD5, 0x6F757B6B, 0x5FBD5DBD};
 
             mInternalROMKeyTable = new uint[5] { 0x75775EB5, 0x5AEDFED5, 0x6B5F7DD5, 0x6F757B6B, 0x5FBD5DBD };
 
@@ -2510,30 +2510,30 @@ namespace Communication
 
             if (result)
             {
-				byte[] tempData = null;
+                byte[] tempData = null;
 
-				if (mSendExtendedSeedRequest)
-				{
-					//The internal ROM wants the num loops and word SECURITY in the message: service id, request seed, num loop, up to 14 bytes of ASCII data
-					tempData = new byte[11];
-					tempData[0] = mRequestSeed;
-					tempData[1] = mRequestSeedNumLoops;
-					tempData[2] = (byte)'S';
-					tempData[3] = (byte)'E';
-					tempData[4] = (byte)'C';
-					tempData[5] = (byte)'U';
-					tempData[6] = (byte)'R';
-					tempData[7] = (byte)'I';
-					tempData[8] = (byte)'T';
-					tempData[9] = (byte)'Y';
-					tempData[10] = 0;
-				}
-				else
-				{
-					//The external RAM expects 2 or more bytes in the message: service id, request seed, the rest are ignored
-					tempData = new byte[1];
-					tempData[0] = mRequestSeed;
-				}
+                if (mSendExtendedSeedRequest)
+                {
+                    //The internal ROM wants the num loops and word SECURITY in the message: service id, request seed, num loop, up to 14 bytes of ASCII data
+                    tempData = new byte[11];
+                    tempData[0] = mRequestSeed;
+                    tempData[1] = mRequestSeedNumLoops;
+                    tempData[2] = (byte)'S';
+                    tempData[3] = (byte)'E';
+                    tempData[4] = (byte)'C';
+                    tempData[5] = (byte)'U';
+                    tempData[6] = (byte)'R';
+                    tempData[7] = (byte)'I';
+                    tempData[8] = (byte)'T';
+                    tempData[9] = (byte)'Y';
+                    tempData[10] = 0;
+                }
+                else
+                {
+                    //The external RAM expects 2 or more bytes in the message: service id, request seed, the rest are ignored
+                    tempData = new byte[1];
+                    tempData[0] = mRequestSeed;
+                }
 
                 SendMessage((byte)KWP2000ServiceID.SecurityAccess, tempData);
 
@@ -2700,36 +2700,36 @@ namespace Communication
             return sendKey;
         }
         /*
-		protected byte[] GenerateInternetExampleSendKey(byte[] seedArray)
-		{
-			Debug.Assert(seedArray.Length == 4, "Unexpected length of seed");
+        protected byte[] GenerateInternetExampleSendKey(byte[] seedArray)
+        {
+            Debug.Assert(seedArray.Length == 4, "Unexpected length of seed");
 
             Debug.Assert(mSecurityKeyIndex < mExternalRAMKeyTable.Length);
             byte securityKeyIndex = (byte)Math.Min(mSecurityKeyIndex, mExternalRAMKeyTable.Length - 1);
 
-			uint seed = (uint)(seedArray[0] << 24) + (uint)(seedArray[1] << 16) + (uint)(seedArray[2] << 8) + (uint)seedArray[3];
+            uint seed = (uint)(seedArray[0] << 24) + (uint)(seedArray[1] << 16) + (uint)(seedArray[2] << 8) + (uint)seedArray[3];
 
-			for (int i = 0; i < mRequestSeedNumLoops; i++)
-			{
-				if ((seed & 0x80000000) == 0)
-				{
-					seed = (mExternalRAMKeyTable[securityKeyIndex]) ^ (seed << 1);
-				}
-				else
-				{
-					seed <<= 1;
-				}
-			}
+            for (int i = 0; i < mRequestSeedNumLoops; i++)
+            {
+                if ((seed & 0x80000000) == 0)
+                {
+                    seed = (mExternalRAMKeyTable[securityKeyIndex]) ^ (seed << 1);
+                }
+                else
+                {
+                    seed <<= 1;
+                }
+            }
 
-			byte[] sendKey = new byte[4];
+            byte[] sendKey = new byte[4];
 
-			sendKey[0] = (byte)((seed >> 24) & 0xFF);
-			sendKey[1] = (byte)((seed >> 16) & 0xFF);
-			sendKey[2] = (byte)((seed >> 8) & 0xFF);
-			sendKey[3] = (byte)((seed) & 0xFF);
+            sendKey[0] = (byte)((seed >> 24) & 0xFF);
+            sendKey[1] = (byte)((seed >> 16) & 0xFF);
+            sendKey[2] = (byte)((seed >> 8) & 0xFF);
+            sendKey[3] = (byte)((seed) & 0xFF);
 
-			return sendKey;
-		}
+            return sendKey;
+        }
         */
 
         //sendkey value from 0x77 to 0x80 would work with the security table, other numbers would go to an algorithm
@@ -2789,8 +2789,8 @@ namespace Communication
             return sendKey;
         }
 
-		protected bool mSupportSpecialSeed;
-		protected bool mSendExtendedSeedRequest;
+        protected bool mSupportSpecialSeed;
+        protected bool mSendExtendedSeedRequest;
 
         protected byte mRequestSeed;
         protected byte mRequestSeedNumLoops;
@@ -2813,14 +2813,14 @@ namespace Communication
             mAddress = address;
             mSize = size;
             mFormat = TransferDataAction.GetDataFormatByte(compression, encryption);
-			mOperationType = (byte)KWP2000ServiceID.NegativeResponse;
+            mOperationType = (byte)KWP2000ServiceID.NegativeResponse;
 
             WasFailureCausedByPreviousIncompleteDownload = false;
         }
 
         protected void SetOperationToDownload()
         {
-			mOperationType = (byte)KWP2000ServiceID.RequestDownload;
+            mOperationType = (byte)KWP2000ServiceID.RequestDownload;
         }
 
         protected void SetOperationToUpload()
@@ -2836,17 +2836,17 @@ namespace Communication
 
             if (base.Start())
             {
-				if ((mOperationType == (byte)KWP2000ServiceID.RequestDownload) || (mOperationType == (byte)KWP2000ServiceID.RequestUpload))
+                if ((mOperationType == (byte)KWP2000ServiceID.RequestDownload) || (mOperationType == (byte)KWP2000ServiceID.RequestUpload))
                 {
                     uint endAddress = mAddress + mSize - 1;
 
-					if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                    if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                     {
                         KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mAddress, mSize, mFormat);
 
                         DisplayStatusMessage("Requesting download to ECU for address range 0x" + mAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8") + ".", StatusMessageType.USER);
                     }
-					else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                    else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                     {
                         KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mAddress, mSize, mFormat);
 
@@ -2877,11 +2877,11 @@ namespace Communication
                             mMaxBlockSize = message.mData[0];
                             DisplayStatusMessage("ECU reports max block size is: " + mMaxBlockSize, StatusMessageType.DEV);
 
-							if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                            if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                             {
                                 DisplayStatusMessage("Request download to ECU succeeded.", StatusMessageType.USER);
                             }
-							else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                            else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                             {
                                 DisplayStatusMessage("Request upload from ECU succeeded.", StatusMessageType.USER);
                             }
@@ -2890,11 +2890,11 @@ namespace Communication
                         }
                         else
                         {
-							if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                            if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                             {
                                 DisplayStatusMessage("Request download to ECU failed, received wrong message data size.", StatusMessageType.USER);
                             }
-							else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                            else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                             {
                                 DisplayStatusMessage("Request upload from ECU failed, received wrong message data size.", StatusMessageType.USER);
                             }
@@ -2910,11 +2910,11 @@ namespace Communication
                         {
                             if((message.mData[1] == (byte)KWP2000ResponseCode.ServiceNotSupported) || (message.mData[1] == (byte)KWP2000ResponseCode.NoProgram))
                             {
-								if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                                if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Request download to ECU failed, ECU reports service is not supported.", StatusMessageType.USER);
                                 }
-								else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                                else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Request upload from ECU failed, ECU reports service is not supported. Request upload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
                                 }
@@ -2924,11 +2924,11 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.GeneralReject)
                             {
-								if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                                if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Request download to ECU failed, ECU reports RequestDownload was rejected.", StatusMessageType.USER);
                                 }
-								else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                                else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Request upload from ECU failed, ECU reports RequestUpload was rejected. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
                                 }
@@ -2938,11 +2938,11 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested)
                             {
-								if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                                if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Request download to ECU failed, ECU reports security access has not been granted.", StatusMessageType.USER);
                                 }
-								else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                                else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Request upload from ECU failed, ECU reports security access has not been granted.", StatusMessageType.USER);
                                 }
@@ -2952,11 +2952,11 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
                             {
-								if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                                if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Request download to ECU failed, ECU reports conditions not correct or sequence error. Please turn off the ignition and retry.", StatusMessageType.USER);
                                 }
-								else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                                else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Request upload from ECU failed, ECU reports conditions not correct or sequence error. Please turn off the ignition and retry.", StatusMessageType.USER);
                                 }
@@ -2966,12 +2966,12 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.RoutineNotCompleteOrServiceInProgress)
                             {
-								if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                                if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     WasFailureCausedByPreviousIncompleteDownload = true;
                                     DisplayStatusMessage("Request download to ECU failed, ECU reports routine not complete or service in progress.", StatusMessageType.USER);
                                 }
-								else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                                else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Request upload from ECU failed, ECU reports routine not complete or service in progress. Please turn off the ignition and retry.", StatusMessageType.USER);
                                 }
@@ -2985,11 +2985,11 @@ namespace Communication
 
                 if (!handled)
                 {
-					if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
+                    if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                     {
                         DisplayStatusMessage("Request download to ECU failed.", StatusMessageType.USER);
                     }
-					else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
+                    else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                     {
                         DisplayStatusMessage("Request upload from ECU failed.", StatusMessageType.USER);
                     }
@@ -3281,7 +3281,7 @@ namespace Communication
                         {
                             Debug.Assert(mDataIndex + data.LongLength <= RawData.LongLength);
                             data.CopyTo(RawData, mDataIndex);//using array copy to handle 64 bit lengths
-						}
+                        }
 
                         uncompressedSize = (uint)data.Length;
 
@@ -4088,3 +4088,5 @@ namespace Communication
         private ushort mCommonIdentifier;
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

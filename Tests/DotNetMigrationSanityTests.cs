@@ -41,3 +41,5 @@ public sealed class DotNetMigrationSanityTests
             $"Expected .NET 8 or higher, got {version.Major}.{version.Minor}. Runtime: {RuntimeInformation.FrameworkDescription}");
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

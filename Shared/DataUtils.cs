@@ -26,39 +26,39 @@ using System.Collections.Generic;
 
 namespace Shared
 {
-	public abstract class DataUtils
-	{
-		public enum DataType
-		{
+    public abstract class DataUtils
+    {
+        public enum DataType
+        {
             [Description("Int8")]
-			Int8,
+            Int8,
             [Description("UInt8")]
-			UInt8,
+            UInt8,
             [Description("Int16")]
-			Int16,
+            Int16,
             [Description("UInt16")]
-			UInt16,
+            UInt16,
             [Description("Int32")]
-			Int32,
+            Int32,
             [Description("UInt32")]
-			UInt32,
+            UInt32,
             [Description("Undefined")]
-			Undefined
-		};
+            Undefined
+        };
 
 
         public static UInt32 GetDataTypeSize(DataType type)
         {
             // A dictionary mapping each DataType to its corresponding size.
             var dataTypeSizes = new Dictionary<DataType, UInt32>
-			{
-				{ DataType.Int8, 1 },
-				{ DataType.UInt8, 1 },
-				{ DataType.Int16, 2 },
-				{ DataType.UInt16, 2 },
-				{ DataType.Int32, 4 },
-				{ DataType.UInt32, 4 }
-			};
+            {
+                { DataType.Int8, 1 },
+                { DataType.UInt8, 1 },
+                { DataType.Int16, 2 },
+                { DataType.UInt16, 2 },
+                { DataType.Int32, 4 },
+                { DataType.UInt32, 4 }
+            };
 
             if (dataTypeSizes.TryGetValue(type, out var size))
             {
@@ -71,266 +71,266 @@ namespace Shared
 
         public static float ClampedScale(float value, float scale, float min, float max)
         {
-			float result = value * scale;
-			return result < min ? min : result > max ? max : result;
+            float result = value * scale;
+            return result < min ? min : result > max ? max : result;
         }
 
         public static float ClampedOffset(float value, float offset, float min, float max)
-		{
-			float result = value + offset;
+        {
+            float result = value + offset;
             return result < min ? min : result > max ? max : result;
         }
 
 
-		//TODO: could probably replace read/write raw value functions with the BitConverter class, except BitConverter doesn't support UInt8
+        //TODO: could probably replace read/write raw value functions with the BitConverter class, except BitConverter doesn't support UInt8
 
-		public static unsafe bool WriteRawFloatValueByType(double value, DataUtils.DataType destType, byte[] rawDataDest, UInt32 offset)
-		{
-			bool result = false;
+        public static unsafe bool WriteRawFloatValueByType(double value, DataUtils.DataType destType, byte[] rawDataDest, UInt32 offset)
+        {
+            bool result = false;
 
-			if ((rawDataDest != null) && (GetDataTypeSize(destType) + offset <= (rawDataDest.Length)))
-			{
-				result = true;
+            if ((rawDataDest != null) && (GetDataTypeSize(destType) + offset <= (rawDataDest.Length)))
+            {
+                result = true;
 
-				fixed (void* dest = &rawDataDest[offset])
-				{
-					switch (destType)
-					{
-						case DataUtils.DataType.Int8:
-							{
-								SByte* castDest = (SByte*)dest;
-								*castDest = (SByte)Math.Min(Math.Max(value, SByte.MinValue), SByte.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.UInt8:
-							{
-								Byte* castDest = (Byte*)dest;
-								*castDest = (Byte)Math.Min(Math.Max(value, Byte.MinValue), Byte.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.Int16:
-							{
-								Int16* castDest = (Int16*)dest;
-								*castDest = (Int16)Math.Min(Math.Max(value, Int16.MinValue), Int16.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.UInt16:
-							{
-								UInt16* castDest = (UInt16*)dest;
-								*castDest = (UInt16)Math.Min(Math.Max(value, UInt16.MinValue), UInt16.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.Int32:
-							{
-								Int32* castDest = (Int32*)dest;
-								*castDest = (Int32)Math.Min(Math.Max(value, Int32.MinValue), Int32.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.UInt32:
-							{
-								UInt32* castDest = (UInt32*)dest;
-								*castDest = (UInt32)Math.Min(Math.Max(value, UInt32.MinValue), UInt32.MaxValue);
-								break;
-							}
-						default:
-							{
-								result = false;
-								break;
-							}
-					}
-				}
-			}
+                fixed (void* dest = &rawDataDest[offset])
+                {
+                    switch (destType)
+                    {
+                        case DataUtils.DataType.Int8:
+                            {
+                                SByte* castDest = (SByte*)dest;
+                                *castDest = (SByte)Math.Min(Math.Max(value, SByte.MinValue), SByte.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt8:
+                            {
+                                Byte* castDest = (Byte*)dest;
+                                *castDest = (Byte)Math.Min(Math.Max(value, Byte.MinValue), Byte.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.Int16:
+                            {
+                                Int16* castDest = (Int16*)dest;
+                                *castDest = (Int16)Math.Min(Math.Max(value, Int16.MinValue), Int16.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt16:
+                            {
+                                UInt16* castDest = (UInt16*)dest;
+                                *castDest = (UInt16)Math.Min(Math.Max(value, UInt16.MinValue), UInt16.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.Int32:
+                            {
+                                Int32* castDest = (Int32*)dest;
+                                *castDest = (Int32)Math.Min(Math.Max(value, Int32.MinValue), Int32.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt32:
+                            {
+                                UInt32* castDest = (UInt32*)dest;
+                                *castDest = (UInt32)Math.Min(Math.Max(value, UInt32.MinValue), UInt32.MaxValue);
+                                break;
+                            }
+                        default:
+                            {
+                                result = false;
+                                break;
+                            }
+                    }
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public static unsafe bool ReadRawFloatValueByType(out double value, DataUtils.DataType sourceType, byte[] rawData, UInt32 offset)
-		{
-			bool result = false;
-			value = 0;
+        public static unsafe bool ReadRawFloatValueByType(out double value, DataUtils.DataType sourceType, byte[] rawData, UInt32 offset)
+        {
+            bool result = false;
+            value = 0;
 
-			if ((rawData != null) && (GetDataTypeSize(sourceType) + offset <= rawData.Length))
-			{
-				result = true;
+            if ((rawData != null) && (GetDataTypeSize(sourceType) + offset <= rawData.Length))
+            {
+                result = true;
 
-				fixed (void* source = &rawData[offset])
-				{
-					switch (sourceType)
-					{
-						case DataUtils.DataType.Int8:
-							{
-								value = *(SByte*)(source);
-								break;
-							}
-						case DataUtils.DataType.UInt8:
-							{
-								value = *(Byte*)(source);
-								Debug.Assert(value >= 0.0);
-								break;
-							}
-						case DataUtils.DataType.Int16:
-							{
-								value = *(Int16*)(source);
-								break;
-							}
-						case DataUtils.DataType.UInt16:
-							{
-								value = *(UInt16*)(source);
-								Debug.Assert(value >= 0.0);
-								break;
-							}
-						case DataUtils.DataType.Int32:
-							{
-								value = *(Int32*)(source);
-								break;
-							}
-						case DataUtils.DataType.UInt32:
-							{
-								value = *(UInt32*)(source);
-								Debug.Assert(value >= 0.0);
-								break;
-							}
-						default:
-							{
-								value = 0;
-								result = false;
-								break;
-							}
-					}
-				}
-			}
+                fixed (void* source = &rawData[offset])
+                {
+                    switch (sourceType)
+                    {
+                        case DataUtils.DataType.Int8:
+                            {
+                                value = *(SByte*)(source);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt8:
+                            {
+                                value = *(Byte*)(source);
+                                Debug.Assert(value >= 0.0);
+                                break;
+                            }
+                        case DataUtils.DataType.Int16:
+                            {
+                                value = *(Int16*)(source);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt16:
+                            {
+                                value = *(UInt16*)(source);
+                                Debug.Assert(value >= 0.0);
+                                break;
+                            }
+                        case DataUtils.DataType.Int32:
+                            {
+                                value = *(Int32*)(source);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt32:
+                            {
+                                value = *(UInt32*)(source);
+                                Debug.Assert(value >= 0.0);
+                                break;
+                            }
+                        default:
+                            {
+                                value = 0;
+                                result = false;
+                                break;
+                            }
+                    }
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
         public static unsafe bool WriteRawIntValueByType(UInt32 value, DataUtils.DataType destType, byte[] rawDataDest, UInt32 offset)
-		{
-			bool result = false;
+        {
+            bool result = false;
 
-			if ((rawDataDest != null) && (GetDataTypeSize(destType) + offset <= rawDataDest.Length))
-			{
-				result = true;
+            if ((rawDataDest != null) && (GetDataTypeSize(destType) + offset <= rawDataDest.Length))
+            {
+                result = true;
 
-				fixed (void* dest = &rawDataDest[offset])
-				{
-					switch (destType)
-					{
-						case DataUtils.DataType.Int8:
-							{
-								SByte* castDest = (SByte*)dest;
-								*castDest = (SByte)Math.Min(Math.Max(value, SByte.MinValue), SByte.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.UInt8:
-							{
-								Byte* castDest = (Byte*)dest;
-								*castDest = (Byte)Math.Min(Math.Max(value, Byte.MinValue), Byte.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.Int16:
-							{
-								Int16* castDest = (Int16*)dest;
-								*castDest = (Int16)Math.Min(Math.Max(value, Int16.MinValue), Int16.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.UInt16:
-							{
-								UInt16* castDest = (UInt16*)dest;
-								*castDest = (UInt16)Math.Min(Math.Max(value, UInt16.MinValue), UInt16.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.Int32:
-							{
-								Int32* castDest = (Int32*)dest;
-								*castDest = (Int32)Math.Min(Math.Max(value, Int32.MinValue), Int32.MaxValue);
-								break;
-							}
-						case DataUtils.DataType.UInt32:
-							{
-								UInt32* castDest = (UInt32*)dest;
-								*castDest = (UInt32)Math.Min(Math.Max(value, UInt32.MinValue), UInt32.MaxValue);
-								break;
-							}
-						default:
-							{
-								result = false;
-								break;
-							}
-					}
-				}
-			}
+                fixed (void* dest = &rawDataDest[offset])
+                {
+                    switch (destType)
+                    {
+                        case DataUtils.DataType.Int8:
+                            {
+                                SByte* castDest = (SByte*)dest;
+                                *castDest = (SByte)Math.Min(Math.Max(value, SByte.MinValue), SByte.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt8:
+                            {
+                                Byte* castDest = (Byte*)dest;
+                                *castDest = (Byte)Math.Min(Math.Max(value, Byte.MinValue), Byte.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.Int16:
+                            {
+                                Int16* castDest = (Int16*)dest;
+                                *castDest = (Int16)Math.Min(Math.Max(value, Int16.MinValue), Int16.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt16:
+                            {
+                                UInt16* castDest = (UInt16*)dest;
+                                *castDest = (UInt16)Math.Min(Math.Max(value, UInt16.MinValue), UInt16.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.Int32:
+                            {
+                                Int32* castDest = (Int32*)dest;
+                                *castDest = (Int32)Math.Min(Math.Max(value, Int32.MinValue), Int32.MaxValue);
+                                break;
+                            }
+                        case DataUtils.DataType.UInt32:
+                            {
+                                UInt32* castDest = (UInt32*)dest;
+                                *castDest = (UInt32)Math.Min(Math.Max(value, UInt32.MinValue), UInt32.MaxValue);
+                                break;
+                            }
+                        default:
+                            {
+                                result = false;
+                                break;
+                            }
+                    }
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public static unsafe bool ReadRawIntValueByType(out UInt32 value, DataUtils.DataType sourceType, byte[] rawData, UInt32 offset)
-		{
-			bool result = false;
-			value = 0;
+        public static unsafe bool ReadRawIntValueByType(out UInt32 value, DataUtils.DataType sourceType, byte[] rawData, UInt32 offset)
+        {
+            bool result = false;
+            value = 0;
 
-			if ((rawData != null) && (GetDataTypeSize(sourceType) + offset <= rawData.Length))
-			{
-				result = true;
+            if ((rawData != null) && (GetDataTypeSize(sourceType) + offset <= rawData.Length))
+            {
+                result = true;
 
-				fixed (void* source = &rawData[offset])
-				{
-					switch (sourceType)
-					{
-						case DataUtils.DataType.Int8:
-							{
-								value = (UInt32)(*(SByte*)(source));
-								break;
-							}
-						case DataUtils.DataType.UInt8:
-							{
-								value = *(Byte*)(source);
-								Debug.Assert(value >= 0.0);
-								break;
-							}
-						case DataUtils.DataType.Int16:
-							{
-								value = (UInt32)(*(Int16*)(source));
-								break;
-							}
-						case DataUtils.DataType.UInt16:
-							{
-								value = *(UInt16*)(source);
-								Debug.Assert(value >= 0.0);
-								break;
-							}
-						case DataUtils.DataType.Int32:
-							{
-								value = (UInt32)(*(Int32*)(source));
-								break;
-							}
-						case DataUtils.DataType.UInt32:
-							{
-								value = *(UInt32*)(source);
-								Debug.Assert(value >= 0.0);
-								break;
-							}
-						default:
-							{
-								value = 0;
-								result = false;
-								break;
-							}
-					}
-				}
-			}
+                fixed (void* source = &rawData[offset])
+                {
+                    switch (sourceType)
+                    {
+                        case DataUtils.DataType.Int8:
+                            {
+                                value = (UInt32)(*(SByte*)(source));
+                                break;
+                            }
+                        case DataUtils.DataType.UInt8:
+                            {
+                                value = *(Byte*)(source);
+                                Debug.Assert(value >= 0.0);
+                                break;
+                            }
+                        case DataUtils.DataType.Int16:
+                            {
+                                value = (UInt32)(*(Int16*)(source));
+                                break;
+                            }
+                        case DataUtils.DataType.UInt16:
+                            {
+                                value = *(UInt16*)(source);
+                                Debug.Assert(value >= 0.0);
+                                break;
+                            }
+                        case DataUtils.DataType.Int32:
+                            {
+                                value = (UInt32)(*(Int32*)(source));
+                                break;
+                            }
+                        case DataUtils.DataType.UInt32:
+                            {
+                                value = *(UInt32*)(source);
+                                Debug.Assert(value >= 0.0);
+                                break;
+                            }
+                        default:
+                            {
+                                value = 0;
+                                result = false;
+                                break;
+                            }
+                    }
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public static double GetCorrectedValueFromRaw(double rawValue, double scale, double offset)
-		{
-			return (rawValue * scale) + offset;
-		}
+        public static double GetCorrectedValueFromRaw(double rawValue, double scale, double offset)
+        {
+            return (rawValue * scale) + offset;
+        }
 
-		public static double GetRawValueFromCorrected(double correctedValue, double scale, double offset)
-		{
-			return (correctedValue - offset) / scale;
-		}
+        public static double GetRawValueFromCorrected(double correctedValue, double scale, double offset)
+        {
+            return (correctedValue - offset) / scale;
+        }
 
         public static uint ReadHexString(string hexString)
         {
@@ -360,5 +360,7 @@ namespace Shared
         {
             return string.Format("0x{0:X}", value);
         }
-	}
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

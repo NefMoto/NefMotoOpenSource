@@ -138,3 +138,5 @@ public sealed class DataUtilsTests
         Assert.Equal(raw, back);
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

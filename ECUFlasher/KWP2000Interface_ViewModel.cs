@@ -47,50 +47,50 @@ namespace ECUFlasher
             CommInterface.PropertyChanged += CommInterfacePropertyChanged;
             CopyDefaultTimings();
 
-			CommInterface.ConnectionStatusChangedEvent += ConnectionStatusChangedEvent;
+            CommInterface.ConnectionStatusChangedEvent += ConnectionStatusChangedEvent;
 
-			var defaultBaudRates = ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates;
+            var defaultBaudRates = ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates;
 
-			var savedAvailableRates = new List<uint>();
+            var savedAvailableRates = new List<uint>();
 
-			if (defaultBaudRates != null)
-			{
-				foreach (var rateObj in defaultBaudRates)
-				{
-					if (rateObj is uint)
-					{
-						var rate = (uint)rateObj;
+            if (defaultBaudRates != null)
+            {
+                foreach (var rateObj in defaultBaudRates)
+                {
+                    if (rateObj is uint)
+                    {
+                        var rate = (uint)rateObj;
 
-						if (!savedAvailableRates.Contains(rate))
-						{
-							savedAvailableRates.Add(rate);
-						}
-					}
-				}
-			}
+                        if (!savedAvailableRates.Contains(rate))
+                        {
+                            savedAvailableRates.Add(rate);
+                        }
+                    }
+                }
+            }
 
-			savedAvailableRates.Sort();
+            savedAvailableRates.Sort();
 
-			AvailableBaudRates = new ObservableCollection<uint>(savedAvailableRates);
+            AvailableBaudRates = new ObservableCollection<uint>(savedAvailableRates);
 
-			if (!AvailableBaudRates.Any())
-			{
-				ResetAvailableBaudRatesToDefault();
-				SaveAvailableBaudRates();
-			}
+            if (!AvailableBaudRates.Any())
+            {
+                ResetAvailableBaudRatesToDefault();
+                SaveAvailableBaudRates();
+            }
 
-			//get the last used baud rate
-			var previousRate = ECUFlasher.Properties.Settings.Default.DesiredKWP2000BaudRate;
+            //get the last used baud rate
+            var previousRate = ECUFlasher.Properties.Settings.Default.DesiredKWP2000BaudRate;
 
-			//try to find the last used baud rate in the available rates list, if it isn't there, then use the last baud rate
-			if (AvailableBaudRates.Contains(previousRate))
-			{
-				DesiredBaudRate = previousRate;
-			}
-			else
-			{
-				DesiredBaudRate = AvailableBaudRates.Last();
-			}
+            //try to find the last used baud rate in the available rates list, if it isn't there, then use the last baud rate
+            if (AvailableBaudRates.Contains(previousRate))
+            {
+                DesiredBaudRate = previousRate;
+            }
+            else
+            {
+                DesiredBaudRate = AvailableBaudRates.Last();
+            }
 
             //get the last used connection method
             DesiredConnectionMethod = ECUFlasher.Properties.Settings.Default.DesiredKWP2000ConnectionMethod;
@@ -98,9 +98,9 @@ namespace ECUFlasher
             EnableSlowInitTimingLog = ECUFlasher.Properties.Settings.Default.EnableSlowInitTimingLog;
         }
 
-		void ConnectionStatusChangedEvent(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
-		{
-		}
+        void ConnectionStatusChangedEvent(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
+        {
+        }
 
         public KWP2000Interface KWP2000CommInterface
         {
@@ -114,57 +114,57 @@ namespace ECUFlasher
 
         public ObservableCollection<uint> AvailableBaudRates { get; private set; }
 
-		private void ResetAvailableBaudRatesToDefault()
-		{
-			AvailableBaudRates.Clear();
+        private void ResetAvailableBaudRatesToDefault()
+        {
+            AvailableBaudRates.Clear();
 
-			foreach (uint baudRate in Enum.GetValues(typeof(KWP2000BaudRates)))
-			{
-				if (!AvailableBaudRates.Contains(baudRate))
-				{
-					AvailableBaudRates.Add(baudRate);
-				}
-			}
-		}
+            foreach (uint baudRate in Enum.GetValues(typeof(KWP2000BaudRates)))
+            {
+                if (!AvailableBaudRates.Contains(baudRate))
+                {
+                    AvailableBaudRates.Add(baudRate);
+                }
+            }
+        }
 
-		private void SaveAvailableBaudRates()
-		{
-			if (ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates == null)
-			{
-				ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates = new System.Collections.ArrayList();
-			}
+        private void SaveAvailableBaudRates()
+        {
+            if (ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates == null)
+            {
+                ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates = new System.Collections.ArrayList();
+            }
 
-			ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates.Clear();
+            ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates.Clear();
 
-			foreach (var rate in AvailableBaudRates)
-			{
-				ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates.Add(rate);
-			}
-		}
+            foreach (var rate in AvailableBaudRates)
+            {
+                ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates.Add(rate);
+            }
+        }
 
-		public uint DesiredBaudRate
-		{
-			get
-			{
-				return _DesiredBaudRate;
-			}
-			set
-			{
-				if (_DesiredBaudRate != value)
-				{
-					_DesiredBaudRate = value;
+        public uint DesiredBaudRate
+        {
+            get
+            {
+                return _DesiredBaudRate;
+            }
+            set
+            {
+                if (_DesiredBaudRate != value)
+                {
+                    _DesiredBaudRate = value;
 
-					ECUFlasher.Properties.Settings.Default.DesiredKWP2000BaudRate = DesiredBaudRate;
+                    ECUFlasher.Properties.Settings.Default.DesiredKWP2000BaudRate = DesiredBaudRate;
 
-					DesiredBaudRates = new List<uint>(AvailableBaudRates.Where(baudRate => (baudRate <= _DesiredBaudRate)).Reverse());
+                    DesiredBaudRates = new List<uint>(AvailableBaudRates.Where(baudRate => (baudRate <= _DesiredBaudRate)).Reverse());
 
-					OnPropertyChanged(new PropertyChangedEventArgs("DesiredBaudRate"));
-				}
-			}
-		}
-		private uint _DesiredBaudRate;
+                    OnPropertyChanged(new PropertyChangedEventArgs("DesiredBaudRate"));
+                }
+            }
+        }
+        private uint _DesiredBaudRate;
 
-		public List<uint> DesiredBaudRates { get; private set; }
+        public List<uint> DesiredBaudRates { get; private set; }
 
         public ConnectionMethod DesiredConnectionMethod
         {
@@ -205,7 +205,7 @@ namespace ECUFlasher
         }
         private bool _EnableSlowInitTimingLog;
 
-		[DefaultValue(KWP2000SettingsDefaults.ConnectAddress)]
+        [DefaultValue(KWP2000SettingsDefaults.ConnectAddress)]
         public byte ConnectAddress
         {
             get
@@ -222,9 +222,9 @@ namespace ECUFlasher
                 }
             }
         }
-		private byte mConnectAddress = KWP2000SettingsDefaults.ConnectAddress;
+        private byte mConnectAddress = KWP2000SettingsDefaults.ConnectAddress;
 
-		[DefaultValue(KWP2000SettingsDefaults.ConnectAddressMode)]
+        [DefaultValue(KWP2000SettingsDefaults.ConnectAddressMode)]
         public KWP2000AddressMode ConnectAddressMode
         {
             get
@@ -241,10 +241,10 @@ namespace ECUFlasher
                 }
             }
         }
-		private KWP2000AddressMode _ConnectAddressMode = KWP2000SettingsDefaults.ConnectAddressMode;
+        private KWP2000AddressMode _ConnectAddressMode = KWP2000SettingsDefaults.ConnectAddressMode;
         #endregion
 
-		#region DefaultTimingParameters
+        #region DefaultTimingParameters
         private void CommInterfacePropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             //TODO: make this less error prone, doing a string compare is weak
@@ -265,7 +265,7 @@ namespace ECUFlasher
             DefaultP4TesterInterByteTimeMinMS = currentTiming.P4TesterInterByteTimeMinMs;
         }
 
-		//TODO: need to add a default value
+        //TODO: need to add a default value
         public long DefaultP1ECUInterByteTimeMaxMS
         {
             get
@@ -295,7 +295,7 @@ namespace ECUFlasher
         }
         private long _DefaultP1ECUInterByteTimeMaxMS;
 
-		//TODO: need to add a default value
+        //TODO: need to add a default value
         public long DefaultP2ECUResponseTimeMinMS
         {
             get
@@ -325,7 +325,7 @@ namespace ECUFlasher
         }
         private long _DefaultP2ECUResponseTimeMinMS;
 
-		//TODO: need to add a default value
+        //TODO: need to add a default value
         public long DefaultP2ECUResponseTimeMaxMS
         {
             get
@@ -355,7 +355,7 @@ namespace ECUFlasher
         }
         private long _DefaultP2ECUResponseTimeMaxMS;
 
-		//TODO: need to add a default value
+        //TODO: need to add a default value
         public long DefaultP3TesterResponseTimeMinMS
         {
             get
@@ -385,7 +385,7 @@ namespace ECUFlasher
         }
         private long _DefaultP3TesterResponseTimeMinMS;
 
-		//TODO: need to add a default value
+        //TODO: need to add a default value
         public long DefaultP3TesterResponseTimeMaxMS
         {
             get
@@ -415,7 +415,7 @@ namespace ECUFlasher
         }
         private long _DefaultP3TesterResponseTimeMaxMS;
 
-		//TODO: need to add a default value
+        //TODO: need to add a default value
         public long DefaultP4TesterInterByteTimeMinMS
         {
             get
@@ -444,110 +444,110 @@ namespace ECUFlasher
             }
         }
         private long _DefaultP4TesterInterByteTimeMinMS;
-		#endregion
+        #endregion
 
-		#region SecuritySettings
+        #region SecuritySettings
 
-		[DefaultValue(KWP2000SettingsDefaults.SecuritySeedRequest)]
-		public byte SeedRequest
-		{
-			get { return _SeedRequest; }
-			set
-			{
-				if (_SeedRequest != value)
-				{
-					_SeedRequest = value;
-					OnPropertyChanged(new PropertyChangedEventArgs("SeedRequest"));
-				}
-			}
-		}
-		private byte _SeedRequest = KWP2000SettingsDefaults.SecuritySeedRequest;
+        [DefaultValue(KWP2000SettingsDefaults.SecuritySeedRequest)]
+        public byte SeedRequest
+        {
+            get { return _SeedRequest; }
+            set
+            {
+                if (_SeedRequest != value)
+                {
+                    _SeedRequest = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("SeedRequest"));
+                }
+            }
+        }
+        private byte _SeedRequest = KWP2000SettingsDefaults.SecuritySeedRequest;
 
-		[DefaultValue(KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest)]
-		public bool ShouldUseExtendedSeedRequest
-		{
-			get { return _ShouldUseExtendedSeedRequest; }
-			set
-			{
-				if (_ShouldUseExtendedSeedRequest != value)
-				{
-					_ShouldUseExtendedSeedRequest = value;
-					OnPropertyChanged(new PropertyChangedEventArgs("ShouldUseExtendedSeedRequest"));
-				}
-			}
-		}
-		private bool _ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
+        [DefaultValue(KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest)]
+        public bool ShouldUseExtendedSeedRequest
+        {
+            get { return _ShouldUseExtendedSeedRequest; }
+            set
+            {
+                if (_ShouldUseExtendedSeedRequest != value)
+                {
+                    _ShouldUseExtendedSeedRequest = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("ShouldUseExtendedSeedRequest"));
+                }
+            }
+        }
+        private bool _ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
 
-		[DefaultValue(KWP2000SettingsDefaults.SecuritySupportSpecialKey)]
-		public bool ShouldSupportSpecialKey
-		{
-			get { return _ShouldSupportSpecialKey; }
-			set
-			{
-				if (_ShouldSupportSpecialKey != value)
-				{
-					_ShouldSupportSpecialKey = value;
-					OnPropertyChanged(new PropertyChangedEventArgs("ShouldSupportSpecialKey"));
-				}
-			}
-		}
-		private bool _ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;
+        [DefaultValue(KWP2000SettingsDefaults.SecuritySupportSpecialKey)]
+        public bool ShouldSupportSpecialKey
+        {
+            get { return _ShouldSupportSpecialKey; }
+            set
+            {
+                if (_ShouldSupportSpecialKey != value)
+                {
+                    _ShouldSupportSpecialKey = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("ShouldSupportSpecialKey"));
+                }
+            }
+        }
+        private bool _ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;
 
-		#endregion
+        #endregion
 
-		#region RestoreSettingsToDefaultsCommand
-		public ReactiveCommand RestoreSettingsToDefaultsCommand
-		{
-			get
-			{
-				if (_RestoreSettingsToDefaultsCommand == null)
-				{
-					_RestoreSettingsToDefaultsCommand = new ReactiveCommand(OnRestoreSettingsToDefaults, RestoreSettingsToDefaultsCommandCanExecute);
-					_RestoreSettingsToDefaultsCommand.Name = "Restore To Defaults";
-					_RestoreSettingsToDefaultsCommand.Description = "Restore this settings tab to defaults (address, timing, options). Does not change connect-tab init method or baud rate.";
-					_RestoreSettingsToDefaultsCommand.AddWatchedProperty(CommInterface, "ConnectionStatus");
-				}
+        #region RestoreSettingsToDefaultsCommand
+        public ReactiveCommand RestoreSettingsToDefaultsCommand
+        {
+            get
+            {
+                if (_RestoreSettingsToDefaultsCommand == null)
+                {
+                    _RestoreSettingsToDefaultsCommand = new ReactiveCommand(OnRestoreSettingsToDefaults, RestoreSettingsToDefaultsCommandCanExecute);
+                    _RestoreSettingsToDefaultsCommand.Name = "Restore To Defaults";
+                    _RestoreSettingsToDefaultsCommand.Description = "Restore this settings tab to defaults (address, timing, options). Does not change connect-tab init method or baud rate.";
+                    _RestoreSettingsToDefaultsCommand.AddWatchedProperty(CommInterface, "ConnectionStatus");
+                }
 
-				return _RestoreSettingsToDefaultsCommand;
-			}
-		}
-		private ReactiveCommand _RestoreSettingsToDefaultsCommand;
+                return _RestoreSettingsToDefaultsCommand;
+            }
+        }
+        private ReactiveCommand _RestoreSettingsToDefaultsCommand;
 
-		private bool RestoreSettingsToDefaultsCommandCanExecute(List<string> reasonsDisabled)
-		{
-			bool result = true;
+        private bool RestoreSettingsToDefaultsCommandCanExecute(List<string> reasonsDisabled)
+        {
+            bool result = true;
 
-			if (CommInterface.ConnectionStatus != CommunicationInterface.ConnectionStatusType.CommunicationTerminated)
-			{
-				reasonsDisabled.Add("Must be disconnected to restore settings");
-				result = false;
-			}
+            if (CommInterface.ConnectionStatus != CommunicationInterface.ConnectionStatusType.CommunicationTerminated)
+            {
+                reasonsDisabled.Add("Must be disconnected to restore settings");
+                result = false;
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		private void OnRestoreSettingsToDefaults()
-		{
-			KWP2000SettingsDefaults.ApplyTo(KWP2000CommInterface);
+        private void OnRestoreSettingsToDefaults()
+        {
+            KWP2000SettingsDefaults.ApplyTo(KWP2000CommInterface);
 
-			ConnectAddress = KWP2000SettingsDefaults.ConnectAddress;
-			ConnectAddressMode = KWP2000SettingsDefaults.ConnectAddressMode;
-			EnableSlowInitTimingLog = KWP2000SettingsDefaults.EnableSlowInitTimingLog;
-			SeedRequest = KWP2000SettingsDefaults.SecuritySeedRequest;
-			ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
-			ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;
+            ConnectAddress = KWP2000SettingsDefaults.ConnectAddress;
+            ConnectAddressMode = KWP2000SettingsDefaults.ConnectAddressMode;
+            EnableSlowInitTimingLog = KWP2000SettingsDefaults.EnableSlowInitTimingLog;
+            SeedRequest = KWP2000SettingsDefaults.SecuritySeedRequest;
+            ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
+            ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;
 
-			ECUFlasher.Properties.Settings.Default.Save();
+            ECUFlasher.Properties.Settings.Default.Save();
 
-			if (App != null)
-			{
-				App.DisplayStatusMessage("KWP2000 settings restored to defaults.", StatusMessageType.USER);
-			}
-		}
-		#endregion
+            if (App != null)
+            {
+                App.DisplayStatusMessage("KWP2000 settings restored to defaults.", StatusMessageType.USER);
+            }
+        }
+        #endregion
 
-		#region ConnectCommands
-		private bool ConnectCommandCanExecute(List<string> reasonsDisabled)
+        #region ConnectCommands
+        private bool ConnectCommandCanExecute(List<string> reasonsDisabled)
         {
             bool result = true;
 
@@ -666,5 +666,7 @@ namespace ECUFlasher
             KWP2000CommInterface.DisconnectFromECU();
         }
         #endregion
-	}
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

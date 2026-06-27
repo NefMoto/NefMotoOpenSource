@@ -31,3 +31,5 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("02911029-8671-4e22-9e80-e9229d506f27")]
+
+// vi: set sw=4 ts=8 expandtab:

@@ -28,17 +28,17 @@ using Shared;
 namespace Checksum
 {
     [Serializable]
-	public class MainChecksum : BaseChecksum
-	{
-		public MainChecksum(uint addressLocation, uint checksumLocation, uint numRanges)
-		{
-			AddressLocation = addressLocation;
-			ChecksumLocation = checksumLocation;
-			NumRanges = numRanges;
+    public class MainChecksum : BaseChecksum
+    {
+        public MainChecksum(uint addressLocation, uint checksumLocation, uint numRanges)
+        {
+            AddressLocation = addressLocation;
+            ChecksumLocation = checksumLocation;
+            NumRanges = numRanges;
 
-			mChecksum = 0;
-			mInvChecksum = 0;
-		}
+            mChecksum = 0;
+            mInvChecksum = 0;
+        }
 
         //for serialization
         public MainChecksum()
@@ -46,142 +46,144 @@ namespace Checksum
         {
         }
 
-		public override bool LoadChecksum()
-		{
-			bool result = false;
+        public override bool LoadChecksum()
+        {
+            bool result = false;
 
-			if ((mMemory != null) && (mMemory.Size > 0))
-			{
-				result = true;
-				uint dataTypeSize = DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32);
+            if ((mMemory != null) && (mMemory.Size > 0))
+            {
+                result = true;
+                uint dataTypeSize = DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32);
 
-				result &= mMemory.ReadRawIntValueByType(out mChecksum, DataUtils.DataType.UInt32, ChecksumLocation);
-				result &= mMemory.ReadRawIntValueByType(out mInvChecksum, DataUtils.DataType.UInt32, ChecksumLocation + dataTypeSize);
+                result &= mMemory.ReadRawIntValueByType(out mChecksum, DataUtils.DataType.UInt32, ChecksumLocation);
+                result &= mMemory.ReadRawIntValueByType(out mInvChecksum, DataUtils.DataType.UInt32, ChecksumLocation + dataTypeSize);
 
-				for (uint x = 0; x < NumRanges; x++)
-				{
-					uint currentAddress = AddressLocation + (dataTypeSize * 2 * x);
+                for (uint x = 0; x < NumRanges; x++)
+                {
+                    uint currentAddress = AddressLocation + (dataTypeSize * 2 * x);
 
-					result &= mMemory.ReadRawIntValueByType(out mStartAddresses[x], DataUtils.DataType.UInt32, currentAddress);
-					result &= mMemory.ReadRawIntValueByType(out mEndAddresses[x], DataUtils.DataType.UInt32, currentAddress + dataTypeSize);
-				}
-			}
+                    result &= mMemory.ReadRawIntValueByType(out mStartAddresses[x], DataUtils.DataType.UInt32, currentAddress);
+                    result &= mMemory.ReadRawIntValueByType(out mEndAddresses[x], DataUtils.DataType.UInt32, currentAddress + dataTypeSize);
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public override bool UpdateChecksum(bool outputMessage)
-		{
-			mChecksum = 0;
-			bool failed = false;
+        public override bool UpdateChecksum(bool outputMessage)
+        {
+            mChecksum = 0;
+            bool failed = false;
 
-			for (uint x = 0; x < NumRanges; x++)
-			{
-				uint newChecksum;
-				if (!CalculateChecksumForRange(mStartAddresses[x], mEndAddresses[x] - mStartAddresses[x], DataUtils.DataType.UInt16, out newChecksum))
-				{
-					failed = true;
-					break;
-				}
+            for (uint x = 0; x < NumRanges; x++)
+            {
+                uint newChecksum;
+                if (!CalculateChecksumForRange(mStartAddresses[x], mEndAddresses[x] - mStartAddresses[x], DataUtils.DataType.UInt16, out newChecksum))
+                {
+                    failed = true;
+                    break;
+                }
 
-				mChecksum += newChecksum;
-			}
+                mChecksum += newChecksum;
+            }
 
-			mInvChecksum = ~mChecksum;
+            mInvChecksum = ~mChecksum;
 
-			bool result = !failed;
+            bool result = !failed;
 
-			if (result)
-			{
-				DisplayStatusMessage("Main checksum updated", StatusMessageType.LOG);
-			}
-			else
-			{
-				DisplayStatusMessage("Main checksum failed to update", StatusMessageType.LOG);
-			}
+            if (result)
+            {
+                DisplayStatusMessage("Main checksum updated", StatusMessageType.LOG);
+            }
+            else
+            {
+                DisplayStatusMessage("Main checksum failed to update", StatusMessageType.LOG);
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public override bool IsCorrect(bool outputMessage)
-		{
-			uint calcChecksum = 0;
-			bool failed = false;
+        public override bool IsCorrect(bool outputMessage)
+        {
+            uint calcChecksum = 0;
+            bool failed = false;
 
-			for (uint x = 0; x < NumRanges; x++)
-			{
-				uint newChecksum;
-				if (!CalculateChecksumForRange(mStartAddresses[x], mEndAddresses[x] - mStartAddresses[x], DataUtils.DataType.UInt16, out newChecksum))
-				{
-					failed = true;
-					break;
-				}
+            for (uint x = 0; x < NumRanges; x++)
+            {
+                uint newChecksum;
+                if (!CalculateChecksumForRange(mStartAddresses[x], mEndAddresses[x] - mStartAddresses[x], DataUtils.DataType.UInt16, out newChecksum))
+                {
+                    failed = true;
+                    break;
+                }
 
-				calcChecksum += newChecksum;
-			}
+                calcChecksum += newChecksum;
+            }
 
-			bool result = !failed && (calcChecksum == mChecksum);
+            bool result = !failed && (calcChecksum == mChecksum);
 
-			if (outputMessage)
-			{
-				if (!result)
-				{
-					DisplayStatusMessage("Main checksum incorrect", StatusMessageType.LOG);
-				}
-				else
-				{
-					DisplayStatusMessage("Main checksum OK", StatusMessageType.LOG);
-				}
-			}
+            if (outputMessage)
+            {
+                if (!result)
+                {
+                    DisplayStatusMessage("Main checksum incorrect", StatusMessageType.LOG);
+                }
+                else
+                {
+                    DisplayStatusMessage("Main checksum OK", StatusMessageType.LOG);
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public override bool CommitChecksum()
-		{
-			bool result = false;
+        public override bool CommitChecksum()
+        {
+            bool result = false;
 
-			if ((mMemory != null) && (mMemory.Size > 0))
-			{
-				result = mMemory.WriteRawIntValueByType(mChecksum, DataUtils.DataType.UInt32, ChecksumLocation)
-				&& mMemory.WriteRawIntValueByType(mInvChecksum, DataUtils.DataType.UInt32, ChecksumLocation + DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32));
-			}
+            if ((mMemory != null) && (mMemory.Size > 0))
+            {
+                result = mMemory.WriteRawIntValueByType(mChecksum, DataUtils.DataType.UInt32, ChecksumLocation)
+                && mMemory.WriteRawIntValueByType(mInvChecksum, DataUtils.DataType.UInt32, ChecksumLocation + DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32));
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public uint AddressLocation { get; set; }
+        public uint AddressLocation { get; set; }
         public uint ChecksumLocation { get; set; }
-		public uint NumRanges
-		{
-			get
-			{
-				return _NumRanges;
-			}
-			set
-			{
-				if (value != _NumRanges)
-				{
-					_NumRanges = value;
+        public uint NumRanges
+        {
+            get
+            {
+                return _NumRanges;
+            }
+            set
+            {
+                if (value != _NumRanges)
+                {
+                    _NumRanges = value;
 
-					if (_NumRanges > 0)
-					{
-						mStartAddresses = new uint[_NumRanges];
-						mEndAddresses = new uint[_NumRanges];
-					}
-					else
-					{
-						mStartAddresses = null;
-						mEndAddresses = null;
-					}
-				}
-			}
-		}
-		private uint _NumRanges;
+                    if (_NumRanges > 0)
+                    {
+                        mStartAddresses = new uint[_NumRanges];
+                        mEndAddresses = new uint[_NumRanges];
+                    }
+                    else
+                    {
+                        mStartAddresses = null;
+                        mEndAddresses = null;
+                    }
+                }
+            }
+        }
+        private uint _NumRanges;
 
-		protected uint[] mStartAddresses;
-		protected uint[] mEndAddresses;
-		protected uint mChecksum;
-		protected uint mInvChecksum;
-	}
+        protected uint[] mStartAddresses;
+        protected uint[] mEndAddresses;
+        protected uint mChecksum;
+        protected uint mInvChecksum;
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

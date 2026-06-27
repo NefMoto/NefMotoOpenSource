@@ -40,20 +40,20 @@ using System.Windows.Markup;
 
 namespace Shared
 {
-	public class ExtensionFixer
-	{
-		public static string SwitchToLongExtension(string fileName, string shortExt, string longExt)
-		{
-			var convertedFileName = fileName;
+    public class ExtensionFixer
+    {
+        public static string SwitchToLongExtension(string fileName, string shortExt, string longExt)
+        {
+            var convertedFileName = fileName;
 
-			if (!fileName.EndsWith(longExt, StringComparison.OrdinalIgnoreCase) && fileName.EndsWith(shortExt, StringComparison.OrdinalIgnoreCase))
-			{
-				convertedFileName = fileName.Replace(shortExt, longExt);
-			}
+            if (!fileName.EndsWith(longExt, StringComparison.OrdinalIgnoreCase) && fileName.EndsWith(shortExt, StringComparison.OrdinalIgnoreCase))
+            {
+                convertedFileName = fileName.Replace(shortExt, longExt);
+            }
 
-			return convertedFileName;
-		}
-	}
+            return convertedFileName;
+        }
+    }
 
     public class AsStringConverter : IValueConverter
     {
@@ -64,14 +64,14 @@ namespace Shared
                 return value;
             }
 
-			if ((parameter == null) || !(parameter is string))
-			{
-				return value.ToString();
-			}
-			else
-			{
-				return string.Format(parameter as string, value);
-			}
+            if ((parameter == null) || !(parameter is string))
+            {
+                return value.ToString();
+            }
+            else
+            {
+                return string.Format(parameter as string, value);
+            }
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -233,19 +233,19 @@ namespace Shared
                 }
             }
 
-			return null;
+            return null;
         }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-			var description = GetDescriptionAttribute(value);
+            var description = GetDescriptionAttribute(value);
 
-			if (description == null)
-			{
-				description = DependencyProperty.UnsetValue;
-			}
+            if (description == null)
+            {
+                description = DependencyProperty.UnsetValue;
+            }
 
-			return description;
+            return description;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -254,292 +254,292 @@ namespace Shared
         }
     }
 
-	public class ValueConverterGroup : IValueConverter
-	{
-		public class ConverterTuple
-		{
-			public IValueConverter Converter;
-			public object ConverterParam;
-			public Type TargetType;
-		}
+    public class ValueConverterGroup : IValueConverter
+    {
+        public class ConverterTuple
+        {
+            public IValueConverter Converter;
+            public object ConverterParam;
+            public Type TargetType;
+        }
 
-		private List<ConverterTuple> Converters
-		{
-			get
-			{
-				if (_Converters == null)
-				{
-					_Converters = new List<ConverterTuple>();
-				}
+        private List<ConverterTuple> Converters
+        {
+            get
+            {
+                if (_Converters == null)
+                {
+                    _Converters = new List<ConverterTuple>();
+                }
 
-				return _Converters;
-			}
+                return _Converters;
+            }
 
-			set
-			{
-				_Converters = value;
-			}
-		}
-		private List<ConverterTuple> _Converters;
+            set
+            {
+                _Converters = value;
+            }
+        }
+        private List<ConverterTuple> _Converters;
 
-		public void AddConverter(IValueConverter converter, object converterParam, Type targetType)
-		{
-			var tuple = new ConverterTuple();
-			tuple.Converter = converter;
-			tuple.ConverterParam = converterParam;
-			tuple.TargetType = targetType;
+        public void AddConverter(IValueConverter converter, object converterParam, Type targetType)
+        {
+            var tuple = new ConverterTuple();
+            tuple.Converter = converter;
+            tuple.ConverterParam = converterParam;
+            tuple.TargetType = targetType;
 
-			Converters.Add(tuple);
-		}
+            Converters.Add(tuple);
+        }
 
-		public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-		{
-			object result = value;
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            object result = value;
 
-			foreach (var tuple in Converters)
-			{
-				result = tuple.Converter.Convert(result, tuple.TargetType, tuple.ConverterParam, culture);
+            foreach (var tuple in Converters)
+            {
+                result = tuple.Converter.Convert(result, tuple.TargetType, tuple.ConverterParam, culture);
 
-				if (result == Binding.DoNothing)
-				{
-					// If the converter returns 'DoNothing' then the binding operation should terminate.
-					break;
-				}
-			}
+                if (result == Binding.DoNothing)
+                {
+                    // If the converter returns 'DoNothing' then the binding operation should terminate.
+                    break;
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-		{
-			throw new NotImplementedException();
-		}
-	}
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 
-	public class DefaultValueExtension : MarkupExtension
-	{
-		public DefaultValueExtension()
-		{
-		}
+    public class DefaultValueExtension : MarkupExtension
+    {
+        public DefaultValueExtension()
+        {
+        }
 
-		public DefaultValueExtension(string path)
-		{
-			Path = path;
-		}
+        public DefaultValueExtension(string path)
+        {
+            Path = path;
+        }
 
-		public string Path
-		{
-			get;
-			set;
-		}
+        public string Path
+        {
+            get;
+            set;
+        }
 
-		public IValueConverter Converter
-		{
-			get;
-			set;
-		}
+        public IValueConverter Converter
+        {
+            get;
+            set;
+        }
 
-		public object ConverterParam
-		{
-			get;
-			set;
-		}
+        public object ConverterParam
+        {
+            get;
+            set;
+        }
 
-		public override object ProvideValue(IServiceProvider serviceProvider)
-		{
-			if (serviceProvider != null)
-			{
-				var valueTargetProvider = (IProvideValueTarget)serviceProvider.GetService(typeof(IProvideValueTarget));
+        public override object ProvideValue(IServiceProvider serviceProvider)
+        {
+            if (serviceProvider != null)
+            {
+                var valueTargetProvider = (IProvideValueTarget)serviceProvider.GetService(typeof(IProvideValueTarget));
 
-				if (valueTargetProvider != null)
-				{
-					var ValueConverterGroup = new ValueConverterGroup();
+                if (valueTargetProvider != null)
+                {
+                    var ValueConverterGroup = new ValueConverterGroup();
 
-					var defaultConverter = new DefaultValueFromBindingConverter();
-					ValueConverterGroup.AddConverter(defaultConverter, Path, typeof(object));
+                    var defaultConverter = new DefaultValueFromBindingConverter();
+                    ValueConverterGroup.AddConverter(defaultConverter, Path, typeof(object));
 
-					if(Converter != null)
-					{
-						ValueConverterGroup.AddConverter(Converter, ConverterParam, typeof(object));
-					}
+                    if(Converter != null)
+                    {
+                        ValueConverterGroup.AddConverter(Converter, ConverterParam, typeof(object));
+                    }
 
-					var binding = new Binding(Path);
-					binding.Mode = BindingMode.OneTime;
-					binding.Converter = ValueConverterGroup;
+                    var binding = new Binding(Path);
+                    binding.Mode = BindingMode.OneTime;
+                    binding.Converter = ValueConverterGroup;
 
-					var bindingExp = binding.ProvideValue(serviceProvider) as BindingExpression;
-					defaultConverter.SourceBinding = bindingExp;
+                    var bindingExp = binding.ProvideValue(serviceProvider) as BindingExpression;
+                    defaultConverter.SourceBinding = bindingExp;
 
-					return bindingExp;
-				}
-			}
+                    return bindingExp;
+                }
+            }
 
-			return DependencyProperty.UnsetValue;
-		}
-	}
+            return DependencyProperty.UnsetValue;
+        }
+    }
 
-	public class DefaultValueFromBindingConverter : IValueConverter
-	{
-		public BindingExpression SourceBinding
-		{
-			get;
-			set;
-		}
+    public class DefaultValueFromBindingConverter : IValueConverter
+    {
+        public BindingExpression SourceBinding
+        {
+            get;
+            set;
+        }
 
-		public static object GetDefaultValueAttribute(object source, string propertyPath)
-		{
-			if ((source != null) && (propertyPath != null))
-			{
-				PropertyInfo prop = null;
-				{
-					var type = source.GetType();
-					object value = source;
+        public static object GetDefaultValueAttribute(object source, string propertyPath)
+        {
+            if ((source != null) && (propertyPath != null))
+            {
+                PropertyInfo prop = null;
+                {
+                    var type = source.GetType();
+                    object value = source;
 
-					//TODO: handle other special characters in the property path
-					foreach (var part in propertyPath.Split('.'))
-					{
-						prop = type.GetProperty(part);
-						value = prop.GetValue(value, null);
+                    //TODO: handle other special characters in the property path
+                    foreach (var part in propertyPath.Split('.'))
+                    {
+                        prop = type.GetProperty(part);
+                        value = prop.GetValue(value, null);
 
-						if (value is IList)
-						{
-							value = (value as IList)[0];//TODO: handle property path indexers
-						}
+                        if (value is IList)
+                        {
+                            value = (value as IList)[0];//TODO: handle property path indexers
+                        }
 
-						type = value.GetType();
-					}
-				}
+                        type = value.GetType();
+                    }
+                }
 
-				var propertyAttributes = prop.GetCustomAttributes(typeof(DefaultValueAttribute), false);
+                var propertyAttributes = prop.GetCustomAttributes(typeof(DefaultValueAttribute), false);
 
-				if (propertyAttributes.Length > 0)
-				{
-					return (propertyAttributes[0] as DefaultValueAttribute).Value;
-				}
-			}
+                if (propertyAttributes.Length > 0)
+                {
+                    return (propertyAttributes[0] as DefaultValueAttribute).Value;
+                }
+            }
 
-			return DependencyProperty.UnsetValue;
-		}
+            return DependencyProperty.UnsetValue;
+        }
 
-		public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-		{
-			if (parameter is string)
-			{
-				return GetDefaultValueAttribute(SourceBinding.DataItem, parameter as string);
-			}
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (parameter is string)
+            {
+                return GetDefaultValueAttribute(SourceBinding.DataItem, parameter as string);
+            }
 
-			return DependencyProperty.UnsetValue;
-		}
+            return DependencyProperty.UnsetValue;
+        }
 
-		public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-		{
-			throw new NotImplementedException();
-		}
-	}
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 
-	[ValueConversion(typeof(byte[]), typeof(string))]
-	public class ByteArrayConverter : IValueConverter
-	{
-		public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-		{
-			if (value is byte[])
-			{
-				var bytes = value as byte[];
+    [ValueConversion(typeof(byte[]), typeof(string))]
+    public class ByteArrayConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value is byte[])
+            {
+                var bytes = value as byte[];
 
-				var sb = new StringBuilder(bytes.Length * 2);
+                var sb = new StringBuilder(bytes.Length * 2);
 
-				for (int x = 0; x < bytes.Length; x++)
-				{
-					sb.Append(bytes[x].ToString("X2"));
-				}
+                for (int x = 0; x < bytes.Length; x++)
+                {
+                    sb.Append(bytes[x].ToString("X2"));
+                }
 
-				return sb.ToString();
-			}
+                return sb.ToString();
+            }
 
-			return value;
-		}
+            return value;
+        }
 
-		public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-		{
-			if (value is string)
-			{
-				var bytes = new List<byte>();
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value is string)
+            {
+                var bytes = new List<byte>();
 
-				var strValue = value as string;
-				var array = strValue.ToCharArray();
+                var strValue = value as string;
+                var array = strValue.ToCharArray();
 
-				Debug.Assert(array.Length % 2 == 0);
+                Debug.Assert(array.Length % 2 == 0);
 
-				for (int x = 0; x < array.Length; x += 2)
-				{
-					var curStr = array[x].ToString() + array[x + 1].ToString();
-					var curByte = Byte.Parse(curStr, NumberStyles.HexNumber);
-					bytes.Add(curByte);
-				}
+                for (int x = 0; x < array.Length; x += 2)
+                {
+                    var curStr = array[x].ToString() + array[x + 1].ToString();
+                    var curByte = Byte.Parse(curStr, NumberStyles.HexNumber);
+                    bytes.Add(curByte);
+                }
 
-				return bytes.ToArray();
-			}
+                return bytes.ToArray();
+            }
 
-			return value;
-		}
-	}
+            return value;
+        }
+    }
 
-	[ValueConversion(typeof(byte[]), typeof(BitmapSource))]
-	public class ByteArrayToBitmapConverter : IValueConverter
-	{
-		public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-		{
-			if (value is byte[])
-			{
-				try
-				{
-					byte[] valueBytes = value as byte[];
+    [ValueConversion(typeof(byte[]), typeof(BitmapSource))]
+    public class ByteArrayToBitmapConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value is byte[])
+            {
+                try
+                {
+                    byte[] valueBytes = value as byte[];
 
-					int width = 1024;
-					int height = valueBytes.Length / width;
+                    int width = 1024;
+                    int height = valueBytes.Length / width;
 
-					Debug.Assert((value as byte[]).Length == width * height);
+                    Debug.Assert((value as byte[]).Length == width * height);
 
-					var format = PixelFormats.Gray8;
-					int stride = (width * format.BitsPerPixel + 7) / 8;//as per MSDN
+                    var format = PixelFormats.Gray8;
+                    int stride = (width * format.BitsPerPixel + 7) / 8;//as per MSDN
 
-					return BitmapSource.Create(width, height, 96, 96, format, BitmapPalettes.Halftone8, valueBytes, stride);
-				}
-				catch
-				{
-				}
-			}
+                    return BitmapSource.Create(width, height, 96, 96, format, BitmapPalettes.Halftone8, valueBytes, stride);
+                }
+                catch
+                {
+                }
+            }
 
-			return value;
-		}
+            return value;
+        }
 
-		public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-		{
-			throw new NotSupportedException();
-		}
-	}
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotSupportedException();
+        }
+    }
 
-	[AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
-	public class ValueMappedDescriptionAttribute : Attribute
-	{
-		public ValueMappedDescriptionAttribute(object value, string description)
-		{
-			Value = value;
-			Description = description;
-		}
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
+    public class ValueMappedDescriptionAttribute : Attribute
+    {
+        public ValueMappedDescriptionAttribute(object value, string description)
+        {
+            Value = value;
+            Description = description;
+        }
 
-		public object Value
-		{
-			get;
-			set;
-		}
+        public object Value
+        {
+            get;
+            set;
+        }
 
-		public string Description
-		{
-			get;
-			set;
-		}
-	}
+        public string Description
+        {
+            get;
+            set;
+        }
+    }
 
     /*
     [ValueConversion(typeof(Boolean), typeof(Boolean))]
@@ -1378,3 +1378,5 @@ namespace Shared
         }
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

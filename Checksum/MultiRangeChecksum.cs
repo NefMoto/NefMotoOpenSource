@@ -28,131 +28,133 @@ using Shared;
 
 namespace Checksum
 {
-	[Serializable]
-	public class MultiRangeChecksum : BaseChecksum
-	{
-		public MultiRangeChecksum(uint checksumLocation)
-		{
-			ChecksumLocation = checksumLocation;
-			mChecksum = 0;
-			mInverseChecksum = 0;
+    [Serializable]
+    public class MultiRangeChecksum : BaseChecksum
+    {
+        public MultiRangeChecksum(uint checksumLocation)
+        {
+            ChecksumLocation = checksumLocation;
+            mChecksum = 0;
+            mInverseChecksum = 0;
 
-			mAddressRanges = new List<AddressRange>();
-		}
+            mAddressRanges = new List<AddressRange>();
+        }
 
-		//for serialization
-		public MultiRangeChecksum()
-			: this(0)
-		{
-		}
+        //for serialization
+        public MultiRangeChecksum()
+            : this(0)
+        {
+        }
 
-		public void AddRange(AddressRange range)
-		{
-			mAddressRanges.Add(range);
-		}
+        public void AddRange(AddressRange range)
+        {
+            mAddressRanges.Add(range);
+        }
 
-		public override bool LoadChecksum()
-		{
-			bool result = false;
+        public override bool LoadChecksum()
+        {
+            bool result = false;
 
-			if ((mMemory != null) && (mMemory.Size > 0))
-			{
-				result = true;
-				uint dataTypeSize = DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32);
+            if ((mMemory != null) && (mMemory.Size > 0))
+            {
+                result = true;
+                uint dataTypeSize = DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32);
 
-				result &= mMemory.ReadRawIntValueByType(out mChecksum, DataUtils.DataType.UInt32, ChecksumLocation);
-				result &= mMemory.ReadRawIntValueByType(out mInverseChecksum, DataUtils.DataType.UInt32, ChecksumLocation + DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32));
-			}
+                result &= mMemory.ReadRawIntValueByType(out mChecksum, DataUtils.DataType.UInt32, ChecksumLocation);
+                result &= mMemory.ReadRawIntValueByType(out mInverseChecksum, DataUtils.DataType.UInt32, ChecksumLocation + DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32));
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public override bool UpdateChecksum(bool outputMessage)
-		{
-			mChecksum = 0;
-			bool failed = false;
+        public override bool UpdateChecksum(bool outputMessage)
+        {
+            mChecksum = 0;
+            bool failed = false;
 
-			foreach (var range in mAddressRanges)
-			{
-				uint newChecksum;
-				if (!CalculateChecksumForRange(range.StartAddress, range.NumBytes, DataUtils.DataType.UInt8, out newChecksum))
-				{
-					failed = true;
-					break;
-				}
+            foreach (var range in mAddressRanges)
+            {
+                uint newChecksum;
+                if (!CalculateChecksumForRange(range.StartAddress, range.NumBytes, DataUtils.DataType.UInt8, out newChecksum))
+                {
+                    failed = true;
+                    break;
+                }
 
-				mChecksum += newChecksum;
-			}
+                mChecksum += newChecksum;
+            }
 
-			mInverseChecksum = ~mChecksum;
+            mInverseChecksum = ~mChecksum;
 
-			bool result = !failed;
+            bool result = !failed;
 
-			if (result)
-			{
-				DisplayStatusMessage("Multi range checksum updated", StatusMessageType.LOG);
-			}
-			else
-			{
-				DisplayStatusMessage("Multi range checksum failed to update", StatusMessageType.LOG);
-			}
+            if (result)
+            {
+                DisplayStatusMessage("Multi range checksum updated", StatusMessageType.LOG);
+            }
+            else
+            {
+                DisplayStatusMessage("Multi range checksum failed to update", StatusMessageType.LOG);
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public override bool IsCorrect(bool outputMessage)
-		{
-			uint calcChecksum = 0;
-			bool failed = false;
+        public override bool IsCorrect(bool outputMessage)
+        {
+            uint calcChecksum = 0;
+            bool failed = false;
 
-			foreach (var range in mAddressRanges)
-			{
-				uint newChecksum;
-				if (!CalculateChecksumForRange(range.StartAddress, range.NumBytes, DataUtils.DataType.UInt8, out newChecksum))
-				{
-					failed = true;
-					break;
-				}
+            foreach (var range in mAddressRanges)
+            {
+                uint newChecksum;
+                if (!CalculateChecksumForRange(range.StartAddress, range.NumBytes, DataUtils.DataType.UInt8, out newChecksum))
+                {
+                    failed = true;
+                    break;
+                }
 
-				calcChecksum += newChecksum;
-			}
+                calcChecksum += newChecksum;
+            }
 
-			bool result = !failed && (calcChecksum == mChecksum) && (~calcChecksum == mInverseChecksum);
+            bool result = !failed && (calcChecksum == mChecksum) && (~calcChecksum == mInverseChecksum);
 
-			if (outputMessage)
-			{
-				if (!result)
-				{
-					DisplayStatusMessage("Multi range checksum incorrect", StatusMessageType.LOG);
-				}
-				else
-				{
-					DisplayStatusMessage("Multi range checksum OK", StatusMessageType.LOG);
-				}
-			}
+            if (outputMessage)
+            {
+                if (!result)
+                {
+                    DisplayStatusMessage("Multi range checksum incorrect", StatusMessageType.LOG);
+                }
+                else
+                {
+                    DisplayStatusMessage("Multi range checksum OK", StatusMessageType.LOG);
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public override bool CommitChecksum()
-		{
-			bool result = false;
+        public override bool CommitChecksum()
+        {
+            bool result = false;
 
-			if ((mMemory != null) && (mMemory.Size > 0))
-			{
-				result = true;
+            if ((mMemory != null) && (mMemory.Size > 0))
+            {
+                result = true;
 
-				result &= mMemory.WriteRawIntValueByType(mChecksum, DataUtils.DataType.UInt32, ChecksumLocation);
-				result &= mMemory.WriteRawIntValueByType(mInverseChecksum, DataUtils.DataType.UInt32, ChecksumLocation + DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32));
-			}
+                result &= mMemory.WriteRawIntValueByType(mChecksum, DataUtils.DataType.UInt32, ChecksumLocation);
+                result &= mMemory.WriteRawIntValueByType(mInverseChecksum, DataUtils.DataType.UInt32, ChecksumLocation + DataUtils.GetDataTypeSize(DataUtils.DataType.UInt32));
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public uint ChecksumLocation { get; set; }
+        public uint ChecksumLocation { get; set; }
 
-		protected List<AddressRange> mAddressRanges;
-		protected uint mChecksum;
-		protected uint mInverseChecksum;
-	}
+        protected List<AddressRange> mAddressRanges;
+        protected uint mChecksum;
+        protected uint mInverseChecksum;
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

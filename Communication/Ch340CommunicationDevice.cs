@@ -109,3 +109,5 @@ namespace Communication
     }
 }
 #pragma warning restore CA1416 // Validate platform compatibility
+
+// vi: set sw=4 ts=8 expandtab:

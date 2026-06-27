@@ -28,94 +28,96 @@ using Shared;
 
 namespace Checksum
 {
-	public class AddressRange
-	{
-		public AddressRange(uint start, uint numBytes)
-		{
-			StartAddress = start;
-			NumBytes = numBytes;
-		}
+    public class AddressRange
+    {
+        public AddressRange(uint start, uint numBytes)
+        {
+            StartAddress = start;
+            NumBytes = numBytes;
+        }
 
-		public uint StartAddress { get; set; }
-		public uint NumBytes { get; set; }
-	}
+        public uint StartAddress { get; set; }
+        public uint NumBytes { get; set; }
+    }
 
     [Serializable]
-	public abstract class BaseChecksum
-	{
+    public abstract class BaseChecksum
+    {
         //for serialization
         public BaseChecksum()
         {
         }
 
-		public void SetMemoryReference(MemoryImage memory)
-		{
-			mMemory = memory;
+        public void SetMemoryReference(MemoryImage memory)
+        {
+            mMemory = memory;
 
             LoadChecksum();
-		}
+        }
 
-		public abstract bool LoadChecksum();
-		public abstract bool UpdateChecksum(bool outputMessage);
-		public abstract bool IsCorrect(bool outputMessage);
-		public abstract bool CommitChecksum();
+        public abstract bool LoadChecksum();
+        public abstract bool UpdateChecksum(bool outputMessage);
+        public abstract bool IsCorrect(bool outputMessage);
+        public abstract bool CommitChecksum();
 
-		protected bool CalculateChecksumForRange(uint startAddr, uint numBytes, DataUtils.DataType readingType, out uint checksum)
-		{
-			bool result = false;
-			checksum = 0;
+        protected bool CalculateChecksumForRange(uint startAddr, uint numBytes, DataUtils.DataType readingType, out uint checksum)
+        {
+            bool result = false;
+            checksum = 0;
 
-			if ((startAddr >= 0) && (numBytes > 0) && (mMemory != null))
-			{
-				result = true;
+            if ((startAddr >= 0) && (numBytes > 0) && (mMemory != null))
+            {
+                result = true;
 
-				for (uint addr = startAddr; addr < startAddr + numBytes; addr += DataUtils.GetDataTypeSize(readingType))
-				{
-					uint temp = 0;
+                for (uint addr = startAddr; addr < startAddr + numBytes; addr += DataUtils.GetDataTypeSize(readingType))
+                {
+                    uint temp = 0;
 
-					result &= mMemory.ReadRawIntValueByType(out temp, readingType, addr);
+                    result &= mMemory.ReadRawIntValueByType(out temp, readingType, addr);
 
-					checksum += temp;
-				}
-			}
+                    checksum += temp;
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		protected bool CalculateRollingChecksumForRange(uint startAddr, uint numBytes, uint seedAddr, ref uint checksum)
-		{
-			bool result = false;
+        protected bool CalculateRollingChecksumForRange(uint startAddr, uint numBytes, uint seedAddr, ref uint checksum)
+        {
+            bool result = false;
 
-			if ((startAddr >= 0) && (numBytes > 0) && (mMemory != null) && (numBytes < mMemory.Size) && (seedAddr < mMemory.EndAddress))
-			{
-				result = true;
+            if ((startAddr >= 0) && (numBytes > 0) && (mMemory != null) && (numBytes < mMemory.Size) && (seedAddr < mMemory.EndAddress))
+            {
+                result = true;
 
-				for (uint index = startAddr; index < startAddr + numBytes; index++)
-				{
-					uint currentByte = 0;
-					result &= mMemory.ReadRawIntValueByType(out currentByte, DataUtils.DataType.UInt8, index);
+                for (uint index = startAddr; index < startAddr + numBytes; index++)
+                {
+                    uint currentByte = 0;
+                    result &= mMemory.ReadRawIntValueByType(out currentByte, DataUtils.DataType.UInt8, index);
 
-					uint seed = 0;
-					result &= mMemory.ReadRawIntValueByType(out seed, DataUtils.DataType.UInt32, seedAddr + ((currentByte ^ (checksum & 0xFF)) << 2));
+                    uint seed = 0;
+                    result &= mMemory.ReadRawIntValueByType(out seed, DataUtils.DataType.UInt32, seedAddr + ((currentByte ^ (checksum & 0xFF)) << 2));
 
-					checksum >>= 8;
-					checksum ^= seed;
-				}
-			}
+                    checksum >>= 8;
+                    checksum ^= seed;
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		protected void DisplayStatusMessage(string message, StatusMessageType messageType)
-		{
+        protected void DisplayStatusMessage(string message, StatusMessageType messageType)
+        {
             if (DisplayStatusMessageEvent != null)
-			{
+            {
                 DisplayStatusMessageEvent(message, messageType);
-			}
-		}
+            }
+        }
 
-		protected MemoryImage mMemory;
+        protected MemoryImage mMemory;
 
         public event DisplayStatusMessageDelegate DisplayStatusMessageEvent;
-	}
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

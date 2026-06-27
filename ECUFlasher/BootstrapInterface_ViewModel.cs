@@ -38,11 +38,11 @@ namespace ECUFlasher
             CommInterface = new BootstrapInterface(displayStatusMessage);
 
             AvailableBaudRates = new ObservableCollection<uint>();
-			AvailableBaudRates.Add(9600);
+            AvailableBaudRates.Add(9600);
             AvailableBaudRates.Add(19200);
-			AvailableBaudRates.Add(38400);
-			AvailableBaudRates.Add(57600);
-			AvailableBaudRates.Add(124800);
+            AvailableBaudRates.Add(38400);
+            AvailableBaudRates.Add(57600);
+            AvailableBaudRates.Add(124800);
 
             // Get the last used baud rate; default to 57600 when 0 or not in list
             var previousRate = ECUFlasher.Properties.Settings.Default.DesiredBootModeBaudRate;
@@ -175,3 +175,5 @@ namespace ECUFlasher
         #endregion
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

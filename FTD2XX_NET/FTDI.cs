@@ -3217,3 +3217,5 @@ namespace FTD2XX_NET
         private delegate FTDI.FT_STATUS tFT_GetChipIDFromDeviceIndex(uint deviceIndex, ref uint lpdwChipIDBuffer);
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

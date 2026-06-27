@@ -29,220 +29,222 @@ using Shared;
 
 namespace Checksum
 {
-	public abstract class ChecksumOperation : Operation
-	{
-		public ChecksumOperation(byte[] imageToCheck)
-		{
-			ImageToCheck = imageToCheck;
-		}
+    public abstract class ChecksumOperation : Operation
+    {
+        public ChecksumOperation(byte[] imageToCheck)
+        {
+            ImageToCheck = imageToCheck;
+        }
 
-		protected void DisplayStatusMessage(string message, StatusMessageType messageType)
-		{
-			//TODO: hook this up
-		}
+        protected void DisplayStatusMessage(string message, StatusMessageType messageType)
+        {
+            //TODO: hook this up
+        }
 
-		protected static bool DetectChecksums(byte[] imageToCheck, out uint baseAddress, out IEnumerable<BaseChecksum> detectedChecksums)
-		{
-			bool result = false;
-			baseAddress = 0;
-			var detectedChecksumList = new List<BaseChecksum>();
-			detectedChecksums = detectedChecksumList;
+        protected static bool DetectChecksums(byte[] imageToCheck, out uint baseAddress, out IEnumerable<BaseChecksum> detectedChecksums)
+        {
+            bool result = false;
+            baseAddress = 0;
+            var detectedChecksumList = new List<BaseChecksum>();
+            detectedChecksums = detectedChecksumList;
 
-			if ((imageToCheck != null) && (imageToCheck.Length > 0))
-			{
-				result = true;
+            if ((imageToCheck != null) && (imageToCheck.Length > 0))
+            {
+                result = true;
 
-				Checksum.RollingChecksums detectedRollingChecksum;
-				Checksum.MultiRangeChecksum detectedMultiRangeChecksum;
-				if (Checksum.ChecksumDetection.DetectRollingAndMultiRangeChecksums(imageToCheck, out detectedRollingChecksum, out detectedMultiRangeChecksum)
-					|| Checksum.ChecksumDetection.DetectMultiRangeChecksum(imageToCheck, out detectedMultiRangeChecksum))
-				{
-					if (detectedMultiRangeChecksum != null)
-					{
-						detectedChecksumList.Add(detectedMultiRangeChecksum);
-					}
+                Checksum.RollingChecksums detectedRollingChecksum;
+                Checksum.MultiRangeChecksum detectedMultiRangeChecksum;
+                if (Checksum.ChecksumDetection.DetectRollingAndMultiRangeChecksums(imageToCheck, out detectedRollingChecksum, out detectedMultiRangeChecksum)
+                    || Checksum.ChecksumDetection.DetectMultiRangeChecksum(imageToCheck, out detectedMultiRangeChecksum))
+                {
+                    if (detectedMultiRangeChecksum != null)
+                    {
+                        detectedChecksumList.Add(detectedMultiRangeChecksum);
+                    }
 
-					if (detectedRollingChecksum != null)
-					{
-						detectedChecksumList.Add(detectedRollingChecksum);
-					}
-				}
-				else
-				{
-					result = false;
-				}
+                    if (detectedRollingChecksum != null)
+                    {
+                        detectedChecksumList.Add(detectedRollingChecksum);
+                    }
+                }
+                else
+                {
+                    result = false;
+                }
 
-				Checksum.MainChecksum detectedMainChecksum;
-				if (Checksum.ChecksumDetection.DetectMainChecksum(imageToCheck, out detectedMainChecksum))
-				{
-					detectedChecksumList.Add(detectedMainChecksum);
-				}
-				else
-				{
-					result = false;
-				}
+                Checksum.MainChecksum detectedMainChecksum;
+                if (Checksum.ChecksumDetection.DetectMainChecksum(imageToCheck, out detectedMainChecksum))
+                {
+                    detectedChecksumList.Add(detectedMainChecksum);
+                }
+                else
+                {
+                    result = false;
+                }
 
-				IEnumerable<Checksum.MultipointChecksum> detectedMultiPointChecksums;
-				if (Checksum.ChecksumDetection.DetectMultiPointChecksums(imageToCheck, out baseAddress, out detectedMultiPointChecksums))
-				{
-					detectedChecksumList.AddRange(detectedMultiPointChecksums.Cast<Checksum.BaseChecksum>());
-				}
-				else
-				{
-					result = false;
-				}
-			}
+                IEnumerable<Checksum.MultipointChecksum> detectedMultiPointChecksums;
+                if (Checksum.ChecksumDetection.DetectMultiPointChecksums(imageToCheck, out baseAddress, out detectedMultiPointChecksums))
+                {
+                    detectedChecksumList.AddRange(detectedMultiPointChecksums.Cast<Checksum.BaseChecksum>());
+                }
+                else
+                {
+                    result = false;
+                }
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		protected byte[] ImageToCheck { get; private set; }
-	}
+        protected byte[] ImageToCheck { get; private set; }
+    }
 
-	public class ValidateChecksumsOperation : ChecksumOperation
-	{
-		public ValidateChecksumsOperation(byte[] imageToCheck)
-			: base(imageToCheck)
-		{
-			AreChecksumsCorrect = false;
-			NumChecksums = 0;
-			NumIncorrectChecksums = 0;
-		}
+    public class ValidateChecksumsOperation : ChecksumOperation
+    {
+        public ValidateChecksumsOperation(byte[] imageToCheck)
+            : base(imageToCheck)
+        {
+            AreChecksumsCorrect = false;
+            NumChecksums = 0;
+            NumIncorrectChecksums = 0;
+        }
 
-		public bool AreChecksumsCorrect { get; private set; }
-		public uint NumChecksums { get; set; }
-		public uint NumIncorrectChecksums { get; set; }
+        public bool AreChecksumsCorrect { get; private set; }
+        public uint NumChecksums { get; set; }
+        public uint NumIncorrectChecksums { get; set; }
 
-		protected override void OnOperationStart()
-		{
-			var asyncDel = (Action)(() =>
-			{
-				bool areChecksumsCorrect;
-				uint numChecksums;
-				uint numIncorrectChecksums;
-				var success = ValidateChecksums(ImageToCheck, out areChecksumsCorrect, out numChecksums, out numIncorrectChecksums);
+        protected override void OnOperationStart()
+        {
+            var asyncDel = (Action)(() =>
+            {
+                bool areChecksumsCorrect;
+                uint numChecksums;
+                uint numIncorrectChecksums;
+                var success = ValidateChecksums(ImageToCheck, out areChecksumsCorrect, out numChecksums, out numIncorrectChecksums);
 
-				AreChecksumsCorrect = areChecksumsCorrect;
-				NumChecksums = numChecksums;
-				NumIncorrectChecksums = numIncorrectChecksums;
+                AreChecksumsCorrect = areChecksumsCorrect;
+                NumChecksums = numChecksums;
+                NumIncorrectChecksums = numIncorrectChecksums;
 
-				OperationCompleted(success);
-			});
+                OperationCompleted(success);
+            });
 
-			Task.Run(() => asyncDel());
-		}
+            Task.Run(() => asyncDel());
+        }
 
-		public static bool ValidateChecksums(byte[] imageToCheck, out bool areChecksumsCorrect, out uint numChecksums, out uint numIncorrectChecksums)
-		{
-			areChecksumsCorrect = false;
-			numChecksums = 0;
-			numIncorrectChecksums = 0;
+        public static bool ValidateChecksums(byte[] imageToCheck, out bool areChecksumsCorrect, out uint numChecksums, out uint numIncorrectChecksums)
+        {
+            areChecksumsCorrect = false;
+            numChecksums = 0;
+            numIncorrectChecksums = 0;
 
-			uint baseAddress;
-			IEnumerable<BaseChecksum> detectedChecksums;
-			if (DetectChecksums(imageToCheck, out baseAddress, out detectedChecksums))
-			{
-				numChecksums = (uint)detectedChecksums.Count();
+            uint baseAddress;
+            IEnumerable<BaseChecksum> detectedChecksums;
+            if (DetectChecksums(imageToCheck, out baseAddress, out detectedChecksums))
+            {
+                numChecksums = (uint)detectedChecksums.Count();
 
-				var memImageToCheck = new MemoryImage(imageToCheck, baseAddress);
+                var memImageToCheck = new MemoryImage(imageToCheck, baseAddress);
 
-				foreach (var checksum in detectedChecksums)
-				{
-					checksum.SetMemoryReference(memImageToCheck);
+                foreach (var checksum in detectedChecksums)
+                {
+                    checksum.SetMemoryReference(memImageToCheck);
 
-					if (!checksum.IsCorrect(false))
-					{
-						numIncorrectChecksums++;
-					}
-				}
+                    if (!checksum.IsCorrect(false))
+                    {
+                        numIncorrectChecksums++;
+                    }
+                }
 
-				areChecksumsCorrect = (numIncorrectChecksums == 0);
+                areChecksumsCorrect = (numIncorrectChecksums == 0);
 
-				return true;
-			}
-			else
-			{
-				return false;
-			}
-		}
-	}
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
 
-	public class CorrectChecksumsOperation : ChecksumOperation
-	{
-		public CorrectChecksumsOperation(byte[] imageToCheck)
-			: base(imageToCheck)
-		{
-			NumChecksums = 0;
-			NumCorrectedChecksums = 0;
-		}
+    public class CorrectChecksumsOperation : ChecksumOperation
+    {
+        public CorrectChecksumsOperation(byte[] imageToCheck)
+            : base(imageToCheck)
+        {
+            NumChecksums = 0;
+            NumCorrectedChecksums = 0;
+        }
 
-		public uint NumChecksums { get; set; }
-		public uint NumCorrectedChecksums { get; set; }
+        public uint NumChecksums { get; set; }
+        public uint NumCorrectedChecksums { get; set; }
 
-		protected override void OnOperationStart()
-		{
-			var asyncDel = (Action)(() =>
-			{
-				uint numChecksums;
-				uint numCorrectedChecksums;
-				var success = CorrectChecksums(ImageToCheck, out numChecksums, out numCorrectedChecksums);
+        protected override void OnOperationStart()
+        {
+            var asyncDel = (Action)(() =>
+            {
+                uint numChecksums;
+                uint numCorrectedChecksums;
+                var success = CorrectChecksums(ImageToCheck, out numChecksums, out numCorrectedChecksums);
 
-				NumChecksums = numChecksums;
-				NumCorrectedChecksums = numCorrectedChecksums;
+                NumChecksums = numChecksums;
+                NumCorrectedChecksums = numCorrectedChecksums;
 
-				OperationCompleted(success);
-			});
+                OperationCompleted(success);
+            });
 
-			Task.Run(() => asyncDel());
-		}
+            Task.Run(() => asyncDel());
+        }
 
-		public static bool CorrectChecksums(byte[] imageToCheck, out uint numChecksums, out uint numCorrectedChecksums)
-		{
-			//TODO: make sure we are actually updating checksum data and not some random data
+        public static bool CorrectChecksums(byte[] imageToCheck, out uint numChecksums, out uint numCorrectedChecksums)
+        {
+            //TODO: make sure we are actually updating checksum data and not some random data
 
-			numCorrectedChecksums = 0;
-			numChecksums = 0;
+            numCorrectedChecksums = 0;
+            numChecksums = 0;
 
-			uint baseAddress;
-			IEnumerable<BaseChecksum> detectedChecksums;
-			if (DetectChecksums(imageToCheck, out baseAddress, out detectedChecksums))
-			{
-				numChecksums = (uint)detectedChecksums.Count();
+            uint baseAddress;
+            IEnumerable<BaseChecksum> detectedChecksums;
+            if (DetectChecksums(imageToCheck, out baseAddress, out detectedChecksums))
+            {
+                numChecksums = (uint)detectedChecksums.Count();
 
-				var memImageToCheck = new MemoryImage(imageToCheck, baseAddress);
+                var memImageToCheck = new MemoryImage(imageToCheck, baseAddress);
 
-				foreach (var checksum in detectedChecksums)
-				{
-					checksum.SetMemoryReference(memImageToCheck);
+                foreach (var checksum in detectedChecksums)
+                {
+                    checksum.SetMemoryReference(memImageToCheck);
 
-					if (checksum.UpdateChecksum(true) && checksum.CommitChecksum())
-					{
-						numCorrectedChecksums++;
-					}
-				}
+                    if (checksum.UpdateChecksum(true) && checksum.CommitChecksum())
+                    {
+                        numCorrectedChecksums++;
+                    }
+                }
 
-				bool corrected = (numChecksums == numCorrectedChecksums);
+                bool corrected = (numChecksums == numCorrectedChecksums);
 
-				if (corrected)
-				{
-					foreach (var checksum in detectedChecksums)
-					{
-						checksum.SetMemoryReference(memImageToCheck);
+                if (corrected)
+                {
+                    foreach (var checksum in detectedChecksums)
+                    {
+                        checksum.SetMemoryReference(memImageToCheck);
 
-						if (!checksum.IsCorrect(false))
-						{
-							corrected = false;
-							break;
-						}
-					}
-				}
+                        if (!checksum.IsCorrect(false))
+                        {
+                            corrected = false;
+                            break;
+                        }
+                    }
+                }
 
-				return corrected;
-			}
-			else
-			{
-				return false;
-			}
-		}
-	}
+                return corrected;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:

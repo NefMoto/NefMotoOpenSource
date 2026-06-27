@@ -113,3 +113,5 @@ public sealed class ChecksumMigrationTests
             Assert.Equal(firstChecksumBytes[i], memory.RawData[(int)checksumSlotAddr + i]);
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

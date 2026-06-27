@@ -285,3 +285,5 @@ namespace Communication
         bool WaitForTransmitDrain(uint timeoutMs);
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

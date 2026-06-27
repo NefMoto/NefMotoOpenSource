@@ -54,3 +54,5 @@ namespace Communication
         protected KWP2000Message mMessage;
     }
 }
+
+// vi: set sw=4 ts=8 expandtab:

@@ -27,29 +27,29 @@ using System.Diagnostics;
 
 namespace Shared
 {
-	public class MemoryImage
-	{
-		public MemoryImage()
-		{
+    public class MemoryImage
+    {
+        public MemoryImage()
+        {
             Reset();
-		}
+        }
 
-		public MemoryImage(MemoryImage other)
-		{
-			CopyFrom(other);
-		}
+        public MemoryImage(MemoryImage other)
+        {
+            CopyFrom(other);
+        }
 
-		public MemoryImage(uint numBytes, uint baseAddress)
-		{
-			RawData = new byte[numBytes];
-			StartAddress = baseAddress;
-		}
+        public MemoryImage(uint numBytes, uint baseAddress)
+        {
+            RawData = new byte[numBytes];
+            StartAddress = baseAddress;
+        }
 
-		public MemoryImage(byte[] data, uint baseAddress)
-		{
-			RawData = data;
-			StartAddress = baseAddress;
-		}
+        public MemoryImage(byte[] data, uint baseAddress)
+        {
+            RawData = data;
+            StartAddress = baseAddress;
+        }
 
         public void Reset()
         {
@@ -57,15 +57,15 @@ namespace Shared
             RawData = null;
         }
 
-		public uint StartAddress { get; set; }
+        public uint StartAddress { get; set; }
 
-		public uint EndAddress
-		{
-			get
-			{
-				return StartAddress + Size;
-			}
-		}
+        public uint EndAddress
+        {
+            get
+            {
+                return StartAddress + Size;
+            }
+        }
 
         public uint Size
         {
@@ -89,119 +89,121 @@ namespace Shared
         }
         private byte[] mRawData;
 
-		public bool WriteRawFloatValueByType(double value, DataUtils.DataType destType, uint address)
-		{
-			bool result = false;
+        public bool WriteRawFloatValueByType(double value, DataUtils.DataType destType, uint address)
+        {
+            bool result = false;
 
-			if (address >= StartAddress)
-			{
-				result = DataUtils.WriteRawFloatValueByType(value, destType, RawData, address - StartAddress);
-			}
+            if (address >= StartAddress)
+            {
+                result = DataUtils.WriteRawFloatValueByType(value, destType, RawData, address - StartAddress);
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public bool ReadRawFloatValueByType(out double value, DataUtils.DataType sourceType, uint address)
-		{
-			bool result = false;
-			value = 0;
+        public bool ReadRawFloatValueByType(out double value, DataUtils.DataType sourceType, uint address)
+        {
+            bool result = false;
+            value = 0;
 
-			if (address >= StartAddress)
-			{
-				result = DataUtils.ReadRawFloatValueByType(out value, sourceType, RawData, address - StartAddress);
-			}
+            if (address >= StartAddress)
+            {
+                result = DataUtils.ReadRawFloatValueByType(out value, sourceType, RawData, address - StartAddress);
+            }
 
-			return result;
-		}
+            return result;
+        }
 
         public bool WriteRawIntValueByType(uint value, DataUtils.DataType destType, uint address)
-		{
-			bool result = false;
+        {
+            bool result = false;
 
-			if (address >= StartAddress)
-			{
-				result = DataUtils.WriteRawIntValueByType(value, destType, RawData, address - StartAddress);
-			}
+            if (address >= StartAddress)
+            {
+                result = DataUtils.WriteRawIntValueByType(value, destType, RawData, address - StartAddress);
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public bool ReadRawIntValueByType(out uint value, DataUtils.DataType sourceType, uint address)
-		{
-			bool result = false;
-			value = 0;
+        public bool ReadRawIntValueByType(out uint value, DataUtils.DataType sourceType, uint address)
+        {
+            bool result = false;
+            value = 0;
 
-			if (address >= StartAddress)
-			{
-				result = DataUtils.ReadRawIntValueByType(out value, sourceType, RawData, address - StartAddress);
-			}
+            if (address >= StartAddress)
+            {
+                result = DataUtils.ReadRawIntValueByType(out value, sourceType, RawData, address - StartAddress);
+            }
 
-			return result;
-		}
+            return result;
+        }
 
-		public void CopyFrom(MemoryImage otherImage)
-		{
-			StartAddress = otherImage.StartAddress;
+        public void CopyFrom(MemoryImage otherImage)
+        {
+            StartAddress = otherImage.StartAddress;
 
-			if ((otherImage.RawData != null) && (otherImage.RawData.Length > 0))
-			{
-				if (RawData == null)
-				{
-					RawData = new byte[otherImage.RawData.Length];
-				}
+            if ((otherImage.RawData != null) && (otherImage.RawData.Length > 0))
+            {
+                if (RawData == null)
+                {
+                    RawData = new byte[otherImage.RawData.Length];
+                }
 
-				if (RawData.Length != otherImage.RawData.Length)
-				{
-					Array.Resize<byte>(ref mRawData, otherImage.RawData.Length);
-				}
+                if (RawData.Length != otherImage.RawData.Length)
+                {
+                    Array.Resize<byte>(ref mRawData, otherImage.RawData.Length);
+                }
 
-				Buffer.BlockCopy(otherImage.RawData, 0, RawData, 0, RawData.Length);
-			}
-			else
-			{
-				RawData = null;
-			}
-		}
+                Buffer.BlockCopy(otherImage.RawData, 0, RawData, 0, RawData.Length);
+            }
+            else
+            {
+                RawData = null;
+            }
+        }
 
-		public bool SaveToFile(string fileName)
-		{
-			bool retval = false;
+        public bool SaveToFile(string fileName)
+        {
+            bool retval = false;
 
-			try
-			{
-				if ((RawData != null) && (RawData.Length > 0))
-				{
-					File.WriteAllBytes(fileName, RawData);
-					retval = true;
-				}
-			}
-			catch
-			{
-				retval = false;
-			}
+            try
+            {
+                if ((RawData != null) && (RawData.Length > 0))
+                {
+                    File.WriteAllBytes(fileName, RawData);
+                    retval = true;
+                }
+            }
+            catch
+            {
+                retval = false;
+            }
 
-			return retval;
-		}
-	}
+            return retval;
+        }
+    }
 
-	public class TaggedMemoryImage : MemoryImage
-	{
-		public TaggedMemoryImage(byte[] data, uint baseAddress, object userTag)
-			: base(data, baseAddress)
-		{
-			UserTag = userTag;
-		}
+    public class TaggedMemoryImage : MemoryImage
+    {
+        public TaggedMemoryImage(byte[] data, uint baseAddress, object userTag)
+            : base(data, baseAddress)
+        {
+            UserTag = userTag;
+        }
 
-		public TaggedMemoryImage(uint numBytes, uint baseAddress, object userTag)
-			: base(numBytes, baseAddress)
-		{
-			UserTag = userTag;
-		}
+        public TaggedMemoryImage(uint numBytes, uint baseAddress, object userTag)
+            : base(numBytes, baseAddress)
+        {
+            UserTag = userTag;
+        }
 
-		public object UserTag
-		{
-			get;
-			set;
-		}
-	}
+        public object UserTag
+        {
+            get;
+            set;
+        }
+    }
 }
+
+// vi: set sw=4 ts=8 expandtab:
