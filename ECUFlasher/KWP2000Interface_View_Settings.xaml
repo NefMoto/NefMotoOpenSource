@@ -161,15 +161,30 @@ Contact by Email: tony@nefariousmotorsports.com
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Address"
-                               ToolTip="Connection address (hex). UI default 0x01 — use for slow init on ME7 bench (KWP1281-first path). 0x11 is an internal retry target, not a reliable one-shot slow-init address on ME7.1 bench. Fast init physical default is also 0x01."/>
+                        <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Connect address"
+                               ToolTip="Hex connect address. Meaning depends on init method on the connect tab: slow init = 5-baud address (ME7 bench: 0x01); fast init = StartCommunication target."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
                                  Text="{Binding Path=ConnectAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
 
-                        <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Address mode"
-                               ToolTip="Physical or functional addressing mode used for fast init."/>
-                        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Source={StaticResource AddressModeEnumValues}}"
-                                  SelectedItem="{Binding Path=ConnectAddressMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                        <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Path=IsFastInitConnectionMethodSelected}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Fast init address mode"
+                                   ToolTip="Physical or functional addressing for fast init only. Hidden when connect tab uses slow init."/>
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding Source={StaticResource AddressModeEnumValues}}"
+                                      SelectedItem="{Binding Path=ConnectAddressMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                        </Grid>
 
                         <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Attempts"
                                ToolTip="Number of connection attempts before giving up."/>
@@ -259,6 +274,11 @@ Contact by Email: tony@nefariousmotorsports.com
                                  Text="{Binding Path=CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
+
+                <TextBlock Text="Connect-tab init method and baud rate, and slow init timing log, are remembered between sessions. Other settings on this tab reset when you close the app."
+                           Foreground="{StaticResource ForegroundBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,8"/>
 
                 <Button Command="{Binding Path=RestoreSettingsToDefaultsCommand}"
                         HorizontalAlignment="Center"

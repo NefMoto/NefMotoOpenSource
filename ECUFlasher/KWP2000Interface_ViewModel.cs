@@ -175,12 +175,19 @@ namespace ECUFlasher
                 {
                     _DesiredConnectionMethod = value;
                     OnPropertyChanged(new PropertyChangedEventArgs("DesiredConnectionMethod"));
+                    OnPropertyChanged(new PropertyChangedEventArgs("IsFastInitConnectionMethodSelected"));
 
                     ECUFlasher.Properties.Settings.Default.DesiredKWP2000ConnectionMethod = _DesiredConnectionMethod;
                 }
             }
         }
         private ConnectionMethod _DesiredConnectionMethod = ConnectionMethod.SlowInit;
+
+        /// <summary>True when connect tab uses fast init (address mode applies).</summary>
+        public bool IsFastInitConnectionMethodSelected
+        {
+            get { return DesiredConnectionMethod == ConnectionMethod.FastInit; }
+        }
 
         public bool EnableSlowInitTimingLog
         {
@@ -497,7 +504,7 @@ namespace ECUFlasher
 				{
 					_RestoreSettingsToDefaultsCommand = new ReactiveCommand(OnRestoreSettingsToDefaults, RestoreSettingsToDefaultsCommandCanExecute);
 					_RestoreSettingsToDefaultsCommand.Name = "Restore To Defaults";
-					_RestoreSettingsToDefaultsCommand.Description = "Restore KWP2000 settings tab values to their defaults";
+					_RestoreSettingsToDefaultsCommand.Description = "Restore this settings tab to defaults (address, timing, options). Does not change connect-tab init method or baud rate.";
 					_RestoreSettingsToDefaultsCommand.AddWatchedProperty(CommInterface, "ConnectionStatus");
 				}
 
