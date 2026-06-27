@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -19,17 +19,17 @@ Contact by Email: tony@nefariousmotorsports.com
 -->
 
 <UserControl x:Class="ECUFlasher.KWP2000Interface_View_Settings"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:sys="clr-namespace:System;assembly=mscorlib"
-             xmlns:ECUFlasher="clr-namespace:ECUFlasher"
-             xmlns:props="clr-namespace:ECUFlasher.Properties"
-             xmlns:Communication="clr-namespace:Communication;assembly=Communication"
-             xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
-             mc:Ignorable="d"
-             d:DesignHeight="300" d:DesignWidth="700">
+            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:sys="clr-namespace:System;assembly=mscorlib"
+            xmlns:ECUFlasher="clr-namespace:ECUFlasher"
+            xmlns:props="clr-namespace:ECUFlasher.Properties"
+            xmlns:Communication="clr-namespace:Communication;assembly=Communication"
+            xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+            mc:Ignorable="d"
+            d:DesignHeight="300" d:DesignWidth="700">
     <UserControl.Resources>
 
         <ObjectDataProvider MethodName="GetValues" ObjectType="{x:Type sys:Enum}" x:Key="AddressModeEnumValues">
@@ -126,8 +126,8 @@ Contact by Email: tony@nefariousmotorsports.com
                                     HorizontalAlignment="Left"
                                     Panel.ZIndex="1">
                                 <ContentPresenter ContentSource="Header"
-                                                  ContentTemplate="{TemplateBinding HeaderTemplate}"
-                                                  RecognizesAccessKey="True"/>
+                                                ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                                RecognizesAccessKey="True"/>
                             </Border>
                             <ContentPresenter Grid.Row="1" Margin="{TemplateBinding Padding}"/>
                         </Grid>
@@ -162,9 +162,9 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Connect address"
-                               ToolTip="Hex connect address. Meaning depends on init method on the connect tab: slow init = 5-baud address (ME7 bench: 0x01); fast init = StartCommunication target."/>
+                                ToolTip="Hex connect address. Meaning depends on init method on the connect tab: slow init = 5-baud address (ME7 bench: 0x01); fast init = StartCommunication target."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
-                                 Text="{Binding Path=ConnectAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=ConnectAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
 
                         <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
                             <Grid.Style>
@@ -181,15 +181,15 @@ Contact by Email: tony@nefariousmotorsports.com
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Label Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Fast init address mode"
-                                   ToolTip="Physical or functional addressing for fast init only. Hidden when connect tab uses slow init."/>
+                                    ToolTip="Physical or functional addressing for fast init only. Hidden when connect tab uses slow init."/>
                             <ComboBox Grid.Column="1" ItemsSource="{Binding Source={StaticResource AddressModeEnumValues}}"
-                                      SelectedItem="{Binding Path=ConnectAddressMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                        SelectedItem="{Binding Path=ConnectAddressMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                         </Grid>
 
                         <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Attempts"
-                               ToolTip="Number of connection attempts before giving up."/>
+                                ToolTip="Number of connection attempts before giving up."/>
                         <TextBox Grid.Row="2" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.NumConnectionAttempts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.NumConnectionAttempts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
 
@@ -207,24 +207,24 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Fast init offset (ms)"
-                               ToolTip="Fast init low/high time offset in milliseconds."/>
+                                ToolTip="Fast init low/high time offset in milliseconds."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.FastInitLowHighTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.FastInitLowHighTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Slow 5-baud offset (ms)"
-                               ToolTip="Five-baud bit time offset used during slow init break timing."/>
+                                ToolTip="Five-baud bit time offset used during slow init break timing."/>
                         <TextBox Grid.Row="1" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.SlowInitFiveBaudBitTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.SlowInitFiveBaudBitTimeOffsetMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Slow init gap (ms)"
-                               ToolTip="Time between slow inits before starting the KWP2000 session."/>
+                                ToolTip="Time between slow inits before starting the KWP2000 session."/>
                         <TextBox Grid.Row="2" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.TimeBetweenSlowInitForKWP2000MS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.TimeBetweenSlowInitForKWP2000MS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="3" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Post slow-init (ms)"
-                               ToolTip="Delay after slow init before sending the start communication message."/>
+                                ToolTip="Delay after slow init before sending the start communication message."/>
                         <TextBox Grid.Row="3" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.TimeAfterSlowInitBeforeStartCommMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.TimeAfterSlowInitBeforeStartCommMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
 
@@ -240,14 +240,14 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Verify cable in dumb mode"
-                               ToolTip="Verify the cable is wired correctly when communicating in dumb (KWP1281) mode."/>
+                                ToolTip="Verify the cable is wired correctly when communicating in dumb (KWP1281) mode."/>
                         <CheckBox Grid.Row="0" Grid.Column="1"
-                                  IsChecked="{Binding Path=CommInterface.ShouldVerifyDumbMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                IsChecked="{Binding Path=CommInterface.ShouldVerifyDumbMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Slow init timing log"
-                               ToolTip="Log per-bit slow init timing, RX queue depth, and handshake phase deltas to the status log (for bench diagnostics)."/>
+                                ToolTip="Log per-bit slow init timing, RX queue depth, and handshake phase deltas to the status log (for bench diagnostics)."/>
                         <CheckBox Grid.Row="1" Grid.Column="1"
-                                  IsChecked="{Binding Path=EnableSlowInitTimingLog, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                IsChecked="{Binding Path=EnableSlowInitTimingLog, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
 
@@ -264,21 +264,21 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Read timeout (ms)"
-                               ToolTip="Serial device read timeout in milliseconds."/>
+                                ToolTip="Serial device read timeout in milliseconds."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.FTDIDeviceReadTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Write timeout (ms)"
-                               ToolTip="Serial device write timeout in milliseconds."/>
+                                ToolTip="Serial device write timeout in milliseconds."/>
                         <TextBox Grid.Row="1" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.FTDIDeviceWriteTimeOutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
 
                 <TextBlock Text="Connect-tab init method and baud rate, and slow init timing log, are remembered between sessions. Other settings on this tab reset when you close the app."
-                           Foreground="{StaticResource ForegroundBrush}"
-                           TextWrapping="Wrap"
-                           Margin="0,8,0,8"/>
+                            Foreground="{StaticResource ForegroundBrush}"
+                            TextWrapping="Wrap"
+                            Margin="0,8,0,8"/>
 
                 <Button Command="{Binding Path=RestoreSettingsToDefaultsCommand}"
                         HorizontalAlignment="Center"
@@ -299,19 +299,19 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Byte complement (ms)"
-                               ToolTip="Minimum time before the tester sends the byte complement during KWP1281 slow init."/>
+                                ToolTip="Minimum time before the tester sends the byte complement during KWP1281 slow init."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendByteComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendByteComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Response (ms)"
-                               ToolTip="Minimum time before the tester sends a response message during KWP1281."/>
+                                ToolTip="Minimum time before the tester sends a response message during KWP1281."/>
                         <TextBox Grid.Row="1" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendResponseMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendResponseMessageMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Next byte (ms)"
-                               ToolTip="Minimum time before sending the next byte after receiving the complement during KWP1281."/>
+                                ToolTip="Minimum time before sending the next byte after receiving the complement during KWP1281."/>
                         <TextBox Grid.Row="2" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.KWP1281_TesterMinTimeToSendNextByteAfterReceivingComplementMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
 
@@ -332,39 +332,39 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P1 ECU max inter-byte"
-                               ToolTip="Default P1: maximum ECU inter-byte time in milliseconds."/>
+                                ToolTip="Default P1: maximum ECU inter-byte time in milliseconds."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
-                                 Text="{Binding Path=DefaultP1ECUInterByteTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=DefaultP1ECUInterByteTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P2 ECU min response"
-                               ToolTip="Default P2 minimum: minimum ECU response time in milliseconds."/>
+                                ToolTip="Default P2 minimum: minimum ECU response time in milliseconds."/>
                         <TextBox Grid.Row="1" Grid.Column="1"
-                                 Text="{Binding Path=DefaultP2ECUResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=DefaultP2ECUResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P2 ECU max response"
-                               ToolTip="Default P2 maximum: maximum ECU response time in milliseconds."/>
+                                ToolTip="Default P2 maximum: maximum ECU response time in milliseconds."/>
                         <TextBox Grid.Row="2" Grid.Column="1"
-                                 Text="{Binding Path=DefaultP2ECUResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=DefaultP2ECUResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="3" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P3 tester min response"
-                               ToolTip="Default P3 minimum: minimum tester response time in milliseconds."/>
+                                ToolTip="Default P3 minimum: minimum tester response time in milliseconds."/>
                         <TextBox Grid.Row="3" Grid.Column="1"
-                                 Text="{Binding Path=DefaultP3TesterResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=DefaultP3TesterResponseTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="4" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P3 tester max response"
-                               ToolTip="Default P3 maximum: maximum tester response time in milliseconds."/>
+                                ToolTip="Default P3 maximum: maximum tester response time in milliseconds."/>
                         <TextBox Grid.Row="4" Grid.Column="1"
-                                 Text="{Binding Path=DefaultP3TesterResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=DefaultP3TesterResponseTimeMaxMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="5" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P4 tester min inter-byte"
-                               ToolTip="Default P4 minimum: minimum tester inter-byte time in milliseconds."/>
+                                ToolTip="Default P4 minimum: minimum tester inter-byte time in milliseconds."/>
                         <TextBox Grid.Row="5" Grid.Column="1"
-                                 Text="{Binding Path=DefaultP4TesterInterByteTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=DefaultP4TesterInterByteTimeMinMS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="6" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="P4 min when connecting"
-                               ToolTip="P4 minimum inter-byte time used while connecting. Some ECUs need a higher value than the default session timing."/>
+                                ToolTip="P4 minimum inter-byte time used while connecting. Some ECUs need a higher value than the default session timing."/>
                         <TextBox Grid.Row="6" Grid.Column="1"
-                                 Text="{Binding Path=CommInterface.P4TesterInterByteTimeMinMsWhenConnecting, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=CommInterface.P4TesterInterByteTimeMinMsWhenConnecting, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
 
@@ -381,19 +381,19 @@ Contact by Email: tony@nefariousmotorsports.com
                         </Grid.RowDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Seed request"
-                               ToolTip="Security access seed request byte (hex) sent to the ECU."/>
+                                ToolTip="Security access seed request byte (hex) sent to the ECU."/>
                         <TextBox Grid.Row="0" Grid.Column="1"
-                                 Text="{Binding Path=SeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
+                                Text="{Binding Path=SeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource hexConverter}, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Use extended seed request"
-                               ToolTip="Use the extended security access seed request format."/>
+                                ToolTip="Use the extended security access seed request format."/>
                         <CheckBox Grid.Row="1" Grid.Column="1"
-                                  IsChecked="{Binding Path=ShouldUseExtendedSeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                IsChecked="{Binding Path=ShouldUseExtendedSeedRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
 
                         <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingLabelStyle}" Content="Support special key"
-                               ToolTip="Enable support for ECU-specific special security keys."/>
+                                ToolTip="Enable support for ECU-specific special security keys."/>
                         <CheckBox Grid.Row="2" Grid.Column="1"
-                                  IsChecked="{Binding Path=ShouldSupportSpecialKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
+                                IsChecked="{Binding Path=ShouldSupportSpecialKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"/>
                     </Grid>
                 </GroupBox>
             </StackPanel>

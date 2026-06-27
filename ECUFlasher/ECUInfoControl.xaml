@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -160,7 +160,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 </WrapPanel>
                 <Border DockPanel.Dock="Top">
                     <ListBox Name="ECUDTCsListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" ItemsSource="{Binding Path=ECUDTCs}" Background="Transparent"
-                                                 Shared:ListBoxHelper.AutoScrollToCurrentItem="True"/>
+                                                Shared:ListBoxHelper.AutoScrollToCurrentItem="True"/>
                 </Border>
             </DockPanel>
 
@@ -170,8 +170,8 @@ Contact by Email: tony@nefariousmotorsports.com
                 <WrapPanel DockPanel.Dock="Top">
                     <Label Content="Read Info Session Type:"/>
                     <ComboBox ItemsSource="{Binding Path=AvailableReadInfoSessionTypes}" IsEnabled="{Binding ElementName=ReadInfoButton, Path=IsEnabled}"
-                              SelectedItem="{Binding Path=ReadInfoSessionType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"
-                              ToolTip="Desired diagnostic session type for reading ECU info" ToolTipService.ShowOnDisabled="True"/>
+                                SelectedItem="{Binding Path=ReadInfoSessionType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"
+                                ToolTip="Desired diagnostic session type for reading ECU info" ToolTipService.ShowOnDisabled="True"/>
                     <Button Name="ReadInfoButton" Command="{Binding Path=ReadInfoCommand}"/>
                     <Button Command="{Binding Path=SaveInfoCommand}"/>
                     <Button Command="{Binding Path=LoadInfoCommand}"/>
@@ -179,8 +179,8 @@ Contact by Email: tony@nefariousmotorsports.com
                 </WrapPanel>
                 <Border DockPanel.Dock="Top">
                     <ListBox Name="ECUInfoListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" Background="Transparent"
-                                             Shared:ListBoxHelper.AutoScrollToCurrentItem="True"
-                                             ItemsSource="{Binding Path=CombinedECUInfo}"/>
+                                            Shared:ListBoxHelper.AutoScrollToCurrentItem="True"
+                                            ItemsSource="{Binding Path=CombinedECUInfo}"/>
                 </Border>
             </DockPanel>
         </Grid>

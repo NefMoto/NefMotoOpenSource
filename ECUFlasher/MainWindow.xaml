@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Nefarious Motorsports ME7 ECU Flasher
 Copyright (C) 2017  Nefarious Motorsports Inc
 
@@ -102,8 +102,8 @@ Contact by Email: tony@nefariousmotorsports.com
         <DockPanel Grid.Row="1" Grid.ColumnSpan="2">
             <Image DockPanel.Dock="Left" Source=".\resources\app-banner.jpg" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" ClipToBounds="True" Width="225" Height="80"/>
             <ComboBox DockPanel.Dock="Left" Style="{StaticResource CommunicationProtocolComboBoxStyle}"
-                      ItemsSource="{Binding Source={StaticResource CommunicationProtocolEnumValues}}" ToolTip="Desired communication protocol"
-                      SelectedItem="{Binding Path=App.DesiredProtocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
+                        ItemsSource="{Binding Source={StaticResource CommunicationProtocolEnumValues}}" ToolTip="Desired communication protocol"
+                        SelectedItem="{Binding Path=App.DesiredProtocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
             <ContentControl Content="{Binding Path=App.CommInterfaceViewModel}" DockPanel.Dock="Right" VerticalAlignment="Top"/>
         </DockPanel>
         <TabControl Grid.Row="2" Background="{DynamicResource BackgroundBrush}" Grid.ColumnSpan="2">

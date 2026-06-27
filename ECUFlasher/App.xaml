@@ -319,8 +319,8 @@ Contact by Email: tony@nefariousmotorsports.com
             <Setter Property="ContentTemplate">
                 <Setter.Value>
                     <!-- Note: This template is currently FTDI-specific because ChipID is only available on FtdiDeviceInfo.
-                         When other device types (e.g., CH340) are added, consider using a DataTemplateSelector or
-                         making this template work with the base DeviceInfo type and conditionally showing ChipID. -->
+                        When other device types (e.g., CH340) are added, consider using a DataTemplateSelector or
+                        making this template work with the base DeviceInfo type and conditionally showing ChipID. -->
                     <DataTemplate DataType="Communication:FtdiDeviceInfo">
                         <!--We are in a data template so data context is automatically the element content-->
                         <StackPanel>
