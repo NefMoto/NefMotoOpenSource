@@ -22,6 +22,9 @@ using System;
 using System.Collections.Generic;
 using System.IO.Ports;
 using System.Management;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using Shared;
 #pragma warning disable CA1416 // Validate platform compatibility - This is Windows-only code
 
@@ -299,6 +302,7 @@ namespace Communication
 
         /// <summary>
         /// Shared enumeration: finds COM ports matching the given USB VID and creates DeviceInfo via the factory.
+        /// Uses a single WMI query filtered by VID so phantom/BT COM ports are not scanned per-port.
         /// </summary>
         protected static IEnumerable<DeviceInfo> EnumerateByVid(
             string vid,
@@ -307,50 +311,123 @@ namespace Communication
             DisplayStatusMessageDelegate logMessage = null)
         {
             var devices = new List<DeviceInfo>();
+
             try
             {
-                if (logMessage != null)
-                    logMessage($"{logPrefix}: Starting enumeration", StatusMessageType.LOG);
-
-                string[] portNames;
-                try
+                foreach (ComPortVidMatch candidate in QueryPnPEntitiesByVid(vid))
                 {
-                    portNames = SerialPort.GetPortNames();
-                    if (logMessage != null)
-                        logMessage($"{logPrefix}: Found {portNames.Length} COM ports", StatusMessageType.LOG);
-                }
-                catch (System.IO.FileNotFoundException ex)
-                {
-                    if (logMessage != null)
-                        logMessage($"{logPrefix}: FileNotFoundException: {ex.Message}", StatusMessageType.USER);
-                    return devices;
-                }
-                catch (Exception ex)
-                {
-                    if (logMessage != null)
-                        logMessage($"{logPrefix}: Exception: {ex.GetType().Name}: {ex.Message}", StatusMessageType.USER);
-                    return devices;
-                }
-
-                foreach (string portName in portNames)
-                {
-                    try
+                    if (!IsPortAccessible(candidate.PortName))
                     {
-                        if (!IsPortAccessible(portName)) continue;
-                        if (IsComPortDeviceByVid(portName, vid, out string description, out string serialNumber))
-                        {
-                            devices.Add(createDeviceInfo(portName, description, serialNumber));
-                        }
+                        continue;
                     }
-                    catch { }
+
+                    devices.Add(createDeviceInfo(candidate.PortName, candidate.Description, candidate.SerialNumber));
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                logMessage?.Invoke(
+                    $"{logPrefix}: Exception: {ex.GetType().Name}: {ex.Message}",
+                    StatusMessageType.LOG);
+            }
 
             return devices;
         }
 
+        private readonly struct ComPortVidMatch
+        {
+            public ComPortVidMatch(string portName, string description, string serialNumber)
+            {
+                PortName = portName;
+                Description = description;
+                SerialNumber = serialNumber;
+            }
+
+            public string PortName { get; }
+            public string Description { get; }
+            public string SerialNumber { get; }
+        }
+
+        private static IEnumerable<ComPortVidMatch> QueryPnPEntitiesByVid(string vid)
+        {
+            var matches = new List<ComPortVidMatch>();
+            // WQL LIKE treats '_' as single-char wildcard; escape so VID_1A86 matches literally.
+            string vidLikePattern = $"%VID[_]{vid}%";
+
+            using (var searcher = new ManagementObjectSearcher(
+                "SELECT DeviceID, Name FROM Win32_PnPEntity WHERE DeviceID LIKE '" + vidLikePattern + "'"))
+            {
+                foreach (ManagementObject device in searcher.Get())
+                {
+                    string deviceId = device["DeviceID"]?.ToString() ?? string.Empty;
+                    string name = device["Name"]?.ToString() ?? string.Empty;
+
+                    if (!TryExtractComPortName(name, out string portName))
+                    {
+                        continue;
+                    }
+
+                    string serialNumber = null;
+                    try
+                    {
+                        serialNumber = device["SerialNumber"]?.ToString();
+                    }
+                    catch (ManagementException)
+                    {
+                        serialNumber = null;
+                    }
+
+                    if (string.IsNullOrEmpty(serialNumber))
+                    {
+                        serialNumber = ExtractSerialNumberFromPnpId(deviceId);
+                    }
+
+                    matches.Add(new ComPortVidMatch(portName, name, serialNumber ?? string.Empty));
+                }
+            }
+
+            return matches;
+        }
+
+        private static bool TryExtractComPortName(string deviceName, out string portName)
+        {
+            portName = null;
+            if (string.IsNullOrEmpty(deviceName))
+            {
+                return false;
+            }
+
+            Match match = Regex.Match(deviceName, @"\((COM\d+)\)\s*$", RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            portName = match.Groups[1].Value;
+            return !string.IsNullOrEmpty(portName);
+        }
+
+        private const int PortProbeTimeoutMs = 1000;
+
         protected static bool IsPortAccessible(string portName)
+        {
+            try
+            {
+                var probe = Task.Run(() => TryProbePort(portName));
+                if (!probe.Wait(PortProbeTimeoutMs))
+                {
+                    return false;
+                }
+
+                return probe.Result;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryProbePort(string portName)
         {
             SerialPort testPort = null;
             try
@@ -385,68 +462,6 @@ namespace Communication
                 }
                 catch { }
             }
-        }
-
-        /// <summary>
-        /// Checks if a COM port belongs to a device with the given USB VID (e.g. "0403" for FTDI, "1A86" for CH340).
-        /// </summary>
-        protected static bool IsComPortDeviceByVid(string portName, string vid, out string description, out string serialNumber)
-        {
-            description = null;
-            serialNumber = null;
-
-            try
-            {
-                string vidUpper = $"VID_{vid}";
-
-                using (var searcher = new ManagementObjectSearcher(
-                    $"SELECT * FROM Win32_SerialPort WHERE DeviceID = '{portName}'"))
-                {
-                    foreach (ManagementObject port in searcher.Get())
-                    {
-                        string pnpId = port["PNPDeviceID"]?.ToString() ?? "";
-                        string desc = port["Description"]?.ToString() ?? "";
-
-                        if (pnpId.Contains(vidUpper, StringComparison.OrdinalIgnoreCase))
-                        {
-                            description = desc;
-                            serialNumber = ExtractSerialNumberFromPnpId(pnpId);
-                            return true;
-                        }
-                    }
-                }
-
-                using (var searcher = new ManagementObjectSearcher(
-                    $"SELECT * FROM Win32_PnPEntity WHERE DeviceID LIKE '%{vidUpper}%' AND Name LIKE '%{portName}%'"))
-                {
-                    foreach (ManagementObject device in searcher.Get())
-                    {
-                        try
-                        {
-                            string deviceID = device["DeviceID"]?.ToString() ?? "";
-                            string name = device["Name"]?.ToString() ?? "";
-
-                            if (deviceID.Contains(vidUpper, StringComparison.OrdinalIgnoreCase))
-                            {
-                                description = name;
-                                try
-                                {
-                                    serialNumber = device["SerialNumber"]?.ToString();
-                                }
-                                catch (ManagementException) { serialNumber = null; }
-                                catch (Exception) { serialNumber = null; }
-                                if (string.IsNullOrEmpty(serialNumber))
-                                    serialNumber = ExtractSerialNumberFromPnpId(deviceID);
-                                return true;
-                            }
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch { }
-
-            return false;
         }
 
         protected static string ExtractSerialNumberFromPnpId(string pnpDeviceID)
