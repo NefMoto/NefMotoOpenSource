@@ -20,6 +20,7 @@ Contact by Email: tony@nefariousmotorsports.com
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Shared;
 
@@ -42,19 +43,37 @@ namespace Communication
         public static DisplayStatusMessageDelegate LogMessage { get; set; }
 
         /// <summary>
+        /// Optional callback for short-lived UI progress text during enumeration (may be invoked from a worker thread).
+        /// </summary>
+        public static Action<string> ReportEnumerationProgress { get; set; }
+
+        /// <summary>
         /// Enumerates all available communication devices
         /// </summary>
         public static IEnumerable<DeviceInfo> EnumerateAllDevices()
         {
             var devices = new List<DeviceInfo>();
+            var totalTimer = Stopwatch.StartNew();
 
-            // Enumerate FTDI devices
+            ReportEnumerationProgress?.Invoke("Searching for FTDI devices…");
+            var ftdiTimer = Stopwatch.StartNew();
             devices.AddRange(FtdiCommunicationDevice.Enumerate(LogMessage));
+            LogTiming("FTDI enumeration", ftdiTimer.Elapsed);
 
-            // Enumerate CH340 devices
+            ReportEnumerationProgress?.Invoke("Searching for CH340 devices…");
+            var ch340Timer = Stopwatch.StartNew();
             devices.AddRange(Ch340CommunicationDevice.Enumerate(LogMessage));
+            LogTiming("CH340 enumeration", ch340Timer.Elapsed);
+
+            LogTiming("Device enumeration total", totalTimer.Elapsed);
+            LogMessage?.Invoke($"DeviceManager: Found {devices.Count} device(s)", StatusMessageType.LOG);
 
             return devices;
+        }
+
+        private static void LogTiming(string label, TimeSpan elapsed)
+        {
+            LogMessage?.Invoke($"{label} took {elapsed.TotalMilliseconds:F0} ms", StatusMessageType.LOG);
         }
 
 

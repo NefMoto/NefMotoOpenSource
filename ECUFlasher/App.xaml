@@ -470,9 +470,16 @@ Contact by Email: tony@nefariousmotorsports.com
                 <Trigger Property="Validation.HasError" Value="false">
                     <Setter Property="ToolTip" Value="{StaticResource DeviceToolTip}"/>
                 </Trigger>
-                <DataTrigger Binding="{Binding Path=CommInterface.ConnectionStatus}" Value="{x:Static Communication:CommunicationInterface+ConnectionStatusType.CommunicationTerminated}">
-                    <Setter Property="IsEnabled" Value="true"/>
+                <DataTrigger Binding="{Binding Path=App.IsRefreshingDevices, Mode=OneWay}" Value="True">
+                    <Setter Property="ToolTip" Value="{Binding Path=App.DeviceRefreshStatus, Mode=OneWay}"/>
                 </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Path=CommInterface.ConnectionStatus}" Value="{x:Static Communication:CommunicationInterface+ConnectionStatusType.CommunicationTerminated}"/>
+                        <Condition Binding="{Binding Path=App.IsRefreshingDevices, Mode=OneWay}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="IsEnabled" Value="true"/>
+                </MultiDataTrigger>
             </Style.Triggers>
         </Style>
 

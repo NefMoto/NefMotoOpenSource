@@ -108,21 +108,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 </DataTemplate>
             </ComboBox.ItemTemplate>
         </ComboBox>
-        <ComboBox Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource DeviceComboBoxStyle}" ItemsSource="{Binding Path=App.Devices}"
-                            SelectedItem="{Binding Path=App.SelectedDeviceInfo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}">
-            <ComboBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock>
-                        <TextBlock.Text>
-                            <PriorityBinding FallbackValue="Unknown Device">
-                                <Binding Path="DescriptionProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>
-                                <Binding Path="IDProp" Mode="OneWay" ValidatesOnExceptions="True" ValidatesOnDataErrors="True" Converter="{StaticResource stringValidConverter}"/>
-                            </PriorityBinding>
-                        </TextBlock.Text>
-                    </TextBlock>
-                </DataTemplate>
-            </ComboBox.ItemTemplate>
-        </ComboBox>
+        <ECUFlasher:DeviceSelectorControl Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2"/>
         <Button Grid.Column="3" Grid.Row="0" Command="{Binding Path=App.RefreshDevicesCommand}" Style="{StaticResource ConnectionButtonsStyle}"/>
         <Button Grid.Column="0" Grid.Row="1" Command="{Binding Path=DetectSupportedBaudRatesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Visibility="Collapsed"/>
         <ComboBox Grid.Column="1" Grid.Row="1" Name="DesiredConnectionMethodComboBox" Style="{StaticResource ConnectionMethodComboBoxStyle}"

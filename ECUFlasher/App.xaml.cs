@@ -37,7 +37,10 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using System.Windows.Data;
 using System.Windows.Shapes;
 using System.Xml.Serialization;
@@ -135,8 +138,6 @@ namespace ECUFlasher
                     };
                     SelectedDeviceInfo = new Communication.FtdiDeviceInfo(ftdiNode, legacyDevice.ChipID);
                 }
-
-                OnRefreshDevices();
             }
             catch(Exception e)
             {
@@ -161,6 +162,27 @@ namespace ECUFlasher
             base.OnStartup(e);
 
             DisplayStatusMessage("Opened " + GetApplicationName(), StatusMessageType.LOG);
+
+            // Device enumeration can block for a long time on some systems (WMI, COM port probes).
+            // Run after the main window is shown so startup does not appear hung.
+            if (MainWindow != null)
+            {
+                MainWindow.ContentRendered += OnMainWindowContentRenderedForDeviceRefresh;
+            }
+            else
+            {
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(BeginRefreshDevices));
+            }
+        }
+
+        private void OnMainWindowContentRenderedForDeviceRefresh(object sender, EventArgs e)
+        {
+            if (MainWindow != null)
+            {
+                MainWindow.ContentRendered -= OnMainWindowContentRenderedForDeviceRefresh;
+            }
+
+            BeginRefreshDevices();
         }
 
         protected override void OnExit(ExitEventArgs e)
@@ -260,22 +282,6 @@ namespace ECUFlasher
             {
                 PropertyChanged(this, e);
             }
-        }
-
-        private bool SelectedUSBDevicePredicate(DeviceInfo device)
-        {
-            if (device != null && SelectedDeviceInfo != null)
-            {
-                if ((SelectedDeviceInfo.Description != device.Description)
-                    || (SelectedDeviceInfo.SerialNumber != device.SerialNumber)
-                    || (SelectedDeviceInfo.Type != device.Type)
-                    || (SelectedDeviceInfo.DeviceID != device.DeviceID))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         private void DisplayApplicationStatusMessage(string message, StatusMessageType messageType)
@@ -803,10 +809,17 @@ namespace ECUFlasher
                     _RefreshDevicesCommand.Name = "Refresh Devices";
                     _RefreshDevicesCommand.Description = "Refresh the connected USB devices";
                     _RefreshDevicesCommand.AddWatchedProperty(CommInterface, "ConnectionStatus");
+                    _RefreshDevicesCommand.AddWatchedProperty(this, "IsRefreshingDevices");
 
                     _RefreshDevicesCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
                     {
                         bool result = true;
+
+                        if (IsRefreshingDevices)
+                        {
+                            reasonsDisabled.Add("Device search in progress");
+                            result = false;
+                        }
 
                         if (CommInterface.ConnectionStatus != CommunicationInterface.ConnectionStatusType.CommunicationTerminated)
                         {
@@ -823,23 +836,143 @@ namespace ECUFlasher
         }
         private ReactiveCommand _RefreshDevicesCommand;
 
+        private int _deviceRefreshInProgress;
+
+        public bool IsRefreshingDevices
+        {
+            get => _isRefreshingDevices;
+            private set
+            {
+                if (_isRefreshingDevices != value)
+                {
+                    _isRefreshingDevices = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs(nameof(IsRefreshingDevices)));
+                }
+            }
+        }
+        private bool _isRefreshingDevices;
+
+        public string DeviceRefreshStatus
+        {
+            get => _deviceRefreshStatus;
+            private set
+            {
+                if (_deviceRefreshStatus != value)
+                {
+                    _deviceRefreshStatus = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs(nameof(DeviceRefreshStatus)));
+                }
+            }
+        }
+        private string _deviceRefreshStatus = string.Empty;
+
         private void OnRefreshDevices()
         {
-            RefreshDevices();
+            BeginRefreshDevices();
+        }
 
-            DeviceInfo matchedInfoInList = Devices.FirstOrDefault(this.SelectedUSBDevicePredicate);
+        private void BeginRefreshDevices()
+        {
+            if (Interlocked.CompareExchange(ref _deviceRefreshInProgress, 1, 0) != 0)
+            {
+                return;
+            }
+
+            IsRefreshingDevices = true;
+            DeviceRefreshStatus = "Searching for devices…";
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    Communication.DeviceManager.LogMessage = DisplayStatusMessage;
+                    Communication.DeviceManager.ReportEnumerationProgress = ReportDeviceEnumerationProgress;
+                    var deviceList = Communication.DeviceManager.EnumerateAllDevices().ToList();
+                    Dispatcher.Invoke(() =>
+                    {
+                        FinishDeviceRefresh();
+                        ApplyRefreshedDevices(deviceList);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        FinishDeviceRefresh();
+                        DisplayStatusMessage($"Exception during device enumeration: {ex.GetType().Name}: {ex.Message}", StatusMessageType.USER);
+                        DisplayStatusMessage($"Stack trace: {ex.StackTrace}", StatusMessageType.LOG);
+                    });
+                }
+                finally
+                {
+                    Communication.DeviceManager.ReportEnumerationProgress = null;
+                }
+            });
+        }
+
+        private void ReportDeviceEnumerationProgress(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return;
+            }
+
+            Dispatcher.Invoke(() => DeviceRefreshStatus = message);
+        }
+
+        private void FinishDeviceRefresh()
+        {
+            IsRefreshingDevices = false;
+            DeviceRefreshStatus = string.Empty;
+            Interlocked.Exchange(ref _deviceRefreshInProgress, 0);
+        }
+
+        private void ApplyRefreshedDevices(List<DeviceInfo> deviceList)
+        {
+            RefreshDevices(deviceList);
+
+            DeviceInfo preferred = _SelectedDeviceInfo;
+            DeviceInfo matchedInfoInList = preferred != null
+                ? Devices.FirstOrDefault(device => DeviceInfoMatches(device, preferred))
+                : null;
             if (matchedInfoInList == null)
             {
-                //couldn't find the the selected device in the list, try to use the first one in the list
-                SelectedDeviceInfo = Devices.FirstOrDefault();
-            }
-            else
-            {
-                //use the one in the list
-                SelectedDeviceInfo = matchedInfoInList;
+                matchedInfoInList = Devices.FirstOrDefault();
             }
 
-            CollectionViewSource.GetDefaultView(Devices).MoveCurrentToFirst();
+            SelectedDeviceInfo = matchedInfoInList;
+
+            var view = CollectionViewSource.GetDefaultView(Devices);
+            if (view != null && SelectedDeviceInfo != null)
+            {
+                view.MoveCurrentTo(SelectedDeviceInfo);
+            }
+
+            DisplayStatusMessage(
+                $"Found {deviceList.Count} device(s).",
+                deviceList.Count > 0 ? StatusMessageType.LOG : StatusMessageType.USER);
+        }
+
+        private static bool DeviceInfoMatches(DeviceInfo device, DeviceInfo preferred)
+        {
+            if (device == null || preferred == null)
+            {
+                return false;
+            }
+
+            if (device.Type != preferred.Type)
+            {
+                return false;
+            }
+
+            if (device is FtdiDeviceInfo ftdiDevice && preferred is FtdiDeviceInfo preferredFtdi)
+            {
+                return ftdiDevice.LocId == preferredFtdi.LocId;
+            }
+
+            return device.Description == preferred.Description
+                && device.SerialNumber == preferred.SerialNumber
+                && device.DeviceID == preferred.DeviceID;
         }
         #endregion
         public DeviceInfo SelectedDeviceInfo
@@ -988,25 +1121,13 @@ namespace ECUFlasher
             NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
         }
 
-        private void RefreshDevices()
+        private void RefreshDevices(IEnumerable<DeviceInfo> deviceList)
         {
             Devices.Clear();
 
-            // Set up logging for DeviceManager enumeration
-            Communication.DeviceManager.LogMessage = DisplayStatusMessage;
-
-            try
+            foreach (var deviceInfo in deviceList)
             {
-                // Use DeviceManager to enumerate all devices and add them to the collection
-                foreach (var deviceInfo in Communication.DeviceManager.EnumerateAllDevices())
-                {
-                    Devices.Add(deviceInfo);
-                }
-            }
-            catch (Exception ex)
-            {
-                DisplayStatusMessage($"Exception during device enumeration: {ex.GetType().Name}: {ex.Message}", StatusMessageType.USER);
-                DisplayStatusMessage($"Stack trace: {ex.StackTrace}", StatusMessageType.LOG);
+                Devices.Add(deviceInfo);
             }
 
             #region fakeDevices
