@@ -960,7 +960,7 @@ namespace Communication
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
                         {
-                            validationMesage = "End address is not the end of flash memory.";
+                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try ME7 29F800), or flash may extend beyond this layout.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
                         {
@@ -1030,7 +1030,7 @@ namespace Communication
                         }
                         else if (!layoutIsValid)
                         {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue reading flash memory?", UserPromptType.OK_CANCEL);
+                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue reading flash memory?", UserPromptType.OK_CANCEL);
                         }
 
                         if (promptResult == UserPromptResult.OK)
@@ -1811,7 +1811,7 @@ namespace Communication
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
                         {
-                            validationMesage = "End address is not the end of flash memory.";
+                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try ME7 29F800), or flash may extend beyond this layout.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
                         {
@@ -1881,7 +1881,7 @@ namespace Communication
                         }
                         else if (!layoutIsValid)
                         {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue writing flash memory?", UserPromptType.OK_CANCEL);
+                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue writing flash memory?", UserPromptType.OK_CANCEL);
                         }
 
                         if (promptResult == UserPromptResult.OK)
