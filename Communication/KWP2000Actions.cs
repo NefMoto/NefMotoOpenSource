@@ -1883,50 +1883,51 @@ namespace Communication
             }
 
             uint size = mEndAddress - mStartAddress;
+            uint address = mStartAddress;
+            uint requestSize = size;
 
             switch (mState)
             {
                 case ValidationState.Range:
                 {
-                    if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
-                    {
-                        KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mStartAddress, size, dataFormat);
-                    }
-                    else
-                    {
-                        KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mStartAddress, size, dataFormat);
-                    }
                     break;
                 }
                 case ValidationState.BeforeStart:
                 {
-                    if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
-                    {
-                        KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mStartAddress - 2, size + 2, dataFormat);
-                    }
-                    else
-                    {
-                        KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mStartAddress - 2, size + 2, dataFormat);
-                    }
+                    address = mStartAddress - 2;
+                    requestSize = size + 2;
                     break;
                 }
                 case ValidationState.AfterEnd:
                 {
-                    if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
-                    {
-                        KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mStartAddress, size + 2, dataFormat);
-                    }
-                    else
-                    {
-                        KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mStartAddress, size + 2, dataFormat);
-                    }
+                    requestSize = size + 2;
+                    break;
+                }
+                case ValidationState.CheckMirroredDuplicate:
+                {
+                    address = mEndAddress;
+                    break;
+                }
+                case ValidationState.CheckMirroredEnd:
+                {
+                    address = mEndAddress + size;
+                    requestSize = 2;
                     break;
                 }
                 default:
                 {
                     Debug.Fail("Unknown state");
-                    break;
+                    return;
                 }
+            }
+
+            if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+            {
+                KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, address, requestSize, dataFormat);
+            }
+            else
+            {
+                KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, address, requestSize, dataFormat);
             }
         }
 
@@ -2019,6 +2020,51 @@ namespace Communication
                     }
                     else
                     {
+                        // ME7 ECUs with 512KB flash often mirror into a 1MB address space; the +2 byte
+                        // probe succeeds against the mirror even when the layout size is correct.
+                        mState = ValidationState.CheckMirroredDuplicate;
+                        DisplayStatusMessage("Checking for mirrored flash mapping.", StatusMessageType.LOG);
+                    }
+
+                    break;
+                }
+                case ValidationState.CheckMirroredDuplicate:
+                {
+                    if (didRequestWork)
+                    {
+                        mState = ValidationState.CheckMirroredEnd;
+                        DisplayStatusMessage("Mirrored flash region detected, checking upper bound.", StatusMessageType.LOG);
+                    }
+                    else
+                    {
+                        ValidationResult = Result.EndIsntHighest;
+                        DisplayStatusMessage("Flash end address isn't the highest address.", StatusMessageType.LOG);
+                    }
+
+                    break;
+                }
+                case ValidationState.CheckMirroredEnd:
+                {
+                    if (!didRequestWork)
+                    {
+                        if ((failureResponseCode == (byte)KWP2000ResponseCode.CanNotUploadFromSpecifiedAddress)
+                            || (failureResponseCode == (byte)KWP2000ResponseCode.CanNotUploadNumberOfBytesRequested)
+                            || (failureResponseCode == (byte)KWP2000ResponseCode.CanNotDownloadToSpecifiedAddress)
+                            || (failureResponseCode == (byte)KWP2000ResponseCode.CanNotDownloadNumberOfBytesRequested))
+                        {
+                            ValidationResult = Result.Valid;
+
+                            DisplayStatusMessage("Flash is mirrored in ECU address space; layout matches physical chip size.", StatusMessageType.USER);
+                            DisplayStatusMessage("Flash memory addresses are valid.", StatusMessageType.LOG);
+                        }
+                        else
+                        {
+                            ValidationResult = Result.ValidationDidNotComplete;
+                            DisplayStatusMessage("Unknown response code while validating mirrored flash end.", StatusMessageType.LOG);
+                        }
+                    }
+                    else
+                    {
                         ValidationResult = Result.EndIsntHighest;
                         DisplayStatusMessage("Flash end address isn't the highest address.", StatusMessageType.LOG);
                     }
@@ -2037,7 +2083,9 @@ namespace Communication
         {
             Range,
             BeforeStart,
-            AfterEnd
+            AfterEnd,
+            CheckMirroredDuplicate,
+            CheckMirroredEnd
         }
 
         protected byte mMemoryTestServiceID;
