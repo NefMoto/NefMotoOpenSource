@@ -37,7 +37,12 @@ namespace Shared
     {
         OK,
         OK_CANCEL,
-        YES_NO_CANCEL
+        YES_NO_CANCEL,
+        /// <summary>
+        /// Yes/No/Cancel MessageBox for "Check for mirror before continuing?":
+        /// Yes=Check (CHECK), No=Continue (OK), Cancel=Abort (CANCEL).
+        /// </summary>
+        CONTINUE_CHECK_CANCEL
     };
 
     public enum UserPromptResult
@@ -46,7 +51,8 @@ namespace Shared
         OK,
         CANCEL,
         YES,
-        NO
+        NO,
+        CHECK
     };
 
     public delegate void DisplayStatusMessageDelegate(string message, StatusMessageType messageType);

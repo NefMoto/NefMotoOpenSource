@@ -313,6 +313,12 @@ namespace ECUFlasher
 
         internal UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType)
         {
+            // Prompts may be requested from the communication thread.
+            if (!Dispatcher.CheckAccess())
+            {
+                return Dispatcher.Invoke(() => DisplayUserPrompt(title, message, promptType));
+            }
+
             var button = MessageBoxButton.OKCancel;
 
             switch (promptType)
@@ -328,7 +334,11 @@ namespace ECUFlasher
                     break;
                 }
                 case UserPromptType.YES_NO_CANCEL:
+                case UserPromptType.CONTINUE_CHECK_CANCEL:
                 {
+                    // Same native MessageBox chrome as other prompts.
+                    // CONTINUE_CHECK_CANCEL question is "Check for mirror before continuing?"
+                    // Yes=Check, No=Continue without check, Cancel=Abort.
                     button = MessageBoxButton.YesNoCancel;
                     break;
                 }
@@ -365,12 +375,16 @@ namespace ECUFlasher
                 }
                 case MessageBoxResult.Yes:
                 {
-                    result = UserPromptResult.YES;
+                    result = (promptType == UserPromptType.CONTINUE_CHECK_CANCEL)
+                        ? UserPromptResult.CHECK
+                        : UserPromptResult.YES;
                     break;
                 }
                 case MessageBoxResult.No:
                 {
-                    result = UserPromptResult.NO;
+                    result = (promptType == UserPromptType.CONTINUE_CHECK_CANCEL)
+                        ? UserPromptResult.OK
+                        : UserPromptResult.NO;
                     break;
                 }
                 default:
