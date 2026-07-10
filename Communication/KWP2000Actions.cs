@@ -1703,6 +1703,11 @@ namespace Communication
         {
             ValidationRunning,
             Valid,
+            /// <summary>
+            /// Layout end is not the highest addressable byte, but a mirrored duplicate region
+            /// appears to exist (512KB chip mirrored into 1MB, or a 1MB chip with a 512KB layout).
+            /// </summary>
+            PossiblyMirrored,
             StartInvalid,
             EndInvalid,
             StartIsntLowest,
@@ -2052,10 +2057,9 @@ namespace Communication
                             || (failureResponseCode == (byte)KWP2000ResponseCode.CanNotDownloadToSpecifiedAddress)
                             || (failureResponseCode == (byte)KWP2000ResponseCode.CanNotDownloadNumberOfBytesRequested))
                         {
-                            ValidationResult = Result.Valid;
+                            ValidationResult = Result.PossiblyMirrored;
 
-                            DisplayStatusMessage("Flash is mirrored in ECU address space; layout matches physical chip size.", StatusMessageType.USER);
-                            DisplayStatusMessage("Flash memory addresses are valid.", StatusMessageType.LOG);
+                            DisplayStatusMessage("Addressable flash extends past this layout (possible 512KB mirror or larger chip).", StatusMessageType.LOG);
                         }
                         else
                         {
