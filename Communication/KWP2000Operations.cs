@@ -598,6 +598,58 @@ namespace Communication
         protected PercentCompleteDelegate mPercentCompleteDel;
     };
 
+    /// <summary>
+    /// Shared helpers for the ambiguous 512KB-layout / mirrored-1MB address-space case.
+    /// </summary>
+    internal static class MirroredFlashLayoutHelper
+    {
+        public const uint CompareSampleSize = 64;
+
+        public static string PromptMessage(bool forWrite)
+        {
+            string operation = forWrite ? "write" : "read";
+            return "Addressable flash extends past the selected layout (possible 512KB mirror, or a 1MB chip with a 512KB layout).\n\n"
+                + "Check for a mirrored mapping before continuing the " + operation + "?";
+        }
+
+        public static void ChooseCompareSample(uint layoutStart, uint layoutEnd, out uint sampleOffset, out uint sampleSize)
+        {
+            uint layoutSize = layoutEnd - layoutStart;
+            sampleSize = CompareSampleSize;
+            if (sampleSize > layoutSize)
+            {
+                sampleSize = layoutSize;
+            }
+            sampleSize &= ~1u;
+            if (sampleSize < 2)
+            {
+                sampleSize = Math.Min(2u, layoutSize & ~1u);
+            }
+
+            // Start of flash: across ME7Sum bins (94 real 1MB images), a 64-byte
+            // window at offset 0 never matched half1; mid/near-end can both be 0xFF.
+            sampleOffset = 0;
+        }
+
+        public static bool SamplesMatch(byte[] primary, byte[] mirror)
+        {
+            if ((primary == null) || (mirror == null) || (primary.Length == 0) || (primary.Length != mirror.Length))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < primary.Length; i++)
+            {
+                if (primary[i] != mirror[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
     public class ReadExternalFlashOperation : KWP2000Operation
     {
         public class ReadExternalFlashSettings
@@ -702,6 +754,39 @@ namespace Communication
                         case ReadingState.ValidateMemoryLayout:
                         {
                             nextAction = new ValidateStartAndEndAddressesWithRequestUploadDownloadAction(KWP2000CommInterface, mFlashBlockList.First().StartAddress, mFlashBlockList.Last().EndAddress);
+                            break;
+                        }
+                        case ReadingState.MirrorCheckRequestPrimary:
+                        {
+                            CommInterface.DisplayStatusMessage("Checking for mirrored flash: reading sample at 0x" + (mFlashBlockList.First().StartAddress + mMirrorCheckOffset).ToString("X8") + ".", StatusMessageType.USER);
+                            nextAction = new RequestUploadFromECUAction(KWP2000CommInterface, mFlashBlockList.First().StartAddress + mMirrorCheckOffset, mMirrorCheckSize, mCompressionType, mEncryptionType);
+                            break;
+                        }
+                        case ReadingState.MirrorCheckTransferPrimary:
+                        {
+                            nextAction = new TransferDataAction(KWP2000CommInterface, TransferDataAction.TransferMode.UploadFromECU, mEncryptionType, mCompressionType, mMaxBlockSize, mMirrorCheckPrimaryData, null);
+                            break;
+                        }
+                        case ReadingState.MirrorCheckExitPrimary:
+                        {
+                            nextAction = new RequestTransferExitAction(KWP2000CommInterface);
+                            break;
+                        }
+                        case ReadingState.MirrorCheckRequestMirror:
+                        {
+                            uint mirrorAddress = mFlashBlockList.Last().EndAddress + mMirrorCheckOffset;
+                            CommInterface.DisplayStatusMessage("Checking for mirrored flash: reading sample at 0x" + mirrorAddress.ToString("X8") + ".", StatusMessageType.USER);
+                            nextAction = new RequestUploadFromECUAction(KWP2000CommInterface, mirrorAddress, mMirrorCheckSize, mCompressionType, mEncryptionType);
+                            break;
+                        }
+                        case ReadingState.MirrorCheckTransferMirror:
+                        {
+                            nextAction = new TransferDataAction(KWP2000CommInterface, TransferDataAction.TransferMode.UploadFromECU, mEncryptionType, mCompressionType, mMaxBlockSize, mMirrorCheckMirrorData, null);
+                            break;
+                        }
+                        case ReadingState.MirrorCheckExitMirror:
+                        {
+                            nextAction = new RequestTransferExitAction(KWP2000CommInterface);
                             break;
                         }
                         case ReadingState.CheckIfReadRequired:
@@ -894,7 +979,18 @@ namespace Communication
 
                         mMaxBlockSize = ((RequestUploadFromECUAction)action).GetMaxBlockSize();
 
-                        mState = ReadingState.TransferData;
+                        if (mState == ReadingState.MirrorCheckRequestPrimary)
+                        {
+                            mState = ReadingState.MirrorCheckTransferPrimary;
+                        }
+                        else if (mState == ReadingState.MirrorCheckRequestMirror)
+                        {
+                            mState = ReadingState.MirrorCheckTransferMirror;
+                        }
+                        else
+                        {
+                            mState = ReadingState.TransferData;
+                        }
                     }
                 }
                 else if (action is TransferDataAction)
@@ -906,7 +1002,18 @@ namespace Communication
 
                     if (success)
                     {
-                        mState = ReadingState.ExitTransfer;
+                        if (mState == ReadingState.MirrorCheckTransferPrimary)
+                        {
+                            mState = ReadingState.MirrorCheckExitPrimary;
+                        }
+                        else if (mState == ReadingState.MirrorCheckTransferMirror)
+                        {
+                            mState = ReadingState.MirrorCheckExitMirror;
+                        }
+                        else
+                        {
+                            mState = ReadingState.ExitTransfer;
+                        }
                     }
                 }
                 else if (action is RequestTransferExitAction)
@@ -920,7 +1027,35 @@ namespace Communication
 
                     if (success)
                     {
-                        if (ShouldVerifyReadSectors)
+                        if (mState == ReadingState.MirrorCheckExitPrimary)
+                        {
+                            mState = ReadingState.MirrorCheckRequestMirror;
+                        }
+                        else if (mState == ReadingState.MirrorCheckExitMirror)
+                        {
+                            if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
+                            {
+                                CommInterface.DisplayStatusMessage("Mirror check passed: sample at layout offset 0x" + mMirrorCheckOffset.ToString("X") + " matches the region above the layout. Continuing with this layout.", StatusMessageType.USER);
+                                mState = ReadingState.Start;
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try ME7 29F800 for a 1MB chip).", StatusMessageType.USER);
+                                var continueAnyway = CommInterface.DisplayUserPrompt(
+                                    "Flash does not appear mirrored",
+                                    "The sample above the layout does not match the layout range. A 1MB layout (ME7 29F800) is probably required.\n\nContinue with this layout anyway?",
+                                    UserPromptType.OK_CANCEL);
+                                if (continueAnyway == UserPromptResult.OK)
+                                {
+                                    mState = ReadingState.Start;
+                                }
+                                else
+                                {
+                                    success = false;
+                                }
+                            }
+                        }
+                        else if (ShouldVerifyReadSectors)
                         {
                             mState = ReadingState.ValidateReadData;
                         }
@@ -934,6 +1069,7 @@ namespace Communication
                 {
                     bool validationCompleted = true;
                     bool layoutIsValid = false;
+                    bool possiblyMirrored = false;
 
                     string validationMesage = null;
 
@@ -945,6 +1081,11 @@ namespace Communication
                         {
                             layoutIsValid = true;
                             validationMesage = "Memory layout is valid.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
+                        {
+                            possiblyMirrored = true;
+                            validationMesage = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
                         {
@@ -960,7 +1101,7 @@ namespace Communication
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
                         {
-                            validationMesage = "End address is not the end of flash memory.";
+                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try ME7 29F800), or flash may extend beyond this layout.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
                         {
@@ -997,7 +1138,36 @@ namespace Communication
 
                     success = validationCompleted && layoutIsValid;
 
-                    if (!success)
+                    if (possiblyMirrored)
+                    {
+                        var promptResult = CommInterface.DisplayUserPrompt(
+                            "Memory layout may be ambiguous",
+                            MirroredFlashLayoutHelper.PromptMessage(false),
+                            UserPromptType.CONTINUE_CHECK_CANCEL);
+
+                        if (promptResult == UserPromptResult.OK)
+                        {
+                            success = true;
+                            mState = ReadingState.Start;
+                        }
+                        else if (promptResult == UserPromptResult.CHECK)
+                        {
+                            MirroredFlashLayoutHelper.ChooseCompareSample(
+                                mFlashBlockList.First().StartAddress,
+                                mFlashBlockList.Last().EndAddress,
+                                out mMirrorCheckOffset,
+                                out mMirrorCheckSize);
+                            mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
+                            mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
+                            success = true;
+                            mState = ReadingState.MirrorCheckRequestPrimary;
+                        }
+                        else
+                        {
+                            success = false;
+                        }
+                    }
+                    else if (!success)
                     {
                         var promptResult = UserPromptResult.CANCEL;
                         string promptTitle = "Unable to validate memory layout";
@@ -1030,16 +1200,16 @@ namespace Communication
                         }
                         else if (!layoutIsValid)
                         {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue reading flash memory?", UserPromptType.OK_CANCEL);
+                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue reading flash memory?", UserPromptType.OK_CANCEL);
                         }
 
                         if (promptResult == UserPromptResult.OK)
                         {
                             success = true;
+                            mState = ReadingState.Start;
                         }
                     }
-
-                    if (success)
+                    else if (success)
                     {
                         mState = ReadingState.Start;
                     }
@@ -1090,6 +1260,12 @@ namespace Communication
         private enum ReadingState
         {
             ValidateMemoryLayout,
+            MirrorCheckRequestPrimary,
+            MirrorCheckTransferPrimary,
+            MirrorCheckExitPrimary,
+            MirrorCheckRequestMirror,
+            MirrorCheckTransferMirror,
+            MirrorCheckExitMirror,
             Start,
             CheckIfReadRequired,
             RequestUpload,
@@ -1115,6 +1291,11 @@ namespace Communication
         private TransferDataAction.EncryptionType mEncryptionType;
 
         private bool mCurrentSectorRequiresRead;
+
+        private uint mMirrorCheckOffset;
+        private uint mMirrorCheckSize;
+        private byte[] mMirrorCheckPrimaryData;
+        private byte[] mMirrorCheckMirrorData;
     };
 
     public class WriteExternalFlashOperation : KWP2000Operation
@@ -1311,6 +1492,39 @@ namespace Communication
                         case FlashingState.ValidateStartAndEndAddresses:
                         {
                             nextAction = new ValidateStartAndEndAddressesWithRequestUploadDownloadAction(KWP2000CommInterface, mFlashBlockList.First().mMemoryImage.StartAddress, mFlashBlockList.Last().mMemoryImage.EndAddress);
+                            break;
+                        }
+                        case FlashingState.MirrorCheckRequestPrimary:
+                        {
+                            CommInterface.DisplayStatusMessage("Checking for mirrored flash: reading sample at 0x" + (mFlashBlockList.First().mMemoryImage.StartAddress + mMirrorCheckOffset).ToString("X8") + ".", StatusMessageType.USER);
+                            nextAction = new RequestUploadFromECUAction(KWP2000CommInterface, mFlashBlockList.First().mMemoryImage.StartAddress + mMirrorCheckOffset, mMirrorCheckSize, TransferDataAction.CompressionType.Uncompressed, TransferDataAction.EncryptionType.Unencrypted);
+                            break;
+                        }
+                        case FlashingState.MirrorCheckTransferPrimary:
+                        {
+                            nextAction = new TransferDataAction(KWP2000CommInterface, TransferDataAction.TransferMode.UploadFromECU, TransferDataAction.EncryptionType.Unencrypted, TransferDataAction.CompressionType.Uncompressed, mMaxBlockSize, mMirrorCheckPrimaryData, null);
+                            break;
+                        }
+                        case FlashingState.MirrorCheckExitPrimary:
+                        {
+                            nextAction = new RequestTransferExitAction(KWP2000CommInterface);
+                            break;
+                        }
+                        case FlashingState.MirrorCheckRequestMirror:
+                        {
+                            uint mirrorAddress = mFlashBlockList.Last().mMemoryImage.EndAddress + mMirrorCheckOffset;
+                            CommInterface.DisplayStatusMessage("Checking for mirrored flash: reading sample at 0x" + mirrorAddress.ToString("X8") + ".", StatusMessageType.USER);
+                            nextAction = new RequestUploadFromECUAction(KWP2000CommInterface, mirrorAddress, mMirrorCheckSize, TransferDataAction.CompressionType.Uncompressed, TransferDataAction.EncryptionType.Unencrypted);
+                            break;
+                        }
+                        case FlashingState.MirrorCheckTransferMirror:
+                        {
+                            nextAction = new TransferDataAction(KWP2000CommInterface, TransferDataAction.TransferMode.UploadFromECU, TransferDataAction.EncryptionType.Unencrypted, TransferDataAction.CompressionType.Uncompressed, mMaxBlockSize, mMirrorCheckMirrorData, null);
+                            break;
+                        }
+                        case FlashingState.MirrorCheckExitMirror:
+                        {
+                            nextAction = new RequestTransferExitAction(KWP2000CommInterface);
                             break;
                         }
                         case FlashingState.CheckIfFirstBlockAccidentallyErased:
@@ -1670,10 +1884,47 @@ namespace Communication
                     }
                 }
                 #endregion
+                #region RequestUpload (mirror check)
+                else if (action is RequestUploadFromECUAction)
+                {
+                    if (success)
+                    {
+                        mMaxBlockSize = ((RequestUploadFromECUAction)action).GetMaxBlockSize();
+
+                        if (mState == FlashingState.MirrorCheckRequestPrimary)
+                        {
+                            mState = FlashingState.MirrorCheckTransferPrimary;
+                        }
+                        else if (mState == FlashingState.MirrorCheckRequestMirror)
+                        {
+                            mState = FlashingState.MirrorCheckTransferMirror;
+                        }
+                        else
+                        {
+                            Debug.Fail("Unexpected RequestUpload during flash write");
+                            success = false;
+                        }
+                    }
+                }
+                #endregion
                 #region TransferData
                 else if (action is TransferDataAction)
                 {
-                    if (mState == FlashingState.TransferDataToFailTransfer)
+                    if ((mState == FlashingState.MirrorCheckTransferPrimary) || (mState == FlashingState.MirrorCheckTransferMirror))
+                    {
+                        if (success)
+                        {
+                            if (mState == FlashingState.MirrorCheckTransferPrimary)
+                            {
+                                mState = FlashingState.MirrorCheckExitPrimary;
+                            }
+                            else
+                            {
+                                mState = FlashingState.MirrorCheckExitMirror;
+                            }
+                        }
+                    }
+                    else if (mState == FlashingState.TransferDataToFailTransfer)
                     {
                         if (action.CompletedWithoutCommunicationError)
                         {
@@ -1705,7 +1956,38 @@ namespace Communication
                 #region RequestTransferExit
                 else if (action is RequestTransferExitAction)
                 {
-                    if (mState == FlashingState.ExitPreviousFailedTransfer)
+                    if ((mState == FlashingState.MirrorCheckExitPrimary) || (mState == FlashingState.MirrorCheckExitMirror))
+                    {
+                        if (success)
+                        {
+                            if (mState == FlashingState.MirrorCheckExitPrimary)
+                            {
+                                mState = FlashingState.MirrorCheckRequestMirror;
+                            }
+                            else if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
+                            {
+                                CommInterface.DisplayStatusMessage("Mirror check passed: sample at layout offset 0x" + mMirrorCheckOffset.ToString("X") + " matches the region above the layout. Continuing with this layout.", StatusMessageType.USER);
+                                mState = FlashingState.StartBlock;
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try ME7 29F800 for a 1MB chip).", StatusMessageType.USER);
+                                var continueAnyway = CommInterface.DisplayUserPrompt(
+                                    "Flash does not appear mirrored",
+                                    "The sample above the layout does not match the layout range. A 1MB layout (ME7 29F800) is probably required.\n\nContinue with this layout anyway?",
+                                    UserPromptType.OK_CANCEL);
+                                if (continueAnyway == UserPromptResult.OK)
+                                {
+                                    mState = FlashingState.StartBlock;
+                                }
+                                else
+                                {
+                                    success = false;
+                                }
+                            }
+                        }
+                    }
+                    else if (mState == FlashingState.ExitPreviousFailedTransfer)
                     {
                         if (action.CompletedWithoutCommunicationError)
                         {
@@ -1785,6 +2067,7 @@ namespace Communication
                 {
                     bool validationCompleted = true;
                     bool layoutIsValid = false;
+                    bool possiblyMirrored = false;
 
                     string validationMesage = null;
 
@@ -1796,6 +2079,11 @@ namespace Communication
                         {
                             layoutIsValid = true;
                             validationMesage = "Memory layout is valid.";
+                        }
+                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
+                        {
+                            possiblyMirrored = true;
+                            validationMesage = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
                         {
@@ -1811,7 +2099,7 @@ namespace Communication
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
                         {
-                            validationMesage = "End address is not the end of flash memory.";
+                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try ME7 29F800), or flash may extend beyond this layout.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
                         {
@@ -1848,7 +2136,36 @@ namespace Communication
 
                     success = validationCompleted && layoutIsValid;
 
-                    if (!success)
+                    if (possiblyMirrored)
+                    {
+                        var promptResult = CommInterface.DisplayUserPrompt(
+                            "Memory layout may be ambiguous",
+                            MirroredFlashLayoutHelper.PromptMessage(true),
+                            UserPromptType.CONTINUE_CHECK_CANCEL);
+
+                        if (promptResult == UserPromptResult.OK)
+                        {
+                            success = true;
+                            mState = FlashingState.StartBlock;
+                        }
+                        else if (promptResult == UserPromptResult.CHECK)
+                        {
+                            MirroredFlashLayoutHelper.ChooseCompareSample(
+                                mFlashBlockList.First().mMemoryImage.StartAddress,
+                                mFlashBlockList.Last().mMemoryImage.EndAddress,
+                                out mMirrorCheckOffset,
+                                out mMirrorCheckSize);
+                            mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
+                            mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
+                            success = true;
+                            mState = FlashingState.MirrorCheckRequestPrimary;
+                        }
+                        else
+                        {
+                            success = false;
+                        }
+                    }
+                    else if (!success)
                     {
                         var promptResult = UserPromptResult.CANCEL;
                         string promptTitle = "Unable to validate memory layout";
@@ -1881,16 +2198,16 @@ namespace Communication
                         }
                         else if (!layoutIsValid)
                         {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. Do you want to continue writing flash memory?", UserPromptType.OK_CANCEL);
+                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue writing flash memory?", UserPromptType.OK_CANCEL);
                         }
 
                         if (promptResult == UserPromptResult.OK)
                         {
                             success = true;
+                            mState = FlashingState.StartBlock;
                         }
                     }
-
-                    if (success)
+                    else if (success)
                     {
                         mState = FlashingState.StartBlock;
                     }
@@ -2040,6 +2357,12 @@ namespace Communication
         private enum FlashingState
         {
             ValidateStartAndEndAddresses,
+            MirrorCheckRequestPrimary,
+            MirrorCheckTransferPrimary,
+            MirrorCheckExitPrimary,
+            MirrorCheckRequestMirror,
+            MirrorCheckTransferMirror,
+            MirrorCheckExitMirror,
             StartBlock,//intermediate state
             CheckIfFirstBlockAccidentallyErased,
             CheckIfFlashRequired,
@@ -2078,6 +2401,11 @@ namespace Communication
         private uint mTotalBytesValidated;
         private TransferDataAction.CompressionType mCompressionType;
         private TransferDataAction.EncryptionType mEncryptionType;
+
+        private uint mMirrorCheckOffset;
+        private uint mMirrorCheckSize;
+        private byte[] mMirrorCheckPrimaryData;
+        private byte[] mMirrorCheckMirrorData;
 
         private TransferDataAction mTransferDataActionToResume;
     };
