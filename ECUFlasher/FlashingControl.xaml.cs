@@ -777,7 +777,7 @@ namespace ECUFlasher
             {
                 DirectoryInfo dirInfo = Directory.GetParent(FileNameToFlash);
 
-                if (dirInfo != null)
+                if (dirInfo != null && Directory.Exists(dirInfo.FullName))
                 {
                     dialog.InitialDirectory = dirInfo.FullName;
                 }
@@ -1590,7 +1590,7 @@ namespace ECUFlasher
                 }
             }
 
-            if (string.IsNullOrEmpty(flashSaveLocation))
+            if (string.IsNullOrEmpty(flashSaveLocation) || !Directory.Exists(flashSaveLocation))
             {
                 flashSaveLocation = Directory.GetCurrentDirectory();
             }
