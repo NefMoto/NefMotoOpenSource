@@ -34,6 +34,13 @@ namespace Communication
         private const ushort ChecksumPresentMask = 0x0001;
         private const ushort ChecksumBitMask = 0x0040;
 
+        /// <summary>
+        /// Pages whose firmware descriptor has the CS bit but real ME7 dumps use for
+        /// VAG HW/SW ASCII (e.g. 8D0907551M / 0002) and do not store the Bosch page checksum.
+        /// Formula math is unchanged; these are excluded from pass/fail policy only.
+        /// </summary>
+        public static readonly int[] ChecksumExemptPages = { 28, 29 };
+
         /// <summary>Per-page descriptor words from ME7 firmware EEPROM page table.</summary>
         private static readonly ushort[] PageDescriptors =
         {
@@ -45,13 +52,57 @@ namespace Communication
 
         public sealed class ValidationResult
         {
-            public int PagesWithChecksum { get; set; }
+            /// <summary>CS pages that are enforced (descriptor CS bit, not exempt).</summary>
+            public int PagesChecked { get; set; }
+
+            /// <summary>Enforced pages whose stored checksum does not match the formula.</summary>
             public int PagesInvalid { get; set; }
 
+            /// <summary>Exempt CS pages (HW/SW ID); not counted toward pass/fail.</summary>
+            public int PagesExempt { get; set; }
+
+            /// <summary>Exempt pages that also do not match the formula (expected on real chips).</summary>
+            public int PagesExemptMismatch { get; set; }
+
+            /// <summary>True when every enforced checksum page is valid (and at least one was checked).</summary>
             public bool AllChecksumPagesValid
             {
-                get { return PagesInvalid == 0 && PagesWithChecksum > 0; }
+                get { return PagesInvalid == 0 && PagesChecked > 0; }
             }
+
+            /// <summary>User-facing summary for status log / prompts.</summary>
+            public string FormatStatusMessage(bool warnOnly = false)
+            {
+                string exemptNote = PagesExempt > 0
+                    ? $"; pages 28–29 (HW/SW ID) not checksummed"
+                    : string.Empty;
+
+                if (AllChecksumPagesValid)
+                {
+                    return $"ME7 95040 page checksums OK ({PagesChecked} data pages){exemptNote}.";
+                }
+
+                string suffix = warnOnly ? "; writing anyway." : ".";
+                return $"Warning: ME7 95040 page checksums failed ({PagesInvalid} bad / {PagesChecked} data pages checked){exemptNote}{suffix}";
+            }
+        }
+
+        public static bool IsChecksumExemptPage(int pageNumber)
+        {
+            for (int i = 0; i < ChecksumExemptPages.Length; i++)
+            {
+                if (ChecksumExemptPages[i] == pageNumber)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static ushort GetPageDescriptor(int pageNumber)
+        {
+            return PageDescriptors[pageNumber];
         }
 
         public static ValidationResult Validate(byte[] data, int dataOffset = 0)
@@ -73,12 +124,22 @@ namespace Communication
                     continue;
                 }
 
-                result.PagesWithChecksum++;
-
                 ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, descriptor);
                 ushort stored = (ushort)(data[pageOffset + 14] | (data[pageOffset + 15] << 8));
+                bool match = stored == expected;
 
-                if (stored != expected)
+                if (IsChecksumExemptPage(page))
+                {
+                    result.PagesExempt++;
+                    if (!match)
+                    {
+                        result.PagesExemptMismatch++;
+                    }
+                    continue;
+                }
+
+                result.PagesChecked++;
+                if (!match)
                 {
                     result.PagesInvalid++;
                 }
@@ -103,6 +164,48 @@ namespace Communication
             }
 
             return unchecked((ushort)(-sum));
+        }
+
+        /// <summary>
+        /// Writes Bosch page checksums for all non-exempt CS pages in place.
+        /// Pages 28–29 (HW/SW ID) are never modified. Returns how many pages were updated.
+        /// </summary>
+        public static int CorrectChecksums(byte[] data, int dataOffset = 0)
+        {
+            int pagesUpdated = 0;
+
+            if (data == null || data.Length < dataOffset + EepromSize)
+            {
+                return 0;
+            }
+
+            for (int page = 0; page < PageCount; page++)
+            {
+                if (IsChecksumExemptPage(page))
+                {
+                    continue;
+                }
+
+                ushort descriptor = PageDescriptors[page];
+                if ((descriptor & ChecksumPresentMask) == 0)
+                {
+                    continue;
+                }
+
+                int pageOffset = dataOffset + (page * PageSize);
+                ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, descriptor);
+                ushort stored = (ushort)(data[pageOffset + 14] | (data[pageOffset + 15] << 8));
+                if (stored == expected)
+                {
+                    continue;
+                }
+
+                data[pageOffset + 14] = (byte)(expected & 0xFF);
+                data[pageOffset + 15] = (byte)(expected >> 8);
+                pagesUpdated++;
+            }
+
+            return pagesUpdated;
         }
     }
 }

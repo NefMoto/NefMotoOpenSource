@@ -8,7 +8,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - **KWP2000** (ISO 14230) - Full support for diagnostic and programming operations
 - **KWP1281** - Legacy protocol support for older ECUs
-- **Boot Mode** - Connection, ECU information reading, register access, flash read and flash write (ME7/Simos3/EDC15 variants). Layout auto-detect from device ID. Bootmode implementation is derived from [C167BootTool](https://github.com/EcuProg7/C167BootTool) (ME7BootTool.py)
+- **Boot Mode** - Connection, ECU information reading, register access, flash read/write (ME7/Simos3/EDC15 variants), and SPI EEPROM (95040) read/write on ME7.1/ME7.5. Layout auto-detect from device ID. Bootmode implementation is derived from [C167BootTool](https://github.com/EcuProg7/C167BootTool) (ME7BootTool.py)
 
 ### Connection Methods
 
@@ -17,8 +17,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### ECU Operations
 
-- Read flash memory (full or partial)
-- Write flash memory with verification
+- Read and write flash memory with verification
+- Read and write physical SPI EEPROM (95040) in bootmode (ME7.1 / ME7.5)
 - Erase flash sectors
 - Read ECU identification information (KWP2000 and Bootmode)
 - Bootmode ECU information: Device ID, CPU family, system registers (SYSCON, BUSCON, ADDRSEL), memory status

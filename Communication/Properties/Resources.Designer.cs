@@ -119,6 +119,26 @@ namespace Communication.Properties {
                 return ((byte[])(obj));
             }
         }
+
+        /// <summary>
+        ///   SPI EEPROM driver for C16x/ST10 SSC (ME7.1/7.5 95040). From C167BootTool gremlindriver.bin.
+        /// </summary>
+        internal static byte[] BootmodeEepromDriverSSC {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeEepromDriverSSC", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+
+        /// <summary>
+        ///   SPI EEPROM driver for ST10/XC167 XSSC. From C167BootTool ST10XDriver.bin.
+        /// </summary>
+        internal static byte[] BootmodeEepromDriverXSSC {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeEepromDriverXSSC", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }
 

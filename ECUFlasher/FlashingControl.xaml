@@ -80,6 +80,16 @@ Contact by Email: tony@nefariousmotorsports.com
                 <CheckBox x:Name="chkVerifyWrite" VerticalAlignment="Center" IsChecked="True" IsEnabled="{Binding Path=IsVerifyWriteEnabled}"/>
                 <Label>Verify Write</Label>
             </StackPanel>
+            <StackPanel Orientation="Horizontal" Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,4,0,0">
+                <ComboBox MinWidth="200" Margin="0,0,8,0"
+                    Style="{StaticResource ValidationComboBoxStyle}"
+                    ItemsSource="{Binding Path=AvailableEepromPresets}"
+                    SelectedItem="{Binding Path=SelectedEepromPreset, Mode=TwoWay}"
+                    DisplayMemberPath="DisplayName"
+                    ToolTip="Bootmode SPI EEPROM preset (physical 95040 chip)"/>
+                <Button Command="{Binding Path=ReadBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="0,0,8,0"/>
+                <Button Command="{Binding Path=WriteBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}"/>
+            </StackPanel>
             <!-- <Button Command="{Binding Path=CorrectChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="1" IsEnabled="true"/>-->
         </Grid>
         <!--<Image DockPanel.Dock="Bottom" Source="{Binding Path=FlashMemoryImage.RawData, Converter={StaticResource byteArrayToBitmapConverter}}"/>-->
