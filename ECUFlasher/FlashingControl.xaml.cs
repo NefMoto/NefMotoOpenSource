@@ -626,16 +626,13 @@ namespace ECUFlasher
 
         private string GetMemoryLayoutsDirectory()
         {
-            // Try to find MemoryLayouts directory relative to the executable
-            string exePath = Assembly.GetEntryAssembly()?.Location;
-            if (String.IsNullOrEmpty(exePath))
-            {
-                exePath = Assembly.GetExecutingAssembly().Location;
-            }
+            //Assembly.Location returns an empty string in a single-file build, so this fell through
+            //to the working directory and found no layouts at all. AppContext.BaseDirectory is the
+            //application's own folder in both single-file and regular builds.
+            string exeDir = AppContext.BaseDirectory;
 
-            if (!String.IsNullOrEmpty(exePath))
+            if (!String.IsNullOrEmpty(exeDir))
             {
-                string exeDir = Path.GetDirectoryName(exePath);
                 string memoryLayoutsDir = Path.Combine(exeDir, "MemoryLayouts");
 
                 if (Directory.Exists(memoryLayoutsDir))

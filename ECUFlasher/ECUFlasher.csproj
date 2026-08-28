@@ -174,4 +174,8 @@
   <PropertyGroup>
     <UseWindowsForms>True</UseWindowsForms>
   </PropertyGroup>
+  <ItemGroup>
+    <!--MemoryLayouts must sit next to the executable: without them KWP2000 read and write stay disabled-->
+    <Content Include="..\MemoryLayouts\*.MemoryLayout.xml" Link="MemoryLayouts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
