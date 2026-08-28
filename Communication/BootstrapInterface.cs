@@ -37,7 +37,7 @@ namespace Communication
     /// <remarks>
     /// <para><b>State:</b> DeviceID 0xAA = core already running. LastKnownFlashDeviceID preserved across disconnect; layout available when core running if we have it from same session.</para>
     /// <para><b>Limitations:</b> Diff read not supported (MiniMon has no checksum-for-range). Core running: cannot load flash driver; layout only if LastKnownFlashDeviceID from prior connect. LastKnownFlashDeviceID not persisted across app restart.</para>
-    /// <para><b>I/O:</b> SendBytes/ReceiveBytes loop until full count or timeout; ReceiveBytes Math.Max(1000, numBytes*3) ms; Write timeout ~data.Length*5 ms for echo.</para>
+    /// <para><b>I/O:</b> SendBytes/ReceiveBytes loop until full count or timeout; ReceiveBytes Math.Max(minTimeoutMs, numBytes*3) ms (default min 1000; MiniMon_Call uses 3000 to match C167BootTool ser.timeout=3); Write timeout ~data.Length*5 ms for echo.</para>
     /// <para><b>Troubleshooting:</b> 0xFD (NAK) vs 0xEA often baud/timing; FTDI more reliable. Connection failed: "Put ECU in boot mode". Core running, no LastKnownFlashDeviceID: "Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type."</para>
     /// <para><b>Constants:</b> CPU IDs 0x55/0xA5/0xB5/0xC5/0xD5, 0xAA core running. Flash IDs 0x22AB/0x2258/0x2223/0x22D6. Driver 0x00F600. ME7 base 0x800000, Simos3/EDC15 0x400000.</para>
     /// <para><b>TODO:</b> Automatic retry on sector/block failure (retry block read or sector erase+program N times before failing). Persist LastKnownFlashDeviceID in ECU RAM (requires safe address).</para>
@@ -129,8 +129,66 @@ namespace Communication
             EDC15       // EDC15 variant - 0x400000 base address (top boot)
         }
 
+        /// <summary>SPI peripheral used by the bootmode EEPROM driver (C167BootTool -SSC / -XSSC).</summary>
+        public enum BootmodeEepromPeriph
+        {
+            SSC,
+            XSSC
+        }
+
+        /// <summary>EEPROM chip type codes from C167BootTool (ME7.1/7.5 use 95040 = 1).</summary>
+        public enum BootmodeEepromType : ushort
+        {
+            Type95080To95320 = 0,
+            Type95040 = 1,
+            Type93S46_6Bit = 2,
+            Type93S56_8Bit = 3,
+            Type93S76_10Bit = 4,
+            Type24C02_8Bit = 10,
+            Type24C04_9Bit = 11
+        }
+
+        /// <summary>
+        /// Hardware preset for bootmode SPI EEPROM access. ME7.1/7.5 default: 95040, Port4.7, 512 B.
+        /// Periph (SSC vs XSSC) must be confirmed on bench (Phase 0).
+        /// </summary>
+        public sealed class BootmodeEepromSettings
+        {
+            public BootmodeEepromPeriph Periph { get; set; } = BootmodeEepromPeriph.SSC;
+            public BootmodeEepromType EepromType { get; set; } = BootmodeEepromType.Type95040;
+            public byte PortNumber { get; set; } = 4;
+            public byte PinNumber { get; set; } = 7;
+            public uint Size { get; set; } = 512;
+
+            public static BootmodeEepromSettings ForMe75()
+            {
+                return new BootmodeEepromSettings
+                {
+                    Periph = BootmodeEepromPeriph.SSC,
+                    EepromType = BootmodeEepromType.Type95040,
+                    PortNumber = 4,
+                    PinNumber = 7,
+                    Size = 512
+                };
+            }
+
+            public static BootmodeEepromSettings ForMe71()
+            {
+                // Same CS as ME7.5 until Phase 0 confirms; try XSSC if SSC fails on bench.
+                return new BootmodeEepromSettings
+                {
+                    Periph = BootmodeEepromPeriph.SSC,
+                    EepromType = BootmodeEepromType.Type95040,
+                    PortNumber = 4,
+                    PinNumber = 7,
+                    Size = 512
+                };
+            }
+        }
+
         // Register addresses
         private const uint SYSCON_Addr = 0x00FF12;
+        private const uint XPERCON_Addr = 0x00F024;
         private const uint BUSCON0_Addr = 0x00FF0C;
         private const uint BUSCON1_Addr = 0x00FF14;
         private const uint BUSCON2_Addr = 0x00FF16;
@@ -169,10 +227,27 @@ namespace Communication
         private const uint ExtFlashWriteAddress_Simos3 = 0x400000;
         private const uint ExtFlashWriteAddress_EDC15 = 0x400000;
 
-        // Flash driver addresses
+        // Flash driver addresses (EEPROM SPI drivers use the same load/entry/buffer addresses —
+        // reload flash driver with LoadFlashDriver before any flash op after EEPROM work)
         private const uint FlashDriverEntryPoint = 0x00F640;
         private const uint DriverCopyAddress = 0xFC00;
         private const uint DriverAddress = 0x00F600;  // Where driver is loaded
+
+        // EEPROM SPI driver CS patch sites (C167BootTool ME7BootTool.py)
+        private const uint EepromDriverSetCsDirAddress = 0x00F600;
+        private const uint EepromDriverClearCsDirAddress = 0x00F604;
+        private const uint EepromDriverClearCsAddress = 0x00F608;
+        private const uint EepromDriverSetCsAddress = 0x00F60C;
+        private const ushort EepromOpCodeBset = 0x000F;
+        private const ushort EepromOpCodeBclr = 0x000E;
+
+        // EEPROM driver function codes (passed via MiniMon_Call register[0], not MiniMon opcodes)
+        private const ushort EepromCmdGetState = 0x0093;
+        private const ushort EepromCmdReadSpi = 0x0036;
+        private const ushort EepromCmdWriteSpi = 0x0037;
+
+        private const ushort XPERCON_Data_XSSC = 0x0500;
+        private const ushort SYSCON_Data_XSSC = 0xE204;
 
         // Flash driver function code addresses
         private const byte FC_GETSTATE_ADDR_MANUFID = 0x00;
@@ -186,6 +261,13 @@ namespace Communication
 
         // Block size for reading/writing
         private const ushort DefaultBlockLength = 0x200;  // 512 bytes
+
+        /// <summary>
+        /// Result-wait for MiniMon_Call (16 register bytes after the called function returns).
+        /// Matches C167BootTool ME7BootTool.py: serial.Serial(..., timeout=3) used by CallAtAddress.
+        /// EEPROM C_WRITESPI of a 0x200 block can exceed the default 1 s ReceiveBytes floor.
+        /// </summary>
+        private const uint MiniMonCallResultTimeoutMs = 3000;
 
         public BootstrapInterface(DisplayStatusMessageDelegate displayStatusMessage)
             : base(displayStatusMessage)
@@ -535,7 +617,7 @@ namespace Communication
             return success;
         }
 
-        bool ReceiveBytes(uint numBytes, out byte[] data)
+        bool ReceiveBytes(uint numBytes, out byte[] data, uint minTimeoutMs = 1000)
         {
             data = new byte[numBytes];
 
@@ -547,8 +629,14 @@ namespace Communication
             }
 
             // Read may return incomplete data; loop until we have all bytes or timeout.
-            // Minimum 1000ms so CH340 has time for ECU responses.
-            uint readTimeout = (uint)Math.Max(1000, numBytes * 3);
+            // Default min 1000ms so CH340 has time for ECU responses.
+            // MiniMon_Call uses MiniMonCallResultTimeoutMs (3s) to match C167BootTool ser.timeout=3.
+            if (minTimeoutMs < 1)
+            {
+                minTimeoutMs = 1;
+            }
+
+            uint readTimeout = (uint)Math.Max(minTimeoutMs, numBytes * 3);
             uint numBytesRead = 0;
             var totalDeadline = Stopwatch.StartNew();
             while (numBytesRead < numBytes && totalDeadline.ElapsedMilliseconds < readTimeout)
@@ -1269,8 +1357,13 @@ namespace Communication
                 return false;
             }
 
-            if (!ReceiveBytes(16, out registerResults))
+            // Wait for R8–R15 after the callee returns. C167BootTool CallAtAddress uses ser.timeout=3
+            // for this (plus A_ACK2); SPI EEPROM write of a full 0x200 block needs more than 1 s.
+            if (!ReceiveBytes(16, out registerResults, MiniMonCallResultTimeoutMs))
             {
+                DisplayStatusMessage(
+                    $"MiniMon_Call: timed out waiting for register results ({MiniMonCallResultTimeoutMs}ms).",
+                    StatusMessageType.LOG);
                 return false;
             }
 
@@ -2394,6 +2487,518 @@ namespace Communication
 
             layout = new MemoryLayout(baseAddress, totalSize, sectorSizes);
             return true;
+        }
+
+        #endregion
+
+        #region Bootmode SPI EEPROM (95040)
+
+        /// <summary>
+        /// Uploads the SSC or XSSC EEPROM SPI driver to 0xF600. Overwrites any flash driver —
+        /// call <see cref="LoadFlashDriver"/> again before flash operations.
+        /// </summary>
+        public bool LoadEepromDriver(BootmodeEepromPeriph periph)
+        {
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot load EEPROM driver.", StatusMessageType.USER);
+                return false;
+            }
+
+            byte[] driverData = null;
+            switch (periph)
+            {
+                case BootmodeEepromPeriph.SSC:
+                    driverData = Properties.Resources.BootmodeEepromDriverSSC;
+                    break;
+                case BootmodeEepromPeriph.XSSC:
+                    driverData = Properties.Resources.BootmodeEepromDriverXSSC;
+                    break;
+                default:
+                    DisplayStatusMessage($"Unknown EEPROM peripheral: {periph}", StatusMessageType.USER);
+                    return false;
+            }
+
+            if (driverData == null || driverData.Length == 0)
+            {
+                DisplayStatusMessage($"EEPROM driver data is null or empty for {periph}", StatusMessageType.USER);
+                return false;
+            }
+
+            byte functionResult;
+            if (!MiniMon_WriteBlock(DriverAddress, driverData, out functionResult))
+            {
+                DisplayStatusMessage("Failed to upload EEPROM driver to ECU memory.", StatusMessageType.USER);
+                DisplayStatusMessage($"LoadEepromDriver: MiniMon_WriteBlock failed, functionResult=0x{functionResult:X2}", StatusMessageType.LOG);
+                return false;
+            }
+
+            DisplayStatusMessage($"EEPROM driver loaded ({periph}, {driverData.Length} bytes). Reload flash driver before flash ops.", StatusMessageType.USER);
+            return true;
+        }
+
+        /// <summary>Enable XSSC peripheral (XPERCON + SYSCON). Required before XSSC EEPROM driver use.</summary>
+        public bool ConfigureXsscForEeprom()
+        {
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot configure XSSC.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (!MiniMon_WriteWord(XPERCON_Addr, XPERCON_Data_XSSC))
+            {
+                DisplayStatusMessage("ConfigureXsscForEeprom: failed writing XPERCON.", StatusMessageType.LOG);
+                return false;
+            }
+
+            if (!MiniMon_WriteWord(SYSCON_Addr, SYSCON_Data_XSSC))
+            {
+                DisplayStatusMessage("ConfigureXsscForEeprom: failed writing SYSCON.", StatusMessageType.LOG);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Patches the four near CS routines in the loaded EEPROM driver for the given port/pin
+        /// (C167BootTool: Port4 Pin7 for ME7.1/7.5).
+        /// </summary>
+        public bool PatchEepromChipSelect(byte portNumber, byte pinNumber)
+        {
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot patch EEPROM chip select.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (pinNumber > 15)
+            {
+                DisplayStatusMessage($"Invalid EEPROM CS pin {pinNumber} (0-15).", StatusMessageType.USER);
+                return false;
+            }
+
+            byte portAddr8;
+            byte directionPortAddr8;
+            if (!TryGetEepromPortAddresses(portNumber, out portAddr8, out directionPortAddr8))
+            {
+                DisplayStatusMessage($"Unsupported EEPROM CS port {portNumber} (use 2, 3, 4, 6, 7, or 8).", StatusMessageType.USER);
+                return false;
+            }
+
+            ushort setDir = (ushort)(((pinNumber << 4) | EepromOpCodeBset) | (directionPortAddr8 << 8));
+            ushort clearDir = (ushort)(((pinNumber << 4) | EepromOpCodeBclr) | (directionPortAddr8 << 8));
+            ushort setCs = (ushort)(((pinNumber << 4) | EepromOpCodeBset) | (portAddr8 << 8));
+            ushort clearCs = (ushort)(((pinNumber << 4) | EepromOpCodeBclr) | (portAddr8 << 8));
+
+            // Addresses match C167BootTool: set CS at 0xF60C, clear CS at 0xF608
+            if (!MiniMon_WriteWord(EepromDriverSetCsDirAddress, setDir)
+                || !MiniMon_WriteWord(EepromDriverClearCsDirAddress, clearDir)
+                || !MiniMon_WriteWord(EepromDriverSetCsAddress, setCs)
+                || !MiniMon_WriteWord(EepromDriverClearCsAddress, clearCs))
+            {
+                DisplayStatusMessage("PatchEepromChipSelect: MiniMon_WriteWord failed.", StatusMessageType.LOG);
+                return false;
+            }
+
+            DisplayStatusMessage($"EEPROM CS patched: Port{portNumber}.{pinNumber}", StatusMessageType.LOG);
+            return true;
+        }
+
+        /// <summary>
+        /// Load driver, optional XSSC setup, patch CS, and verify driver state (0xF0 or 0x80).
+        /// </summary>
+        public bool PrepareEepromDriver(BootmodeEepromSettings settings, out ushort driverState)
+        {
+            driverState = 0;
+
+            if (settings == null)
+            {
+                DisplayStatusMessage("PrepareEepromDriver: settings is null.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (settings.Periph == BootmodeEepromPeriph.XSSC)
+            {
+                if (!ConfigureXsscForEeprom())
+                {
+                    return false;
+                }
+            }
+
+            if (!LoadEepromDriver(settings.Periph))
+            {
+                return false;
+            }
+
+            if (!PatchEepromChipSelect(settings.PortNumber, settings.PinNumber))
+            {
+                return false;
+            }
+
+            if (!GetEepromDriverState(out driverState))
+            {
+                return false;
+            }
+
+            bool ok = (driverState == 0x00F0) || (driverState == 0x0080);
+            DisplayStatusMessage(
+                $"EEPROM driver state: 0x{driverState:X4} ({(ok ? "OK" : "unexpected — check CS/periph")})",
+                ok ? StatusMessageType.LOG : StatusMessageType.USER);
+            return ok;
+        }
+
+        public bool GetEepromDriverState(out ushort state)
+        {
+            state = 0;
+
+            ushort[] registers = new ushort[]
+            {
+                EepromCmdGetState,
+                0x0000,
+                0x0000,
+                0x0000,
+                0x0000,
+                0x0000,
+                0x0000,
+                0x0001
+            };
+
+            ushort[] results;
+            if (!CallEepromDriver(registers, out results))
+            {
+                DisplayStatusMessage("GetEepromDriverState: MiniMon_Call failed.", StatusMessageType.LOG);
+                return false;
+            }
+
+            state = results[1];
+            return true;
+        }
+
+        /// <summary>Read one block from the SPI EEPROM into host memory (max 0x200 bytes).</summary>
+        public bool ReadEepromBlock(uint offset, ushort length, BootmodeEepromType eepromType, out byte[] data)
+        {
+            data = null;
+
+            if (length == 0 || length > DefaultBlockLength)
+            {
+                DisplayStatusMessage($"ReadEepromBlock: invalid length {length} (1..{DefaultBlockLength}).", StatusMessageType.USER);
+                return false;
+            }
+
+            ushort[] registers = new ushort[]
+            {
+                EepromCmdReadSpi,
+                length,
+                (ushort)(offset & 0xFFFF),
+                (ushort)eepromType,
+                0x0000,
+                (ushort)(DriverCopyAddress & 0xFFFF),
+                0x0000,
+                0x0009
+            };
+
+            ushort[] results;
+            if (!CallEepromDriver(registers, out results))
+            {
+                DisplayStatusMessage($"ReadEepromBlock: call failed at offset 0x{offset:X4}.", StatusMessageType.LOG);
+                LogEepromRegisters("ReadEepromBlock", results);
+                return false;
+            }
+
+            if (results[7] != 0)
+            {
+                DisplayStatusMessage($"ReadEepromBlock: driver error 0x{results[7]:X4} at offset 0x{offset:X4}.", StatusMessageType.USER);
+                LogEepromRegisters("ReadEepromBlock", results);
+                return false;
+            }
+
+            if (!MiniMon_ReadBlock(DriverCopyAddress, length, out data))
+            {
+                DisplayStatusMessage($"ReadEepromBlock: MiniMon_ReadBlock failed at 0x{DriverCopyAddress:X6}.", StatusMessageType.LOG);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>Write one block to the SPI EEPROM from host memory (max 0x200 bytes).</summary>
+        public bool WriteEepromBlock(uint offset, byte[] data, BootmodeEepromType eepromType)
+        {
+            if (data == null || data.Length == 0 || data.Length > DefaultBlockLength)
+            {
+                DisplayStatusMessage($"WriteEepromBlock: invalid data length (1..{DefaultBlockLength}).", StatusMessageType.USER);
+                return false;
+            }
+
+            ushort writeSize = (ushort)data.Length;
+
+            byte functionResult;
+            if (!MiniMon_WriteBlock(DriverCopyAddress, data, out functionResult))
+            {
+                DisplayStatusMessage($"WriteEepromBlock: MiniMon_WriteBlock failed, result=0x{functionResult:X2}.", StatusMessageType.LOG);
+                return false;
+            }
+
+            ushort[] registers = new ushort[]
+            {
+                EepromCmdWriteSpi,
+                writeSize,
+                (ushort)(offset & 0xFFFF),
+                (ushort)eepromType,
+                0x0000,
+                (ushort)(DriverCopyAddress & 0xFFFF),
+                0x0000,
+                0x0009
+            };
+
+            ushort[] results;
+            if (!CallEepromDriver(registers, out results))
+            {
+                DisplayStatusMessage($"WriteEepromBlock: call failed at offset 0x{offset:X4}.", StatusMessageType.LOG);
+                LogEepromRegisters("WriteEepromBlock", results);
+                return false;
+            }
+
+            if (results[7] != 0)
+            {
+                DisplayStatusMessage($"WriteEepromBlock: driver error 0x{results[7]:X4} at offset 0x{offset:X4}.", StatusMessageType.USER);
+                LogEepromRegisters("WriteEepromBlock", results);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Prepare driver and read the full EEPROM image (default 512 B in 0x200 chunks).
+        /// </summary>
+        public bool ReadEeprom(BootmodeEepromSettings settings, out byte[] data, Action<uint, uint> progress = null)
+        {
+            data = null;
+
+            ushort state;
+            if (!PrepareEepromDriver(settings, out state))
+            {
+                return false;
+            }
+
+            uint size = settings.Size;
+            if (size == 0)
+            {
+                DisplayStatusMessage("ReadEeprom: size is zero.", StatusMessageType.USER);
+                return false;
+            }
+
+            data = new byte[size];
+            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: false, progress))
+            {
+                data = null;
+                return false;
+            }
+
+            DisplayStatusMessage($"Read EEPROM OK: {size} bytes (state was 0x{state:X4}).", StatusMessageType.USER);
+            return true;
+        }
+
+        /// <summary>
+        /// Prepare driver, write EEPROM, optionally verify by re-read (C167BootTool always verifies).
+        /// </summary>
+        public bool WriteEeprom(BootmodeEepromSettings settings, byte[] data, bool verify = true, Action<uint, uint> progress = null)
+        {
+            if (settings == null || data == null || data.Length == 0)
+            {
+                DisplayStatusMessage("WriteEeprom: invalid settings or data.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (data.Length > settings.Size)
+            {
+                DisplayStatusMessage($"WriteEeprom: data length {data.Length} exceeds settings.Size {settings.Size}.", StatusMessageType.USER);
+                return false;
+            }
+
+            ushort state;
+            if (!PrepareEepromDriver(settings, out state))
+            {
+                return false;
+            }
+
+            uint size = (uint)data.Length;
+            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: true, progress))
+            {
+                return false;
+            }
+
+            if (verify)
+            {
+                DisplayStatusMessage("Verifying EEPROM write...", StatusMessageType.USER);
+                // Driver already prepared; read blocks directly without re-Prepare
+                byte[] readBack = new byte[size];
+                if (!TransferEepromBlocks(settings.EepromType, readBack, size, writing: false, progress: null))
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < data.Length; i++)
+                {
+                    if (data[i] != readBack[i])
+                    {
+                        DisplayStatusMessage($"EEPROM verify failed at offset 0x{i:X4}: wrote 0x{data[i]:X2}, read 0x{readBack[i]:X2}.", StatusMessageType.USER);
+                        return false;
+                    }
+                }
+
+                DisplayStatusMessage("EEPROM write verified OK.", StatusMessageType.USER);
+            }
+
+            DisplayStatusMessage($"Write EEPROM OK: {size} bytes (state was 0x{state:X4}).", StatusMessageType.USER);
+            return true;
+        }
+
+        /// <summary>
+        /// Read or write EEPROM in DefaultBlockLength chunks. Buffer is destination when reading, source when writing.
+        /// Assumes the EEPROM driver is already prepared.
+        /// </summary>
+        private bool TransferEepromBlocks(
+            BootmodeEepromType eepromType,
+            byte[] buffer,
+            uint size,
+            bool writing,
+            Action<uint, uint> progress)
+        {
+            if (buffer == null || buffer.Length < size)
+            {
+                return false;
+            }
+
+            uint offset = 0;
+            while (offset < size)
+            {
+                ushort blockLen = (ushort)Math.Min(DefaultBlockLength, size - offset);
+                if (writing)
+                {
+                    byte[] block = new byte[blockLen];
+                    Array.Copy(buffer, (int)offset, block, 0, blockLen);
+                    if (!WriteEepromBlock(offset, block, eepromType))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    byte[] block;
+                    if (!ReadEepromBlock(offset, blockLen, eepromType, out block))
+                    {
+                        return false;
+                    }
+
+                    Array.Copy(block, 0, buffer, (int)offset, blockLen);
+                }
+
+                offset += blockLen;
+                progress?.Invoke(offset, size);
+            }
+
+            return true;
+        }
+
+        private bool CallEepromDriver(ushort[] registers, out ushort[] results)
+        {
+            results = null;
+            if (registers == null || registers.Length != 8)
+            {
+                return false;
+            }
+
+            byte[] registerBytes = PackEepromRegisters(registers);
+            byte[] resultBytes;
+            if (!MiniMon_Call(FlashDriverEntryPoint, registerBytes, out resultBytes))
+            {
+                return false;
+            }
+
+            results = UnpackEepromRegisters(resultBytes);
+            return results != null;
+        }
+
+        private static byte[] PackEepromRegisters(ushort[] registers)
+        {
+            byte[] bytes = new byte[16];
+            for (int i = 0; i < 8; i++)
+            {
+                bytes[i * 2] = (byte)(registers[i] & 0xFF);
+                bytes[i * 2 + 1] = (byte)(registers[i] >> 8);
+            }
+            return bytes;
+        }
+
+        private static ushort[] UnpackEepromRegisters(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length < 16)
+            {
+                return null;
+            }
+
+            ushort[] registers = new ushort[8];
+            for (int i = 0; i < 8; i++)
+            {
+                registers[i] = (ushort)(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
+            }
+            return registers;
+        }
+
+        private void LogEepromRegisters(string context, ushort[] results)
+        {
+            if (results == null)
+            {
+                DisplayStatusMessage($"{context}: no register results.", StatusMessageType.LOG);
+                return;
+            }
+
+            var parts = new string[results.Length];
+            for (int i = 0; i < results.Length; i++)
+            {
+                parts[i] = $"0x{results[i]:X4}";
+            }
+            DisplayStatusMessage($"{context}: registers [{string.Join(", ", parts)}]", StatusMessageType.LOG);
+        }
+
+        private static bool TryGetEepromPortAddresses(byte portNumber, out byte portAddr8, out byte directionPortAddr8)
+        {
+            // 8-bit SFR encodings from C167BootTool ME7BootTool.py
+            switch (portNumber)
+            {
+                case 2:
+                    portAddr8 = 0xE0;
+                    directionPortAddr8 = 0xE1;
+                    return true;
+                case 3:
+                    portAddr8 = 0xE2;
+                    directionPortAddr8 = 0xE3;
+                    return true;
+                case 4:
+                    portAddr8 = 0xE4;
+                    directionPortAddr8 = 0xE5;
+                    return true;
+                case 6:
+                    portAddr8 = 0xE6;
+                    directionPortAddr8 = 0xE7;
+                    return true;
+                case 7:
+                    portAddr8 = 0xE8;
+                    directionPortAddr8 = 0xE9;
+                    return true;
+                case 8:
+                    portAddr8 = 0xEA;
+                    directionPortAddr8 = 0xEB;
+                    return true;
+                default:
+                    portAddr8 = 0;
+                    directionPortAddr8 = 0;
+                    return false;
+            }
         }
 
         #endregion

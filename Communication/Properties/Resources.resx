@@ -136,4 +136,10 @@
   <data name="BootmodeFlashDriverSimos3" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\FX00B_Simos3Driver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="BootmodeEepromDriverSSC" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\gremlindriver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="BootmodeEepromDriverXSSC" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\ST10XDriver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
 </root>

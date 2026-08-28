@@ -27,6 +27,128 @@ using Shared;
 namespace Communication
 {
     /// <summary>
+    /// NOP communication action that stays "running" until explicitly completed.
+    /// Used by bootmode ops that do work on a background thread.
+    /// </summary>
+    internal sealed class BootmodeNopCommunicationAction : CommunicationAction
+    {
+        public BootmodeNopCommunicationAction(CommunicationInterface commInterface)
+            : base(commInterface)
+        {
+        }
+
+        public override bool Start()
+        {
+            return base.Start();
+        }
+
+        public new void ActionCompleted(bool success)
+        {
+            ActionCompletedInternal(success, false);
+        }
+    }
+
+    /// <summary>
+    /// Bootmode operation that runs work on a background thread behind a NOP action.
+    /// Subclasses implement <see cref="RunWorker"/> and return success/failure.
+    /// </summary>
+    public abstract class BootmodeBackgroundOperation : CommunicationOperation
+    {
+        protected BootmodeBackgroundOperation(CommunicationInterface commInterface, string operationLabel)
+            : base(commInterface)
+        {
+            mOperationLabel = operationLabel ?? "Bootmode operation";
+            mNOPAction = new BootmodeNopCommunicationAction(commInterface);
+            mState = WorkerState.Start;
+        }
+
+        /// <summary>Perform the work; return true on success. Do not call StartNextAction.</summary>
+        protected abstract bool RunWorker();
+
+        /// <summary>Optional subclass reset (state is reset to Start by the base).</summary>
+        protected virtual void OnResetWorker()
+        {
+        }
+
+        protected void ReportProgress(uint bytesDone, uint totalBytes)
+        {
+            if (totalBytes > 0)
+            {
+                OnUpdatePercentComplete(((float)bytesDone / (float)totalBytes) * 100.0f);
+            }
+        }
+
+        protected override void ResetOperation()
+        {
+            mState = WorkerState.Start;
+            OnResetWorker();
+        }
+
+        protected override CommunicationAction NextAction()
+        {
+            if (!IsRunning)
+            {
+                return null;
+            }
+
+            switch (mState)
+            {
+                case WorkerState.Start:
+                    mState = WorkerState.Running;
+                    Thread worker = new Thread(() => WorkerThread());
+                    worker.IsBackground = true;
+                    worker.Start();
+                    return mNOPAction;
+
+                case WorkerState.Running:
+                    return mNOPAction;
+
+                case WorkerState.Finished:
+                    mNOPAction.ActionCompleted(true);
+                    OperationCompleted(true);
+                    return null;
+
+                case WorkerState.Failed:
+                    mNOPAction.ActionCompleted(false);
+                    OperationCompleted(false);
+                    return null;
+
+                default:
+                    return null;
+            }
+        }
+
+        private void WorkerThread()
+        {
+            try
+            {
+                bool success = RunWorker();
+                mState = success ? WorkerState.Finished : WorkerState.Failed;
+            }
+            catch (Exception ex)
+            {
+                CommInterface.DisplayStatusMessage($"{mOperationLabel} exception: {ex.Message}", StatusMessageType.USER);
+                CommInterface.DisplayStatusMessage(ex.StackTrace, StatusMessageType.LOG);
+                mState = WorkerState.Failed;
+            }
+
+            StartNextAction();
+        }
+
+        private enum WorkerState
+        {
+            Start,
+            Running,
+            Finished,
+            Failed
+        }
+
+        private readonly string mOperationLabel;
+        private WorkerState mState;
+        private readonly BootmodeNopCommunicationAction mNOPAction;
+    }
+
+    /// <summary>
     /// Bootmode flash read operation. Diff read not supported (MiniMon has no checksum-for-range); all sectors read.
     /// Checksum verification via MiniMon_GetChecksum() not yet implemented.
     /// </summary>
@@ -59,7 +181,7 @@ namespace Communication
             mTotalBytesRead = 0;
 
             // Create a NOP action that will stay "running" while our thread does the work
-            mNOPAction = new NOPCommunicationAction(commInterface);
+            mNOPAction = new BootmodeNopCommunicationAction(commInterface);
         }
 
         protected override void ResetOperation()
@@ -256,32 +378,7 @@ namespace Communication
         private uint mTotalBytesToRead;
         private uint mTotalBytesRead;
         public MemoryImage mReadFlashMemory;
-        private NOPCommunicationAction mNOPAction;
-
-        /// <summary>
-        /// A NOP (No Operation) communication action that stays "running" until explicitly completed.
-        /// Used to prevent the base class from thinking the operation is complete when we're using a background thread.
-        /// </summary>
-        private class NOPCommunicationAction : CommunicationAction
-        {
-            public NOPCommunicationAction(CommunicationInterface commInterface)
-                : base(commInterface)
-            {
-                // Base constructor sets IsComplete = true, but Start() will set it to false
-            }
-
-            public override bool Start()
-            {
-                // Call base Start() which sets IsComplete = false and makes it "running"
-                return base.Start();
-            }
-
-            public new void ActionCompleted(bool success)
-            {
-                // Complete the action explicitly
-                ActionCompletedInternal(success, false);
-            }
-        }
+        private BootmodeNopCommunicationAction mNOPAction;
     }
 
     /// <summary>
@@ -313,7 +410,7 @@ namespace Communication
             }
             mBytesWritten = 0;
 
-            mNOPAction = new NOPCommunicationAction(commInterface);
+            mNOPAction = new BootmodeNopCommunicationAction(commInterface);
         }
 
         public int NumSectors { get { return mTotalSectors; } }
@@ -491,24 +588,158 @@ namespace Communication
         private uint mTotalBytesToWrite;
         private uint mBytesWritten;
         private int mNumSuccessfullyFlashedSectors;
-        private NOPCommunicationAction mNOPAction;
+        private BootmodeNopCommunicationAction mNOPAction;
+    }
 
-        private class NOPCommunicationAction : CommunicationAction
+    /// <summary>
+    /// Bootmode SPI EEPROM read (physical 95040 chip). Overwrites flash driver at 0xF600 —
+    /// reload flash driver after this operation if flash work follows.
+    /// </summary>
+    public class BootmodeReadEepromOperation : BootmodeBackgroundOperation
+    {
+        public BootmodeReadEepromOperation(
+            BootstrapInterface commInterface,
+            BootstrapInterface.BootmodeEepromSettings settings)
+            : base(commInterface, "Bootmode EEPROM read")
         {
-            public NOPCommunicationAction(CommunicationInterface commInterface)
-                : base(commInterface)
+            mBootstrapInterface = commInterface;
+            mSettings = settings ?? BootstrapInterface.BootmodeEepromSettings.ForMe75();
+        }
+
+        public MemoryImage ReadMemory { get; private set; }
+
+        protected override void OnResetWorker()
+        {
+            ReadMemory = null;
+        }
+
+        protected override bool RunWorker()
+        {
+            CommInterface.DisplayStatusMessage(
+                $"Bootmode EEPROM read: {mSettings.Periph}, type={(ushort)mSettings.EepromType}, Port{mSettings.PortNumber}.{mSettings.PinNumber}, size={mSettings.Size}",
+                StatusMessageType.USER);
+
+            byte[] data;
+            bool success = mBootstrapInterface.ReadEeprom(
+                mSettings,
+                out data,
+                ReportProgress);
+
+            if (!success || data == null)
             {
+                return false;
             }
 
-            public override bool Start()
+            ReadMemory = new MemoryImage(data, 0);
+            BootmodeEepromChecksumMessages.ReportMe7Eeprom95040Checksums(CommInterface, mSettings, data, warnOnly: false);
+            CommInterface.DisplayStatusMessage(
+                "Bootmode EEPROM read complete. Reload flash driver before any flash operation.",
+                StatusMessageType.USER);
+            return true;
+        }
+
+        private readonly BootstrapInterface mBootstrapInterface;
+        private readonly BootstrapInterface.BootmodeEepromSettings mSettings;
+    }
+
+    /// <summary>
+    /// Bootmode SPI EEPROM write (physical 95040 chip). Overwrites flash driver at 0xF600 —
+    /// reload flash driver after this operation if flash work follows.
+    /// </summary>
+    public class BootmodeWriteEepromOperation : BootmodeBackgroundOperation
+    {
+        public BootmodeWriteEepromOperation(
+            BootstrapInterface commInterface,
+            BootstrapInterface.BootmodeEepromSettings settings,
+            byte[] dataToWrite,
+            bool verify)
+            : base(commInterface, "Bootmode EEPROM write")
+        {
+            if (dataToWrite == null || dataToWrite.Length == 0)
             {
-                return base.Start();
+                throw new ArgumentException("EEPROM write data is empty.", nameof(dataToWrite));
             }
 
-            public new void ActionCompleted(bool success)
+            mBootstrapInterface = commInterface;
+            mSettings = settings ?? BootstrapInterface.BootmodeEepromSettings.ForMe75();
+            mDataToWrite = dataToWrite;
+            mVerify = verify;
+        }
+
+        protected override bool RunWorker()
+        {
+            CommInterface.DisplayStatusMessage(
+                $"Bootmode EEPROM write: {mSettings.Periph}, type={(ushort)mSettings.EepromType}, Port{mSettings.PortNumber}.{mSettings.PinNumber}, size={mDataToWrite.Length}, verify={mVerify}",
+                StatusMessageType.USER);
+
+            if (mDataToWrite.Length > mSettings.Size)
             {
-                ActionCompletedInternal(success, false);
+                CommInterface.DisplayStatusMessage(
+                    $"EEPROM file is {mDataToWrite.Length} bytes; preset max is {mSettings.Size}.",
+                    StatusMessageType.USER);
+                return false;
             }
+
+            BootmodeEepromChecksumMessages.ReportMe7Eeprom95040Checksums(
+                CommInterface,
+                mSettings,
+                mDataToWrite,
+                warnOnly: true);
+
+            bool success = mBootstrapInterface.WriteEeprom(
+                mSettings,
+                mDataToWrite,
+                mVerify,
+                ReportProgress);
+
+            if (!success)
+            {
+                return false;
+            }
+
+            CommInterface.DisplayStatusMessage(
+                "Bootmode EEPROM write complete. Reload flash driver before any flash operation.",
+                StatusMessageType.USER);
+            return true;
+        }
+
+        private readonly BootstrapInterface mBootstrapInterface;
+        private readonly BootstrapInterface.BootmodeEepromSettings mSettings;
+        private readonly byte[] mDataToWrite;
+        private readonly bool mVerify;
+    }
+
+    internal static class BootmodeEepromChecksumMessages
+    {
+        public static void ReportMe7Eeprom95040Checksums(
+            CommunicationInterface commInterface,
+            BootstrapInterface.BootmodeEepromSettings settings,
+            byte[] data,
+            bool warnOnly)
+        {
+            if (settings == null
+                || data == null
+                || settings.EepromType != BootstrapInterface.BootmodeEepromType.Type95040
+                || data.Length < Me7Eeprom95040Checksum.EepromSize)
+            {
+                return;
+            }
+
+            var checksum = Me7Eeprom95040Checksum.Validate(data);
+            if (checksum.AllChecksumPagesValid)
+            {
+                if (!warnOnly)
+                {
+                    commInterface.DisplayStatusMessage(
+                        checksum.FormatStatusMessage(warnOnly: false),
+                        StatusMessageType.USER);
+                }
+                return;
+            }
+
+            commInterface.DisplayStatusMessage(
+                checksum.FormatStatusMessage(warnOnly),
+                StatusMessageType.USER);
         }
     }
 }
