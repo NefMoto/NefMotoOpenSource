@@ -3,6 +3,8 @@
 REM Set configuration based on argument
 if "%1"=="installer" (
     set CONFIG=Release
+) else if "%1"=="publish" (
+    set CONFIG=Release
 ) else if "%1"=="release" (
     set CONFIG=Release
 ) else (
@@ -19,6 +21,18 @@ REM Build the solution
 echo Building ECUFlasher.sln using dotnet (%CONFIG%)...
 dotnet build ECUFlasher.sln --configuration %CONFIG% --verbosity minimal
 if errorlevel 1 exit /b %ERRORLEVEL%
+
+REM Framework-dependent publish folder (not single-file, not the MSI)
+if "%1"=="publish" (
+    echo Publishing to publish\NefMotoECUFlasher %FULL_VERSION%
+    dotnet publish ECUFlasher/ECUFlasher.csproj --configuration Release --self-contained false -p:PublishSingleFile=false -o publish/NefMotoECUFlasher --verbosity minimal
+    if errorlevel 1 exit /b %ERRORLEVEL%
+    dir /b publish\NefMotoECUFlasher\MemoryLayouts\*.MemoryLayout.xml >nul 2>nul
+    if errorlevel 1 (
+        echo error: MemoryLayouts missing from publish\NefMotoECUFlasher
+        exit /b 1
+    )
+)
 
 REM If installer argument provided, build installer
 if "%1"=="installer" (
