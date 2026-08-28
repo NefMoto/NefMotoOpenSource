@@ -5,8 +5,8 @@ CONFIG ?= Debug
 # NEVER export VERSION: the SDK will use it (incorrectly) as a version expected to be sanitized to 1.2.3.4
 FULL_VERSION ?= $(shell git describe --tags --abbrev=4 --always --dirty)
 
-DEBUG_DIR := ECUFlasher/bin/msil/Debug/net8.0-windows
-RELEASE_DIR := ECUFlasher/bin/msil/Release/net8.0-windows
+DEBUG_DIR := ECUFlasher/bin/msil/Debug/net10.0-windows
+RELEASE_DIR := ECUFlasher/bin/msil/Release/net10.0-windows
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(FULL_VERSION).msi
 PUBLISH_DIR := publish/NefMotoECUFlasher
@@ -35,7 +35,7 @@ installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.w
 	@ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
 	FULL_VERSION=$(FULL_VERSION) wix build -arch x86 -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o $(INSTALLER) Installer/Product.wxs
 
-# Framework-dependent publish folder (not single-file, not the MSI). Still needs the .NET 8 Desktop runtime.
+# Framework-dependent publish folder (not single-file, not the MSI). Still needs the .NET 10 Desktop runtime.
 publish:
 	@echo "Publishing to $(PUBLISH_DIR) ($(FULL_VERSION))..."
 	@FULL_VERSION=$(FULL_VERSION) dotnet publish ECUFlasher/ECUFlasher.csproj --configuration Release --self-contained false -p:PublishSingleFile=false -o $(PUBLISH_DIR) --verbosity minimal

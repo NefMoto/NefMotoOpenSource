@@ -36,7 +36,7 @@ if "%1"=="publish" (
 
 REM If installer argument provided, build installer
 if "%1"=="installer" (
-    set ECUFlasher_TargetDir=ECUFlasher/bin/msil/Release/net8.0-windows/
+    set ECUFlasher_TargetDir=ECUFlasher/bin/msil/Release/net10.0-windows/
     echo Building installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi...
     wix build -arch x86 -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o Installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi Installer/Product.wxs
     if errorlevel 1 exit /b %ERRORLEVEL%

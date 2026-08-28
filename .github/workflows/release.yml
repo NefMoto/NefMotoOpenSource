@@ -63,7 +63,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '10.0.x'
 
     - name: Setup Python
       uses: actions/setup-python@v7
@@ -142,8 +142,9 @@ jobs:
           releaseBody="## What's Changed"$'\n'$'\n'"Release ${tag}"
         fi
 
-        # Append MSI download link
+        # Append MSI download link and runtime requirement
         releaseBody="${releaseBody}"$'\n'$'\n'"## Downloads"$'\n'$'\n'"📦 [Download Installer](${msiUrl}) (${msiName})"
+        releaseBody="${releaseBody}"$'\n'$'\n'"Requires the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). The .NET 8 Desktop runtime is not sufficient."
 
         # Multiline output for GITHUB_OUTPUT
         {

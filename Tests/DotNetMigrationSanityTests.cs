@@ -30,15 +30,15 @@ public sealed class DotNetMigrationSanityTests
     }
 
     /// <summary>
-    /// Ensures we're running on a .NET version we expect (e.g. 8+). Update
+    /// Ensures we're running on a .NET version we expect (e.g. 10+). Update
     /// when bumping minimum supported runtime.
     /// </summary>
     [Fact]
-    public void Runtime_IsAtLeastNet8()
+    public void Runtime_IsAtLeastNet10()
     {
         var version = Environment.Version;
-        Assert.True(version.Major >= 8,
-            $"Expected .NET 8 or higher, got {version.Major}.{version.Minor}. Runtime: {RuntimeInformation.FrameworkDescription}");
+        Assert.True(version.Major >= 10,
+            $"Expected .NET 10 or higher, got {version.Major}.{version.Minor}. Runtime: {RuntimeInformation.FrameworkDescription}");
     }
 }
 

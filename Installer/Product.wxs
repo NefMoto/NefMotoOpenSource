@@ -37,16 +37,16 @@
       AllowDowngrades="yes"
       Schedule="afterInstallInitialize" />
 
-    <!-- Launch conditions: Check for .NET 8 -->
-    <Property Id="DOTNET8STATUS" Secure="yes" />
-    <Property Id="DOTNET8STATUS86" Secure="yes" />
-    <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX64" />
-    <netfx:DotNetCompatibilityCheckRef Id="Net8CheckX86" />
-    <!-- DotNetCompatibilityCheck sets DOTNET8STATUS and/or DOTNET8STATUS86 to 0 if the .NET 8.0 Runtime is installed -->
+    <!-- Launch conditions: Check for .NET 10 Desktop runtime -->
+    <Property Id="DOTNET10STATUS" Secure="yes" />
+    <Property Id="DOTNET10STATUS86" Secure="yes" />
+    <netfx:DotNetCompatibilityCheckRef Id="Net10CheckX64" />
+    <netfx:DotNetCompatibilityCheckRef Id="Net10CheckX86" />
+    <!-- DotNetCompatibilityCheck sets DOTNET10STATUS and/or DOTNET10STATUS86 to 0 if the .NET 10.0 Runtime is installed -->
     <!-- Install fails and the Message is displayed if the condition is NOT met -->
     <Launch
-      Condition="Installed OR DOTNET8STATUS=&quot;0&quot; OR DOTNET8STATUS86=&quot;0&quot;"
-      Message="This application requires the .NET 8.0 Runtime. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0" />
+      Condition="Installed OR DOTNET10STATUS=&quot;0&quot; OR DOTNET10STATUS86=&quot;0&quot;"
+      Message="This application requires the .NET 10.0 Desktop Runtime. Please install it from https://dotnet.microsoft.com/download/dotnet/10.0" />
 
     <!-- Remove shortcuts on uninstall (custom action; WiX component removal fails for per-user paths) -->
     <CustomAction Id="RemoveShortcutsCA" Directory="System6432Folder" ExeCommand="cmd.exe /c del /q &quot;%PUBLIC%\Desktop\NefMotoECUFlasher.lnk&quot; 2&gt;nul &amp; del /q &quot;%USERPROFILE%\Desktop\NefMotoECUFlasher.lnk&quot; 2&gt;nul &amp; rmdir /s /q &quot;%ProgramData%\Microsoft\Windows\Start Menu\Programs\NefMotoECUFlasher&quot; 2&gt;nul &amp; rmdir /s /q &quot;%APPDATA%\Microsoft\Windows\Start Menu\Programs\NefMotoECUFlasher&quot; 2&gt;nul" Return="ignore" />
@@ -66,18 +66,18 @@
 
   <Fragment>
     <netfx:DotNetCompatibilityCheck
-      Id="Net8CheckX64"
-      Property="DOTNET8STATUS"
+      Id="Net10CheckX64"
+      Property="DOTNET10STATUS"
       RuntimeType="desktop"
-      Version="8.0.0"
+      Version="10.0.0"
       Platform="x64"
       RollForward="latestMajor" />
 
     <netfx:DotNetCompatibilityCheck
-      Id="Net8CheckX86"
-      Property="DOTNET8STATUS86"
+      Id="Net10CheckX86"
+      Property="DOTNET10STATUS86"
       RuntimeType="desktop"
-      Version="8.0.0"
+      Version="10.0.0"
       Platform="x86"
       RollForward="latestMajor" />
   </Fragment>
@@ -89,7 +89,7 @@
         <Directory Id="RuntimesFolder" Name="runtimes">
           <Directory Id="WinFolder" Name="win">
             <Directory Id="LibFolder" Name="lib">
-              <Directory Id="Net80Folder" Name="net8.0" />
+              <Directory Id="Net100Folder" Name="net10.0" />
             </Directory>
           </Directory>
         </Directory>
@@ -152,12 +152,12 @@
         <File Id="Checksum.dll" Name="Checksum.dll" Source="$(var.TargetDir)Checksum.dll" KeyPath="yes" />
       </Component>
     </ComponentGroup>
-    <ComponentGroup Id="RuntimeDlls" Directory="Net80Folder">
+    <ComponentGroup Id="RuntimeDlls" Directory="Net100Folder">
       <Component Id="System.IO.Ports.dll.runtime" Guid="a7b8c9d0-e1f2-3456-7890-123456789abc">
-        <File Id="System.IO.Ports.dll.runtime" Name="System.IO.Ports.dll" Source="$(var.TargetDir)runtimes/win/lib/net8.0/System.IO.Ports.dll" KeyPath="yes" />
+        <File Id="System.IO.Ports.dll.runtime" Name="System.IO.Ports.dll" Source="$(var.TargetDir)runtimes/win/lib/net10.0/System.IO.Ports.dll" KeyPath="yes" />
       </Component>
       <Component Id="System.Management.dll.runtime" Guid="b8c9d0e1-f2a3-4567-8901-23456789abcd">
-        <File Id="System.Management.dll.runtime" Name="System.Management.dll" Source="$(var.TargetDir)runtimes/win/lib/net8.0/System.Management.dll" KeyPath="yes" />
+        <File Id="System.Management.dll.runtime" Name="System.Management.dll" Source="$(var.TargetDir)runtimes/win/lib/net10.0/System.Management.dll" KeyPath="yes" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="MemoryLayouts" Directory="MemoryLayoutsFolder">

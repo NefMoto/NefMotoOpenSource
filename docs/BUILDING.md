@@ -16,7 +16,7 @@ make release
 # Build Release and installer
 make installer
 
-# Framework-dependent publish folder (not the MSI; still needs .NET 8)
+# Framework-dependent publish folder (not the MSI; still needs .NET 10)
 make publish
 
 # Clean build artifacts
@@ -35,16 +35,16 @@ build.bat release
 REM Build Release and installer
 build.bat installer
 
-REM Framework-dependent publish folder (not the MSI; still needs .NET 8)
+REM Framework-dependent publish folder (not the MSI; still needs .NET 10)
 build.bat publish
 ```
 
 ## Prerequisites
 
-- **.NET SDK** (preferred) or **Visual Studio** with MSBuild
+- **.NET 10 SDK** (preferred) or **Visual Studio** with MSBuild. End users of the MSI need the **.NET 10 Desktop Runtime**, not only the console runtime.
 - **WiX Toolset v6.0+** (for installer builds)
   - `dotnet tool install --global wix --version 6.0.2`
 - **WiX UI and NetFX extensions**
   - `wix extension add WixToolset.UI.wixext WixToolset.NetFx.wixext --global`
 
-`make publish` / `build.bat publish` writes a framework-dependent copy to `publish/NefMotoECUFlasher`. It is not a substitute for the MSI: no shortcuts, no installer .NET check, and it still needs the .NET 8 Desktop runtime. `MemoryLayouts` is copied next to the executable. This is not a single-file exe.
+`make publish` / `build.bat publish` writes a framework-dependent copy to `publish/NefMotoECUFlasher`. It is not a substitute for the MSI: no shortcuts, no installer .NET check, and it still needs the .NET 10 Desktop runtime. `MemoryLayouts` is copied next to the executable. This is not a single-file exe.

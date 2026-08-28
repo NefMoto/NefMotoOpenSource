@@ -58,6 +58,8 @@ To rebuild an existing tag without moving it, use **Actions → Release → Run 
 
 `build.yml` retains MSI workflow artifacts for 90 days; `release.yml` is what publishes the installer on GitHub Releases.
 
+The generated **Downloads** section includes a .NET 10 Desktop Runtime requirement (and a note that .NET 8 Desktop is not enough). Keep that in sync with README **Requirements**.
+
 ### What `release.yml` does
 
 1. **Determine tag type** — Tags with a hyphen suffix (e.g. `-rc1`) are pre-releases. Finds `prev_tag` (nearest ancestor tag from the tagged commit’s parent, often the prior RC) for RC changelog ranges.
@@ -65,7 +67,7 @@ To rebuild an existing tag without moving it, use **Actions → Release → Run 
 3. **Release notes** — [git-cliff](https://git-cliff.org) via `kenji-miyake/setup-git-cliff@v2` (version not pinned):
    - **Stable:** `git cliff -l` — changelog since the previous stable tag (`tag_pattern` in `cliff.toml`).
    - **Pre-release:** `git cliff $prev_tag..$tag` — commits since the previous tag on the line (often the prior RC). CI replaces git-cliff’s first line so the header reads `(since $prev_tag)`; git-cliff alone still prints the last **stable** tag there.
-4. **Publish** — Deletes any existing GitHub release for the tag (re-tag / re-run), appends a `## Downloads` section with the MSI link, then creates the release via `softprops/action-gh-release@v3`.
+4. **Publish** — Deletes any existing GitHub release for the tag (re-tag / re-run), appends a `## Downloads` section with the MSI link and .NET 10 Desktop Runtime requirement, then creates the release via `softprops/action-gh-release@v3`.
 
 CI does **not** pass `--offline` to git-cliff so PR titles, issue links, and contributor metadata can resolve through the GitHub API.
 
