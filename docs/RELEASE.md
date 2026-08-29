@@ -58,7 +58,7 @@ To rebuild an existing tag without moving it, use **Actions → Release → Run 
 
 `build.yml` retains MSI workflow artifacts for 90 days; `release.yml` is what publishes the installer on GitHub Releases.
 
-The generated **Downloads** section includes a .NET 10 Desktop Runtime requirement (and a note that .NET 8 Desktop is not enough). Keep that in sync with README **Requirements**.
+The generated **Downloads** section includes a .NET 10 Desktop Runtime (x64) requirement (and a note that .NET 8 Desktop is not enough). Keep that in sync with README **Requirements**. The MSI is **x64** and installs to Program Files; upgrading from an older x86 MSI should uninstall the Program Files (x86) copy.
 
 ### What `release.yml` does
 
