@@ -2118,6 +2118,41 @@ namespace Communication
             public byte[] mBlockData;
         }
 
+        // First byte of a 0xF6 ident block may have bit 7 set: extra ident is
+        // available via block title 0x00. The character is the low 7 bits
+        // (0xB0 -> '0', so the displayed part number is 06A906032HN not °6A...).
+        private static byte Kwp1281IdentDisplayByte(byte curByte, int index)
+        {
+            if (index == 0)
+            {
+                return (byte)(curByte & 0x7F);
+            }
+
+            return curByte;
+        }
+
+        private static string Kwp1281IdentBlockToAscii(byte[] blockData)
+        {
+            if (blockData == null)
+            {
+                return "";
+            }
+
+            string text = "";
+            for (int i = 0; i < blockData.Length; i++)
+            {
+                byte curByte = Kwp1281IdentDisplayByte(blockData[i], i);
+                if (curByte == 0)
+                {
+                    break;
+                }
+
+                text += (char)curByte;
+            }
+
+            return text;
+        }
+
         private bool KWP1281ReadBlock(out KWP1281Block messageBlock)
         {
             bool result = false;
@@ -2214,8 +2249,9 @@ namespace Communication
 
                     if (messageBlock.mBlockData != null)
                     {
-                        foreach (char curChar in messageBlock.mBlockData)
+                        for (int i = 0; i < messageBlock.mBlockData.Length; i++)
                         {
+                            char curChar = (char)Kwp1281IdentDisplayByte(messageBlock.mBlockData[i], i);
                             // Sanitize null and other unprintable characters
                             if (curChar == '\0')
                             {
@@ -2425,18 +2461,7 @@ namespace Communication
                     //check for ASCII block
                     if (messageBlock.mBlockTitle == (byte)KWP1281BlockTitle.ASCIIData)
                     {
-                        if (messageBlock.mBlockData != null)
-                        {
-                            foreach (byte curByte in messageBlock.mBlockData)
-                            {
-                                // Stop processing at null termination
-                                if (curByte == 0)
-                                {
-                                    break;
-                                }
-                                ASCIIData += (char)curByte;
-                            }
-                        }
+                        ASCIIData += Kwp1281IdentBlockToAscii(messageBlock.mBlockData);
                     }
                 }
                 else
