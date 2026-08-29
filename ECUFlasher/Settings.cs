@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: tony@nefariousmotorsports.com
 */
 
+using System.Configuration;
+
 namespace ECUFlasher.Properties {
 
 
@@ -26,15 +28,17 @@ namespace ECUFlasher.Properties {
     //  The PropertyChanged event is raised after a setting's value is changed.
     //  The SettingsLoaded event is raised after the setting values are loaded.
     //  The SettingsSaving event is raised before the setting values are saved.
+    [SettingsProvider(typeof(global::ECUFlasher.AppDataSettingsProvider))]
     internal sealed partial class Settings {
 
         public Settings() {
-            // // To add event handlers for saving and changing settings, uncomment the lines below:
-            //
-            // this.SettingChanging += this.SettingChangingEventHandler;
-            //
-            // this.SettingsSaving += this.SettingsSavingEventHandler;
-            //
+            var provider = new global::ECUFlasher.AppDataSettingsProvider();
+            provider.Initialize(nameof(global::ECUFlasher.AppDataSettingsProvider), null);
+            Providers.Add(provider);
+            foreach (SettingsProperty property in Properties)
+            {
+                property.Provider = provider;
+            }
         }
 
         private void SettingChangingEventHandler(object sender, System.Configuration.SettingChangingEventArgs e) {

@@ -117,6 +117,10 @@ namespace ECUFlasher
                 CreateLogFile();
 
                 DisplayStatusMessage("Opening " + GetApplicationName(), StatusMessageType.LOG);
+                if (!string.IsNullOrEmpty(AppDataSettingsProvider.MigratedFromPath))
+                {
+                    DisplayStatusMessage("Migrated user settings from " + AppDataSettingsProvider.MigratedFromPath, StatusMessageType.LOG);
+                }
 
                 // mFTDILibrary no longer needed - DeviceManager handles device enumeration
 
