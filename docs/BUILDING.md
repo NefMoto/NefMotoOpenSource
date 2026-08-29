@@ -43,7 +43,7 @@ build.bat publish
 
 - **.NET 10 SDK** (preferred) or **Visual Studio** with MSBuild. End users of the MSI need the **.NET 10 Desktop Runtime**, not only the console runtime.
 - Target framework is `NetTfm` in [`Directory.Build.props`](../Directory.Build.props). Output dirs do not include the TFM (`ECUFlasher/bin/msil/Debug` / `Release`).
-- **WiX Toolset v6.0+** (for installer builds)
+- **WiX Toolset v6.0+** (for installer builds; MSI is **x64**, `-arch x64`)
   - `dotnet tool install --global wix --version 6.0.2`
 - **WiX UI and NetFX extensions**
   - `wix extension add WixToolset.UI.wixext WixToolset.NetFx.wixext --global`

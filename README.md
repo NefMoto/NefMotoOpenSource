@@ -75,6 +75,8 @@ See [RELEASE.md](docs/RELEASE.md) for release instructions.
 
 Pre-built releases are available at: <https://github.com/NefMoto/NefMotoOpenSource/releases/latest>
 
+The MSI is 64-bit and installs to `C:\Program Files\NefMotoECUFlasher`. Upgrading from an older x86 install should replace the copy under Program Files (x86).
+
 ## Requirements
 
 - Windows operating system
