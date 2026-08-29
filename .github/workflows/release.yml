@@ -144,7 +144,7 @@ jobs:
 
         # Append MSI download link and runtime requirement
         releaseBody="${releaseBody}"$'\n'$'\n'"## Downloads"$'\n'$'\n'"📦 [Download Installer](${msiUrl}) (${msiName})"
-        releaseBody="${releaseBody}"$'\n'$'\n'"Requires the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). The .NET 8 Desktop runtime is not sufficient."
+        releaseBody="${releaseBody}"$'\n'$'\n'"Requires the [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe). The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not sufficient."
 
         # Multiline output for GITHUB_OUTPUT
         {

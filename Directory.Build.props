@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <!-- Single TFM source of truth. FTD2XX_NET is netX.0 (no WPF); everything else is netX.0-windows. -->
+    <NetTfm>net10.0</NetTfm>
+    <TargetFramework Condition="'$(MSBuildProjectName)' == 'FTD2XX_NET'">$(NetTfm)</TargetFramework>
+    <TargetFramework Condition="'$(MSBuildProjectName)' != 'FTD2XX_NET'">$(NetTfm)-windows</TargetFramework>
+    <!-- Keep bin paths stable across TFM bumps (Makefile, WiX, launch.json). -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+</Project>

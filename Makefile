@@ -5,8 +5,15 @@ CONFIG ?= Debug
 # NEVER export VERSION: the SDK will use it (incorrectly) as a version expected to be sanitized to 1.2.3.4
 FULL_VERSION ?= $(shell git describe --tags --abbrev=4 --always --dirty)
 
-DEBUG_DIR := ECUFlasher/bin/msil/Debug/net10.0-windows
-RELEASE_DIR := ECUFlasher/bin/msil/Release/net10.0-windows
+# Same source as Directory.Build.props <NetTfm>
+NET_TFM := $(shell sed -n 's/.*<NetTfm>\([^<]*\)<\/NetTfm>.*/\1/p' Directory.Build.props | head -1)
+ifeq ($(strip $(NET_TFM)),)
+$(error Could not read NetTfm from Directory.Build.props)
+endif
+DOTNET_MAJOR := $(shell echo "$(NET_TFM)" | sed -n 's/^net\([0-9][0-9]*\).*/\1/p')
+
+DEBUG_DIR := ECUFlasher/bin/msil/Debug
+RELEASE_DIR := ECUFlasher/bin/msil/Release
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(FULL_VERSION).msi
 PUBLISH_DIR := publish/NefMotoECUFlasher
@@ -29,13 +36,16 @@ build:
 	@echo "Building with dotnet ($(CONFIG))..."
 	FULL_VERSION=$(FULL_VERSION) dotnet build ECUFlasher.sln --configuration $(CONFIG) --verbosity minimal
 
-installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile
-	@echo "Building $(INSTALLER) ($(FULL_VERSION))..."
+installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile Directory.Build.props
+	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
 	@mkdir -p Installer/bin/Release
 	@ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
-	FULL_VERSION=$(FULL_VERSION) wix build -arch x86 -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o $(INSTALLER) Installer/Product.wxs
+	FULL_VERSION=$(FULL_VERSION) wix build -arch x86 \
+		-d RuntimeTfm=$(NET_TFM) -d DotNetMajor=$(DOTNET_MAJOR) \
+		-ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext \
+		-o $(INSTALLER) Installer/Product.wxs
 
-# Framework-dependent publish folder (not single-file, not the MSI). Still needs the .NET 10 Desktop runtime.
+# Framework-dependent publish folder (not single-file, not the MSI). Still needs the Desktop runtime matching NetTfm.
 publish:
 	@echo "Publishing to $(PUBLISH_DIR) ($(FULL_VERSION))..."
 	@FULL_VERSION=$(FULL_VERSION) dotnet publish ECUFlasher/ECUFlasher.csproj --configuration Release --self-contained false -p:PublishSingleFile=false -o $(PUBLISH_DIR) --verbosity minimal

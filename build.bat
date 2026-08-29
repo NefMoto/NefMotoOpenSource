@@ -17,6 +17,10 @@ if "%FULL_VERSION%"=="" set FULL_VERSION=unknown
 
 echo Full Version: %FULL_VERSION%
 
+REM TFM from Directory.Build.props (same source as the SDK)
+for /f "tokens=3 delims=<>" %%a in ('findstr /c:"<NetTfm>" Directory.Build.props') do set NET_TFM=%%a
+for /f "tokens=1 delims=." %%a in ("%NET_TFM:net=%") do set DOTNET_MAJOR=%%a
+
 REM Build the solution
 echo Building ECUFlasher.sln using dotnet (%CONFIG%)...
 dotnet build ECUFlasher.sln --configuration %CONFIG% --verbosity minimal
@@ -36,9 +40,9 @@ if "%1"=="publish" (
 
 REM If installer argument provided, build installer
 if "%1"=="installer" (
-    set ECUFlasher_TargetDir=ECUFlasher/bin/msil/Release/net10.0-windows/
+    set ECUFlasher_TargetDir=ECUFlasher/bin/msil/Release/
     echo Building installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi...
-    wix build -arch x86 -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o Installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi Installer/Product.wxs
+    wix build -arch x86 -d RuntimeTfm=%NET_TFM% -d DotNetMajor=%DOTNET_MAJOR% -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o Installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi Installer/Product.wxs
     if errorlevel 1 exit /b %ERRORLEVEL%
 )
 
