@@ -74,7 +74,7 @@ namespace Communication
             public string FormatStatusMessage(bool warnOnly = false)
             {
                 string exemptNote = PagesExempt > 0
-                    ? $"; pages 28–29 (HW/SW ID) not checksummed"
+                    ? $"; pages 28-29 (HW/SW ID) not checksummed"
                     : string.Empty;
 
                 if (AllChecksumPagesValid)
@@ -168,7 +168,7 @@ namespace Communication
 
         /// <summary>
         /// Writes Bosch page checksums for all non-exempt CS pages in place.
-        /// Pages 28–29 (HW/SW ID) are never modified. Returns how many pages were updated.
+        /// Pages 28-29 (HW/SW ID) are never modified. Returns how many pages were updated.
         /// </summary>
         public static int CorrectChecksums(byte[] data, int dataOffset = 0)
         {

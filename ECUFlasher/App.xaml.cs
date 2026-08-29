@@ -33,6 +33,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -414,10 +415,11 @@ namespace ECUFlasher
                         //display status message can be called from multiple threads
                         lock (mLogFileName)
                         {
-                            string logFileEntry = DateTime.Now.ToString("dd/MMM/yyyy hh:mm:ss.fff") + ": " + messageType + ": " + message + Environment.NewLine;
+                            string logFileEntry = DateTime.Now.ToString("dd/MMM/yyyy hh:mm:ss.fff", CultureInfo.InvariantCulture)
+                                + ": " + messageType + ": " + message + Environment.NewLine;
 
-                            //this will create the file if it doesn't exist
-                            File.AppendAllText(mLogFileName, logFileEntry, Encoding.Default);
+                            // ASCII so forum pastes do not mojibake; UI keeps the original string
+                            File.AppendAllText(mLogFileName, logFileEntry, Encoding.ASCII);
                             mLogFileSize += logFileEntry.Length;
                         }
                     }

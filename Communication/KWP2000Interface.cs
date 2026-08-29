@@ -2485,12 +2485,12 @@ namespace Communication
                     + ", KWP2000 addr=0x" + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + ".", StatusMessageType.LOG);
                 if (mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS)
                 {
-                    DisplayStatusMessage("Slow init: user address 0x01 — KWP1281-first path; app may retry at 0x"
+                    DisplayStatusMessage("Slow init: user address 0x01 - KWP1281-first path; app may retry at 0x"
                         + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + " (Even parity) internally.", StatusMessageType.LOG);
                 }
                 else if (mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS)
                 {
-                    DisplayStatusMessage("Slow init: user address 0x11 — direct one-shot KWP2000 slow init (no KWP1281 first). May fail on ME7 bench; 0x01 is the usual working address.", StatusMessageType.LOG);
+                    DisplayStatusMessage("Slow init: user address 0x11 - direct one-shot KWP2000 slow init (no KWP1281 first). May fail on ME7 bench; 0x01 is the usual working address.", StatusMessageType.LOG);
                 }
 
                 //wait for the required idle time
@@ -2548,7 +2548,7 @@ namespace Communication
                     //did the second slow init result in another KWP1281 session?
                     if((mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS) && (keyByte1 == KWP_1281_PROTOCOL_KEY_BYTE_1) && (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
                     {
-                        DisplayStatusMessage("Slow init: KWP1281 at 0x01 again — third attempt at 0x"
+                        DisplayStatusMessage("Slow init: KWP1281 at 0x01 again - third attempt at 0x"
                             + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + " Even parity.", StatusMessageType.LOG);
                         KWP1281RunShortSession();
 

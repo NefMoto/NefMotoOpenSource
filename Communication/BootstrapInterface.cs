@@ -2644,7 +2644,7 @@ namespace Communication
 
             bool ok = (driverState == 0x00F0) || (driverState == 0x0080);
             DisplayStatusMessage(
-                $"EEPROM driver state: 0x{driverState:X4} ({(ok ? "OK" : "unexpected — check CS/periph")})",
+                $"EEPROM driver state: 0x{driverState:X4} ({(ok ? "OK" : "unexpected - check CS/periph")})",
                 ok ? StatusMessageType.LOG : StatusMessageType.USER);
             return ok;
         }

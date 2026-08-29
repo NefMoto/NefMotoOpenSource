@@ -1471,7 +1471,7 @@ namespace ECUFlasher
                     _WriteBootmodeEepromCommand = CreateBootmodeEepromCommand(
                         this.OnWriteBootmodeEeprom,
                         "Write EEPROM (Bootmode)",
-                        "Write physical SPI EEPROM (95040) via bootmode; immo/security risk — backup first",
+                        "Write physical SPI EEPROM (95040) via bootmode; immo/security risk - backup first",
                         CanExecuteBootmodeEepromCommand);
                 }
 
@@ -1734,7 +1734,7 @@ namespace ECUFlasher
                 {
                     string csPrompt =
                         $"ME7 95040 data-page checksums are invalid ({checksum.PagesInvalid} bad / {checksum.PagesChecked} checked).\n"
-                        + "Pages 28–29 (HW/SW ID) are ignored and will not be changed.\n\n"
+                        + "Pages 28-29 (HW/SW ID) are ignored and will not be changed.\n\n"
                         + "Yes = correct data-page checksums, then continue\n"
                         + "No = write the file as-is\n"
                         + "Cancel = abort";
@@ -1753,7 +1753,7 @@ namespace ECUFlasher
                     {
                         int pagesUpdated = Me7Eeprom95040Checksum.CorrectChecksums(dataToWrite);
                         App.DisplayStatusMessage(
-                            $"Corrected {pagesUpdated} EEPROM data-page checksum(s); pages 28–29 left unchanged.",
+                            $"Corrected {pagesUpdated} EEPROM data-page checksum(s); pages 28-29 left unchanged.",
                             StatusMessageType.USER);
                     }
                 }
@@ -2461,16 +2461,16 @@ namespace ECUFlasher
         public static IReadOnlyList<BootmodeEepromPresetOption> All { get; } = new List<BootmodeEepromPresetOption>
         {
             new BootmodeEepromPresetOption(
-                "ME7.5 — 95040 SSC P4.7 (512 B)",
+                "ME7.5 - 95040 SSC P4.7 (512 B)",
                 BootstrapInterface.BootmodeEepromSettings.ForMe75()),
             new BootmodeEepromPresetOption(
-                "ME7.1 — 95040 SSC P4.7 (512 B)",
+                "ME7.1 - 95040 SSC P4.7 (512 B)",
                 BootstrapInterface.BootmodeEepromSettings.ForMe71()),
             new BootmodeEepromPresetOption(
-                "ME7.5 — 95040 XSSC P4.7 (512 B)",
+                "ME7.5 - 95040 XSSC P4.7 (512 B)",
                 MakeXssc(BootstrapInterface.BootmodeEepromSettings.ForMe75())),
             new BootmodeEepromPresetOption(
-                "ME7.1 — 95040 XSSC P4.7 (512 B)",
+                "ME7.1 - 95040 XSSC P4.7 (512 B)",
                 MakeXssc(BootstrapInterface.BootmodeEepromSettings.ForMe71())),
         };
 
