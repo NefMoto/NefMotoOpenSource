@@ -55,6 +55,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - **ME7.x** - Primary target; full KWP2000 and bootmode support
 - **ME7.5 fast init** - Not supported on one bench unit after address and timing sweeps. Use **slow init** instead. Other ME7.5 images may differ. See [docs/KWP2000.md](docs/KWP2000.md)
+- Some ME7 images (e.g. `06A906032HN`) omit the ISO inverted-address byte after KWP2000 slow init; NefMoto continues if that byte is absent. See [docs/KWP2000.md](docs/KWP2000.md)
 - **Simos 3.x / EDC15** - Bootmode support (layout auto-detect)
 - Memory layouts provided for common flash chips (29F200, 29F400, 29F800 series)
 - Some ECUs may require specific connection parameters or timing adjustments

@@ -1846,28 +1846,42 @@ namespace Communication
                             }
                         }
 
-                        //need to read the address complement if this slow init started a KWP2000 session
+                        // ISO 14230-2 W4: ECU should send inverted address. Some Bosch images
+                        // (e.g. 06A906032HN) never do after valid KWP2000 keys. 0-byte timeout:
+                        // continue. Wrong byte: fail. See issue #95.
                         if (result && IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
                         {
                             success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
+                            // FTDI Read waits SetTimeouts per attempt; apply W4 window so we do not wait DeviceReadTimeOutMs (~1-2 s)
+                            success &= mCommunicationDevice.SetTimeouts(SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS, FTDIDeviceWriteTimeOutMs);
 
                             LogSlowInitHandshakePhase("address complement read start");
 
                             //read the complement of the address
                             byte[] addressComplement = new byte[1];
                             uint numBytesRead = 0;
-                            success &= mCommunicationDevice.Read(addressComplement, (uint)addressComplement.Length, ref numBytesRead, SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS);
+                            bool complementReadOk = mCommunicationDevice.Read(addressComplement, (uint)addressComplement.Length, ref numBytesRead, SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS);
+                            success &= complementReadOk;
+
+                            byte expectedComplement = (byte)~connectAddress;
+                            bool complementMatched = complementReadOk && (numBytesRead == addressComplement.Length) && (addressComplement[0] == expectedComplement);
+                            bool complementAbsent = complementReadOk && (numBytesRead == 0);
 
                             LogSlowInitHandshakePhase("address complement read done",
                                 numBytesRead > 0 ? addressComplement[0] : null,
-                                success && (numBytesRead == addressComplement.Length) && (addressComplement[0] == (byte)~connectAddress));
+                                complementMatched || complementAbsent);
 
-                            DisplayStatusMessage("Slow init address complement read: success=" + success
+                            DisplayStatusMessage("Slow init address complement read: success=" + complementReadOk
                                 + ", read=" + numBytesRead
                                 + ", value=0x" + (numBytesRead > 0 ? addressComplement[0].ToString("X2") : "??")
-                                + ", expected=0x" + ((byte)~connectAddress).ToString("X2") + ".", StatusMessageType.LOG);
+                                + ", expected=0x" + expectedComplement.ToString("X2") + ".", StatusMessageType.LOG);
 
-                            if (!success || (numBytesRead != addressComplement.Length) || (addressComplement[0] != (byte)~connectAddress))
+                            if (complementAbsent)
+                            {
+                                DisplayStatusMessage("Slow init: no address complement (0 bytes, expected 0x"
+                                    + expectedComplement.ToString("X2") + "); continuing.", StatusMessageType.LOG);
+                            }
+                            else if (!complementMatched)
                             {
                                 result = false;
                                 DisplayStatusMessage("Failed to read address complement.", StatusMessageType.LOG);
