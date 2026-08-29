@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>Library</OutputType>
     <SccProjectName>
     </SccProjectName>
@@ -71,9 +70,6 @@
     <ProjectReference Include="..\Communication\Communication.csproj" />
     <ProjectReference Include="..\FTD2XX_NET\FTD2XX_NET.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
   </ItemGroup>
   <PropertyGroup>
     <AssemblyTitle>ApplicationShared</AssemblyTitle>
