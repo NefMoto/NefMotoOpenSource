@@ -40,7 +40,7 @@ installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.w
 	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
 	@mkdir -p Installer/bin/Release
 	@ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
-	FULL_VERSION=$(FULL_VERSION) wix build -arch x86 \
+	FULL_VERSION=$(FULL_VERSION) wix build -arch x64 \
 		-d RuntimeTfm=$(NET_TFM) -d DotNetMajor=$(DOTNET_MAJOR) \
 		-ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext \
 		-o $(INSTALLER) Installer/Product.wxs
