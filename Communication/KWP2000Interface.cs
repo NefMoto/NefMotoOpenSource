@@ -3589,7 +3589,14 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                     if (messageResponsesFinishedEvent != null)
                     {
-                        QueueAndTriggerEvent(new FinishedReceivingResponsesEventHolder(messageResponsesFinishedEvent, finishedMessage, mCurrentMessageSentProperly, mCurrentMessageReceivedAnyResponses, mCurrentMessageWaitedForAllReplies, (uint)(mNumSendAttemptsForCurrentMessage - 1)));
+                        // Same as received messages: do not use the Task.Run queue (#100).
+                        DispatchResponsesFinished(
+                            messageResponsesFinishedEvent,
+                            finishedMessage,
+                            mCurrentMessageSentProperly,
+                            mCurrentMessageReceivedAnyResponses,
+                            mCurrentMessageWaitedForAllReplies,
+                            (uint)(mNumSendAttemptsForCurrentMessage - 1));
                     }
                 }
 
@@ -3619,6 +3626,45 @@ connectEndTime = connectStartTime + connectTime + 3;
                 mCurrentMessageWaitedForAllReplies = false;
                 mNumSendAttemptsForCurrentMessage = 0;
                 mCurrentMessageSentFinishedEvent = true;
+            }
+        }
+
+        private void DispatchReceivedMessage(KWP2000Message message)
+        {
+            var handler = ReceivedMessageEvent;
+            if (handler == null)
+            {
+                return;
+            }
+
+            try
+            {
+                handler(this, message);
+            }
+            catch (Exception e)
+            {
+                DisplayStatusMessage("Error dispatching received message: " + e.Message, StatusMessageType.LOG);
+            }
+        }
+
+        private void DispatchResponsesFinished(
+            MulticastDelegate responsesFinishedEvent,
+            KWP2000Message finishedMessage,
+            bool sentProperly,
+            bool receivedAnyReplies,
+            bool waitedForAllReplies,
+            uint numRetries)
+        {
+            if (responsesFinishedEvent is MessageSendFinishedDelegate handler)
+            {
+                try
+                {
+                    handler(this, finishedMessage, sentProperly, receivedAnyReplies, waitedForAllReplies, numRetries);
+                }
+                catch (Exception e)
+                {
+                    DisplayStatusMessage("Error dispatching responses-finished: " + e.Message, StatusMessageType.LOG);
+                }
             }
         }
 
@@ -4167,13 +4213,9 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                             if (shouldTriggerMessageHandler && (ReceivedMessageEvent != null))
                             {
-                                //must be called before the finish expecting responses handler
-                                bool queuedMessage = QueueAndTriggerEvent(new ReceivedMessageEventHolder(ReceivedMessageEvent, message));
-
-                                if (!queuedMessage)
-                                {
-                                    DisplayStatusMessage("Cannot queue received message, receive message buffer is full, deleting message.", StatusMessageType.LOG);
-                                }
+                                // Invoke on this thread. QueueAndTriggerEvent uses Task.Run and will
+                                // never dispatch if mNumQueuedEventHandlersInProgress is stuck (#100).
+                                DispatchReceivedMessage(message);
                             }
 
                             //don't keep waiting for more messages if we don't have to
