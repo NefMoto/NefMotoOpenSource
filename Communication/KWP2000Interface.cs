@@ -1850,6 +1850,8 @@ namespace Communication
                         if (result && IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
                         {
                             success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
+                            // FTDI Read waits SetTimeouts per attempt; apply W4 window so we do not wait DeviceReadTimeOutMs (~1-2 s)
+                            success &= mCommunicationDevice.SetTimeouts(SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS, FTDIDeviceWriteTimeOutMs);
 
                             LogSlowInitHandshakePhase("address complement read start");
 

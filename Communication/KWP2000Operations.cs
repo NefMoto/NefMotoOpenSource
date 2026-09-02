@@ -1374,6 +1374,7 @@ namespace Communication
 
             mTotalBytesValidated = 0;
             mValidatedEraseMode = true;
+            mForcedLastSectorForECUCompletion = false;
             mState = FlashingState.StartBlock;
 
             foreach (var block in mFlashBlockList)
@@ -1447,12 +1448,20 @@ namespace Communication
 
                             var lastBlock = mFlashBlockList.Last();
 
-                            if (mCurrentBlock != lastBlock)
+                            // Sequential skip-all leaves mCurrentBlock == lastBlock, so the old
+                            // mCurrentBlock != lastBlock check never ran. ME7 stays in programming
+                            // mode unless a sector is actually programmed this session.
+                            if (!mForcedLastSectorForECUCompletion && !lastBlock.mWasErased)
                             {
-                                //if we finished with a block that wasn't the last one, force the last block to flash again to keep the ECU happy
+                                mForcedLastSectorForECUCompletion = true;
                                 mCurrentBlock = lastBlock;
                                 mCurrentBlock.mFlashComplete = false;
                                 mCurrentBlock.mFlashingIsRequired = true;//don't allow the sector to be skipped
+                                if (mTotalBytesValidated >= lastBlock.mMemoryImage.Size)
+                                {
+                                    mTotalBytesValidated -= lastBlock.mMemoryImage.Size;
+                                }
+                                CommInterface.DisplayStatusMessage("Writing the last flash sector so the ECU can complete the programming session.", StatusMessageType.USER);
 
                                 mState = FlashingState.StartBlock;
                             }
@@ -2396,6 +2405,7 @@ namespace Communication
         private byte mMaxBlockSize;
         private bool mEraseEntireFlashAtOnce;
         private bool mValidatedEraseMode;
+        private bool mForcedLastSectorForECUCompletion;
 
         private uint mTotalBytesToFlash;
         private uint mTotalBytesValidated;

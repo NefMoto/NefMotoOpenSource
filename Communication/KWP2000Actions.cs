@@ -1800,23 +1800,30 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.GeneralReject)
                             {
-                                if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
+                                if (TryCompleteOptionalMirrorProbeAsEndIsntHighest())
+                                {
+                                    handled = true;
+                                }
+                                else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestDownload was rejected.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestDownloadRejected;
+                                    handled = true;
+                                    ActionCompleted(false);
                                 }
                                 else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
                                 {
                                     DisplayStatusMessage("Validation failed, ECU reports RequestUpload was rejected. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestUploadRejected;
+                                    handled = true;
+                                    ActionCompleted(false);
                                 }
                                 else
                                 {
                                     ValidationResult = Result.ValidationDidNotComplete;
+                                    handled = true;
+                                    ActionCompleted(false);
                                 }
-
-                                handled = true;
-                                ActionCompleted(false);
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested)
                             {
@@ -1829,21 +1836,35 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
                             {
-                                DisplayStatusMessage("Validation failed, ECU reports conditions not correct or sequence error. Please turn off the ignition and retry.", StatusMessageType.USER);
+                                if (TryCompleteOptionalMirrorProbeAsEndIsntHighest())
+                                {
+                                    handled = true;
+                                }
+                                else
+                                {
+                                    DisplayStatusMessage("Validation failed, ECU reports conditions not correct or sequence error. Please turn off the ignition and retry.", StatusMessageType.USER);
 
-                                ValidationResult = Result.ValidationDidNotComplete;
+                                    ValidationResult = Result.ValidationDidNotComplete;
 
-                                handled = true;
-                                ActionCompleted(false);
+                                    handled = true;
+                                    ActionCompleted(false);
+                                }
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.RoutineNotCompleteOrServiceInProgress)
                             {
-                                DisplayStatusMessage("Validation failed, ECU reports routine not complete or service in progress. Please turn off the ignition and retry.", StatusMessageType.USER);
+                                if (TryCompleteOptionalMirrorProbeAsEndIsntHighest())
+                                {
+                                    handled = true;
+                                }
+                                else
+                                {
+                                    DisplayStatusMessage("Validation failed, ECU reports routine not complete or service in progress. Please turn off the ignition and retry.", StatusMessageType.USER);
 
-                                ValidationResult = Result.ValidationDidNotComplete;
+                                    ValidationResult = Result.ValidationDidNotComplete;
 
-                                handled = true;
-                                ActionCompleted(false);
+                                    handled = true;
+                                    ActionCompleted(false);
+                                }
                             }
                             else
                             {
@@ -2081,6 +2102,21 @@ namespace Communication
                     break;
                 }
             }
+        }
+
+        private bool TryCompleteOptionalMirrorProbeAsEndIsntHighest()
+        {
+            if ((mState != ValidationState.CheckMirroredDuplicate) && (mState != ValidationState.CheckMirroredEnd))
+            {
+                return false;
+            }
+
+            // Extra probes after AfterEnd were added in 1.9.7 (#80). Sequence/reject here
+            // used to abort the write; keep the 1.9.4 continue path instead.
+            ValidationResult = Result.EndIsntHighest;
+            DisplayStatusMessage("Optional mirror probe did not complete. Flash end address isn't the highest address.", StatusMessageType.LOG);
+            ActionCompleted(true);
+            return true;
         }
 
         protected enum ValidationState
