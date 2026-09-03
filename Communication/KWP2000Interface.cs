@@ -1783,6 +1783,10 @@ namespace Communication
 
                                             if (success)
                                             {
+                                                DisplayStatusMessage("Slow init key byte complement echo: 0x"
+                                                    + echo[0].ToString("X2")
+                                                    + " (expected 0x" + keyByteComp[0].ToString("X2") + ").",
+                                                    StatusMessageType.LOG);
                                                 if (echo[0] == keyByteComp[0])
                                                 {
                                                     result = true;
@@ -1847,9 +1851,9 @@ namespace Communication
                         }
 
                         //need to read the address complement if this slow init started a KWP2000 session
+                        // UART is already 8N1 from connect; do not SetDataCharacteristics here (issue #95 / 1.9.4.3)
                         if (result && IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
                         {
-                            success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
                             // FTDI Read waits SetTimeouts per attempt; apply W4 window so we do not wait DeviceReadTimeOutMs (~1-2 s)
                             success &= mCommunicationDevice.SetTimeouts(SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS, FTDIDeviceWriteTimeOutMs);
 
