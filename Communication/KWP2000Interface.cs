@@ -1710,7 +1710,7 @@ namespace Communication
                                 long lastReadTime = 0;
                                 uint keyByteTimeOut = (uint)SlowInitConnectionTiming.W2Max;
                                 uint lastChanceKeyByteTimeOut = keyByteTimeOut * 2;
-                                //keep reading key bytes until we hit the time out, but if we don't have at least 2 keep reading until double the time out
+                                // Stop once two key bytes are in. Waiting W3Max for a third burns most of ISO W4 (issue #95).
                                 do
                                 {
                                     lastReadTime = watch.ElapsedMilliseconds;
@@ -1733,37 +1733,30 @@ namespace Communication
                                             for (int x = 0; x < numBytesRead; ++x)
                                             {
                                                 keyBytes.Add(keyByteData[x]);
-                                                DisplayStatusMessage("Slow init key byte raw[" + (keyBytes.Count - 1) + "]=0x"
-                                                    + keyByteData[x].ToString("X2") + ".", StatusMessageType.LOG);
                                             }
                                         }
                                     }
-                                } while ( (lastReadTime < keyByteTimeOut) || ((keyBytes.Count < 2) && (lastReadTime < lastChanceKeyByteTimeOut)) );
-
-                                DisplayStatusMessage("Slow init key byte read finished: count=" + keyBytes.Count
-                                    + ", elapsed=" + watch.ElapsedMilliseconds + " ms, raw=["
-                                    + FormatSlowInitHexDump(keyBytes.ToArray(), (uint)keyBytes.Count) + "].", StatusMessageType.LOG);
+                                } while ((keyBytes.Count < 2) && ((lastReadTime < keyByteTimeOut) || (lastReadTime < lastChanceKeyByteTimeOut)));
 
                                 //did we read enough key bytes?
                                 //todo: according to the spec there could be more than two key bytes
                                 if (keyBytes.Count >= 2)
                                 {
-                                    // Switch from slow-init data format (7E1) to 8N1 before sending key byte complement
+                                    // Begin critical timing (ISO 14230 W4): from here through Write,
+                                    // elapsed since last key byte must stay 25-50 ms. No logging in this block
+                                    // (issue #95 / #76 DisplayStatusMessage can exceed W4Max on a loaded host).
                                     success &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
 
-                                    //send the complement of the last key byte
                                     byte[] keyByteComp = new byte[1];
                                     keyByteComp[0] = (byte)~keyBytes[keyBytes.Count - 1];
 
-                                    DisplayStatusMessage("Slow init sending key byte complement 0x"
-                                        + keyByteComp[0].ToString("X2") + " (W4Min wait "
-                                        + (uint)SlowInitConnectionTiming.W4Min + " ms).", StatusMessageType.LOG);
-
-                                    //don't reset timer after trying to read last key byte
                                     while (watch.ElapsedMilliseconds < (uint)SlowInitConnectionTiming.W4Min) ;//busy loop
 
                                     uint numBytesWritten = 0;
                                     success &= mCommunicationDevice.Write(keyByteComp, keyByteComp.Length, ref numBytesWritten, 2) && (numBytesWritten == keyByteComp.Length);
+                                    long msAtKeyByteComplementWrite = watch.ElapsedMilliseconds;
+                                    watch.Stop();
+                                    // End critical timing (W4 send). Logging below is after Write.
 
                                     if (success && EnableSlowInitTimingLog)
                                     {
@@ -1771,7 +1764,11 @@ namespace Communication
                                         LogSlowInitHandshakePhase("key byte complement sent");
                                     }
 
-                                    watch.Stop();
+                                    DisplayStatusMessage("Slow init sent key byte complement 0x"
+                                        + keyByteComp[0].ToString("X2") + " at "
+                                        + msAtKeyByteComplementWrite + " ms (W4 "
+                                        + (uint)SlowInitConnectionTiming.W4Min + "-"
+                                        + (uint)SlowInitConnectionTiming.W4Max + " ms).", StatusMessageType.LOG);
 
                                     if (success)
                                     {
@@ -1783,6 +1780,10 @@ namespace Communication
 
                                             if (success)
                                             {
+                                                DisplayStatusMessage("Slow init key byte complement echo: 0x"
+                                                    + echo[0].ToString("X2")
+                                                    + " (expected 0x" + keyByteComp[0].ToString("X2") + ").",
+                                                    StatusMessageType.LOG);
                                                 if (echo[0] == keyByteComp[0])
                                                 {
                                                     result = true;
@@ -1847,9 +1848,9 @@ namespace Communication
                         }
 
                         //need to read the address complement if this slow init started a KWP2000 session
+                        // UART is already 8N1 from connect; do not SetDataCharacteristics here (issue #95 / 1.9.4.3)
                         if (result && IsKeyByte1ValidKWP2000(keyByte1, false) && IsKeyByte2ValidKWP2000(keyByte2, false))
                         {
-                            success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
                             // FTDI Read waits SetTimeouts per attempt; apply W4 window so we do not wait DeviceReadTimeOutMs (~1-2 s)
                             success &= mCommunicationDevice.SetTimeouts(SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS, FTDIDeviceWriteTimeOutMs);
 
