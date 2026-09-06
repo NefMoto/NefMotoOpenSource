@@ -1770,6 +1770,13 @@ namespace Communication
                                         + (uint)SlowInitConnectionTiming.W4Min + "-"
                                         + (uint)SlowInitConnectionTiming.W4Max + " ms).", StatusMessageType.LOG);
 
+                                    if (EnableSlowInitTimingLog)
+                                    {
+                                        DisplayStatusMessage("Slow init key byte read finished: count=" + keyBytes.Count
+                                            + ", raw=["
+                                            + FormatSlowInitHexDump(keyBytes.ToArray(), (uint)keyBytes.Count) + "].", StatusMessageType.LOG);
+                                    }
+
                                     if (success)
                                     {
                                         if (mConsumeTransmitEcho)
