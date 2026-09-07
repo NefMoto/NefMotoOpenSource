@@ -41,6 +41,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - Slow init uses per-bit break timing (not a single low-baud UART frame). Validated on ME7.1 and ME7.5 bench with FTDI and CH340.
 - Clone or poor-quality adapters may fail slow init on either chip type; **Slow init timing log** helps compare timing.
+- In-car K-line (cluster) is not the same as bench.
 
 ### Bootmode
 
@@ -61,7 +62,9 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### Known Issues
 
-See [GitHub Issues](https://github.com/NefMoto/NefMotoOpenSource/issues) for current known issues and feature requests.
+- [Issue #95](https://github.com/NefMoto/NefMotoOpenSource/issues/95) — in-car slow init can miss the KWP2000 address complement.
+- [Issue #100](https://github.com/NefMoto/NefMotoOpenSource/issues/100) — KWP write hang after ident (connect already up). Separate from #95.
+- Other issues: [GitHub Issues](https://github.com/NefMoto/NefMotoOpenSource/issues)
 
 ## Building
 
