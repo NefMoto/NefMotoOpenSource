@@ -2513,24 +2513,12 @@ namespace Communication
             return sendOK;
         }
 
-        // Sleep (target - SleepOverheadMs) then spin to target. Returns overshoot ms. Does not log.
+        // Sleep (target - SleepOverheadMs) then spin to the tick deadline. Returns overshoot ms. Does not log.
         private static long WaitUntilElapsedMs(Stopwatch watch, long targetMs)
         {
-            long remaining = targetMs - watch.ElapsedMilliseconds;
-            if (remaining > SleepOverheadMs)
-            {
-                Thread.Sleep((int)(remaining - SleepOverheadMs));
-            }
-
-            while (watch.ElapsedMilliseconds < targetMs)
-            {
-                ;
-            }
-
-            return watch.ElapsedMilliseconds - targetMs;
+            return WaitUntilElapsedTicks(watch, targetMs * Stopwatch.Frequency / 1000);
         }
 
-        // Sleep (target - SleepOverheadMs) then spin to the tick deadline. Returns overshoot ms. Does not log.
         private static long WaitUntilElapsedTicks(Stopwatch watch, long targetTicks)
         {
             long remainingTicks = targetTicks - watch.ElapsedTicks;
