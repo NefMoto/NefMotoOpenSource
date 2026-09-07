@@ -1154,6 +1154,7 @@ namespace Communication
         private const uint SLOW_INIT_ADDRESS_COMPLEMENT_READ_TIMEOUT_MS = 100;//W4Max 50 ms + margin for USB serial (CH340)
         private const uint DUMB_ADAPTER_ECHO_READ_TIMEOUT_MS = 100;
         private const uint SLOW_INIT_TX_DRAIN_TIMEOUT_MS = 500;
+        private const int SleepOverheadMs = 16;//Windows timer tick ~15.6 ms; Sleep this much short of target, then spin
 
         protected enum SlowInitParity
         {
@@ -1295,6 +1296,7 @@ namespace Communication
                 Stopwatch watch = new Stopwatch();
                 watch.Start();
                 long previousBitEndMs = 0;
+                long maxOvershootMs = 0;
                 void LogSlowInitBitPeriod(string bitLabel, bool lineLow, bool setBreakToggled)
                 {
                     if (!EnableSlowInitTimingLog)
@@ -1311,12 +1313,21 @@ namespace Communication
                         + ", elapsed=" + elapsedMs + " ms, period=" + periodMs + " ms.", StatusMessageType.DEV);
                 }
 
+                void WaitBit(long endTicks)
+                {
+                    long os = WaitUntilElapsedTicks(watch, endTicks);
+                    if (os > maxOvershootMs)
+                    {
+                        maxOvershootMs = os;
+                    }
+                }
+
                 //low start bit
                 success = mCommunicationDevice.SetBreak(true);//low
                 bool isLow = true;
 
                 long currentBitEndTime = FIVE_BAUD_BIT_TIME_TICKS;
-                while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
+                WaitBit(currentBitEndTime);
                 LogSlowInitBitPeriod("start", isLow, true);
 
                 int numHighBits = 0;
@@ -1351,7 +1362,7 @@ namespace Communication
                     }
 
                     currentBitEndTime += FIVE_BAUD_BIT_TIME_TICKS;
-                    while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
+                    WaitBit(currentBitEndTime);
                     LogSlowInitBitPeriod("D" + y + "=" + (isHighBit ? "1" : "0"), isLow, setBreakToggled);
                 }
 
@@ -1382,7 +1393,7 @@ namespace Communication
                     }
 
                     currentBitEndTime += FIVE_BAUD_BIT_TIME_TICKS;
-                    while (watch.ElapsedTicks < currentBitEndTime) ;//busy loop
+                    WaitBit(currentBitEndTime);
                     LogSlowInitBitPeriod("parity", isLow, setBreakToggled);
                 }
 
@@ -1417,6 +1428,9 @@ namespace Communication
                 {
                     DisplayStatusMessage("Failed to send five baud slow init address.", StatusMessageType.LOG);
                 }
+
+                long expectedBitMs = FIVE_BAUD_BIT_TIME_TICKS * 1000 / Stopwatch.Frequency;
+                LogWaitUntilOvershoot("five-baud", expectedBitMs, maxOvershootMs);
             }
 
             return success;
@@ -1513,11 +1527,13 @@ namespace Communication
                         continue;
                     }
 
-                    while (watch.ElapsedMilliseconds < frameTimeMs) ;//busy wait for full frame on wire
+                    long overshootMs = WaitUntilElapsedMs(watch, frameTimeMs);
 
                     success &= WaitForDeviceTransmitDrain(SLOW_INIT_TX_DRAIN_TIMEOUT_MS);
                     success &= mCommunicationDevice.SetBaudRate(DEFAULT_COMMUNICATION_BAUD_RATE);
                     success &= mCommunicationDevice.SetDataCharacteristics(DataBits.Bits8, StopBits.Bits1, Parity.None);
+
+                    LogWaitUntilOvershoot("ch340-frame", frameTimeMs, overshootMs);
 
                     if (success)
                     {
@@ -2398,13 +2414,12 @@ namespace Communication
 
             if (result)
             {
-                {
-                    Stopwatch stopwatch = new Stopwatch();
-                    stopwatch.Start();
-                    while (stopwatch.ElapsedMilliseconds < KWP1281_TesterMinTimeToSendResponseMessageMS) ;//busy loop
-                }
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+                long overshootMs = WaitUntilElapsedMs(stopwatch, KWP1281_TesterMinTimeToSendResponseMessageMS);
 
                 result = KWP1281SendAckBlock(messageBlock);
+                LogWaitUntilOvershoot("kwp1281-ack", KWP1281_TesterMinTimeToSendResponseMessageMS, overshootMs);
             }
 
             return result;
@@ -2429,11 +2444,9 @@ namespace Communication
 
                 if (sendOK)
                 {
-                    {
-                        Stopwatch stopwatch = new Stopwatch();
-                        stopwatch.Start();
-                        while (stopwatch.ElapsedMilliseconds < KWP1281_TesterMinTimeToSendResponseMessageMS) ;//busy loop
-                    }
+                    Stopwatch stopwatch = new Stopwatch();
+                    stopwatch.Start();
+                    long overshootMs = WaitUntilElapsedMs(stopwatch, KWP1281_TesterMinTimeToSendResponseMessageMS);
 
                     lastBlockCounter = messageBlock.mBlockCounter;
 
@@ -2460,12 +2473,18 @@ namespace Communication
                         if (sendOK)
                         {
                             lastBlockCounter++;
-                            break;
                         }
                         else
                         {
                             DisplayStatusMessage("Failed to send end block", StatusMessageType.DEV);
                         }
+                    }
+
+                    LogWaitUntilOvershoot("kwp1281-ack", KWP1281_TesterMinTimeToSendResponseMessageMS, overshootMs);
+
+                    if ((messageBlock.mBlockTitle == (byte)KWP1281BlockTitle.Acknowledge) && sendOK)
+                    {
+                        break;
                     }
 
                     //check for ASCII block
@@ -2492,6 +2511,59 @@ namespace Communication
             success &= mCommunicationDevice.SetTimeouts(FTDIDeviceReadTimeOutMs, FTDIDeviceWriteTimeOutMs);
 
             return sendOK;
+        }
+
+        // Sleep (target - SleepOverheadMs) then spin to target. Returns overshoot ms. Does not log.
+        private static long WaitUntilElapsedMs(Stopwatch watch, long targetMs)
+        {
+            long remaining = targetMs - watch.ElapsedMilliseconds;
+            if (remaining > SleepOverheadMs)
+            {
+                Thread.Sleep((int)(remaining - SleepOverheadMs));
+            }
+
+            while (watch.ElapsedMilliseconds < targetMs)
+            {
+                ;
+            }
+
+            return watch.ElapsedMilliseconds - targetMs;
+        }
+
+        // Sleep (target - SleepOverheadMs) then spin to the tick deadline. Returns overshoot ms. Does not log.
+        private static long WaitUntilElapsedTicks(Stopwatch watch, long targetTicks)
+        {
+            long remainingTicks = targetTicks - watch.ElapsedTicks;
+            if (remainingTicks > 0)
+            {
+                long remainingMs = remainingTicks * 1000 / Stopwatch.Frequency;
+                if (remainingMs > SleepOverheadMs)
+                {
+                    Thread.Sleep((int)(remainingMs - SleepOverheadMs));
+                }
+            }
+
+            while (watch.ElapsedTicks < targetTicks)
+            {
+                ;
+            }
+
+            long overshootTicks = watch.ElapsedTicks - targetTicks;
+            if (overshootTicks <= 0)
+            {
+                return 0;
+            }
+
+            return overshootTicks * 1000 / Stopwatch.Frequency;
+        }
+
+        void LogWaitUntilOvershoot(string label, long expectedMs, long overshootMs)
+        {
+            if (overshootMs > 0)
+            {
+                DisplayStatusMessage("WaitUntil " + label + ": expected=" + expectedMs
+                    + " ms overshoot=" + overshootMs + " ms.", StatusMessageType.LOG);
+            }
         }
 
         protected bool Connect_SlowInit()
@@ -2531,12 +2603,11 @@ namespace Communication
                 //wait for the required idle time
                 Stopwatch watch = new Stopwatch(); watch.Start();
                 const uint idleTime = 2600;//VW says they need a min of 2.6 seconds between slow inits//(uint)SlowInitConnectionTiming.W0Min + (uint)SlowInitConnectionTiming.W5Min;
-                Thread.Sleep((int)idleTime);
-                while (watch.ElapsedMilliseconds < idleTime) ;//busy wait
-                watch.Stop();
+                long overshootMs = WaitUntilElapsedMs(watch, idleTime);
 
                 DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
                 slowInitSuccess = SendSlowInit(mConnectAddress, SlowInitDataBits.Seven, SlowInitParity.Odd, out keyByte1, out keyByte2);
+                LogWaitUntilOvershoot("slow-init-idle", idleTime, overshootMs);
 
                 if (slowInitSuccess)
                 {
@@ -2552,12 +2623,11 @@ namespace Communication
 
                         //wait additional time to give the ECU time to switch to KWP2000
                         watch.Reset(); watch.Start();
-                        while (watch.ElapsedMilliseconds < TimeBetweenSlowInitForKWP2000MS) ;
+                        overshootMs = WaitUntilElapsedMs(watch, TimeBetweenSlowInitForKWP2000MS);
 
-                        DisplayStatusMessage("Slow init: second attempt after KWP1281, waiting "
-                            + TimeBetweenSlowInitForKWP2000MS + " ms.", StatusMessageType.LOG);
                         DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
                         slowInitSuccess = SendSlowInit(mConnectAddress, SlowInitDataBits.Seven, SlowInitParity.Odd, out keyByte1, out keyByte2);
+                        LogWaitUntilOvershoot("kwp1281-gap", TimeBetweenSlowInitForKWP2000MS, overshootMs);
 
                         if (slowInitSuccess)
                         {
@@ -2589,12 +2659,13 @@ namespace Communication
 
                         //wait additional time to give the ECU time to switch to KWP2000
                         watch.Reset(); watch.Start();
-                        while (watch.ElapsedMilliseconds < TimeBetweenSlowInitForKWP2000MS) ;
+                        overshootMs = WaitUntilElapsedMs(watch, TimeBetweenSlowInitForKWP2000MS);
 
                         //we don't set the mConnectAddress here because we are overriding it and don't want to set it
                         connectAddressOverride = DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS;
                         DisplayStatusMessage("Connecting to address 0x" + connectAddressOverride.ToString("X2") + ".", StatusMessageType.USER);
                         slowInitSuccess = SendSlowInit(connectAddressOverride, SlowInitDataBits.Seven, SlowInitParity.Even, out keyByte1, out keyByte2);
+                        LogWaitUntilOvershoot("kwp1281-gap-0x11", TimeBetweenSlowInitForKWP2000MS, overshootMs);
 
                         if (slowInitSuccess)
                         {
@@ -2627,9 +2698,10 @@ namespace Communication
                                 var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, KWP2000ServiceID.StartCommunication, 0, null);
                                 SendMessage(startCommMessage);//queue the message, so we know to expect a response
 
-                                while (watch.ElapsedMilliseconds < TimeAfterSlowInitBeforeStartCommMessageMS) ;//busy loop, give the ecu time to get ready to receive the message, Galletto waits 280ms
+                                overshootMs = WaitUntilElapsedMs(watch, TimeAfterSlowInitBeforeStartCommMessageMS);//Galletto waits 280ms
 
                                 slowInitSuccess = TransmitMessage(startCommMessage, false, 0);
+                                LogWaitUntilOvershoot("startcomm", TimeAfterSlowInitBeforeStartCommMessageMS, overshootMs);
 
                                 if (slowInitSuccess)
                                 {
@@ -3041,9 +3113,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                     if (mCommunicationDevice.SetBreak(false))//let the line return to normal high state
                     {
                         watch.Start();
-                        long idleEndTime = watch.ElapsedMilliseconds + idleTimeMS;
-                        Thread.Sleep((int)idleTimeMS);//OK to sleep because we don't care if we wait for too long
-                        while (watch.ElapsedMilliseconds < idleEndTime) ;
+                        long overshootMs = WaitUntilElapsedMs(watch, idleTimeMS);
 
                         //timing is more accurate when done before setting break
                         //lowEndTime = watch.ElapsedMilliseconds + lowTime + offset;
@@ -3080,6 +3150,8 @@ connectEndTime = connectStartTime + connectTime + 3;
                         {
                             DisplayStatusMessage("Failed to set break on device.", StatusMessageType.LOG);
                         }
+
+                        LogWaitUntilOvershoot("fast-init-idle", idleTimeMS, overshootMs);
                     }
                     else
                     {
