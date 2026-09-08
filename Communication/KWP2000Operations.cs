@@ -19,6 +19,8 @@ Contact by Email: tony@nefariousmotorsports.com
 */
 
 //#define LOG_PERFORMANCE
+// Treat boot-cluster checksums as a miss (diff-write on an unchanged image). Do not commit enabled.
+//#define FORCE_BOOT_CLUSTER_CHECKSUM_MISMATCH
 
 using System;
 using System.Collections.Generic;
@@ -1306,6 +1308,7 @@ namespace Communication
             public bool OnlyWriteNonMatchingSectors = false;
             public bool VerifyWrittenData = true;
             public bool EraseEntireFlashAtOnce = false;
+            public MemoryLayout FlashMemoryLayout;
 
             public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
         }
@@ -1355,6 +1358,7 @@ namespace Communication
 
             mMaxBlockSize = TransferDataAction.DEFAULT_MAX_BLOCK_SIZE;
             mEraseEntireFlashAtOnce = writeSettings.EraseEntireFlashAtOnce;
+            mFlashMemoryLayout = writeSettings.FlashMemoryLayout;
             mValidatedEraseMode = false;
             mEncryptionType = TransferDataAction.EncryptionType.Bosch;
             mCompressionType = TransferDataAction.CompressionType.Bosch;
@@ -1388,6 +1392,28 @@ namespace Communication
             }
 
             mCurrentBlock = mFlashBlockList.First();
+        }
+
+        private bool ApplyEraseFailurePromptResult(UserPromptResult promptResult)
+        {
+            if (promptResult == UserPromptResult.YES)
+            {
+                CommInterface.DisplayStatusMessage("Erasing entire flash and restarting flashing process.", StatusMessageType.USER);
+
+                RestartFlashingProcessAndEraseEntireFlashAtOnce();
+                return true;
+            }
+
+            if (promptResult == UserPromptResult.NO)
+            {
+                CommInterface.DisplayStatusMessage("Skipping flash sector and continuing flashing process.", StatusMessageType.USER);
+
+                mCurrentBlock.mFlashComplete = true;
+                mState = FlashingState.FinishedBlock;
+                return true;
+            }
+
+            return false;
         }
 
         public bool OnlyFlashRequiredSectors { get; private set; }
@@ -1707,7 +1733,17 @@ namespace Communication
 
                         if (success)
                         {
-                            if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
+                            bool checksumCorrect = ((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect;
+#if FORCE_BOOT_CLUSTER_CHECKSUM_MISMATCH
+                            int sectorIndex = mFlashBlockList.IndexOf(mCurrentBlock);
+                            if (checksumCorrect && (mFlashMemoryLayout != null)
+                                && mFlashMemoryLayout.IsBootClusterSector(sectorIndex))
+                            {
+                                CommInterface.DisplayStatusMessage("FORCE_BOOT_CLUSTER_CHECKSUM_MISMATCH: treating boot-cluster sector as a checksum miss.", StatusMessageType.USER);
+                                checksumCorrect = false;
+                            }
+#endif
+                            if (checksumCorrect)
                             {
                                 mCurrentBlock.mFlashingIsRequired = false;
 
@@ -1819,7 +1855,32 @@ namespace Communication
                     {
                         if (!mEraseEntireFlashAtOnce)
                         {
-                            if (((EraseFlashAction)action).FailedBecauseOfPersistentData)
+                            int sectorIndex = mFlashBlockList.IndexOf(mCurrentBlock);
+                            MemoryLayout selectedLayout = mFlashMemoryLayout;
+
+                            if ((selectedLayout != null) && selectedLayout.IsBootClusterSector(sectorIndex))
+                            {
+                                uint startAddress = mCurrentBlock.mMemoryImage.StartAddress;
+                                uint sectorSize = mCurrentBlock.mMemoryImage.Size;
+                                uint endAddress = startAddress + sectorSize - 1;
+                                bool isTopBoot = (selectedLayout.BootOrientation == FlashBootOrientation.TopBoot);
+                                string selectedName = isTopBoot ? "top-boot (BT)" : "bottom-boot (BB)";
+                                string suspectedName = isTopBoot ? "bottom-boot (BB)" : "top-boot (BT)";
+                                string oppositeName = !String.IsNullOrEmpty(selectedLayout.OppositeLayout)
+                                    ? selectedLayout.OppositeLayout
+                                    : "the opposite boot layout";
+
+                                CommInterface.DisplayStatusMessage("Flash write failed: selected "
+                                    + selectedName + " layout, chip looks " + suspectedName + ".",
+                                    StatusMessageType.USER);
+
+                                CommInterface.DisplayUserPrompt("Wrong Flash Layout",
+                                    "Erase failed at 0x" + startAddress.ToString("X8") + "-0x" + endAddress.ToString("X8")
+                                    + ". Selected layout is " + selectedName + "; this chip looks " + suspectedName + "."
+                                    + " Re-flash with " + oppositeName + ".",
+                                    UserPromptType.OK);
+                            }
+                            else if (((EraseFlashAction)action).FailedBecauseOfPersistentData)
                             {
                                 var promptResult = CommInterface.DisplayUserPrompt("Sector Erase Failed",
                                     "Failed to erase the memory sector. The new data being flashed likely conflicts with the ECU's persistent data. The persistent ECU data can be replaced by erasing the entire flash memory before programming. If the ECU may contains a non-standard flash memory chip, it could be causing the erase to fail."
@@ -1829,21 +1890,7 @@ namespace Communication
                                     + "\n\nWARNING: Only erase the entire flash memory if you have a good communication connection with the ECU. If flashing fails after erasing the entire flash memory, it is likely the ECU will no longer boot, and will have to be reflashed on the bench using boot mode."
                                     + " This software does NOT support boot mode.", UserPromptType.YES_NO_CANCEL);
 
-                                if (promptResult == UserPromptResult.YES)
-                                {
-                                    CommInterface.DisplayStatusMessage("Erasing entire flash and restarting flashing process.", StatusMessageType.USER);
-
-                                    RestartFlashingProcessAndEraseEntireFlashAtOnce();
-                                    success = true;
-                                }
-                                else if (promptResult == UserPromptResult.NO)
-                                {
-                                    CommInterface.DisplayStatusMessage("Skipping flash sector and continuing flashing process.", StatusMessageType.USER);
-
-                                    mCurrentBlock.mFlashComplete = true;
-                                    mState = FlashingState.FinishedBlock;
-                                    success = true;
-                                }
+                                success = ApplyEraseFailurePromptResult(promptResult);
                             }
                             else//regular failure
                             {
@@ -2404,6 +2451,7 @@ namespace Communication
         private FlashBlock mCurrentBlock;
         private byte mMaxBlockSize;
         private bool mEraseEntireFlashAtOnce;
+        private MemoryLayout mFlashMemoryLayout;
         private bool mValidatedEraseMode;
         private bool mForcedLastSectorForECUCompletion;
 

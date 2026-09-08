@@ -629,40 +629,7 @@ namespace ECUFlasher
 
         private string GetMemoryLayoutsDirectory()
         {
-            //Assembly.Location returns an empty string in a single-file build, so this fell through
-            //to the working directory and found no layouts at all. AppContext.BaseDirectory is the
-            //application's own folder in both single-file and regular builds.
-            string exeDir = AppContext.BaseDirectory;
-
-            if (!String.IsNullOrEmpty(exeDir))
-            {
-                string memoryLayoutsDir = Path.Combine(exeDir, "MemoryLayouts");
-
-                if (Directory.Exists(memoryLayoutsDir))
-                {
-                    return memoryLayoutsDir;
-                }
-
-                // Try parent directory (for development)
-                string parentDir = Path.GetDirectoryName(exeDir);
-                if (parentDir != null)
-                {
-                    memoryLayoutsDir = Path.Combine(parentDir, "MemoryLayouts");
-                    if (Directory.Exists(memoryLayoutsDir))
-                    {
-                        return memoryLayoutsDir;
-                    }
-                }
-            }
-
-            // Fallback to current directory
-            string currentDirMemoryLayouts = Path.Combine(Directory.GetCurrentDirectory(), "MemoryLayouts");
-            if (Directory.Exists(currentDirMemoryLayouts))
-            {
-                return currentDirMemoryLayouts;
-            }
-
-            return null;
+            return MemoryLayout.GetLayoutsDirectory();
         }
 
         private void PopulateMemoryLayouts()
@@ -2088,6 +2055,7 @@ namespace ECUFlasher
             settings.OnlyWriteNonMatchingSectors = diffWrite;
             settings.VerifyWrittenData = verify;
             settings.EraseEntireFlashAtOnce = false;
+            settings.FlashMemoryLayout = flashMemoryLayout;
             settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
             settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
             settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
@@ -2424,7 +2392,7 @@ namespace ECUFlasher
         private static void AddWriteChecklistLines(List<string> lines, bool includeCommercialDisclaimer)
         {
             lines.Add("If you are ready to write, confirm the following things:");
-            lines.Add("1) You have loaded a valid file and memory layout for the ECU.");
+            lines.Add("1) You have loaded a valid file and memory layout for the ECU (top-boot vs bottom-boot must match the flash chip).");
             lines.Add("2) The engine is not running.");
             lines.Add("3) Battery voltage is at least 12 volts.");
             lines.Add("4) It is OK the ECU adaptation channels will be reset to defaults");
