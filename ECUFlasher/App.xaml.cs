@@ -54,6 +54,8 @@ namespace ECUFlasher
     /// </summary>
     public partial class App : Application, INotifyPropertyChanged, IDataErrorInfo
     {
+        const string LogFileName = "NefMoto.log";
+
         protected string GetAppDataDirectory()
         {
             string appDataDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -114,7 +116,7 @@ namespace ECUFlasher
                 mPropertyErrors = new Dictionary<string, string>();
 
                 mLogFileDirectory = GetAppDataDirectory();
-                mLogFileName =  Path.Combine ( mLogFileDirectory , ECUFlasher.Properties.Resources.ApplicationName + "Log.txt");
+                mLogFileName = Path.Combine(mLogFileDirectory, LogFileName);
                 CreateLogFile();
 
                 DisplayStatusMessage("Opening " + GetApplicationName(), StatusMessageType.LOG);

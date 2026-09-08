@@ -66,6 +66,12 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 - [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103) — KWP write with the wrong BT/BB layout used to look like a persistent-data erase failure. The write now aborts with **Wrong Flash Layout**. Pick the opposite layout (for example `ME7 29F800BB` instead of `ME7 29F800BT`) and write again with checksum skip. Switching layout in the same session is not implemented.
 - Other issues: [GitHub Issues](https://github.com/NefMoto/NefMotoOpenSource/issues)
 
+## Log file
+
+Session log: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\NefMoto.log`
+
+Use **File → Open Log File** (or **Open Log File Location**) when reporting connect or flash problems. This is not the data-logger tab save.
+
 ## Building
 
 See [BUILDING.md](docs/BUILDING.md) for build instructions.
