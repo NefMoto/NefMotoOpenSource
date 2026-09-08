@@ -1089,6 +1089,13 @@ namespace Communication
             Debug.Assert(mFlashToolCode != "000000", "Flash tool code cannot be all zeros");
         }
 
+        /// <summary>
+        /// Set when RequestRoutineResults is GeneralReject or DownloadNotAccepted.
+        /// ME7 uses that NRC for persistent-data copy failure and for an erase range
+        /// that is not a union of physical sectors (BT vs BB). WriteExternalFlashOperation
+        /// treats a boot-cluster fail as Wrong Flash Layout; this flag is the
+        /// Sector Erase Failed prompt on other sectors.
+        /// </summary>
         public bool FailedBecauseOfPersistentData { get; private set; }
 
         public override bool Start()
@@ -1247,6 +1254,8 @@ namespace Communication
 
                 if (!handled)
                 {
+                    // Unhandled erase NRC. Boot-cluster geometry fails use GeneralReject /
+                    // DownloadNotAccepted and are classified in WriteExternalFlashOperation.
                     DisplayStatusMessage("Failed to erase flash memory. You may be using the wrong memory layout.", StatusMessageType.USER);
                     ActionCompleted(false);
                 }

@@ -4,6 +4,10 @@
   <BaseAddress>8388608</BaseAddress>
   <!--Size must be an even number and specified in decimal, hexidecimal is not currently supported. The Size comes from the memory chip datasheet.-->
   <Size>1048576</Size>
+  <!--BootOrientation: TopBoot (BT) or BottomBoot (BB). Omit for uniform maps.-->
+  <BootOrientation>BottomBoot</BootOrientation>
+  <BootClusterSectors>4</BootClusterSectors>
+  <OppositeLayout>ME7 29F800BT</OppositeLayout>
   <!--SectorSizes must be an even number and specified in decimal, hexadecimal is not currently supported. The SectorSizes come from the memory chip datasheet. -->
   <SectorSizes>
     <unsignedInt>16384</unsignedInt>

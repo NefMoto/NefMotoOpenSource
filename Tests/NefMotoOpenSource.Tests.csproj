@@ -20,4 +20,7 @@
     <ProjectReference Include="..\Communication\Communication.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\MemoryLayouts\*.MemoryLayout.xml" Link="MemoryLayouts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

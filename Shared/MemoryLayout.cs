@@ -28,6 +28,13 @@ using System.Reflection;
 
 namespace Shared
 {
+    public enum FlashBootOrientation
+    {
+        Unknown,
+        TopBoot,
+        BottomBoot
+    }
+
     [Serializable]
     public class MemoryLayout : IDataErrorInfo
     {
@@ -53,12 +60,39 @@ namespace Shared
         {
             BaseAddress = 0;
             Size = 0;
+            BootOrientation = FlashBootOrientation.Unknown;
+            BootClusterSectors = 0;
+            OppositeLayout = null;
             SectorSizes.Clear();
             Validate();
         }
 
         public uint BaseAddress { get; set; }
         public uint Size { get; set; }
+
+        /// <summary>TopBoot (BT) or BottomBoot (BB). Omit for uniform maps.</summary>
+        public FlashBootOrientation BootOrientation { get; set; }
+
+        /// <summary>Small boot-block count at the BT top or BB bottom. Omit when BootOrientation is omitted.</summary>
+        public int BootClusterSectors { get; set; }
+
+        /// <summary>Dropdown basename of the opposite BT/BB layout, if one is shipped.</summary>
+        public string OppositeLayout { get; set; }
+
+        public bool ShouldSerializeBootOrientation()
+        {
+            return BootOrientation != FlashBootOrientation.Unknown;
+        }
+
+        public bool ShouldSerializeBootClusterSectors()
+        {
+            return BootClusterSectors != 0;
+        }
+
+        public bool ShouldSerializeOppositeLayout()
+        {
+            return !String.IsNullOrEmpty(OppositeLayout);
+        }
 
         private bool ValidateBaseAddress()
         {
@@ -137,13 +171,81 @@ namespace Shared
             return (error == null);
         }
 
+        private bool ValidateBootMetadata()
+        {
+            string error = null;
+            if ((BootOrientation == FlashBootOrientation.TopBoot) || (BootOrientation == FlashBootOrientation.BottomBoot))
+            {
+                if ((BootClusterSectors < 1) || (SectorSizes == null) || (BootClusterSectors > SectorSizes.Count))
+                {
+                    error = "BootClusterSectors must be between 1 and the number of sectors";
+                }
+            }
+            this["BootOrientation"] = error;
+            return (error == null);
+        }
+
         public bool Validate()
         {
             bool isValid = ValidateBaseAddress();
             isValid &= ValidateSize();
             isValid &= ValidateSectorSizes();
+            isValid &= ValidateBootMetadata();
 
             return isValid;
+        }
+
+        /// <summary>
+        /// Directory next to the executable (or repo/working tree) that holds *.MemoryLayout.xml.
+        /// AppContext.BaseDirectory works for single-file and regular builds; Assembly.Location does not.
+        /// </summary>
+        public static string GetLayoutsDirectory()
+        {
+            string exeDir = AppContext.BaseDirectory;
+
+            if (!String.IsNullOrEmpty(exeDir))
+            {
+                string memoryLayoutsDir = Path.Combine(exeDir, "MemoryLayouts");
+                if (Directory.Exists(memoryLayoutsDir))
+                {
+                    return memoryLayoutsDir;
+                }
+
+                string parentDir = Path.GetDirectoryName(exeDir);
+                if (parentDir != null)
+                {
+                    memoryLayoutsDir = Path.Combine(parentDir, "MemoryLayouts");
+                    if (Directory.Exists(memoryLayoutsDir))
+                    {
+                        return memoryLayoutsDir;
+                    }
+                }
+            }
+
+            string currentDirMemoryLayouts = Path.Combine(Directory.GetCurrentDirectory(), "MemoryLayouts");
+            if (Directory.Exists(currentDirMemoryLayouts))
+            {
+                return currentDirMemoryLayouts;
+            }
+
+            return null;
+        }
+
+        public bool IsBootClusterSector(int index)
+        {
+            if ((BootClusterSectors <= 0) || (SectorSizes == null) || (index < 0) || (index >= SectorSizes.Count))
+            {
+                return false;
+            }
+            if (BootOrientation == FlashBootOrientation.BottomBoot)
+            {
+                return index < BootClusterSectors;
+            }
+            if (BootOrientation == FlashBootOrientation.TopBoot)
+            {
+                return index >= (SectorSizes.Count - BootClusterSectors);
+            }
+            return false;
         }
 
         public string Error
