@@ -108,9 +108,8 @@ namespace ECUFlasher
             dialog.Filter = DTCsFile.FILTER;
             dialog.OverwritePrompt = true;
             dialog.Title = "Select Location to Save DTCs File";
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();//TODO: remember last used directory
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 //replace .xml with .DTCs.xml
                 var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, DTCsFile.SHORT_EXT, DTCsFile.EXT);
@@ -150,9 +149,8 @@ namespace ECUFlasher
             dialog.CheckFileExists = true;
             dialog.CheckPathExists = true;
             dialog.Title = "Select DTCs File to Load";
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();//TODO: remember last used directory
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 ECUDTCs.Clear();
 
@@ -396,9 +394,8 @@ namespace ECUFlasher
             dialog.Filter = IdentificationFile.FILTER;
             dialog.OverwritePrompt = true;
             dialog.Title = "Select Location to Save Info File";
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();//TODO: remember last used directory
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 //replace .xml with .Info.xml
                 var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, IdentificationFile.SHORT_EXT, IdentificationFile.EXT);
@@ -438,9 +435,8 @@ namespace ECUFlasher
             dialog.CheckFileExists = true;
             dialog.CheckPathExists = true;
             dialog.Title = "Select Info File to Load";
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();//TODO: remember last used directory
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 ECUInfo.Clear();
 

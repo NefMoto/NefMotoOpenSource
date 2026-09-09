@@ -318,7 +318,7 @@ namespace Communication
                 {
                     mDefaultTimingParameters = value;
 
-                    OnPropertyChanged(new PropertyChangedEventArgs("DefaultTimingParameters"));
+                    OnPropertyChanged(new PropertyChangedEventArgs(nameof(DefaultTimingParameters)));
                 }
             }
         }

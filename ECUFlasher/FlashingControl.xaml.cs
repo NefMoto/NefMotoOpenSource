@@ -73,8 +73,11 @@ namespace ECUFlasher
             InitializeComponent();
 
             PopulateMemoryLayouts();
-            MemoryLayoutFileName = Properties.Settings.Default.MemoryLayoutFile;
-            FileNameToFlash = Properties.Settings.Default.FlashFile;
+            if (App?.Preferences != null)
+            {
+                MemoryLayoutFileName = App.Preferences.MemoryLayoutFile;
+                FileNameToFlash = App.Preferences.FlashFile;
+            }
 
             // Watch for protocol changes to update IsMemoryLayoutEnabled
             if (App != null)
@@ -216,7 +219,10 @@ namespace ECUFlasher
             }
             else if (!String.IsNullOrEmpty(FileNameToFlash))
             {
-                Properties.Settings.Default.FlashFile = FileNameToFlash;
+                if (App?.Preferences != null)
+                {
+                    App.Preferences.FlashFile = FileNameToFlash;
+                }
 
                 try
                 {
@@ -308,7 +314,10 @@ namespace ECUFlasher
                     error = "Error reading memory layout file";
                 }
 
-                Properties.Settings.Default.MemoryLayoutFile = MemoryLayoutFileName;
+                if (App?.Preferences != null)
+                {
+                    App.Preferences.MemoryLayoutFile = MemoryLayoutFileName;
+                }
             }
             else
             {
@@ -740,22 +749,7 @@ namespace ECUFlasher
             dialog.CheckPathExists = true;
             dialog.Title = "Select File to Flash";
 
-            if (!String.IsNullOrEmpty(FileNameToFlash))
-            {
-                DirectoryInfo dirInfo = Directory.GetParent(FileNameToFlash);
-
-                if (dirInfo != null && Directory.Exists(dirInfo.FullName))
-                {
-                    dialog.InitialDirectory = dirInfo.FullName;
-                }
-            }
-
-            if (String.IsNullOrEmpty(dialog.InitialDirectory))
-            {
-                dialog.InitialDirectory = Directory.GetCurrentDirectory();
-            }
-
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog, FileNameToFlash) == true)
             {
                 FileNameToFlash = dialog.FileName;
             }
@@ -1618,7 +1612,7 @@ namespace ECUFlasher
             dialog.Title = "Save Bootmode EEPROM Dump";
             dialog.FileName = "eeprom-95040.bin";
 
-            if (dialog.ShowDialog() != true)
+            if (App.ShowFileDialog(dialog) != true)
             {
                 return false;
             }
@@ -1652,7 +1646,7 @@ namespace ECUFlasher
             openDialog.CheckFileExists = true;
             openDialog.Title = "Select EEPROM Image to Write";
 
-            if (openDialog.ShowDialog() != true)
+            if (App.ShowFileDialog(openDialog) != true)
             {
                 return;
             }
@@ -1916,26 +1910,7 @@ namespace ECUFlasher
             dialog.OverwritePrompt = true;
             dialog.Title = "Select Where to Save Read Flash File";
 
-            string flashSaveLocation = null;
-
-            if ((FileNameToFlash != null) && (FileNameToFlash.Length > 0))
-            {
-                var dirInfo = Directory.GetParent(FileNameToFlash);
-
-                if (dirInfo != null)
-                {
-                    flashSaveLocation = dirInfo.FullName;
-                }
-            }
-
-            if (string.IsNullOrEmpty(flashSaveLocation) || !Directory.Exists(flashSaveLocation))
-            {
-                flashSaveLocation = Directory.GetCurrentDirectory();
-            }
-
-            dialog.InitialDirectory = flashSaveLocation;
-
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog, FileNameToFlash) == true)
             {
                 if (readMemory.SaveToFile(dialog.FileName))
                 {

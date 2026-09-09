@@ -45,7 +45,7 @@ namespace ECUFlasher
             AvailableBaudRates.Add(124800);
 
             // Get the last used baud rate; default to 57600 when 0 or not in list
-            var previousRate = ECUFlasher.Properties.Settings.Default.DesiredBootModeBaudRate;
+            var previousRate = App?.Preferences != null ? App.Preferences.DesiredBootModeBaudRate : 0u;
             var matched = AvailableBaudRates.FirstOrDefault(baudRate => (baudRate == previousRate));
             DesiredBaudRate = (matched != 0) ? matched : 57600u;
         }
@@ -68,7 +68,10 @@ namespace ECUFlasher
                     mDesiredBaudRate = value;
                     OnPropertyChanged(new PropertyChangedEventArgs("DesiredBaudRate"));
 
-                    ECUFlasher.Properties.Settings.Default.DesiredBootModeBaudRate = mDesiredBaudRate;
+                    if (App?.Preferences != null)
+                    {
+                        App.Preferences.DesiredBootModeBaudRate = mDesiredBaudRate;
+                    }
                 }
             }
         }

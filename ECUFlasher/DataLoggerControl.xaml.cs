@@ -2486,11 +2486,10 @@ namespace ECUFlasher
             var dialog = new SaveFileDialog();
             dialog.DefaultExt = LOG_FILE_EXT;//gets long extensions to work properly when they are added to a filename when saved
             dialog.Filter = LOG_FILE_FILTER;
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();
             dialog.OverwritePrompt = true;
             dialog.Title = "Select Where to Save Log File";
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 //replace .xml with .Log.xml
                 var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, LOG_FILE_SHORT_EXT, LOG_FILE_EXT);
@@ -2649,10 +2648,9 @@ namespace ECUFlasher
             dialog.Filter = LOG_FILE_FILTER;
             dialog.CheckFileExists = true;
             dialog.CheckPathExists = true;
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();
             dialog.Title = "Select Log File to Load";
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 LoadLogFile(dialog.FileName);
             }
@@ -2805,10 +2803,9 @@ namespace ECUFlasher
             dialog.Filter += "|" + ME7LoggerECUFile.FILE_FILTER;
             dialog.CheckFileExists = true;
             dialog.CheckPathExists = true;
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();
             dialog.Title = "Select Variable Definitions File to Load";
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 if (dialog.FileName.EndsWith(ME7LoggerECUFile.FILE_EXT))
                 {
@@ -3050,11 +3047,10 @@ namespace ECUFlasher
             var dialog = new SaveFileDialog();
             dialog.DefaultExt = VARIABLE_DEFINITIONS_FILE_EXT;//gets long extensions to work properly when they are added to a filename when saved
             dialog.Filter = VARIABLE_DEFINITIONS_FILE_FILTER;
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();
             dialog.OverwritePrompt = true;
             dialog.Title = "Select Where to Save Variable Definitions File";
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 //replace .xml with .variables.xml
                 var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, VARIABLE_DEFINITIONS_FILE_SHORT_EXT, VARIABLE_DEFINITIONS_FILE_EXT);
@@ -3148,10 +3144,9 @@ namespace ECUFlasher
             dialog.Filter = READ_VARIABLES_FILE_FILTER;
             dialog.CheckFileExists = true;
             dialog.CheckPathExists = true;
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();
             dialog.Title = "Select Read Variables File to Load";
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 LoadReadVariablesFromFile(dialog.FileName);
             }
@@ -3262,11 +3257,10 @@ namespace ECUFlasher
             var dialog = new SaveFileDialog();
             dialog.DefaultExt = READ_VARIABLES_FILE_EXT;//gets long extensions to work properly when they are added to a filename when saved
             dialog.Filter = READ_VARIABLES_FILE_FILTER;
-            dialog.InitialDirectory = Directory.GetCurrentDirectory();
             dialog.OverwritePrompt = true;
             dialog.Title = "Select Where to Save Read Variables File";
 
-            if (dialog.ShowDialog() == true)
+            if (App.ShowFileDialog(dialog) == true)
             {
                 //replace .xml with .variables.xml
                 var actualFileName = ExtensionFixer.SwitchToLongExtension(dialog.FileName, READ_VARIABLES_FILE_SHORT_EXT, READ_VARIABLES_FILE_EXT);

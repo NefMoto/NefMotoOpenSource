@@ -49,53 +49,17 @@ namespace ECUFlasher
 
             CommInterface.ConnectionStatusChangedEvent += ConnectionStatusChangedEvent;
 
-            var defaultBaudRates = ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates;
+            var prefs = App?.Preferences;
 
-            var savedAvailableRates = new List<uint>();
+            AvailableBaudRates = new ObservableCollection<uint>();
+            ResetAvailableBaudRatesToDefault();
+            ApplyDesiredBaudRate(prefs != null ? prefs.DesiredKWP2000BaudRate : 0u);
 
-            if (defaultBaudRates != null)
+            if (prefs != null)
             {
-                foreach (var rateObj in defaultBaudRates)
-                {
-                    if (rateObj is uint)
-                    {
-                        var rate = (uint)rateObj;
-
-                        if (!savedAvailableRates.Contains(rate))
-                        {
-                            savedAvailableRates.Add(rate);
-                        }
-                    }
-                }
+                DesiredConnectionMethod = (ConnectionMethod)prefs.DesiredKWP2000ConnectionMethod;
+                EnableSlowInitTimingLog = prefs.EnableSlowInitTimingLog;
             }
-
-            savedAvailableRates.Sort();
-
-            AvailableBaudRates = new ObservableCollection<uint>(savedAvailableRates);
-
-            if (!AvailableBaudRates.Any())
-            {
-                ResetAvailableBaudRatesToDefault();
-                SaveAvailableBaudRates();
-            }
-
-            //get the last used baud rate
-            var previousRate = ECUFlasher.Properties.Settings.Default.DesiredKWP2000BaudRate;
-
-            //try to find the last used baud rate in the available rates list, if it isn't there, then use the last baud rate
-            if (AvailableBaudRates.Contains(previousRate))
-            {
-                DesiredBaudRate = previousRate;
-            }
-            else
-            {
-                DesiredBaudRate = AvailableBaudRates.Last();
-            }
-
-            //get the last used connection method
-            DesiredConnectionMethod = ECUFlasher.Properties.Settings.Default.DesiredKWP2000ConnectionMethod;
-
-            EnableSlowInitTimingLog = ECUFlasher.Properties.Settings.Default.EnableSlowInitTimingLog;
         }
 
         void ConnectionStatusChangedEvent(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
@@ -120,25 +84,15 @@ namespace ECUFlasher
 
             foreach (uint baudRate in Enum.GetValues(typeof(KWP2000BaudRates)))
             {
+                if (baudRate == 0)
+                {
+                    continue;
+                }
+
                 if (!AvailableBaudRates.Contains(baudRate))
                 {
                     AvailableBaudRates.Add(baudRate);
                 }
-            }
-        }
-
-        private void SaveAvailableBaudRates()
-        {
-            if (ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates == null)
-            {
-                ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates = new System.Collections.ArrayList();
-            }
-
-            ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates.Clear();
-
-            foreach (var rate in AvailableBaudRates)
-            {
-                ECUFlasher.Properties.Settings.Default.SupportedKWP2000BaudRates.Add(rate);
             }
         }
 
@@ -150,19 +104,35 @@ namespace ECUFlasher
             }
             set
             {
-                if (_DesiredBaudRate != value)
-                {
-                    _DesiredBaudRate = value;
-
-                    ECUFlasher.Properties.Settings.Default.DesiredKWP2000BaudRate = DesiredBaudRate;
-
-                    DesiredBaudRates = new List<uint>(AvailableBaudRates.Where(baudRate => (baudRate <= _DesiredBaudRate)).Reverse());
-
-                    OnPropertyChanged(new PropertyChangedEventArgs("DesiredBaudRate"));
-                }
+                ApplyDesiredBaudRate(value);
             }
         }
         private uint _DesiredBaudRate;
+
+        // Issue #2: unspecified (0) as the combo default left DesiredBaudRates null
+        // because the setter no-op'd when the backing field was already 0. Operations
+        // then used unspecified baud until the process was restarted.
+        void ApplyDesiredBaudRate(uint baudRate)
+        {
+            if (baudRate == 0 || !AvailableBaudRates.Contains(baudRate))
+            {
+                baudRate = AvailableBaudRates.Last();
+            }
+
+            if (_DesiredBaudRate != baudRate)
+            {
+                _DesiredBaudRate = baudRate;
+
+                if (App?.Preferences != null)
+                {
+                    App.Preferences.DesiredKWP2000BaudRate = baudRate;
+                }
+
+                OnPropertyChanged(new PropertyChangedEventArgs(nameof(DesiredBaudRate)));
+            }
+
+            DesiredBaudRates = new List<uint>(AvailableBaudRates.Where(rate => rate <= _DesiredBaudRate).Reverse());
+        }
 
         public List<uint> DesiredBaudRates { get; private set; }
 
@@ -177,7 +147,10 @@ namespace ECUFlasher
                     OnPropertyChanged(new PropertyChangedEventArgs("DesiredConnectionMethod"));
                     OnPropertyChanged(new PropertyChangedEventArgs("IsFastInitConnectionMethodSelected"));
 
-                    ECUFlasher.Properties.Settings.Default.DesiredKWP2000ConnectionMethod = _DesiredConnectionMethod;
+                    if (App?.Preferences != null)
+                    {
+                        App.Preferences.DesiredKWP2000ConnectionMethod = (KwpConnectionMethod)_DesiredConnectionMethod;
+                    }
                 }
             }
         }
@@ -198,7 +171,10 @@ namespace ECUFlasher
                 {
                     _EnableSlowInitTimingLog = value;
                     KWP2000CommInterface.EnableSlowInitTimingLog = value;
-                    ECUFlasher.Properties.Settings.Default.EnableSlowInitTimingLog = value;
+                    if (App?.Preferences != null)
+                    {
+                        App.Preferences.EnableSlowInitTimingLog = value;
+                    }
                     OnPropertyChanged(new PropertyChangedEventArgs("EnableSlowInitTimingLog"));
                 }
             }
@@ -247,8 +223,7 @@ namespace ECUFlasher
         #region DefaultTimingParameters
         private void CommInterfacePropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            //TODO: make this less error prone, doing a string compare is weak
-            if (e.PropertyName == "DefaultTimingParameters")
+            if (e.PropertyName == nameof(KWP2000Interface.DefaultTimingParameters))
             {
                 CopyDefaultTimings();
             }
@@ -265,7 +240,7 @@ namespace ECUFlasher
             DefaultP4TesterInterByteTimeMinMS = currentTiming.P4TesterInterByteTimeMinMs;
         }
 
-        //TODO: need to add a default value
+        [DefaultValue(KWP2000Interface.P1_DEFAULT_ECU_INTERBYTE_MAX_TIME)]
         public long DefaultP1ECUInterByteTimeMaxMS
         {
             get
@@ -293,9 +268,9 @@ namespace ECUFlasher
                 }
             }
         }
-        private long _DefaultP1ECUInterByteTimeMaxMS;
+        private long _DefaultP1ECUInterByteTimeMaxMS = KWP2000Interface.P1_DEFAULT_ECU_INTERBYTE_MAX_TIME;
 
-        //TODO: need to add a default value
+        [DefaultValue(KWP2000Interface.P2_DEFAULT_ECU_RESPONSE_MIN_TIME)]
         public long DefaultP2ECUResponseTimeMinMS
         {
             get
@@ -323,9 +298,9 @@ namespace ECUFlasher
                 }
             }
         }
-        private long _DefaultP2ECUResponseTimeMinMS;
+        private long _DefaultP2ECUResponseTimeMinMS = KWP2000Interface.P2_DEFAULT_ECU_RESPONSE_MIN_TIME;
 
-        //TODO: need to add a default value
+        [DefaultValue(KWP2000Interface.P2_DEFAULT_ECU_RESPONSE_MAX_TIME)]
         public long DefaultP2ECUResponseTimeMaxMS
         {
             get
@@ -353,9 +328,9 @@ namespace ECUFlasher
                 }
             }
         }
-        private long _DefaultP2ECUResponseTimeMaxMS;
+        private long _DefaultP2ECUResponseTimeMaxMS = KWP2000Interface.P2_DEFAULT_ECU_RESPONSE_MAX_TIME;
 
-        //TODO: need to add a default value
+        [DefaultValue(KWP2000Interface.P3_DEFAULT_TESTER_RESPONSE_MIN_TIME)]
         public long DefaultP3TesterResponseTimeMinMS
         {
             get
@@ -383,9 +358,9 @@ namespace ECUFlasher
                 }
             }
         }
-        private long _DefaultP3TesterResponseTimeMinMS;
+        private long _DefaultP3TesterResponseTimeMinMS = KWP2000Interface.P3_DEFAULT_TESTER_RESPONSE_MIN_TIME;
 
-        //TODO: need to add a default value
+        [DefaultValue(KWP2000Interface.P3_DEFAULT_TESTER_RESPONSE_MAX_TIME)]
         public long DefaultP3TesterResponseTimeMaxMS
         {
             get
@@ -413,9 +388,9 @@ namespace ECUFlasher
                 }
             }
         }
-        private long _DefaultP3TesterResponseTimeMaxMS;
+        private long _DefaultP3TesterResponseTimeMaxMS = KWP2000Interface.P3_DEFAULT_TESTER_RESPONSE_MAX_TIME;
 
-        //TODO: need to add a default value
+        [DefaultValue(KWP2000Interface.P4_DEFAULT_TESTER_INTERBYTE_MIN_TIME)]
         public long DefaultP4TesterInterByteTimeMinMS
         {
             get
@@ -443,7 +418,7 @@ namespace ECUFlasher
                 }
             }
         }
-        private long _DefaultP4TesterInterByteTimeMinMS;
+        private long _DefaultP4TesterInterByteTimeMinMS = KWP2000Interface.P4_DEFAULT_TESTER_INTERBYTE_MIN_TIME;
         #endregion
 
         #region SecuritySettings
@@ -537,7 +512,7 @@ namespace ECUFlasher
             ShouldUseExtendedSeedRequest = KWP2000SettingsDefaults.SecurityUseExtendedSeedRequest;
             ShouldSupportSpecialKey = KWP2000SettingsDefaults.SecuritySupportSpecialKey;
 
-            ECUFlasher.Properties.Settings.Default.Save();
+            App?.SavePreferences();
 
             if (App != null)
             {
