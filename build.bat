@@ -42,7 +42,7 @@ REM If installer argument provided, build installer
 if "%1"=="installer" (
     set ECUFlasher_TargetDir=ECUFlasher/bin/msil/Release/
     echo Building installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi...
-    wix build -arch x86 -d RuntimeTfm=%NET_TFM% -d DotNetMajor=%DOTNET_MAJOR% -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o Installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi Installer/Product.wxs
+    wix build -arch x64 -d RuntimeTfm=%NET_TFM% -d DotNetMajor=%DOTNET_MAJOR% -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o Installer/bin/Release/NefMotoECUFlasher-%FULL_VERSION%.msi Installer/Product.wxs
     if errorlevel 1 exit /b %ERRORLEVEL%
 )
 
