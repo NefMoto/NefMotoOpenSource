@@ -19,7 +19,6 @@ Contact by Email: tony@nefariousmotorsports.com
 */
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -330,61 +329,6 @@ namespace ECUFlasher
         }
         private ReactiveCommand _SaveInfoCommand;
 
-        public ICommand LoadInfoCommand
-        {
-            get
-            {
-                if (_LoadInfoCommand == null)
-                {
-                    _LoadInfoCommand = new ReactiveCommand(this.OnLoadInfo);
-                    _LoadInfoCommand.Name = "Load ECU Info";
-                    _LoadInfoCommand.Description = "Load ECU info from a file";
-                }
-
-                return _LoadInfoCommand;
-            }
-        }
-        private ReactiveCommand _LoadInfoCommand;
-
-        public ICommand RemoveInfoEntryCommand
-        {
-            get
-            {
-                if(_RemoveInfoEntryCommand == null)
-                {
-                    _RemoveInfoEntryCommand = new ReactiveCommand();
-                    _RemoveInfoEntryCommand.Name = "Remove Entry";
-                    _RemoveInfoEntryCommand.Description = "Remove selected entries from the list";
-                    _RemoveInfoEntryCommand.ExecuteMethod = delegate(object param)
-                    {
-                        if (param is KWP2000IdentificationOptionValue)
-                        {
-                            ECUInfo.Remove(param as KWP2000IdentificationOptionValue);
-                        }
-                        else if (param is IEnumerable)
-                        {
-                            var collection = param as IEnumerable;
-                            var collectionCopy = new List<KWP2000IdentificationOptionValue>();
-
-                            //need to copy before we change the collection
-                            foreach (var variable in collection)
-                            {
-                                collectionCopy.Add(variable as KWP2000IdentificationOptionValue);
-                            }
-
-                            foreach (var entry in collectionCopy)
-                            {
-                                ECUInfo.Remove(entry);
-                            }
-                        }
-                    };
-                }
-
-                return _RemoveInfoEntryCommand;
-            }
-        }
-        private ReactiveCommand _RemoveInfoEntryCommand;
-
         private void OnSaveInfo()
         {
             App.DisplayStatusMessage("Starting saving of info.", StatusMessageType.USER);
@@ -423,46 +367,6 @@ namespace ECUFlasher
             else
             {
                 App.DisplayStatusMessage("Cancelling saving of info.", StatusMessageType.USER);
-            }
-        }
-
-        private void OnLoadInfo()
-        {
-            App.DisplayStatusMessage("Starting loading of info.", StatusMessageType.USER);
-
-            var dialog = new OpenFileDialog();
-            dialog.Filter = IdentificationFile.FILTER;
-            dialog.CheckFileExists = true;
-            dialog.CheckPathExists = true;
-            dialog.Title = "Select Info File to Load";
-
-            if (App.ShowFileDialog(dialog) == true)
-            {
-                ECUInfo.Clear();
-
-                try
-                {
-                    using (var fileSteam = new FileStream(dialog.FileName, FileMode.Open, FileAccess.Read))
-                    {
-                        var formatter = new XmlSerializer(typeof(IdentificationFile));
-                        var infoFile = (IdentificationFile)formatter.Deserialize(fileSteam);
-
-                        foreach (var entry in infoFile.IdentificationValues)
-                        {
-                            ECUInfo.Add(entry);
-                        }
-
-                        App.DisplayStatusMessage("Successfully loaded info from file.", StatusMessageType.USER);
-                    }
-                }
-                catch (Exception e)
-                {
-                    App.DisplayStatusMessage("Failed to load info from file: " + e.Message, StatusMessageType.USER);
-                }
-            }
-            else
-            {
-                App.DisplayStatusMessage("Cancelling loading of info.", StatusMessageType.USER);
             }
         }
 

@@ -149,40 +149,38 @@ Contact by Email: tony@nefariousmotorsports.com
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <DockPanel Grid.Column="2">
-                <WrapPanel DockPanel.Dock="Top">
-                    <Button Command="{Binding Path=ReadDTCsCommand}"/>
-                    <Button Command="{Binding Path=ClearDTCsCommand}"/>
-                    <Button Command="{Binding Path=SaveDTCsCommand}"/>
-                    <Button Command="{Binding Path=LoadDTCsCommand}"/>
-                </WrapPanel>
-                <Border DockPanel.Dock="Top">
-                    <ListBox Name="ECUDTCsListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" ItemsSource="{Binding Path=ECUDTCs}" Background="Transparent"
-                                                Shared:ListBoxHelper.AutoScrollToCurrentItem="True"/>
-                </Border>
-            </DockPanel>
 
-            <GridSplitter Grid.Column="1" Width="5" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" VerticalAlignment="Stretch"/>
+            <WrapPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                <Label Content="Read Info Session Type:"/>
+                <ComboBox ItemsSource="{Binding Path=AvailableReadInfoSessionTypes}" IsEnabled="{Binding ElementName=ReadInfoButton, Path=IsEnabled}"
+                            SelectedItem="{Binding Path=ReadInfoSessionType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"
+                            ToolTip="Desired diagnostic session type for reading ECU info" ToolTipService.ShowOnDisabled="True"/>
+                <Button Name="ReadInfoButton" Command="{Binding Path=ReadInfoCommand}"/>
+                <Button Command="{Binding Path=SaveInfoCommand}"/>
+            </WrapPanel>
 
-            <DockPanel Grid.Column="0">
-                <WrapPanel DockPanel.Dock="Top">
-                    <Label Content="Read Info Session Type:"/>
-                    <ComboBox ItemsSource="{Binding Path=AvailableReadInfoSessionTypes}" IsEnabled="{Binding ElementName=ReadInfoButton, Path=IsEnabled}"
-                                SelectedItem="{Binding Path=ReadInfoSessionType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"
-                                ToolTip="Desired diagnostic session type for reading ECU info" ToolTipService.ShowOnDisabled="True"/>
-                    <Button Name="ReadInfoButton" Command="{Binding Path=ReadInfoCommand}"/>
-                    <Button Command="{Binding Path=SaveInfoCommand}"/>
-                    <Button Command="{Binding Path=LoadInfoCommand}"/>
-                    <Button Command="{Binding Path=RemoveInfoEntryCommand}" CommandParameter="{Binding ElementName=ECUInfoListBox, Path=SelectedItems}"/>
-                </WrapPanel>
-                <Border DockPanel.Dock="Top">
-                    <ListBox Name="ECUInfoListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" Background="Transparent"
-                                            Shared:ListBoxHelper.AutoScrollToCurrentItem="True"
-                                            ItemsSource="{Binding Path=CombinedECUInfo}"/>
-                </Border>
-            </DockPanel>
+            <WrapPanel Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
+                <Button Command="{Binding Path=ReadDTCsCommand}"/>
+                <Button Command="{Binding Path=ClearDTCsCommand}"/>
+                <Button Command="{Binding Path=SaveDTCsCommand}"/>
+                <Button Command="{Binding Path=LoadDTCsCommand}"/>
+            </WrapPanel>
+
+            <GridSplitter Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Width="5" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" VerticalAlignment="Stretch"/>
+
+            <Border Grid.Row="1" Grid.Column="0">
+                <ListBox IsSynchronizedWithCurrentItem="True" Background="Transparent"
+                                        Shared:ListBoxHelper.AutoScrollToCurrentItem="True"
+                                        ItemsSource="{Binding Path=CombinedECUInfo}"/>
+            </Border>
+
+            <Border Grid.Row="1" Grid.Column="2">
+                <ListBox Name="ECUDTCsListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" ItemsSource="{Binding Path=ECUDTCs}" Background="Transparent"
+                                            Shared:ListBoxHelper.AutoScrollToCurrentItem="True"/>
+            </Border>
         </Grid>
 
         <GridSplitter Grid.Row="1" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" Height="5" HorizontalAlignment="Stretch"/>
