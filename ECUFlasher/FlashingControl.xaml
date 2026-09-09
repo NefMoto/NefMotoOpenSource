@@ -24,7 +24,7 @@ Contact by Email: tony@nefariousmotorsports.com
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:ECUFlasher="clr-namespace:ECUFlasher"
-    xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+    xmlns:SharedUi="clr-namespace:Shared"
     xmlns:props="clr-namespace:ECUFlasher.Properties"
     mc:Ignorable="d"
     d:DesignHeight="300" d:DesignWidth="300"
@@ -34,7 +34,7 @@ Contact by Email: tony@nefariousmotorsports.com
 
     <ECUFlasher:BaseUserControl.Resources>
 
-        <Shared:ByteArrayToBitmapConverter x:Key="byteArrayToBitmapConverter"/>
+        <SharedUi:ByteArrayToBitmapConverter x:Key="byteArrayToBitmapConverter"/>
 
     </ECUFlasher:BaseUserControl.Resources>
 

@@ -26,8 +26,6 @@ using System.Threading;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
-using System.Windows.Data;
-
 using Shared;
 
 namespace Communication

@@ -40,18 +40,16 @@ using System.Windows.Markup;
 
 namespace Shared
 {
-    public class ExtensionFixer
+    internal static class WpfBindingMap
     {
-        public static string SwitchToLongExtension(string fileName, string shortExt, string longExt)
+        public static object FromLogic(object value)
         {
-            var convertedFileName = fileName;
-
-            if (!fileName.EndsWith(longExt, StringComparison.OrdinalIgnoreCase) && fileName.EndsWith(shortExt, StringComparison.OrdinalIgnoreCase))
+            if (ReferenceEquals(value, BindingSentinels.UnsetValue))
             {
-                convertedFileName = fileName.Replace(shortExt, longExt);
+                return DependencyProperty.UnsetValue;
             }
 
-            return convertedFileName;
+            return value;
         }
     }
 
@@ -59,19 +57,7 @@ namespace Shared
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if ((value is string) || (value == null))
-            {
-                return value;
-            }
-
-            if ((parameter == null) || !(parameter is string))
-            {
-                return value.ToString();
-            }
-            else
-            {
-                return string.Format(parameter as string, value);
-            }
+            return WpfBindingMap.FromLogic(AsStringConverterLogic.Convert(value, targetType, parameter, culture));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -84,24 +70,12 @@ namespace Shared
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is TimeSpan)
-            {
-                return ((TimeSpan)value).TotalSeconds;
-            }
-
-            return value;//can't convert, let databinding try to handle it
+            return WpfBindingMap.FromLogic(TimeSpanSecondsConverterLogic.Convert(value, targetType, parameter, culture));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            try
-            {
-                return TimeSpan.FromSeconds((double)value);
-            }
-            catch
-            {
-                return value;//can't convert, let databinding try to handle it
-            }
+            return WpfBindingMap.FromLogic(TimeSpanSecondsConverterLogic.ConvertBack(value, targetType, parameter, culture));
         }
     }
 
@@ -109,34 +83,12 @@ namespace Shared
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is TimeSpan)
-            {
-                var builder = new StringBuilder();
-
-                var timeSpan = (TimeSpan)value;
-
-                builder.AppendFormat("{0:D2}", timeSpan.Hours);
-                builder.AppendFormat(":{0:D2}", timeSpan.Minutes);
-                builder.AppendFormat(":{0:D2}", timeSpan.Seconds);
-                builder.AppendFormat(".{0:D3}", timeSpan.Milliseconds);
-
-                return builder.ToString();
-            }
-
-            return value;//can't convert, let databinding try to handle it
+            return WpfBindingMap.FromLogic(TimeSpanStringFormatConverterLogic.Convert(value, targetType, parameter, culture));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            try
-            {
-                var converter = new TimeSpanConverter();
-                return converter.ConvertFrom(value);
-            }
-            catch
-            {
-                return value;//can't convert, let databinding try to handle it
-            }
+            return WpfBindingMap.FromLogic(TimeSpanStringFormatConverterLogic.ConvertBack(value, targetType, parameter, culture));
         }
     }
 
@@ -144,21 +96,12 @@ namespace Shared
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return DataUtils.WriteHexString(value);
+            return WpfBindingMap.FromLogic(HexConverterLogic.Convert(value, targetType, parameter, culture));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value != null)
-            {
-                if (value is string)
-                {
-                    var valueString = value as string;
-                    return DataUtils.ReadHexString(valueString);
-                }
-            }
-
-            return value;//can't convert, let databinding try to handle it
+            return WpfBindingMap.FromLogic(HexConverterLogic.ConvertBack(value, targetType, parameter, culture));
         }
     }
 
@@ -166,26 +109,7 @@ namespace Shared
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            string strValue = null;
-
-            if (value != null)
-            {
-                strValue = value.ToString();
-            }
-
-            if (string.IsNullOrEmpty(strValue))
-            {
-                return DependencyProperty.UnsetValue;
-            }
-
-            if (targetType == typeof(Boolean))
-            {
-                return true;
-            }
-            else
-            {
-                return strValue;
-            }
+            return WpfBindingMap.FromLogic(StringValidConverterLogic.Convert(value, targetType, parameter, culture));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -218,34 +142,12 @@ namespace Shared
     {
         public static object GetDescriptionAttribute(object value)
         {
-            if (value != null)
-            {
-                var fieldInfo = value.GetType().GetField(value.ToString());
-
-                if (fieldInfo != null)
-                {
-                    var attributes = (DescriptionAttribute[])fieldInfo.GetCustomAttributes(typeof(DescriptionAttribute), false);
-
-                    if (attributes.Length > 0)
-                    {
-                        return attributes[0].Description;
-                    }
-                }
-            }
-
-            return null;
+            return DescriptionAttributeConverterLogic.GetDescriptionAttribute(value);
         }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var description = GetDescriptionAttribute(value);
-
-            if (description == null)
-            {
-                description = DependencyProperty.UnsetValue;
-            }
-
-            return description;
+            return WpfBindingMap.FromLogic(DescriptionAttributeConverterLogic.Convert(value, targetType, parameter, culture));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -516,28 +418,6 @@ namespace Shared
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
             throw new NotSupportedException();
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
-    public class ValueMappedDescriptionAttribute : Attribute
-    {
-        public ValueMappedDescriptionAttribute(object value, string description)
-        {
-            Value = value;
-            Description = description;
-        }
-
-        public object Value
-        {
-            get;
-            set;
-        }
-
-        public string Description
-        {
-            get;
-            set;
         }
     }
 
