@@ -70,7 +70,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 Session log: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\NefMoto.log`
 
-Use **File → Open Log File** (or **Open Log File Location**) when reporting connect or flash problems. This is not the data-logger tab save.
+Preferences (`preferences.json`) live in the same folder. Use **File → Open Log File** (or **Open Log File Location**) when reporting connect or flash problems. This is not the data-logger tab save.
 
 ## Building
 

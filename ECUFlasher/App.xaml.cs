@@ -23,7 +23,6 @@ Contact by Email: tony@nefariousmotorsports.com
 #endif
 
 
-using ApplicationShared;
 using Communication;
 using FTD2XX_NET;
 using Microsoft.Win32;
@@ -55,6 +54,8 @@ namespace ECUFlasher
     public partial class App : Application, INotifyPropertyChanged, IDataErrorInfo
     {
         const string LogFileName = "NefMoto.log";
+
+        public UserPreferences Preferences { get; private set; } = new UserPreferences();
 
         protected string GetAppDataDirectory()
         {
@@ -105,42 +106,29 @@ namespace ECUFlasher
         {
             try
             {
-                // Migrate settings from previous version when upgrading (runs once per version)
-                if (!ECUFlasher.Properties.Settings.Default.SettingsUpgraded)
-                {
-                    ECUFlasher.Properties.Settings.Default.Upgrade();
-                    ECUFlasher.Properties.Settings.Default.SettingsUpgraded = true;
-                    ECUFlasher.Properties.Settings.Default.Save();
-                }
-
                 mPropertyErrors = new Dictionary<string, string>();
 
                 mLogFileDirectory = GetAppDataDirectory();
                 mLogFileName = Path.Combine(mLogFileDirectory, LogFileName);
+                mPreferencesPath = Path.Combine(mLogFileDirectory, UserPreferences.FileName);
                 CreateLogFile();
 
                 DisplayStatusMessage("Opening " + GetApplicationName(), StatusMessageType.LOG);
 
-                // mFTDILibrary no longer needed - DeviceManager handles device enumeration
+                string prefsError;
+                string migratedFrom;
+                Preferences = UserPreferences.Load(mPreferencesPath, out prefsError, out migratedFrom);
+                if (prefsError != null)
+                {
+                    DisplayStatusMessage("Preferences load failed: " + prefsError + "; using defaults.", StatusMessageType.LOG);
+                }
+                else if (migratedFrom != null)
+                {
+                    DisplayStatusMessage("Copied leftover window size, file paths, baud, last adapter, and slow-init timing log from: " + migratedFrom, StatusMessageType.LOG);
+                    SavePreferences();
+                }
 
                 Devices = new ObservableCollection<DeviceInfo>();
-
-                //get the last used device (convert from legacy format if needed)
-                var legacyDevice = ECUFlasher.Properties.Settings.Default.FTDIUSBDevice;
-                if (legacyDevice != null)
-                {
-                    // Convert legacy ApplicationShared.FTDIDeviceInfo to Communication.FtdiDeviceInfo
-                    var ftdiNode = new FTD2XX_NET.FTDI.FT_DEVICE_INFO_NODE
-                    {
-                        Description = legacyDevice.Description,
-                        Flags = legacyDevice.Flags,
-                        ID = legacyDevice.ID,
-                        LocId = legacyDevice.LocId,
-                        SerialNumber = legacyDevice.SerialNumber,
-                        Type = legacyDevice.Type
-                    };
-                    SelectedDeviceInfo = new Communication.FtdiDeviceInfo(ftdiNode, legacyDevice.ChipID);
-                }
             }
             catch(Exception e)
             {
@@ -150,7 +138,7 @@ namespace ECUFlasher
             try
             {
                 //trigger the creation of the comm interface
-                DesiredProtocol = CommunicationInterface.Protocol.KWP2000;
+                DesiredProtocol = Preferences.DesiredProtocol;
             }
             catch(Exception e)
             {
@@ -175,7 +163,7 @@ namespace ECUFlasher
         {
             try
             {
-                ECUFlasher.Properties.Settings.Default.Save();
+                SavePreferences();
             }
             catch (Exception ex)
             {
@@ -467,6 +455,50 @@ namespace ECUFlasher
         private long mLogFileSize = 0;
         private string mLogFileDirectory;
         private string mLogFileName;
+        private string mPreferencesPath;
+
+        internal void SavePreferences()
+        {
+            UserPreferences.Save(mPreferencesPath, Preferences);
+        }
+
+        public bool? ShowFileDialog(FileDialog dialog, string preferredFile = null)
+        {
+            if (dialog == null)
+            {
+                throw new ArgumentNullException(nameof(dialog));
+            }
+
+            dialog.InitialDirectory = SafeFileDialogDirectory.Resolve(
+                preferredFile, Preferences.LastBrowseDirectory, Preferences.FlashFile);
+
+            bool? result;
+            try
+            {
+                result = dialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                DisplayStatusMessage("File dialog rejected folder \"" + dialog.InitialDirectory + "\": " + ex.Message, StatusMessageType.LOG);
+                dialog.InitialDirectory = SafeFileDialogDirectory.Fallback();
+                try
+                {
+                    result = dialog.ShowDialog();
+                }
+                catch (Exception retryEx)
+                {
+                    DisplayStatusMessage("File dialog failed: " + retryEx.Message, StatusMessageType.USER);
+                    return false;
+                }
+            }
+
+            if (result == true)
+            {
+                Preferences.RememberBrowsePath(dialog.FileName);
+            }
+
+            return result;
+        }
 
         private void TruncateLogFile()
         {
@@ -866,11 +898,13 @@ namespace ECUFlasher
         {
             RefreshDevices(deviceList);
 
-            DeviceInfo preferred = _SelectedDeviceInfo;
-            DeviceInfo matchedInfoInList = preferred != null
-                ? Devices.FirstOrDefault(device => device.Equals(preferred))
-                : null;
-            SelectedDeviceInfo = matchedInfoInList ?? Devices.FirstOrDefault();
+            //get the last used device after enumeration (serial / COM port, not a ctor placeholder)
+            DeviceInfo matched = null;
+            if (Preferences.LastDevice != null)
+            {
+                matched = Devices.FirstOrDefault(device => Preferences.LastDevice.Matches(device));
+            }
+            SelectedDeviceInfo = matched ?? Devices.FirstOrDefault();
         }
         #endregion
         public DeviceInfo SelectedDeviceInfo
@@ -901,15 +935,9 @@ namespace ECUFlasher
                         error = "Selected device is not connected";
                     }
 
-                    if (error == null && _SelectedDeviceInfo is FtdiDeviceInfo ftdiInfo)
+                    if (error == null && _SelectedDeviceInfo != null)
                     {
-                        // Convert to legacy format for Settings serialization
-                        var legacyDevice = new ApplicationShared.FTDIDeviceInfo(ftdiInfo.FtdiNode, 0, ftdiInfo.ChipID);
-                        ECUFlasher.Properties.Settings.Default.FTDIUSBDevice = legacyDevice;
-                    }
-                    else if (error == null)
-                    {
-                        ECUFlasher.Properties.Settings.Default.FTDIUSBDevice = null;
+                        Preferences.LastDevice = SavedDevice.FromDevice(_SelectedDeviceInfo);
                     }
 
                     this["SelectedDeviceInfo"] = error;
@@ -924,12 +952,12 @@ namespace ECUFlasher
         {
             get
             {
-                if (CommInterfaceViewModel == null)
+                if (CommInterfaceViewModel?.CommInterface != null)
                 {
-                    DesiredProtocol = CommunicationInterface.Protocol.KWP2000;
+                    return CommInterfaceViewModel.CommInterface.CurrentProtocol;
                 }
 
-                return CommInterfaceViewModel.CommInterface.CurrentProtocol;
+                return Preferences.DesiredProtocol;
             }
             set
             {
@@ -951,9 +979,15 @@ namespace ECUFlasher
                             }
                     }
 
-                    //TODO: previously written code doesn't handle CommInterface being NULL
+                    if (newViewModel == null)
+                    {
+                        newViewModel = new KWP2000Interface_ViewModel();
+                        value = CommunicationInterface.Protocol.KWP2000;
+                    }
 
                     CommInterfaceViewModel = newViewModel;//done this way to only cause the change notification to happen once
+
+                    Preferences.DesiredProtocol = value;
 
                     if (CommInterface != null)
                     {

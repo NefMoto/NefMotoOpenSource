@@ -96,12 +96,7 @@ Contact by Email: tony@nefariousmotorsports.com
                     <DataTemplate.Resources>
                         <!--Apply this style to all text blocks, but only inside this data template-->
                         <Style TargetType="TextBlock">
-                            <Setter Property="Text" Value="{Binding Mode=OneWay, StringFormat=\{0:D\} Baud}"/><!--Have to set the text here so that the style can replace it if we need to-->
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding}" Value="0">
-                                    <Setter Property="Text" Value="Unspecified Baud"/>
-                                </DataTrigger>
-                            </Style.Triggers>
+                            <Setter Property="Text" Value="{Binding Mode=OneWay, StringFormat=\{0:D\} Baud}"/>
                         </Style>
                     </DataTemplate.Resources>
                     <TextBlock/>
