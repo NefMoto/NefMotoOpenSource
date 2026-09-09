@@ -135,7 +135,7 @@ namespace Communication
         }
 
         /// <summary>
-        /// Gets the device ID as uint (for UI binding compatibility with old ApplicationShared.FTDIDeviceInfo)
+        /// Gets the device ID as uint (for UI binding compatibility)
         /// </summary>
         public override object IDProp
         {

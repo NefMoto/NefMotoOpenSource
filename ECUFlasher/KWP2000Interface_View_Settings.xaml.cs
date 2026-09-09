@@ -38,7 +38,7 @@ using Communication;
 namespace ECUFlasher
 {
     /// <summary>
-    /// Interaction logic for SettingsControl.xaml
+    /// Interaction logic for KWP2000Interface_View_Settings.xaml
     /// </summary>
     public partial class KWP2000Interface_View_Settings : UserControl
     {

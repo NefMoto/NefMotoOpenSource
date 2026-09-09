@@ -151,9 +151,6 @@
         <RemoveFile Id="RemoveDesktopShortcut" Name="$(var.ProductName).lnk" Directory="DesktopFolder" On="uninstall" />
         <RemoveFile Id="RemoveCommonDesktopShortcut" Name="$(var.ProductName).lnk" Property="CommonDesktopFolder" On="uninstall" />
       </Component>
-      <Component Id="$(var.ProductName).exe.config" Guid="*">
-        <File Id="$(var.ProductName).exe.config" Name="$(var.ProductName).exe.config" Source="ECUFlasher\app.config" KeyPath="yes" />
-      </Component>
       <Component Id="$(var.ProductName).dll" Guid="*">
         <File Id="$(var.ProductName).dll" Name="$(var.ProductName).dll" Source="$(var.TargetDir)$(var.ProductName).dll" KeyPath="yes" />
       </Component>
