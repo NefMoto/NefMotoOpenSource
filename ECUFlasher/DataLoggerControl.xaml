@@ -27,6 +27,7 @@ Contact by Email: tony@nefariousmotorsports.com
             xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
             xmlns:ECUFlasher="clr-namespace:ECUFlasher"
             xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+            xmlns:SharedUi="clr-namespace:Shared"
             xmlns:props="clr-namespace:ECUFlasher.Properties"
             mc:Ignorable="d"
             d:DesignHeight="300" d:DesignWidth="300"
@@ -38,8 +39,8 @@ Contact by Email: tony@nefariousmotorsports.com
         <Color x:Key="VariableDefinitionsListErrorBackgroundColor">Gray</Color>
         <SolidColorBrush x:Key="VariableDefinitionsListErrorBackgroundBrush" Color="{StaticResource VariableDefinitionsListErrorBackgroundColor}"/>
 
-        <Shared:TimeSpanSecondsConverter x:Key="timeSpanSecondsConverter"/>
-        <Shared:TimeSpanStringFormatConverter x:Key="timeSpanStringFormatConverter"/>
+        <SharedUi:TimeSpanSecondsConverter x:Key="timeSpanSecondsConverter"/>
+        <SharedUi:TimeSpanStringFormatConverter x:Key="timeSpanStringFormatConverter"/>
 
         <ObjectDataProvider MethodName="GetValues" ObjectType="{x:Type sys:Enum}" x:Key="DataTypeEnumValues">
             <ObjectDataProvider.MethodParameters>
@@ -62,7 +63,7 @@ Contact by Email: tony@nefariousmotorsports.com
         </DataTemplate>
 
         <CollectionViewSource Source="{Binding Path=VariableDefinitions}" Filter="ResortRenamedVariablesFilter" x:Key="AlphabeticalVariableDefinitions"
-            Shared:ViewSourceHelper.AutoSelectNewItems="True">
+            SharedUi:ViewSourceHelper.AutoSelectNewItems="True">
             <CollectionViewSource.SortDescriptions>
                 <scm:SortDescription PropertyName="Name"/>
             </CollectionViewSource.SortDescriptions>
@@ -438,7 +439,7 @@ Contact by Email: tony@nefariousmotorsports.com
                                     <RowDefinition Height="Auto"></RowDefinition>
                                 </Grid.RowDefinitions>
                                 <ListBox Name="VariableDefinitionsListBox" Grid.Row="0" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" ItemsSource="{Binding Source={StaticResource AlphabeticalVariableDefinitions}}" Background="Transparent"
-                                    Shared:ListBoxHelper.AutoScrollToCurrentItem="True">
+                                    SharedUi:ListBoxHelper.AutoScrollToCurrentItem="True">
                                 <ListBox.Resources>
 
                                     <Style x:Key="ListBoxItemVariableDefinitionToolTipStyle" TargetType="ToolTip">

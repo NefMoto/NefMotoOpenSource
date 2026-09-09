@@ -26,7 +26,7 @@ Contact by Email: tony@nefariousmotorsports.com
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
     xmlns:ECUFlasher="clr-namespace:ECUFlasher"
     xmlns:props="clr-namespace:ECUFlasher.Properties"
-    xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+    xmlns:SharedUi="clr-namespace:Shared"
     xmlns:Communication="clr-namespace:Communication;assembly=Communication"
     mc:Ignorable="d"
     d:DesignHeight="300" d:DesignWidth="300"
@@ -173,13 +173,13 @@ Contact by Email: tony@nefariousmotorsports.com
 
             <Border Grid.Row="1" Grid.Column="0">
                 <ListBox IsSynchronizedWithCurrentItem="True" Background="Transparent"
-                                        Shared:ListBoxHelper.AutoScrollToCurrentItem="True"
+                                        SharedUi:ListBoxHelper.AutoScrollToCurrentItem="True"
                                         ItemsSource="{Binding Path=CombinedECUInfo}"/>
             </Border>
 
             <Border Grid.Row="1" Grid.Column="2">
                 <ListBox Name="ECUDTCsListBox" IsSynchronizedWithCurrentItem="True" SelectionMode="Extended" ItemsSource="{Binding Path=ECUDTCs}" Background="Transparent"
-                                            Shared:ListBoxHelper.AutoScrollToCurrentItem="True"/>
+                                            SharedUi:ListBoxHelper.AutoScrollToCurrentItem="True"/>
             </Border>
         </Grid>
 

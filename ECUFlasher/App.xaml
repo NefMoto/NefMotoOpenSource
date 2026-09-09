@@ -25,15 +25,15 @@ Contact by Email: tony@nefariousmotorsports.com
     xmlns:ECUFlasher="clr-namespace:ECUFlasher"
     xmlns:props="clr-namespace:ECUFlasher.Properties"
     xmlns:Communication="clr-namespace:Communication;assembly=Communication"
-    xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+    xmlns:SharedUi="clr-namespace:Shared"
     StartupUri="MainWindow.xaml">
     <Application.Resources>
 
         <ECUFlasher:IsBaudRateUndefinedConverter x:Key="isKWP2000BaudRateUndefinedConverer"/>
-        <Shared:DescriptionAttributeConverter x:Key="descriptionAttributeConverter"/>
-        <Shared:HexConverter x:Key="hexConverter"/>
-        <Shared:AsStringConverter x:Key="asStringConverter"/>
-        <Shared:StringValidConverter x:Key="stringValidConverter"/>
+        <SharedUi:DescriptionAttributeConverter x:Key="descriptionAttributeConverter"/>
+        <SharedUi:HexConverter x:Key="hexConverter"/>
+        <SharedUi:AsStringConverter x:Key="asStringConverter"/>
+        <SharedUi:StringValidConverter x:Key="stringValidConverter"/>
         <ECUFlasher:IsConnectionOpenConverter x:Key="isConnectionOpenConverter"/>
         <ECUFlasher:ProgressBarWidthConverter x:Key="progressBarWidthConverter"/>
 

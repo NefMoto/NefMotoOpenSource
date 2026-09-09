@@ -30,8 +30,6 @@ using System.Threading;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
-using System.Windows.Data;
-
 using Shared;
 
 namespace Communication
@@ -242,7 +240,7 @@ namespace Communication
                                             {
                                                 if ((((byte)flashStatus.mProgrammingSessionPreconditions) & ((byte)precondition)) != 0)
                                                 {
-                                                    string reasonDescription = "-" + DescriptionAttributeConverter.GetDescriptionAttribute(precondition);
+                                                    string reasonDescription = "-" + DescriptionAttributeConverterLogic.GetDescriptionAttribute(precondition);
                                                     CommInterface.DisplayStatusMessage(reasonDescription, StatusMessageType.USER);
 
                                                     reasons += "\n" + reasonDescription;

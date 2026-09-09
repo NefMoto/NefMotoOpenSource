@@ -25,7 +25,7 @@ Contact by Email: tony@nefariousmotorsports.com
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:sys="clr-namespace:System;assembly=mscorlib"
             xmlns:ECUFlasher="clr-namespace:ECUFlasher"
-            xmlns:Shared="clr-namespace:Shared;assembly=ECUShared"
+            xmlns:SharedUi="clr-namespace:Shared"
             mc:Ignorable="d"
             d:DesignHeight="300" d:DesignWidth="300">
     <Grid Margin="5">
@@ -66,6 +66,6 @@ Contact by Email: tony@nefariousmotorsports.com
         </Menu>
         <TextBox Grid.Row="1" Text="{Binding Path=StatusText, Mode=OneWay}" IsReadOnly="True" AllowDrop="False" TextWrapping="WrapWithOverflow"
                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" BorderThickness="0"
-                        Shared:AutoScrollTextBox.AutoScrollTextBox="True"/>
+                        SharedUi:AutoScrollTextBox.AutoScrollTextBox="True"/>
     </Grid>
 </UserControl>
