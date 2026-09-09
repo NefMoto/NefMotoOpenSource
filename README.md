@@ -2,6 +2,14 @@
 
 Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
+## Documentation
+
+- [Docs index](docs/index.md)
+- [Getting started](docs/user-guide/getting-started.md) — install, cable, first connect
+- [Flashing](docs/user-guide/flashing.md) — KWP read/write, layouts
+- [Bootmode](docs/user-guide/bootmode.md) — bootstrap, EEPROM
+- [Troubleshooting](docs/user-guide/troubleshooting.md)
+
 ## Features
 
 ### Communication Protocols
@@ -33,42 +41,42 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
   - KWP2000 slow init and fast init (same per-bit break timing for slow init on both chipsets)
   - Bootmode
 - **Legacy Ross-Tech** — discontinued HEX-USB or HEX-USB+CAN only; see [Requirements](#requirements)
-- Some clone adapters or drivers may fail slow init — enable **Slow init timing log** in KWP2000 settings when diagnosing connect issues
+- Some clone adapters or drivers may fail slow init — enable **Slow init timing log** in KWP2000 settings. Fake FTDI **KWP2000**-labeled cables are blacklisted by stock Windows FTDI drivers. [Getting started — Cable](docs/user-guide/getting-started.md#cable)
 
 ## Limitations
 
 ### USB Adapters (KWP2000)
 
-- Slow init uses per-bit break timing (not a single low-baud UART frame). Validated on ME7.1 and ME7.5 bench with FTDI and CH340.
-- Clone or poor-quality adapters may fail slow init on either chip type; **Slow init timing log** helps compare timing.
-- In-car K-line (cluster) is not the same as bench.
+- Slow init uses per-bit break timing (not a single low-baud UART frame). Validated on ME7.1 and ME7.5 bench with FTDI and CH340. [Getting started](docs/user-guide/getting-started.md#connect-with-slow-init)
+- Clone or poor-quality adapters may fail slow init on either chip type; **Slow init timing log** helps compare timing. Fake FTDI chips in cables labeled **KWP2000** are blacklisted by stock Windows FTDI drivers. [Troubleshooting](docs/user-guide/troubleshooting.md#slow-init-fails)
+- In-car K-line (cluster) is not the same as bench. [Getting started](docs/user-guide/getting-started.md#bench-vs-in-the-car)
 
 ### Bootmode
 
-- Use 57600 or 38400 baud for best compatibility. 9600/19200 may fail non-deterministically on CH340 cables (wrong ACKs, NAK, readback errors). Likely cause: USB latency/buffering, jitter, or voltage; not baud error. Prefer FTDI for lower bootmode baud rates. See [issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44).
-- 124800 baud should work on many different ECU/cable combinations, and most reliably on the bench. Use this for best performance once you have verified it is reliable.
+- Prefer **57600** or **38400**. 9600/19200 may fail non-deterministically on CH340. **124800** after you have verified it. [Bootmode](docs/user-guide/bootmode.md#baud), [issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44)
 
 ### Platform
 
-- **Windows only** - Requires Windows for WMI-based device enumeration (CH340 detection)
+- **Windows only** — WMI device enumeration (CH340 detection). [Getting started](docs/user-guide/getting-started.md#install)
 
 ### ECU Support
 
-- **ME7.x** - Primary target; full KWP2000 and bootmode support
-- **ME7.5 fast init** - Not supported on one bench unit after address and timing sweeps. Use **slow init** instead. Other ME7.5 images may differ. See [docs/KWP2000.md](docs/KWP2000.md)
-- **Simos 3.x / EDC15** - Bootmode support (layout auto-detect)
-- Memory layouts provided for common flash chips (29F200, 29F400, 29F800 series)
-- Some ECUs may require specific connection parameters or timing adjustments
+- **ME7.x** — primary target; full KWP2000 and bootmode. Most flash chips are 29F800BB (1MB) or 29F400BB (512KB). [Flashing](docs/user-guide/flashing.md#layout)
+- **ME7.5 fast init** — not supported on one bench unit. Use **slow init**. Other ME7.5 images may differ. [Getting started](docs/user-guide/getting-started.md#fast-init), [KWP2000.md](docs/KWP2000.md)
+- **Simos 3.x / EDC15** — bootmode flash (layout auto-detect). [Bootmode](docs/user-guide/bootmode.md)
+- Some ECUs need different connect timing. [Getting started](docs/user-guide/getting-started.md#connect-with-slow-init)
 
 ### Known Issues
 
-- [Issue #100](https://github.com/NefMoto/NefMotoOpenSource/issues/100) — KWP write hang after ident (connect already up).
-- [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103) — KWP write with the wrong BT/BB layout used to look like a persistent-data erase failure. The write now aborts with **Wrong Flash Layout**. Pick the opposite layout (for example `ME7 29F800BB` instead of `ME7 29F800BT`) and write again with checksum skip. Switching layout in the same session is not implemented.
+- [Issue #100](https://github.com/NefMoto/NefMotoOpenSource/issues/100) — KWP write hang after ident. [Troubleshooting](docs/user-guide/troubleshooting.md#write-hangs-after-ident)
+- [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103) — wrong BT/BB layout aborts with **Wrong Flash Layout**. Pick the opposite layout and **Diff Write Flash**. [Troubleshooting](docs/user-guide/troubleshooting.md#wrong-flash-layout), [Flashing](docs/user-guide/flashing.md#after-an-abort)
 - Other issues: [GitHub Issues](https://github.com/NefMoto/NefMotoOpenSource/issues)
 
 ## Log file
 
 Session log: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\NefMoto.log`
+
+`%AppData%` is the **roaming** profile folder (`C:\Users\<you>\AppData\Roaming` on current Windows, not `AppData\Local`).
 
 Preferences (`preferences.json`) live in the same folder. Use **File → Open Log File** (or **Open Log File Location**) when reporting connect or flash problems. This is not the data-logger tab save.
 
@@ -84,6 +92,8 @@ See [RELEASE.md](docs/RELEASE.md) for release instructions.
 
 Pre-built releases are available at: <https://github.com/NefMoto/NefMotoOpenSource/releases/latest>
 
+Install steps: [Getting started](docs/user-guide/getting-started.md#install).
+
 The MSI is 64-bit and installs to `C:\Program Files\NefMotoECUFlasher`. Upgrading from an older x86 install should replace the copy under Program Files (x86).
 
 ## Requirements
@@ -95,6 +105,8 @@ The MSI is 64-bit and installs to `C:\Program Files\NefMotoECUFlasher`. Upgradin
   - A legacy Ross-Tech HEX-USB or HEX-USB+CAN with Ross-Tech VCP drivers, dumb K-line pass-through, and smart mode disabled — the interface must show up in NefMoto's device list (install VCP per [Ross-Tech](http://www.ross-tech.com/vag-com/usb/virtual-com-port.php) if it does not)
 
 *Ross-Tech HEX-V2 and HEX-NET are not supported; they lack dumb K-line pass-through. Do not use KII-USB (poor pass-through).*
+
+Cheap cables labeled **KWP2000** often use counterfeit FTDI chips that stock Windows FTDI drivers blacklist; they will not enumerate. Use genuine FTDI or CH340. [Getting started — Cable](docs/user-guide/getting-started.md#cable)
 
 ## License
 
