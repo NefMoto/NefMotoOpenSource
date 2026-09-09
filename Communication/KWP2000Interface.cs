@@ -2502,6 +2502,10 @@ namespace Communication
             if ((ASCIIData.Length > 0) && sendOK)
             {
                 DisplayStatusMessage("KWP1281 connect info: " + ASCIIData, StatusMessageType.USER);
+                if (KWP2000RamProgramIdent.ContainsRamProgramIdent(ASCIIData))
+                {
+                    DisplayStatusMessage(KWP2000RamProgramIdent.UserStatusMessage, StatusMessageType.USER);
+                }
             }
             else
             {

@@ -2067,17 +2067,20 @@ namespace ECUFlasher
                 int numSectors = writeOperation.NumSectors;
                 int numSuccessfullyFlashedSectors = writeOperation.NumSuccessfullyFlashedSectors;
 
-                statusMesage = "Writing ECU flash memory succeeded. Wrote " + numSuccessfullyFlashedSectors + " of " + numSectors + " sectors in flash memory.";
+                statusMesage = "Writing ECU flash memory succeeded. Wrote " + numSuccessfullyFlashedSectors + " of " + numSectors + " sectors in flash memory."
+                    + "\n" + KWP2000RamProgramIdent.WriteSuccessAdvice;
             }
             else
             {
                 if (writeOperation.WasFailureCausedByPreviousIncompleteDownload)
                 {
-                    statusMesage = "Writing ECU flash memory failed because a previous programming operation was incomplete. Please reconnect and retry.";
+                    statusMesage = "Writing ECU flash memory failed because a previous programming operation was incomplete. Please reconnect and retry."
+                        + " Do not power cycle.";
                 }
                 else
                 {
-                    statusMesage = "Writing ECU flash memory failed.";
+                    statusMesage = "Writing ECU flash memory failed."
+                        + "\n" + KWP2000RamProgramIdent.WriteFailureAdvice;
                 }
             }
 

@@ -798,6 +798,38 @@ namespace Communication
             }
         }
     }
+
+    public static class KWP2000RamProgramIdent
+    {
+        public const string UserStatusMessage =
+            "ECU is running from the RAM programming kernel (THIS-IS-THE-RAM-PROGRAM). This is expected after a KWP write until a complete power cycle. After a failed write, do not power cycle; reconnect with slow init and retry.";
+
+        public const string WriteSuccessAdvice =
+            "The ECU is still running from the RAM programming kernel until a complete power cycle (ME7.5: all +12, including pin 121). Flash ident, logging, and engine start will not work until then.";
+
+        public const string WriteFailureAdvice =
+            "Do not power cycle. Reconnect with slow init if needed and retry the write. Use bootmode only if KWP no longer connects.";
+
+        public static bool ContainsRamProgramIdent(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+
+            var builder = new StringBuilder(text.Length);
+            foreach (char c in text)
+            {
+                if ((c == '-') || (c == '_') || (c == ' ') || (c == '\0'))
+                {
+                    continue;
+                }
+                builder.Append(c);
+            }
+
+            return builder.ToString().IndexOf("THISISTHERAMPROGRAM", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+    }
 }
 
 // vi: set sw=4 ts=8 expandtab:

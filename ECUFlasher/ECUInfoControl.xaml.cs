@@ -943,6 +943,8 @@ namespace ECUFlasher
             {
                 App.DisplayStatusMessage("Read " + identInfo.IdentOptionData.Count + " ECU info entries:", StatusMessageType.USER);
 
+                bool sawRamProgramIdent = false;
+
                 foreach (var identOption in identInfo.IdentOptionData.Keys)
                 {
                     var identOptionName = GetIdentOptionName(identOption);
@@ -956,6 +958,15 @@ namespace ECUFlasher
                     }
 
                     App.DisplayStatusMessage("\t0x" + identOption.ToString("X2") + ", " + identOptionName + ": " + identOptionString, StatusMessageType.USER);
+                    if (!sawRamProgramIdent && KWP2000RamProgramIdent.ContainsRamProgramIdent(identOptionString))
+                    {
+                        sawRamProgramIdent = true;
+                    }
+                }
+
+                if (sawRamProgramIdent)
+                {
+                    App.DisplayStatusMessage(KWP2000RamProgramIdent.UserStatusMessage, StatusMessageType.USER);
                 }
             }
             else
