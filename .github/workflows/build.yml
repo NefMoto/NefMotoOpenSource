@@ -1,8 +1,5 @@
 name: Build
 
-env:
-  WIX_VERSION: '6.0.2'
-
 on:
   push:
     branches:
@@ -38,7 +35,9 @@ jobs:
 
   installer:
     runs-on: windows-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    # PRs (including synchronize / force-push) and pushes to the default branch.
+    # Not tags — v* MSI is release.yml only. Do not use push: branches: '**' (double-run with pull_request).
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
 
     steps:
     - name: Checkout code
@@ -51,17 +50,6 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: Setup Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: '3.x'
-
-    - name: Install WiX Toolset
-      run: |
-        dotnet tool install --global wix --version ${{ env.WIX_VERSION }}
-        wix extension add WixToolset.UI.wixext/${{ env.WIX_VERSION }} WixToolset.NetFx.wixext/${{ env.WIX_VERSION }} --global
-      shell: pwsh
-
     - name: Build installer
       run: make installer
       shell: bash
@@ -71,4 +59,4 @@ jobs:
       with:
         name: NefMotoECUFlasher-installer
         path: Installer/bin/Release/NefMotoECUFlasher-*.msi
-        retention-days: 90
+        retention-days: 14

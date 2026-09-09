@@ -36,14 +36,11 @@ build:
 	@echo "Building with dotnet ($(CONFIG))..."
 	FULL_VERSION=$(FULL_VERSION) dotnet build ECUFlasher.sln --configuration $(CONFIG) --verbosity minimal
 
-installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile Directory.Build.props
+installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json installer.ps1
 	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
-	@mkdir -p Installer/bin/Release
-	@ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
-	FULL_VERSION=$(FULL_VERSION) wix build -arch x64 \
-		-d RuntimeTfm=$(NET_TFM) -d DotNetMajor=$(DOTNET_MAJOR) \
-		-ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext \
-		-o $(INSTALLER) Installer/Product.wxs
+	@FULL_VERSION=$(FULL_VERSION) NET_TFM=$(NET_TFM) DOTNET_MAJOR=$(DOTNET_MAJOR) \
+	ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer.ps1
 
 # Framework-dependent publish folder (not single-file, not the MSI). Still needs the Desktop runtime matching NetTfm.
 publish:
