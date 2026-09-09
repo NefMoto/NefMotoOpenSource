@@ -1,6 +1,6 @@
 # Called by Makefile and build.bat. Requires FULL_VERSION, NET_TFM, DOTNET_MAJOR, ECUFlasher_TargetDir.
 $ErrorActionPreference = 'Stop'
-Set-Location $PSScriptRoot
+Set-Location (Split-Path $PSScriptRoot -Parent)
 
 $wixVersion = (Get-Content .config/dotnet-tools.json -Raw | ConvertFrom-Json).tools.wix.version
 if (-not $wixVersion) { throw 'wix version missing from .config/dotnet-tools.json' }

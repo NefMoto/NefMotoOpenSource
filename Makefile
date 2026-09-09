@@ -36,11 +36,11 @@ build:
 	@echo "Building with dotnet ($(CONFIG))..."
 	FULL_VERSION=$(FULL_VERSION) dotnet build ECUFlasher.sln --configuration $(CONFIG) --verbosity minimal
 
-installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json installer.ps1
+installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
 	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
 	@FULL_VERSION=$(FULL_VERSION) NET_TFM=$(NET_TFM) DOTNET_MAJOR=$(DOTNET_MAJOR) \
 	ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
-	powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer.ps1
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File Installer/installer.ps1
 
 # Framework-dependent publish folder (not single-file, not the MSI). Still needs the Desktop runtime matching NetTfm.
 publish:

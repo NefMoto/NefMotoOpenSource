@@ -40,7 +40,7 @@ if "%1"=="publish" (
 
 if "%1"=="installer" (
     set ECUFlasher_TargetDir=ECUFlasher/bin/msil/Release/
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer.ps1
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File Installer\installer.ps1
     if errorlevel 1 exit /b %ERRORLEVEL%
 )
 echo Done!
