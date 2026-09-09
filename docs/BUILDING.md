@@ -43,9 +43,6 @@ build.bat publish
 
 - **.NET 10 SDK** (preferred) or **Visual Studio** with MSBuild. End users of the MSI need the **.NET 10 Desktop Runtime**, not only the console runtime.
 - Target framework is `NetTfm` in [`Directory.Build.props`](../Directory.Build.props). Output dirs do not include the TFM (`ECUFlasher/bin/msil/Debug` / `Release`).
-- **WiX Toolset v6.0+** (for installer builds; MSI is **x64**, `-arch x64`)
-  - `dotnet tool install --global wix --version 6.0.2`
-- **WiX UI and NetFX extensions**
-  - `wix extension add WixToolset.UI.wixext WixToolset.NetFx.wixext --global`
+- **WiX Toolset** (installer builds; MSI is **x64**, `-arch x64`). Version is [`.config/dotnet-tools.json`](../.config/dotnet-tools.json) (Dependabot can bump it). [`installer.ps1`](../installer.ps1) runs `dotnet tool restore` then `dotnet tool run wix` — no global `wix` on `PATH`. `make installer` and `build.bat installer` both invoke that script. UI and NetFx extensions are added at the json version during the installer build.
 
 `make publish` / `build.bat publish` writes a framework-dependent copy to `publish/NefMotoECUFlasher`. It is not a substitute for the MSI: no shortcuts, no installer .NET check, and it still needs the .NET 10 Desktop runtime. `MemoryLayouts` is copied next to the executable. This is not a single-file exe.

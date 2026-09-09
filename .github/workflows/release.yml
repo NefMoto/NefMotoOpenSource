@@ -1,8 +1,5 @@
 name: Release
 
-env:
-  WIX_VERSION: '6.0.2'
-
 on:
   push:
     tags:
@@ -65,17 +62,6 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: Setup Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: '3.x'
-
-    - name: Install WiX Toolset
-      run: |
-        dotnet tool install --global wix --version ${{ env.WIX_VERSION }}
-        wix extension add WixToolset.UI.wixext/${{ env.WIX_VERSION }} WixToolset.NetFx.wixext/${{ env.WIX_VERSION }} --global
-      shell: pwsh
-
     - name: Build Release
       run: make release
       shell: bash
@@ -92,10 +78,9 @@ jobs:
       shell: bash
 
     - name: Install git-cliff
-      uses: kenji-miyake/setup-git-cliff@v2
+      uses: taiki-e/install-action@v2
       with:
-        target-platform: x86_64-pc-windows-msvc
-        archive-extension: zip
+        tool: git-cliff
 
     - name: Find MSI file
       id: find_msi

@@ -51,20 +51,20 @@ To rebuild an existing tag without moving it, use **Actions → Release → Run 
 
 ## CI workflows
 
-| Workflow          | Triggers                               | What it does                                      |
-|-------------------|----------------------------------------|---------------------------------------------------|
-| **`build.yml`**   | Push/PR to any branch; push of any tag | Build and test; MSI artifact on tag push          |
-| **`release.yml`** | Push of `v*` tags; `workflow_dispatch` | Build, test, MSI, release notes, GitHub release   |
+| Workflow          | Triggers                                         | What it does                                                        |
+|-------------------|--------------------------------------------------|---------------------------------------------------------------------|
+| **`build.yml`**   | Push/PR to any branch; push of any tag           | Build and test on all of those. MSI smoke on **PRs** and **pushes to the default branch** (artifact kept 14 days). No MSI on tags. |
+| **`release.yml`** | Push of `v*` tags (stable and RC); `workflow_dispatch` | Build, test, MSI, release notes, GitHub release                 |
 
-`build.yml` retains MSI workflow artifacts for 90 days; `release.yml` is what publishes the installer on GitHub Releases.
+`release.yml` is what publishes the installer on GitHub Releases. `build.yml` does not upload an MSI on tag push.
 
 The generated **Downloads** section includes a .NET 10 Desktop Runtime (x64) requirement (and a note that .NET 8 Desktop is not enough). Keep that in sync with README **Requirements**. The MSI is **x64** and installs to Program Files; upgrading from an older x86 MSI should uninstall the Program Files (x86) copy.
 
 ### What `release.yml` does
 
 1. **Determine tag type** — Tags with a hyphen suffix (e.g. `-rc1`) are pre-releases. Finds `prev_tag` (nearest ancestor tag from the tagged commit’s parent, often the prior RC) for RC changelog ranges.
-2. **Build** — `make release`, `make test CONFIG=Release`, `make installer` (WiX 6).
-3. **Release notes** — [git-cliff](https://git-cliff.org) via `kenji-miyake/setup-git-cliff@v2` (version not pinned):
+2. **Build** — `make release`, `make test CONFIG=Release`, `make installer` ([`installer.ps1`](../installer.ps1): local WiX from [`.config/dotnet-tools.json`](../.config/dotnet-tools.json) via `dotnet tool restore` / `dotnet tool run wix`).
+3. **Release notes** — [git-cliff](https://git-cliff.org) via [`taiki-e/install-action@v2`](https://github.com/taiki-e/install-action) (`tool: git-cliff` in `release.yml`, unpinned). The tool version follows that action’s manifests (cooldown of a day or so), not a live GitHub release every job. Dependabot only updates the action, which is how cliff moves. **Blind spot:** there is no PR smoke for notes without churning temporary tags. An RC job that fails to generate notes (including a future 3.0) is the smoke; fix `cliff.toml` or the notes bash before the full tag. Do not add a fake-tag notes job.
    - **Stable:** `git cliff -l` — changelog since the previous stable tag (`tag_pattern` in `cliff.toml`).
    - **Pre-release:** `git cliff $prev_tag..$tag` — commits since the previous tag on the line (often the prior RC). CI replaces git-cliff’s first line so the header reads `(since $prev_tag)`; git-cliff alone still prints the last **stable** tag there.
 4. **Publish** — Deletes any existing GitHub release for the tag (re-tag / re-run), appends a `## Downloads` section with the MSI link and .NET 10 Desktop Runtime requirement, then creates the release via `softprops/action-gh-release@v3`.
