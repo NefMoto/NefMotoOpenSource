@@ -17,9 +17,11 @@ RELEASE_DIR := ECUFlasher/bin/msil/Release
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(FULL_VERSION).msi
 PUBLISH_DIR := publish/NefMotoECUFlasher
+
 # Self-contained ecuflash publish. Set RID (linux-x64, linux-arm64, osx-x64, osx-arm64).
 ECUFLASH_PUBLISH_DIR := publish/ecuflash-$(RID)
 ECUFLASH_TARBALL := ecuflash-$(FULL_VERSION)-$(RID).tar.gz
+AVALONIA_PROJ := ECUFlasher.Avalonia/NefMotoECUFlasher.Avalonia.csproj
 
 .PHONY: all debug release test clean installer publish ecuflash help force
 
@@ -43,6 +45,12 @@ build:
 	FULL_VERSION=$(FULL_VERSION) dotnet build ECUFlasher.sln --configuration $(CONFIG) --verbosity minimal
 
 installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe ecuflash/bin/Release/ecuflash.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
+
+run-avalonia:
+	@echo "Building and running Avalonia app ($(CONFIG))..."
+	@FULL_VERSION=$(FULL_VERSION) dotnet run --project $(AVALONIA_PROJ) --configuration $(CONFIG) --no-launch-profile
+
+installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe nmflasher/bin/Release/nmflasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
 	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
 	@FULL_VERSION=$(FULL_VERSION) NET_TFM=$(NET_TFM) DOTNET_MAJOR=$(DOTNET_MAJOR) \
 	ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
@@ -80,11 +88,12 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  make debug     - Build in Debug configuration (default)"
-	@echo "  make release   - Build in Release configuration"
-	@echo "  make test      - Build and run unit tests"
-	@echo "  make publish   - Framework-dependent publish folder (not MSI)"
+	@echo "  make debug         - Build in Debug configuration (default)"
+	@echo "  make release       - Build in Release configuration"
+	@echo "  make test          - Build and run unit tests"
+	@echo "  make publish       - Framework-dependent publish folder (not MSI)"
 	@echo "  make ecuflash RID=linux-x64 - Self-contained single-file ecuflash tar.gz"
-	@echo "  make installer - Build the MSI installer"
-	@echo "  make clean     - Remove all build artifacts"
-	@echo "  make help      - Show this help message"
+	@echo "  make installer     - Build the MSI installer"
+	@echo "  make run-avalonia  - Build and run the Avalonia UI (cross-platform)"
+	@echo "  make clean         - Remove all build artifacts"
+	@echo "  make help          - Show this help message"

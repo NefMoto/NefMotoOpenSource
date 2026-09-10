@@ -1,0 +1,103 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:NefMotoECUFlasher.Avalonia.ViewModels;assembly=NefMotoECUFlasher.Avalonia"
+        xmlns:comm="clr-namespace:Communication;assembly=Communication"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
+        x:Class="NefMotoECUFlasher.Avalonia.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="NefMoto ECU Flasher"
+        MinWidth="700"
+        MinHeight="450"
+        Width="800"
+        Height="550"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Menu Grid.Row="0" Background="{StaticResource MenuBarBrush}">
+            <MenuItem Header="_File">
+                <MenuItem Header="Open _Log File"/>
+                <MenuItem Header="Open Log File _Location"/>
+                <Separator/>
+                <MenuItem Header="_Clear Log File"/>
+                <Separator/>
+                <MenuItem Header="_Exit" Command="{Binding ExitCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About..." Command="{Binding ShowAboutCommand}"
+                          ToolTip.Tip="Show information about NefMotoECUFlasher"/>
+            </MenuItem>
+        </Menu>
+
+        <DockPanel Grid.Row="1" Margin="4,4,4,0">
+            <!-- Source is 430x111. Show full graphic scaled to height 80 (≈310 wide), not a 225 crop. -->
+            <Image DockPanel.Dock="Left"
+                   Source="avares://NefMotoECUFlasher.Avalonia/Assets/app-banner.jpg"
+                   Stretch="Uniform"
+                   Width="310"
+                   Height="80"
+                   Margin="0,0,8,0"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Top"/>
+            <ComboBox DockPanel.Dock="Left"
+                      VerticalAlignment="Top"
+                      Margin="0,0,8,0"
+                      ToolTip.Tip="Desired communication protocol"
+                      ItemsSource="{Binding AvailableProtocols}"
+                      SelectedItem="{Binding SelectedProtocol}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="comm:CommunicationInterface+Protocol">
+                        <TextBlock Text="{Binding Converter={StaticResource descriptionAttributeConverter}}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <ContentControl DockPanel.Dock="Right" VerticalAlignment="Top">
+                <TextBlock Text="Connection view (to be ported)"
+                           Foreground="{StaticResource ForegroundBrush}"
+                           Margin="4,4"/>
+            </ContentControl>
+        </DockPanel>
+
+        <TabControl Grid.Row="2" Background="{StaticResource BackgroundBrush}">
+            <TabItem Header="KWP2000 Info">
+                <TextBlock Text="KWP2000 Info content (to be ported)" Margin="12" Foreground="{StaticResource ForegroundBrush}"/>
+            </TabItem>
+            <TabItem Header="KWP2000 Flashing">
+                <TextBlock Text="KWP2000 Flashing content (to be ported)" Margin="12" Foreground="{StaticResource ForegroundBrush}"/>
+            </TabItem>
+            <TabItem Header="KWP2000 Logging">
+                <TextBlock Text="KWP2000 Logging content (to be ported)" Margin="12" Foreground="{StaticResource ForegroundBrush}"/>
+            </TabItem>
+            <TabItem Header="{Binding SettingsTabHeader}">
+                <TextBlock Text="Settings content (to be ported)" Margin="12" Foreground="{StaticResource ForegroundBrush}"/>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="3"
+                Background="{StaticResource StatusBarBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="5">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding ConnectionStatusText}"
+                           Foreground="{StaticResource StatusBarForegroundBrush}"
+                           VerticalAlignment="Center"/>
+                <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderBrush}" Margin="8,0" VerticalAlignment="Stretch"/>
+                <TextBlock Grid.Column="2"
+                           Text="{Binding OperationStatusText}"
+                           Foreground="{StaticResource StatusBarForegroundBrush}"
+                           VerticalAlignment="Center"
+                           Margin="4,0"/>
+                <ProgressBar Grid.Column="3"
+                             Width="120"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding PercentOperationComplete}"
+                             IsIndeterminate="False"
+                             VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
