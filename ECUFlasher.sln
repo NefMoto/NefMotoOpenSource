@@ -18,6 +18,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ApplicationShared", "Applic
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NefMotoOpenSource.Tests", "Tests\NefMotoOpenSource.Tests.csproj", "{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ECUFlasher.Avalonia", "ECUFlasher.Avalonia", "{40E481B9-44B3-3B47-09A8-18226783BDEF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NefMotoECUFlasher.Avalonia", "ECUFlasher.Avalonia\NefMotoECUFlasher.Avalonia.csproj", "{42EF48AF-EBC6-472F-AA08-A855021CC69E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +56,10 @@ Global
 		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{42EF48AF-EBC6-472F-AA08-A855021CC69E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{42EF48AF-EBC6-472F-AA08-A855021CC69E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{42EF48AF-EBC6-472F-AA08-A855021CC69E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{42EF48AF-EBC6-472F-AA08-A855021CC69E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -62,6 +70,7 @@ Global
 		{8966A890-1A9B-42E4-B0B6-181627310D7E} = {D5966760-5B3C-49E7-AF91-09DBDBD7EF8D}
 		{7D8C0D8C-A7B5-446F-AD38-08E24D72C882} = {D5966760-5B3C-49E7-AF91-09DBDBD7EF8D}
 		{A72B0474-F8FB-4F9A-A1DB-0269BE9EB1FD} = {D5966760-5B3C-49E7-AF91-09DBDBD7EF8D}
+		{42EF48AF-EBC6-472F-AA08-A855021CC69E} = {40E481B9-44B3-3B47-09A8-18226783BDEF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E0D07F86-F532-40C5-8A14-AEBAA6091D0C}

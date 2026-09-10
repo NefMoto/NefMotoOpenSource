@@ -17,8 +17,9 @@ RELEASE_DIR := ECUFlasher/bin/msil/Release
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(FULL_VERSION).msi
 PUBLISH_DIR := publish/NefMotoECUFlasher
+AVALONIA_PROJ := ECUFlasher.Avalonia/NefMotoECUFlasher.Avalonia.csproj
 
-.PHONY: all debug release test clean installer publish help force
+.PHONY: all debug release test clean installer publish help force run-avalonia
 
 all: debug
 
@@ -35,6 +36,10 @@ test: build
 build:
 	@echo "Building with dotnet ($(CONFIG))..."
 	FULL_VERSION=$(FULL_VERSION) dotnet build ECUFlasher.sln --configuration $(CONFIG) --verbosity minimal
+
+run-avalonia:
+	@echo "Building and running Avalonia app ($(CONFIG))..."
+	@FULL_VERSION=$(FULL_VERSION) dotnet run --project $(AVALONIA_PROJ) --configuration $(CONFIG) --no-launch-profile
 
 installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
 	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
@@ -56,10 +61,11 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  make debug     - Build in Debug configuration (default)"
-	@echo "  make release   - Build in Release configuration"
-	@echo "  make test      - Build and run unit tests"
-	@echo "  make publish   - Framework-dependent publish folder (not MSI)"
-	@echo "  make installer - Build the MSI installer"
-	@echo "  make clean     - Remove all build artifacts"
-	@echo "  make help      - Show this help message"
+	@echo "  make debug         - Build in Debug configuration (default)"
+	@echo "  make release       - Build in Release configuration"
+	@echo "  make test          - Build and run unit tests"
+	@echo "  make publish       - Framework-dependent publish folder (not MSI)"
+	@echo "  make installer     - Build the MSI installer"
+	@echo "  make run-avalonia  - Build and run the Avalonia UI (cross-platform)"
+	@echo "  make clean         - Remove all build artifacts"
+	@echo "  make help          - Show this help message"

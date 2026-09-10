@@ -1,0 +1,244 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:NefMotoECUFlasher.Avalonia.Converters;assembly=NefMotoECUFlasher.Avalonia"
+             x:Class="NefMotoECUFlasher.Avalonia.App"
+             Name="NefMoto ECU Flasher"
+             RequestedThemeVariant="Light">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- Theme colors (match WPF App.xaml) -->
+            <Color x:Key="ForegroundColor">White</Color>
+            <Color x:Key="BackgroundColor">#FF901212</Color>
+            <Color x:Key="BorderColor">Black</Color>
+            <Color x:Key="ErrorBackgroundColor">#FFCC8700</Color>
+            <Color x:Key="HighlightColor">#FFCC8700</Color>
+
+            <SolidColorBrush x:Key="ForegroundBrush" Color="{StaticResource ForegroundColor}"/>
+            <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+            <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+            <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="{StaticResource ErrorBackgroundColor}"/>
+
+            <LinearGradientBrush x:Key="MenuBarBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                <GradientStop Color="#FFE0E0E0" Offset="0.5"/>
+                <GradientStop Color="#FFC0C0C0" Offset="1"/>
+            </LinearGradientBrush>
+            <!-- WPF-like hover (light blue-grey) — keep black text -->
+            <LinearGradientBrush x:Key="MenuItemHoverBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Color="#FFE8F0FF" Offset="0"/>
+                <GradientStop Color="#FFD8E8FF" Offset="0.5"/>
+                <GradientStop Color="#FFC8D8FF" Offset="1"/>
+            </LinearGradientBrush>
+            <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="#FFE0E0E0"/>
+            <SolidColorBrush x:Key="StatusBarForegroundBrush" Color="Black"/>
+
+            <!-- Force light Fluent flyouts even if OS is dark -->
+            <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#FFF0F0F0"/>
+            <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="Black"/>
+            <SolidColorBrush x:Key="MenuFlyoutItemBackground" Color="Transparent"/>
+            <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#FFD8E8FF"/>
+            <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#FFC0C0C0"/>
+            <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="Black"/>
+            <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="Black"/>
+            <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed" Color="Black"/>
+            <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="#FF808080"/>
+            <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="White"/>
+            <SolidColorBrush x:Key="ComboBoxItemForeground" Color="Black"/>
+            <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#FFD8E8FF"/>
+            <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="Black"/>
+            <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#FFE8F0FF"/>
+            <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="Black"/>
+
+            <converters:DescriptionAttributeConverter x:Key="descriptionAttributeConverter"/>
+            <converters:HexConverter x:Key="hexConverter"/>
+            <converters:AsStringConverter x:Key="asStringConverter"/>
+            <converters:StringValidConverter x:Key="stringValidConverter"/>
+            <converters:TimeSpanSecondsConverter x:Key="timeSpanSecondsConverter"/>
+            <converters:TimeSpanStringFormatConverter x:Key="timeSpanStringFormatConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+
+        <Style Selector="Window">
+            <Setter Property="Background" Value="#FF901212"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <!-- Top menu bar: grey, black text -->
+        <Style Selector="Menu">
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="MenuItem">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="8,3"/>
+        </Style>
+        <!-- Hover: light blue highlight, keep black text (not white) -->
+        <Style Selector="MenuItem:pointerover">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFD8E8FF"/>
+        </Style>
+        <Style Selector="MenuItem:selected">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFD8E8FF"/>
+        </Style>
+        <Style Selector="MenuItem:pressed">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFC0C0C0"/>
+        </Style>
+        <!-- Popup panel: light grey, black border -->
+        <Style Selector="MenuItem:open /template/ Popup#PART_Popup > Border">
+            <Setter Property="Background" Value="#FFF0F0F0"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Padding" Value="1"/>
+        </Style>
+        <!-- Header presenter text stays black on hover -->
+        <Style Selector="MenuItem:pointerover /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style Selector="MenuItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style Selector="Separator">
+            <Setter Property="Background" Value="#FFA0A0A0"/>
+            <Setter Property="Margin" Value="4,2"/>
+            <Setter Property="Height" Value="1"/>
+        </Style>
+
+        <!-- Compact-but-readable tabs (WPF header uses ~12pt with Margin 12,4) -->
+        <Style Selector="TabControl">
+            <Setter Property="Background" Value="#FF901212"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="TabItem">
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="MinHeight" Value="24"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="Margin" Value="0,2,1,0"/>
+        </Style>
+        <!-- Paint Fluent's layout root so hover/selected don't show the red TabControl behind -->
+        <Style Selector="TabItem /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+        <!-- Hide Fluent's blue selected underline -->
+        <Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+            <Setter Property="IsVisible" Value="False"/>
+            <Setter Property="Height" Value="0"/>
+        </Style>
+        <!-- WPF: selected = white, black text -->
+        <Style Selector="TabItem:selected">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Margin" Value="0,0,1,-1"/>
+            <Setter Property="ZIndex" Value="1"/>
+        </Style>
+        <Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="White"/>
+        </Style>
+        <Style Selector="TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <!-- WPF: unselected hover = light blue-grey, black text (never red) -->
+        <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#FFE8F0FF"/>
+        </Style>
+        <Style Selector="TabItem:pointerover">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFE8F0FF"/>
+        </Style>
+        <Style Selector="TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <!-- WPF: selected+hover stays white -->
+        <Style Selector="TabItem:selected:pointerover">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style Selector="TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="White"/>
+        </Style>
+        <Style Selector="TabItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style Selector="TabItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+
+        <Style Selector="ComboBox">
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="MinHeight" Value="24"/>
+            <Setter Property="Padding" Value="6,3"/>
+        </Style>
+        <Style Selector="ComboBoxItem">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="6,3"/>
+        </Style>
+        <Style Selector="ComboBoxItem:pointerover">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFE8F0FF"/>
+        </Style>
+        <Style Selector="ComboBoxItem:selected">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFD8E8FF"/>
+        </Style>
+        <Style Selector="ComboBox /template/ Popup#PART_Popup > Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+
+        <Style Selector="Button">
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="MinHeight" Value="24"/>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFE8F0FF"/>
+        </Style>
+        <Style Selector="ProgressBar">
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="Foreground" Value="#FF309030"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Black"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="MinHeight" Value="14"/>
+            <Setter Property="Height" Value="16"/>
+        </Style>
+        <Style Selector="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+    </Application.Styles>
+</Application>

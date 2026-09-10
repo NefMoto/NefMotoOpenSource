@@ -4,6 +4,7 @@
     <NetTfm>net10.0</NetTfm>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'FTD2XX_NET'">true</IsNonWindowsTfm>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'NefMotoECUFlasher.Avalonia'">true</IsNonWindowsTfm>
     <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'Shared'">true</IsNonWindowsTfm>
     <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'Communication'">true</IsNonWindowsTfm>
     <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'Checksum'">true</IsNonWindowsTfm>
