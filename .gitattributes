@@ -8,9 +8,17 @@
 *.sln text
 *.xaml text=lf
 *.xaml.cs text=lf
+*.axaml text=lf
 *.xml text=lf
+*.manifest text=lf
+*.resx text=lf
+*.props text=lf
+*.targets text=lf
 *.config text=lf
 *.json text=lf
+*.yml text=lf
+*.yaml text=lf
+*.toml text=lf
 *.md text=lf
 *.mdc text=lf
 *.txt text=lf
@@ -30,6 +38,7 @@
 *.jpeg binary
 *.gif binary
 *.ico binary
+*.icns binary
 *.exe binary
 *.dll binary
 *.so binary
