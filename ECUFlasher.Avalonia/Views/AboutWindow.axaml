@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:NefMotoECUFlasher.Avalonia.ViewModels;assembly=NefMotoECUFlasher.Avalonia"
+        x:Class="NefMotoECUFlasher.Avalonia.Views.AboutWindow"
+        x:DataType="vm:AboutViewModel"
+        Title="About NefMoto ECU Flasher"
+        Width="420"
+        Height="260"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}">
+
+    <StackPanel Margin="24" Spacing="12">
+        <TextBlock Text="NefMoto ECU Flasher" FontSize="18" FontWeight="Bold" Foreground="{StaticResource ForegroundBrush}"/>
+        <TextBlock Text="{Binding FullVersion}" Foreground="{StaticResource ForegroundBrush}"/>
+        <TextBlock Text="Open source ME7 ECU flasher. GPL v3." Foreground="{StaticResource ForegroundBrush}" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button Content="GitHub releases" Command="{Binding OpenReleasesCommand}"/>
+            <Button Content="nefariousmotorsports.com" Command="{Binding OpenWebsiteCommand}"/>
+        </StackPanel>
+        <Button Content="OK" Command="{Binding CloseCommand}" HorizontalAlignment="Right" Margin="0,12,0,0" Padding="24,6"/>
+    </StackPanel>
+</Window>
