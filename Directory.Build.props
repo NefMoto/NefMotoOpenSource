@@ -1,9 +1,16 @@
 <Project>
   <PropertyGroup>
-    <!-- Single TFM source of truth. FTD2XX_NET is netX.0 (no WPF); everything else is netX.0-windows. -->
+    <!-- Single TFM source of truth. Shared libs/tests are netX.0 (no WPF); ECUFlasher is netX.0-windows. -->
     <NetTfm>net10.0</NetTfm>
-    <TargetFramework Condition="'$(MSBuildProjectName)' == 'FTD2XX_NET'">$(NetTfm)</TargetFramework>
-    <TargetFramework Condition="'$(MSBuildProjectName)' != 'FTD2XX_NET'">$(NetTfm)-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'FTD2XX_NET'">true</IsNonWindowsTfm>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'Shared'">true</IsNonWindowsTfm>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'Communication'">true</IsNonWindowsTfm>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'Checksum'">true</IsNonWindowsTfm>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'ApplicationShared'">true</IsNonWindowsTfm>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'NefMotoOpenSource.Tests'">true</IsNonWindowsTfm>
+    <TargetFramework Condition="'$(IsNonWindowsTfm)' == 'true'">$(NetTfm)</TargetFramework>
+    <TargetFramework Condition="'$(IsNonWindowsTfm)' != 'true'">$(NetTfm)-windows</TargetFramework>
     <!-- Keep bin paths stable across TFM bumps (Makefile, WiX, launch.json). -->
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
