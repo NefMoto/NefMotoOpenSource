@@ -11,7 +11,7 @@ Write-Host "WiX $wixVersion (local tool), $msi"
 
 dotnet tool restore
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
-dotnet tool run wix -- extension add "WixToolset.UI.wixext/$wixVersion" "WixToolset.NetFx.wixext/$wixVersion" --global
+dotnet tool run wix -- --acceptEula wix7 extension add "WixToolset.UI.wixext/$wixVersion" "WixToolset.NetFx.wixext/$wixVersion" --global
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
-dotnet tool run wix -- build -arch x64 -d "RuntimeTfm=$($env:NET_TFM)" -d "DotNetMajor=$($env:DOTNET_MAJOR)" -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o $msi Installer/Product.wxs
+dotnet tool run wix -- --acceptEula wix7 build -arch x64 -d "RuntimeTfm=$($env:NET_TFM)" -d "DotNetMajor=$($env:DOTNET_MAJOR)" -ext WixToolset.UI.wixext -ext WixToolset.NetFx.wixext -o $msi Installer/Product.wxs
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
