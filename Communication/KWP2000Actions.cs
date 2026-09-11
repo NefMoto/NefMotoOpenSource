@@ -108,7 +108,8 @@ namespace Communication
                     }
                     catch (Exception e)
                     {
-                        Debug.Fail("Exception: " + e.Message);
+                        DisplayStatusMessage("Exception handling received message: " + e.Message, StatusMessageType.LOG);
+                        ActionCompletedInternal(false, true);
                     }
                 }
             }
