@@ -254,6 +254,12 @@ paket-files/
 # FAKE - F# Make
 .fake/
 
+# Cursor IDE
+.cursor/
+
+# Visual Studio Code IDE
+.vscode/
+
 # JetBrains Rider
 .idea/
 *.sln.iml
