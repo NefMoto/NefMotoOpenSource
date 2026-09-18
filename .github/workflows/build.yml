@@ -10,6 +10,10 @@ on:
     branches:
       - '**'  # All branches
 
+# Restrict GITHUB_TOKEN. Checkout, build, test, and upload-artifact only need contents: read.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest

@@ -10,6 +10,12 @@ on:
         description: 'Tag to build (e.g., v1.1.1.1 or v1.1.1.1-rc1)'
         required: true
 
+# Restrict GITHUB_TOKEN. Creating/deleting a GitHub release and uploading the MSI need
+# contents: write. git-cliff may call the GitHub API for PR titles (CI is not --offline).
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   build-and-release:
     runs-on: windows-latest
