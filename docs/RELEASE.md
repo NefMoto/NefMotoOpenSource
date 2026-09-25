@@ -73,10 +73,10 @@ CI does **not** pass `--offline` to git-cliff so PR titles, issue links, and con
 
 ## Changelog configuration
 
-Commit grouping, conventional-commit parsing, and the release-note template live in [`cliff.toml`](../cliff.toml). Highlights:
+Commit grouping and the release-note template live in [`cliff.toml`](../cliff.toml). Highlights:
 
 - **`tag_pattern`** — Only stable four-part tags (`v1.9.6.0`). RC tags are excluded from `-l` / latest-stable logic.
-- **Commit parsers** — Conventional prefixes (`feat`, `fix`, `doc`, …) plus legacy message heuristics; unmatched commits go to **Other**.
+- **Commit parsers** — `feat` and `Add` (Features), `fix` (Bug Fixes), `doc` / `docs` (Documentation), `refactor` (Refactor), `chore`, `ci`, `cosmetic`, and `style` (Chore), `deps` and `chore(deps)` (Dependencies). `Bump` subjects and Dependabot merge commits are Dependencies. Identical `Bump` subjects collapse to one line. Non-Dependabot merge commits are skipped. Unmatched commits go to **Other**.
 - **Template** — Prefers GitHub PR title when available; links `#123` to issues.
 
 ## Preview changelog locally
