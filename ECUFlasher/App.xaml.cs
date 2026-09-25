@@ -150,6 +150,11 @@ namespace ECUFlasher
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // Log file already exists from the constructor. Do not mark these handled:
+            // the process should still exit after the stack is on disk.
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+
             base.OnStartup(e);
 
             DisplayStatusMessage("Opened " + GetApplicationName(), StatusMessageType.LOG);
@@ -180,6 +185,62 @@ namespace ECUFlasher
             DisplayStatusMessage("Closing " + GetApplicationName(), StatusMessageType.LOG);
 
             base.OnExit(e);
+        }
+
+        private int mCrashLogged;
+
+        private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            LogUnhandledException("UI", e.Exception);
+        }
+
+        private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            Exception ex = e.ExceptionObject as Exception;
+            if (ex != null)
+            {
+                LogUnhandledException("AppDomain", ex);
+            }
+            else if (e.ExceptionObject != null)
+            {
+                LogUnhandledException("AppDomain", e.ExceptionObject.ToString());
+            }
+        }
+
+        private void LogUnhandledException(string source, Exception ex)
+        {
+            if (ex != null)
+            {
+                LogUnhandledException(source, ex.ToString());
+            }
+        }
+
+        private void LogUnhandledException(string source, string detail)
+        {
+            if ((detail == null) || (mLogFileName == null))
+            {
+                return;
+            }
+
+            if (Interlocked.Exchange(ref mCrashLogged, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                lock (mLogFileName)
+                {
+                    string logFileEntry = DateTime.Now.ToString("dd/MMM/yyyy hh:mm:ss.fff", CultureInfo.InvariantCulture)
+                        + ": " + StatusMessageType.LOG + ": Unhandled (" + source + "): " + detail + Environment.NewLine;
+
+                    File.AppendAllText(mLogFileName, logFileEntry, Encoding.ASCII);
+                    mLogFileSize += logFileEntry.Length;
+                }
+            }
+            catch
+            {
+            }
         }
 
         internal XmlSerializerNamespaces XMLNamespace
@@ -676,7 +737,28 @@ namespace ECUFlasher
             {
                 if (_OpenLogFileLocationCommand == null)
                 {
-                    _OpenLogFileLocationCommand = new ReactiveCommand(delegate() { Process.Start(mLogFileDirectory); });
+                    _OpenLogFileLocationCommand = new ReactiveCommand(delegate()
+                    {
+                        try
+                        {
+                            if (Directory.Exists(mLogFileDirectory))
+                            {
+                                Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = mLogFileDirectory,
+                                    UseShellExecute = true
+                                });
+                            }
+                            else
+                            {
+                                DisplayStatusMessage("Log file location does not exist: " + mLogFileDirectory, StatusMessageType.USER);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DisplayStatusMessage("Failed to open log file location: " + ex.Message, StatusMessageType.USER);
+                        }
+                    });
                     _OpenLogFileLocationCommand.Name = "Open Log File Location";
                     _OpenLogFileLocationCommand.Description = "Open the log file location";
                 }
