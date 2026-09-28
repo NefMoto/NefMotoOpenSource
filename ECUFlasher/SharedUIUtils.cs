@@ -544,6 +544,43 @@ namespace Shared
             }
         }
 
+        // Drop previous owners of propertyName, then watch owner. ConnectionStatus moves when App.CommInterface is replaced.
+        public void ReplaceWatchedProperty(INotifyPropertyChanged owner, string propertyName)
+        {
+            if (owner == null)
+            {
+                return;
+            }
+
+            bool alreadyWatching = false;
+
+            if (WatchedProperties != null)
+            {
+                for (int i = WatchedProperties.Count - 1; i >= 0; i--)
+                {
+                    WatchedEntry entry = WatchedProperties[i];
+                    if ((entry.PropertyName != propertyName) || (entry.Owner == null))
+                    {
+                        continue;
+                    }
+
+                    if (entry.Owner == owner)
+                    {
+                        alreadyWatching = true;
+                        continue;
+                    }
+
+                    entry.Owner.PropertyChanged -= this.PropertyChangedEventHandler;
+                    WatchedProperties.RemoveAt(i);
+                }
+            }
+
+            if (!alreadyWatching)
+            {
+                AddWatchedProperty(owner, propertyName);
+            }
+        }
+
         public void AddWatchedCollection(INotifyPropertyChanged owner, string propertyName, INotifyCollectionChanged collection)
         {
             if (WatchedCollections == null)
@@ -678,6 +715,41 @@ namespace Shared
             }
 
             PropertyWatcher.AddWatchedProperty(owner, propertyName);
+        }
+
+        public void ReplaceWatchedProperty(INotifyPropertyChanged owner, string propertyName)
+        {
+            if (PropertyWatcher == null)
+            {
+                PropertyWatcher = new PropertyChangedWatcher();
+                PropertyWatcher.PropertyChangedCallback += this.WatchedPropertyChangedEventHandler;
+            }
+
+            PropertyWatcher.ReplaceWatchedProperty(owner, propertyName);
+        }
+
+        // ConnectionStatus follows the live interface. CommInterface is watched so CanExecute runs on a protocol change.
+        public void WatchConnection(ECUFlasher.App app)
+        {
+            if (app == null)
+            {
+                return;
+            }
+
+            if (app.CommInterface != null)
+            {
+                AddWatchedProperty(app.CommInterface, "ConnectionStatus");
+            }
+
+            AddWatchedProperty(app, "CommInterface");
+
+            app.PropertyChanged += (sender, e) =>
+            {
+                if ((e.PropertyName == "CommInterface") && (app.CommInterface != null))
+                {
+                    ReplaceWatchedProperty(app.CommInterface, "ConnectionStatus");
+                }
+            };
         }
 
         public void AddWatchedCollection(INotifyPropertyChanged owner, string propertyName, INotifyCollectionChanged collection)

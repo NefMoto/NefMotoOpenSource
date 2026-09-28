@@ -191,9 +191,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        _ReadDTCsCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+                        _ReadDTCsCommand.WatchConnection(App);
                         _ReadDTCsCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _ReadDTCsCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                     }
 
                     _ReadDTCsCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
@@ -245,9 +244,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        _ClearDTCsCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
+                        _ClearDTCsCommand.WatchConnection(App);
                         _ClearDTCsCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _ClearDTCsCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                     }
 
                     _ClearDTCsCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
@@ -416,9 +414,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        AddWatchedPropertySafe(_ReadInfoCommand, App.CommInterface, "ConnectionStatus", "CommInterface");
+                        _ReadInfoCommand.WatchConnection(App);
                         _ReadInfoCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _ReadInfoCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                     }
 
                     _ReadInfoCommand.ExecuteMethod = delegate
