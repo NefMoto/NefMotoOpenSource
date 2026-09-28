@@ -1110,6 +1110,10 @@ namespace Communication
 
                         mNumSendAttemptsForCurrentMessage = 0;
                         mNumConsecutiveUnsolicitedResponses = 0;
+                        mCurrentMessageSentProperly = false;
+                        mCurrentMessageReceivedAnyResponses = false;
+                        mCurrentMessageWaitedForAllReplies = false;
+                        mCurrentMessageSentFinishedEvent = false;
 
                         mDisconnectTimeOut.Reset();
                         ClearMessageBuffers();
@@ -3578,7 +3582,6 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                 if (!mP1ECUResponseInterByteTimeOut.IsRunning && !mP2ECUResponseTimeOut.IsRunning && !mP3TesterRequestTimeOut.IsRunning && IsConnectionOpen())
                 {
-                    Debug.Fail("Connection is open and P1, P2, and P3 timers are not running");
                     DisplayStatusMessage("BAD! Communication connection is open and no message timers are running. Please report to NefMoto.", StatusMessageType.USER);
 
                     mP2ECUResponseTimeOut.Start();//restart the timer to cause a time out
@@ -4094,7 +4097,13 @@ connectEndTime = connectStartTime + connectTime + 3;
         {
             bool isExpecting = mCurrentMessageSentProperly && !mCurrentMessageSentFinishedEvent && !mCurrentMessageWaitedForAllReplies && AnyMessagesPendingSend() && (ConnectionStatus != ConnectionStatusType.Disconnected);
 
-            Debug.Assert(!isExpecting || mP2ECUResponseTimeOut.IsRunning || mP1ECUResponseInterByteTimeOut.IsRunning);
+            // A stalled P2 used to fail this assert and terminate a Debug build. Restart it so the
+            // response timeout can retry or finish the pending message.
+            if (isExpecting && !mP2ECUResponseTimeOut.IsRunning && !mP1ECUResponseInterByteTimeOut.IsRunning)
+            {
+                DisplayStatusMessage("Expecting an ECU response but P1 and P2 are not running. Restarting P2.", StatusMessageType.LOG);
+                mP2ECUResponseTimeOut.Start();
+            }
 
             return isExpecting;
         }

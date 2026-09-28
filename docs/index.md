@@ -14,6 +14,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 ## Developer / maintainer
 
 - [KWP2000.md](KWP2000.md) — bench results, connect timing, RAM kernel after write, settings persistence
+- [P1681-P0602.md](P1681-P0602.md) — `P0602` on this `4B0906018CH` with `06A906032NL`, and why `4B0906018DQ` is not written here
 - [BUILDING.md](BUILDING.md) — build from source
 - [RELEASE.md](RELEASE.md) — how releases are tagged and published
 

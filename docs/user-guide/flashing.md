@@ -30,7 +30,7 @@ Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB). The documented b
 
 - **Full Read Flash** — whole layout
 - **Diff Read Flash** — only sectors that differ from the loaded file
-- **Check if Flash Matches** — compare without saving a new dump
+- **Check if Flash Matches** — compare the loaded file to the ECU with one KWP checksum. Nothing is saved. Disabled in bootmode.
 
 Engine off. Confirmation dialogs include the ME7.5 pin 121 hint when connected over KWP.
 

@@ -65,6 +65,7 @@ Contact by Email: tony@nefariousmotorsports.com
                 <RowDefinition/>
                 <RowDefinition/>
                 <RowDefinition/>
+                <RowDefinition/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition />
@@ -76,11 +77,12 @@ Contact by Email: tony@nefariousmotorsports.com
             <Button Command="{Binding Path=WriteEntireFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="0"/>
             <Button Command="{Binding Path=WriteDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="1"/>
             <Button Command="{Binding Path=VerifyChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="0"/>
+            <Button Command="{Binding Path=CheckIfFlashMatchesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="2"/>
             <StackPanel Orientation="Horizontal" Grid.Column="2" Grid.Row="1" Margin="8,0,0,0">
                 <CheckBox x:Name="chkVerifyWrite" VerticalAlignment="Center" IsChecked="True" IsEnabled="{Binding Path=IsVerifyWriteEnabled}"/>
                 <Label>Verify Write</Label>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,4,0,0">
+            <StackPanel Orientation="Horizontal" Grid.Column="0" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,4,0,0">
                 <ComboBox MinWidth="200" Margin="0,0,8,0"
                     Style="{StaticResource ValidationComboBoxStyle}"
                     ItemsSource="{Binding Path=AvailableEepromPresets}"

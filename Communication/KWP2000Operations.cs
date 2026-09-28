@@ -2943,6 +2943,8 @@ namespace Communication
             EnableAutoNegotiateSecurity(checkSettings.SecuritySettings);
 
             mValidateAction = new ValidateFlashChecksumAction(commInterface, startAddress, data);
+            uint endAddress = (data.Length == 0) ? startAddress : startAddress + (uint)data.Length - 1;
+            mChecksumStatus = "Checksumming " + data.Length + " bytes from 0x" + startAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8") + ".";
 
             mActionArray = new KWP2000Action[1];
             mActionArray[0] = mValidateAction;
@@ -2954,7 +2956,7 @@ namespace Communication
 
             if (action == mValidateAction)
             {
-                CommInterface.DisplayStatusMessage("Starting to check if flash memory matches. Please be patient.", StatusMessageType.USER);
+                CommInterface.DisplayStatusMessage(mChecksumStatus, StatusMessageType.USER);
             }
         }
 
@@ -2981,6 +2983,7 @@ namespace Communication
         public bool DoesMatch { get { return mValidateAction.IsFlashChecksumCorrect;  } }
 
         private ValidateFlashChecksumAction mValidateAction;
+        private string mChecksumStatus;
     };
 
     public class ReadAllLocalIdentifiersOperation : KWP2000Operation
