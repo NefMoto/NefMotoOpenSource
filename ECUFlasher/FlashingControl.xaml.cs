@@ -986,10 +986,9 @@ namespace ECUFlasher
                             result = false;
                         }
 
-                        if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 &&
-                            App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
+                        if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
                         {
-                            reasonsDisabled.Add("Not connected with KWP2000 or BootMode protocol");
+                            reasonsDisabled.Add("Not connected with KWP2000 protocol");
                             result = false;
                         }
 
@@ -1932,6 +1931,12 @@ namespace ECUFlasher
         private void CheckIfFlashMatches()
         {
             var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+
+            if (KWP2000CommViewModel == null)
+            {
+                App.DisplayStatusMessage("Checking if flash matches flash file requires a KWP2000 connection.", StatusMessageType.USER);
+                return;
+            }
 
             var settings = new DoesFlashChecksumMatchOperation.DoesFlashChecksumMatchSettings();
             settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
