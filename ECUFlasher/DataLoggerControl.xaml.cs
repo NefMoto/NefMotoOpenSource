@@ -1530,8 +1530,7 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        _StartReadingCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
-                        _StartReadingCommand.AddWatchedProperty(App, "CommInterface");//to watch for protocol changes
+                        _StartReadingCommand.WatchConnection(App);
                         _StartReadingCommand.AddWatchedProperty(App, "OperationInProgress");
                         _StartReadingCommand.AddWatchedProperty(this, "IsReadingVariables");
                         _StartReadingCommand.AddWatchedProperty(this, "IsLogPlaying");
@@ -1600,11 +1599,6 @@ namespace ECUFlasher
                     _StopReadingCommand = new ReactiveCommand(this.OnStopReading);
                     _StopReadingCommand.Name = "Stop Reading";
                     _StopReadingCommand.Description = "Stop reading variables";
-
-                    if (App != null)
-                    {
-                        _StopReadingCommand.AddWatchedProperty(App.CommInterface, "ConnectionStatus");
-                    }
 
                     _StopReadingCommand.AddWatchedProperty(this, "IsReadingVariables");
 

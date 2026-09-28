@@ -83,27 +83,29 @@ namespace ECUFlasher
             if (App != null)
             {
                 App.PropertyChanged += App_PropertyChanged;
-                if (App.CommInterface != null)
+                _watchedCommInterface = App.CommInterface;
+                if (_watchedCommInterface != null)
                 {
-                    App.CommInterface.PropertyChanged += CommInterface_PropertyChanged;
+                    _watchedCommInterface.PropertyChanged += CommInterface_PropertyChanged;
                 }
             }
         }
+
+        private CommunicationInterface _watchedCommInterface;
 
         private void App_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == "CommInterface")
             {
-                // Unsubscribe from old CommInterface
-                if (sender is App app && app.CommInterface != null)
+                if (_watchedCommInterface != null)
                 {
-                    app.CommInterface.PropertyChanged -= CommInterface_PropertyChanged;
+                    _watchedCommInterface.PropertyChanged -= CommInterface_PropertyChanged;
                 }
 
-                // Subscribe to new CommInterface
-                if (App.CommInterface != null)
+                _watchedCommInterface = App.CommInterface;
+                if (_watchedCommInterface != null)
                 {
-                    App.CommInterface.PropertyChanged += CommInterface_PropertyChanged;
+                    _watchedCommInterface.PropertyChanged += CommInterface_PropertyChanged;
                 }
 
                 OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
@@ -951,9 +953,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        AddWatchedPropertySafe(_CheckIfFlashMatchesCommand, App.CommInterface, "ConnectionStatus", "CommInterface");
+                        _CheckIfFlashMatchesCommand.WatchConnection(App);
                         _CheckIfFlashMatchesCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _CheckIfFlashMatchesCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                         _CheckIfFlashMatchesCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                         _CheckIfFlashMatchesCommand.AddWatchedProperty(this, "IsFlashFileOK");
                     }
@@ -1034,9 +1035,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        AddWatchedPropertySafe(_WriteEntireFlashCommand, App.CommInterface, "ConnectionStatus", "CommInterface");
+                        _WriteEntireFlashCommand.WatchConnection(App);
                         _WriteEntireFlashCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _WriteEntireFlashCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                         _WriteEntireFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
                         _WriteEntireFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
@@ -1163,9 +1163,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        AddWatchedPropertySafe(_WriteDiffFlashCommand, App.CommInterface, "ConnectionStatus", "CommInterface");
+                        _WriteDiffFlashCommand.WatchConnection(App);
                         _WriteDiffFlashCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _WriteDiffFlashCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                         _WriteDiffFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
                         _WriteDiffFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
@@ -1286,9 +1285,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        AddWatchedPropertySafe(_ReadEntireFlashCommand, App.CommInterface, "ConnectionStatus", "CommInterface");
+                        _ReadEntireFlashCommand.WatchConnection(App);
                         _ReadEntireFlashCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _ReadEntireFlashCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                         _ReadEntireFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
 
@@ -1452,9 +1450,8 @@ namespace ECUFlasher
 
             if (App != null)
             {
-                AddWatchedPropertySafe(command, App.CommInterface, "ConnectionStatus", "CommInterface");
+                command.WatchConnection(App);
                 command.AddWatchedProperty(App, "OperationInProgress");
-                command.AddWatchedProperty(App, "CommInterface");
                 command.AddWatchedProperty(this, "SelectedEepromPreset");
             }
 
@@ -1771,9 +1768,8 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
-                        AddWatchedPropertySafe(_ReadDiffFlashCommand, App.CommInterface, "ConnectionStatus", "CommInterface");
+                        _ReadDiffFlashCommand.WatchConnection(App);
                         _ReadDiffFlashCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _ReadDiffFlashCommand.AddWatchedProperty(App, "CommInterface");//listen for protocol changes
                         _ReadDiffFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
                         _ReadDiffFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
