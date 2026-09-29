@@ -631,11 +631,24 @@ namespace Communication
             }
 
             ReadMemory = new MemoryImage(data, 0);
+            LogEepromBytes(data);
             BootmodeEepromChecksumMessages.ReportMe7Eeprom95040Checksums(CommInterface, mSettings, data, warnOnly: false);
             CommInterface.DisplayStatusMessage(
                 "Bootmode EEPROM read complete. Reload flash driver before any flash operation.",
                 StatusMessageType.USER);
             return true;
+        }
+
+        private void LogEepromBytes(byte[] data)
+        {
+            for (int offset = 0; offset < data.Length; offset += 16)
+            {
+                int count = Math.Min(16, data.Length - offset);
+                string hex = BitConverter.ToString(data, offset, count).Replace("-", " ");
+                CommInterface.DisplayStatusMessage(
+                    "EEPROM 0x" + offset.ToString("X4") + ": " + hex,
+                    StatusMessageType.DEV);
+            }
         }
 
         private readonly BootstrapInterface mBootstrapInterface;
