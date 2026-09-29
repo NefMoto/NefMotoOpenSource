@@ -1141,6 +1141,7 @@ namespace ECUFlasher
             {
                 if (ConfirmFlashOperation("Confirm Full Write ECU Flash Memory", FlashConfirmationKind.WriteEntire))
                 {
+                    LogLoadedFlashFile("Full write");
                     // Force verify to false for bootmode
                     bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
                         ? false
@@ -1241,6 +1242,7 @@ namespace ECUFlasher
             {
                 if (ConfirmFlashOperation("Confirm Diff Write ECU Flash Memory", FlashConfirmationKind.WriteDiff))
                 {
+                    LogLoadedFlashFile("Diff write");
                     // Force verify to false for bootmode
                     bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
                         ? false
@@ -1845,6 +1847,7 @@ namespace ECUFlasher
             {
                 if (ConfirmFlashOperation("Confirm Diff Read ECU Flash Memory", FlashConfirmationKind.ReadDiff))
                 {
+                    LogLoadedFlashFile("Diff read");
                     App.OperationInProgress = true;
                     App.PercentOperationComplete = 0.0f;
 
@@ -2145,6 +2148,11 @@ namespace ECUFlasher
         }
 
         /// <summary>Wires completion, sets operation state, displays message, and starts the operation.</summary>
+        private void LogLoadedFlashFile(string operation)
+        {
+            App.DisplayStatusMessage(operation + " loaded file: " + FileNameToFlash, StatusMessageType.LOG);
+        }
+
         private void StartFlashOperation(Operation operation, Operation.CompletedOperationDelegate onComplete, string statusMessage)
         {
             operation.CompletedOperationEvent += onComplete;
