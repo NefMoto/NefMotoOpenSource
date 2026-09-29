@@ -964,10 +964,10 @@ namespace Communication
                             }
                             else
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try ME7 29F800 for a 1MB chip).", StatusMessageType.USER);
+                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).", StatusMessageType.USER);
                                 var continueAnyway = CommInterface.DisplayUserPrompt(
                                     "Flash does not appear mirrored",
-                                    "The sample above the layout does not match the layout range. A 1MB layout (ME7 29F800) is probably required.\n\nContinue with this layout anyway?",
+                                    "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?",
                                     UserPromptType.OK_CANCEL);
                                 if (continueAnyway == UserPromptResult.OK)
                                 {
@@ -1025,7 +1025,7 @@ namespace Communication
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
                         {
-                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try ME7 29F800), or flash may extend beyond this layout.";
+                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
                         {
@@ -1786,8 +1786,12 @@ namespace Communication
                                 uint sectorSize = mCurrentBlock.mMemoryImage.Size;
                                 uint endAddress = startAddress + sectorSize - 1;
                                 bool isTopBoot = (selectedLayout.BootOrientation == FlashBootOrientation.TopBoot);
-                                string selectedName = isTopBoot ? "top-boot (BT)" : "bottom-boot (BB)";
-                                string suspectedName = isTopBoot ? "bottom-boot (BB)" : "top-boot (BT)";
+                                string selectedName = !String.IsNullOrEmpty(selectedLayout.BootLabel)
+                                    ? selectedLayout.BootLabel
+                                    : (isTopBoot ? "top-boot (BT)" : "bottom-boot (BB)");
+                                string suspectedName = !String.IsNullOrEmpty(selectedLayout.OppositeBootLabel)
+                                    ? selectedLayout.OppositeBootLabel
+                                    : (isTopBoot ? "bottom-boot (BB)" : "top-boot (BT)");
                                 string oppositeName = !String.IsNullOrEmpty(selectedLayout.OppositeLayout)
                                     ? selectedLayout.OppositeLayout
                                     : "the opposite boot layout";
@@ -1949,10 +1953,10 @@ namespace Communication
                             }
                             else
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try ME7 29F800 for a 1MB chip).", StatusMessageType.USER);
+                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).", StatusMessageType.USER);
                                 var continueAnyway = CommInterface.DisplayUserPrompt(
                                     "Flash does not appear mirrored",
-                                    "The sample above the layout does not match the layout range. A 1MB layout (ME7 29F800) is probably required.\n\nContinue with this layout anyway?",
+                                    "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?",
                                     UserPromptType.OK_CANCEL);
                                 if (continueAnyway == UserPromptResult.OK)
                                 {
@@ -2077,7 +2081,7 @@ namespace Communication
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
                         {
-                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try ME7 29F800), or flash may extend beyond this layout.";
+                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
                         }
                         else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
                         {

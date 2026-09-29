@@ -2489,6 +2489,14 @@ namespace Communication
             return true;
         }
 
+        /// <summary>
+        /// Shipped layout basename for a flash device ID. FlashDeviceId in the XML is the map.
+        /// </summary>
+        public static string GetLayoutBasenameFromDeviceID(ushort deviceID)
+        {
+            return MemoryLayout.FindBasenameByFlashDeviceId(deviceID);
+        }
+
         #endregion
 
         #region Bootmode SPI EEPROM (95040)

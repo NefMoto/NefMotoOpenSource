@@ -5,29 +5,34 @@
   <!--Size must be an even number and specified in decimal, hexidecimal is not currently supported. The Size comes from the memory chip datasheet.-->
   <Size>1048576</Size>
   <!--BootOrientation: TopBoot (BT) or BottomBoot (BB). Omit for uniform maps.-->
-  <BootOrientation>BottomBoot</BootOrientation>
+  <BootOrientation>TopBoot</BootOrientation>
   <BootClusterSectors>4</BootClusterSectors>
-  <OppositeLayout>ME7 29F800BT</OppositeLayout>
+  <OppositeLayout>29F800BB</OppositeLayout>
+  <!--FlashDeviceId is the FC_GETSTATE id. Hex is allowed. Bootmode uses it to pick this file.-->
+  <FlashDeviceId>0x22D6</FlashDeviceId>
+  <!--BootLabel and OppositeBootLabel are the words for a boot-cluster erase failure.-->
+  <BootLabel>top-boot (BT)</BootLabel>
+  <OppositeBootLabel>bottom-boot (BB)</OppositeBootLabel>
   <!--SectorSizes must be an even number and specified in decimal, hexadecimal is not currently supported. The SectorSizes come from the memory chip datasheet. -->
   <SectorSizes>
-    <unsignedInt>16384</unsignedInt>
-    <unsignedInt>8192</unsignedInt>
-    <unsignedInt>8192</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>65536</unsignedInt>
     <unsignedInt>32768</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
-    <unsignedInt>65536</unsignedInt>
+    <unsignedInt>8192</unsignedInt>
+    <unsignedInt>8192</unsignedInt>
+    <unsignedInt>16384</unsignedInt>
   </SectorSizes>
 </MemoryLayout>

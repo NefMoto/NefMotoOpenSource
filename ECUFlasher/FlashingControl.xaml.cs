@@ -75,7 +75,16 @@ namespace ECUFlasher
             PopulateMemoryLayouts();
             if (App?.Preferences != null)
             {
-                MemoryLayoutFileName = App.Preferences.MemoryLayoutFile;
+                string layoutFile = App.Preferences.MemoryLayoutFile;
+                if (!String.IsNullOrEmpty(layoutFile) && !File.Exists(layoutFile))
+                {
+                    string renamed = layoutFile.Replace("ME7 29F", "29F");
+                    if (File.Exists(renamed))
+                    {
+                        layoutFile = renamed;
+                    }
+                }
+                MemoryLayoutFileName = layoutFile;
                 FileNameToFlash = App.Preferences.FlashFile;
             }
 

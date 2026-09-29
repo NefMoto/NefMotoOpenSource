@@ -185,26 +185,26 @@
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="MemoryLayouts" Directory="MemoryLayoutsFolder">
-      <Component Id="ME7_29F200.MemoryLayout.xml" Guid="*">
-        <File Id="ME7_29F200.MemoryLayout.xml" Name="ME7 29F200.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F200.MemoryLayout.xml" KeyPath="yes" />
+      <Component Id="Am29F200.MemoryLayout.xml" Guid="*">
+        <File Id="Am29F200.MemoryLayout.xml" Name="29F200.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)29F200.MemoryLayout.xml" KeyPath="yes" />
       </Component>
-      <Component Id="ME7_29F200BB.MemoryLayout.xml" Guid="*">
-        <File Id="ME7_29F200BB.MemoryLayout.xml" Name="ME7 29F200BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F200BB.MemoryLayout.xml" KeyPath="yes" />
+      <Component Id="Am29F200BB.MemoryLayout.xml" Guid="*">
+        <File Id="Am29F200BB.MemoryLayout.xml" Name="29F200BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)29F200BB.MemoryLayout.xml" KeyPath="yes" />
       </Component>
-      <Component Id="ME7_29F400.MemoryLayout.xml" Guid="*">
-        <File Id="ME7_29F400.MemoryLayout.xml" Name="ME7 29F400.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F400.MemoryLayout.xml" KeyPath="yes" />
+      <Component Id="Am29F400.MemoryLayout.xml" Guid="*">
+        <File Id="Am29F400.MemoryLayout.xml" Name="29F400.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)29F400.MemoryLayout.xml" KeyPath="yes" />
       </Component>
-      <Component Id="ME7_29F400BB.MemoryLayout.xml" Guid="*">
-        <File Id="ME7_29F400BB.MemoryLayout.xml" Name="ME7 29F400BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F400BB.MemoryLayout.xml" KeyPath="yes" />
+      <Component Id="Am29F400BB.MemoryLayout.xml" Guid="*">
+        <File Id="Am29F400BB.MemoryLayout.xml" Name="29F400BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)29F400BB.MemoryLayout.xml" KeyPath="yes" />
       </Component>
-      <Component Id="ME7_29F800.MemoryLayout.xml" Guid="*">
-        <File Id="ME7_29F800.MemoryLayout.xml" Name="ME7 29F800.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F800.MemoryLayout.xml" KeyPath="yes" />
+      <Component Id="Am29F800.MemoryLayout.xml" Guid="*">
+        <File Id="Am29F800.MemoryLayout.xml" Name="29F800.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)29F800.MemoryLayout.xml" KeyPath="yes" />
       </Component>
-      <Component Id="ME7_29F800BB.MemoryLayout.xml" Guid="*">
-        <File Id="ME7_29F800BB.MemoryLayout.xml" Name="ME7 29F800BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F800BB.MemoryLayout.xml" KeyPath="yes" />
+      <Component Id="Am29F800BB.MemoryLayout.xml" Guid="*">
+        <File Id="Am29F800BB.MemoryLayout.xml" Name="29F800BB.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)29F800BB.MemoryLayout.xml" KeyPath="yes" />
       </Component>
-      <Component Id="ME7_29F800BT.MemoryLayout.xml" Guid="*">
-        <File Id="ME7_29F800BT.MemoryLayout.xml" Name="ME7 29F800BT.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)ME7 29F800BT.MemoryLayout.xml" KeyPath="yes" />
+      <Component Id="Am29F800BT.MemoryLayout.xml" Guid="*">
+        <File Id="Am29F800BT.MemoryLayout.xml" Name="29F800BT.MemoryLayout.xml" Source="$(var.MemoryLayouts_TargetDir)29F800BT.MemoryLayout.xml" KeyPath="yes" />
       </Component>
     </ComponentGroup>
   </Fragment>

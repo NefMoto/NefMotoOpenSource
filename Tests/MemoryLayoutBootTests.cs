@@ -102,23 +102,33 @@ public sealed class MemoryLayoutBootTests
         string dir = MemoryLayout.GetLayoutsDirectory();
         Assert.False(string.IsNullOrEmpty(dir));
 
-        var bt = DeserializeLayout(dir, "ME7 29F800BT");
+        var bt = DeserializeLayout(dir, "29F800BT");
         Assert.Equal(FlashBootOrientation.TopBoot, bt.BootOrientation);
         Assert.Equal(4, bt.BootClusterSectors);
-        Assert.Equal("ME7 29F800BB", bt.OppositeLayout);
+        Assert.Equal("29F800BB", bt.OppositeLayout);
         Assert.True(bt.IsBootClusterSector(15));
         Assert.False(bt.IsBootClusterSector(14));
 
-        var bb = DeserializeLayout(dir, "ME7 29F800BB");
+        var bb = DeserializeLayout(dir, "29F800BB");
         Assert.Equal(FlashBootOrientation.BottomBoot, bb.BootOrientation);
-        Assert.Equal("ME7 29F800BT", bb.OppositeLayout);
+        Assert.Equal("29F800BT", bb.OppositeLayout);
         Assert.True(bb.IsBootClusterSector(0));
         Assert.False(bb.IsBootClusterSector(4));
 
-        var f400 = DeserializeLayout(dir, "ME7 29F400BB");
+        var f400 = DeserializeLayout(dir, "29F400BB");
         Assert.Equal(FlashBootOrientation.BottomBoot, f400.BootOrientation);
-        Assert.True(string.IsNullOrEmpty(f400.OppositeLayout));
+        Assert.Equal("29F400BT", f400.OppositeLayout);
+        Assert.Equal("0x22AB", f400.FlashDeviceId);
+        Assert.Equal("bottom-boot (BB)", f400.BootLabel);
         Assert.True(f400.IsBootClusterSector(3));
+
+        var f400bt = DeserializeLayout(dir, "29F400BT");
+        Assert.Equal(FlashBootOrientation.TopBoot, f400bt.BootOrientation);
+        Assert.Equal("29F400BB", f400bt.OppositeLayout);
+        Assert.Equal("0x2223", f400bt.FlashDeviceId);
+        Assert.Equal("top-boot (BT)", f400bt.BootLabel);
+        Assert.True(f400bt.IsBootClusterSector(7));
+        Assert.False(f400bt.IsBootClusterSector(6));
     }
 
     private static MemoryLayout BootLayout(IList<uint> sizes, uint size, FlashBootOrientation orientation, int clusterSectors)

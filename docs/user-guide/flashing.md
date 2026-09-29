@@ -10,15 +10,15 @@ If a write fails, see [Troubleshooting](troubleshooting.md).
 
 KWP has no flash chip ID. You pick the XML in the layout combo:
 
-- `ME7 29F800BT` — 1MB, **top-boot** small-sector cluster
-- `ME7 29F800BB` — 1MB, **bottom-boot**
-- `ME7 29F800` — 1MB, sixteen 64KB sectors (no boot cluster)
-- `ME7 29F400` / `ME7 29F400BB` — 512KB
-- `ME7 29F200` / `ME7 29F200BB` — 256KB
+- `29F800BT` — 1MB, **top-boot** small-sector cluster
+- `29F800BB` — 1MB, **bottom-boot**
+- `29F800` — 1MB, sixteen 64KB sectors (no boot cluster)
+- `29F400` / `29F400BB` / `29F400BT` — 512KB
+- `29F200` / `29F200BB` — 256KB
 
 BT vs BB is the same density with the small sectors at opposite ends. A write with the wrong orientation can program most of the chip, then fail on the boot cluster. That is **Wrong Flash Layout**, not “persistent data.” Recovery: [Wrong Flash Layout](troubleshooting.md#wrong-flash-layout).
 
-Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB). The documented bench units are 29F800BB (`ME7 29F800BB`).
+Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB). The documented bench units use `29F800BB`.
 
 ## File
 
@@ -40,7 +40,7 @@ If addressable flash extends past the selected layout (512KB chip mirrored into 
 - **No** — continue with this layout
 - **Cancel** — abort
 
-A matching sample is strong evidence of mirroring, not proof of chip size. A mismatch usually means the layout is too small (try `ME7 29F800`). Example: `06A 906 032 CL` — [issue #80](https://github.com/NefMoto/NefMotoOpenSource/issues/80).
+A matching sample is strong evidence of mirroring, not proof of chip size. A mismatch usually means the layout is too small (try `29F800`). Example: `06A 906 032 CL` — [issue #80](https://github.com/NefMoto/NefMotoOpenSource/issues/80).
 
 ## Write
 

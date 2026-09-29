@@ -57,20 +57,20 @@ Developer detail: [Flashing](flashing.md#after-a-successful-write) and [KWP2000.
 
 ## Wrong Flash Layout
 
-KWP has no flash chip ID. You pick the XML layout. Top-boot (BT) and bottom-boot (BB) chips of the same density are different (`ME7 29F800BT` vs `ME7 29F800BB`).
+KWP has no flash chip ID. You pick the XML layout. Top-boot (BT) and bottom-boot (BB) chips of the same density are different (`29F800BT` vs `29F800BB`).
 
 On a KWP write, a boot-cluster erase failure now shows **Wrong Flash Layout** (OK only) and **aborts**. Status names the selected orientation vs what the chip looks like.
 
 Recovery:
 
-- Pick the **opposite** layout named in the dialog (for example `ME7 29F800BB` instead of `ME7 29F800BT`).
+- Pick the **opposite** layout named in the dialog (for example `29F800BB` instead of `29F800BT`).
 - **Diff Write Flash** — matching sectors are skipped (ECU checksum); the boot cluster still needs programming.
 - Entire-flash erase does **not** fix BT vs BB. It still uses the current sector list.
 - Switching layout in the same programming session is not implemented.
 
 This is not **Sector Erase Failed** (persistent data on a middle 64KB sector). [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103). [Flashing](flashing.md#after-an-abort)
 
-Uniform `ME7 29F800` (sixteen 64KB sectors, no boot cluster) is a different mismatch.
+Uniform `29F800` (sixteen 64KB sectors, no boot cluster) is a different mismatch.
 
 ## Sector Erase Failed
 

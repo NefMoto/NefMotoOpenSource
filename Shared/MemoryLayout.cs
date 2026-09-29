@@ -63,6 +63,9 @@ namespace Shared
             BootOrientation = FlashBootOrientation.Unknown;
             BootClusterSectors = 0;
             OppositeLayout = null;
+            FlashDeviceId = null;
+            BootLabel = null;
+            OppositeBootLabel = null;
             SectorSizes.Clear();
             Validate();
         }
@@ -79,6 +82,15 @@ namespace Shared
         /// <summary>Dropdown basename of the opposite BT/BB layout, if one is shipped.</summary>
         public string OppositeLayout { get; set; }
 
+        /// <summary>FC_GETSTATE id that selects this file, such as 0x2258. Omit when bootmode does not detect this map.</summary>
+        public string FlashDeviceId { get; set; }
+
+        /// <summary>Words for this orientation, such as bottom-boot (BB). Omit when BootOrientation is omitted.</summary>
+        public string BootLabel { get; set; }
+
+        /// <summary>Words for the other orientation. Omit when BootOrientation is omitted.</summary>
+        public string OppositeBootLabel { get; set; }
+
         public bool ShouldSerializeBootOrientation()
         {
             return BootOrientation != FlashBootOrientation.Unknown;
@@ -92,6 +104,21 @@ namespace Shared
         public bool ShouldSerializeOppositeLayout()
         {
             return !String.IsNullOrEmpty(OppositeLayout);
+        }
+
+        public bool ShouldSerializeFlashDeviceId()
+        {
+            return !String.IsNullOrEmpty(FlashDeviceId);
+        }
+
+        public bool ShouldSerializeBootLabel()
+        {
+            return !String.IsNullOrEmpty(BootLabel);
+        }
+
+        public bool ShouldSerializeOppositeBootLabel()
+        {
+            return !String.IsNullOrEmpty(OppositeBootLabel);
         }
 
         private bool ValidateBaseAddress()
@@ -191,8 +218,94 @@ namespace Shared
             isValid &= ValidateSize();
             isValid &= ValidateSectorSizes();
             isValid &= ValidateBootMetadata();
+            isValid &= ValidateFlashDeviceId();
 
             return isValid;
+        }
+
+        /// <summary>
+        /// Basename of the shipped layout whose FlashDeviceId matches, or null.
+        /// </summary>
+        public static string FindBasenameByFlashDeviceId(ushort deviceId)
+        {
+            string dir = GetLayoutsDirectory();
+            if (String.IsNullOrEmpty(dir))
+            {
+                return null;
+            }
+
+            string[] paths;
+            try
+            {
+                paths = Directory.GetFiles(dir, "*" + MEMORY_LAYOUT_FILE_EXT);
+            }
+            catch
+            {
+                return null;
+            }
+
+            foreach (string path in paths)
+            {
+                MemoryLayout layout = TryDeserialize(path);
+                ushort parsed;
+                if ((layout == null) || !layout.TryParseFlashDeviceId(out parsed) || (parsed != deviceId))
+                {
+                    continue;
+                }
+
+                string fileName = Path.GetFileName(path);
+                if (fileName.EndsWith(MEMORY_LAYOUT_FILE_EXT))
+                {
+                    return fileName.Substring(0, fileName.Length - MEMORY_LAYOUT_FILE_EXT.Length);
+                }
+            }
+
+            return null;
+        }
+
+        public bool TryParseFlashDeviceId(out ushort deviceId)
+        {
+            deviceId = 0;
+            if (String.IsNullOrEmpty(FlashDeviceId))
+            {
+                return false;
+            }
+
+            string text = FlashDeviceId.Trim();
+            if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                return UInt16.TryParse(text.Substring(2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out deviceId);
+            }
+
+            return UInt16.TryParse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out deviceId);
+        }
+
+        private static MemoryLayout TryDeserialize(string path)
+        {
+            try
+            {
+                using (var stream = File.OpenRead(path))
+                {
+                    return new System.Xml.Serialization.XmlSerializer(typeof(MemoryLayout)).Deserialize(stream) as MemoryLayout;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private bool ValidateFlashDeviceId()
+        {
+            string error = null;
+            ushort ignored;
+            if (!String.IsNullOrEmpty(FlashDeviceId) && !TryParseFlashDeviceId(out ignored))
+            {
+                error = "FlashDeviceId must be a hex value such as 0x2258, or a decimal integer";
+            }
+
+            this["FlashDeviceId"] = error;
+            return (error == null);
         }
 
         /// <summary>
