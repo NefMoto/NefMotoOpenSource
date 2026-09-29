@@ -21,6 +21,7 @@ Contact by Email: nyet@nyet.org
 using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
+using Communication;
 using Shared;
 using Xunit;
 
@@ -86,6 +87,22 @@ public sealed class MemoryLayoutBootTests
         var layout = BootLayout(sizes, 512 * 1024, FlashBootOrientation.TopBoot, 4);
         Assert.True(layout.IsBootClusterSector(7));
         Assert.False(layout.IsBootClusterSector(6));
+    }
+
+    [Theory]
+    [InlineData(0x2258, "29F800BB")]
+    [InlineData(0x22D6, "29F800BT")]
+    [InlineData(0x22AB, "29F400BB")]
+    [InlineData(0x2223, "29F400BT")]
+    public void DeviceId_SelectsShippedLayoutBasename(ushort deviceID, string basename)
+    {
+        Assert.Equal(basename, BootstrapInterface.GetLayoutBasenameFromDeviceID(deviceID));
+    }
+
+    [Fact]
+    public void DeviceId_Unknown_HasNoLayoutBasename()
+    {
+        Assert.Null(BootstrapInterface.GetLayoutBasenameFromDeviceID(0));
     }
 
     [Fact]

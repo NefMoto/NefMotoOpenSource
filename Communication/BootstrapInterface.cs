@@ -253,7 +253,7 @@ namespace Communication
         private const byte FC_GETSTATE_ADDR_MANUFID = 0x00;
         private const byte FC_GETSTATE_ADDR_DEVICEID = 0x01;
 
-        // Flash device IDs (FC_GETSTATE); see GetFlashSizeFromDeviceID, GenerateMemoryLayoutFromDeviceID
+        // Flash device IDs (FC_GETSTATE); see GetLayoutBasenameFromDeviceID, GenerateMemoryLayoutFromDeviceID
         private const ushort DEV_ID_F400BB = 0x22AB;  // 512KB bottom boot
         private const ushort DEV_ID_F800BB = 0x2258;  // 1024KB bottom boot
         private const ushort DEV_ID_F400BT = 0x2223;  // 512KB top boot

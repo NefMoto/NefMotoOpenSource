@@ -23,7 +23,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
-using System.Text;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -120,12 +119,17 @@ namespace ECUFlasher
                 OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
                 OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
                 OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyWriteEnabled"));
+                OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
 
-                // For bootmode, try to auto-detect layout if file is already selected
+                // Switching protocol replaces CommInterface. CurrentProtocol does not change on the old object.
                 if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode &&
                     App.CommInterface.IsConnected() && IsFlashFileOK)
                 {
                     TryAutoDetectLayoutForBootmode();
+                }
+                else
+                {
+                    ApplyDetectedLayoutIfAny();
                 }
             }
         }
@@ -141,6 +145,10 @@ namespace ECUFlasher
 
                 // Re-validate memory layout when protocol changes (to clear errors for bootmode)
                 LoadMemoryLayoutFile();
+                if (App.CommInterface == null || App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
+                {
+                    ApplyDetectedLayoutIfAny();
+                }
 
                 // For bootmode, try to auto-detect layout if file is already selected
                 if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode &&
@@ -156,13 +164,18 @@ namespace ECUFlasher
                     var status = App.CommInterface.ConnectionStatus;
                     if (status == CommunicationInterface.ConnectionStatusType.Disconnected || status == CommunicationInterface.ConnectionStatusType.CommunicationTerminated)
                     {
-                        // Clear local layout so we re-detect when connecting to (possibly different) ECU.
-                        // BootstrapInterface.ResetBootmodeConnectionState clears its layout cache in ConnectionStatus setter.
+                        // Drop the in-memory layout so the next bootmode connect detects again.
+                        // Keep the detected file name; disconnect-then-KWP reloads it.
                         // Must run on UI thread - PropertyChanged can fire from SendReceive thread
                         if (FlashMemoryLayout != null || IsMemoryLayoutOK)
                         {
                             Dispatcher.BeginInvoke(new Action(() =>
                             {
+                                if (App.CommInterface == null || App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
+                                {
+                                    return;
+                                }
+
                                 FlashMemoryLayout = null;
                                 IsMemoryLayoutOK = false;
                                 string placeholder = "Auto-detected (pending)";
@@ -363,7 +376,8 @@ namespace ECUFlasher
                 return;
             }
 
-            if (FlashMemoryLayout != null && FlashMemoryLayout.Validate() && IsMemoryLayoutOK)
+            if (IsMemoryLayoutOK && FlashMemoryLayout != null && FlashMemoryLayout.Validate()
+                && (!String.IsNullOrEmpty(mDetectedLayoutBasename) || FlashMemoryLayout == mDetectedBootmodeLayout))
             {
                 return;
             }
@@ -392,23 +406,100 @@ namespace ECUFlasher
                 return;
             }
 
+            ushort deviceID = bootstrapInterface.LastKnownFlashDeviceID;
             MemoryLayout layoutForClosure = layout;
-            Dispatcher.Invoke((Action)(() =>
+            Dispatcher.Invoke((Action)(() => ApplyBootmodeDetection(deviceID, layoutForClosure)));
+        }
+
+        private void ApplyBootmodeDetection(ushort deviceID, MemoryLayout generated)
+        {
+            string basename = BootstrapInterface.GetLayoutBasenameFromDeviceID(deviceID);
+            string memoryLayoutsDir = GetMemoryLayoutsDirectory();
+            string fullPath = null;
+            if (!String.IsNullOrEmpty(basename) && !String.IsNullOrEmpty(memoryLayoutsDir))
             {
-                FlashMemoryLayout = layoutForClosure;
-                IsMemoryLayoutOK = true;
-
-                string autoDetectedString = $"Auto-detected: {layoutForClosure.Size / 1024}KB, {layoutForClosure.SectorSizes.Count} sectors";
-                if (!AvailableMemoryLayouts.Contains(autoDetectedString))
+                fullPath = Path.Combine(memoryLayoutsDir, basename + MemoryLayout.MEMORY_LAYOUT_FILE_EXT);
+                if (!File.Exists(fullPath))
                 {
-                    AvailableMemoryLayouts.Insert(0, autoDetectedString);
+                    fullPath = null;
                 }
-                mSelectedMemoryLayout = autoDetectedString;
+            }
 
-                OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryLayout"));
-                OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+            if (fullPath != null)
+            {
+                if (!AvailableMemoryLayouts.Contains(basename))
+                {
+                    AvailableMemoryLayouts.Add(basename);
+                }
+
+                mDetectedLayoutBasename = basename;
+                mDetectedBootmodeLayout = null;
+                MemoryLayoutFileName = fullPath;
                 OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
-            }));
+                OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+                if (IsMemoryLayoutOK && FlashMemoryLayout != null)
+                {
+                    App.DisplayStatusMessage("Bootmode-detected layout: " + basename, StatusMessageType.USER);
+                    return;
+                }
+
+                mDetectedLayoutBasename = null;
+                mMemoryLayoutFileName = null;
+            }
+
+            mDetectedBootmodeLayout = generated;
+            ApplyDetectedLayout(generated);
+            App.DisplayStatusMessage(
+                "Bootmode-detected layout: 0x" + generated.BaseAddress.ToString("X6") + ", " + generated.SectorSizes.Count + " sectors",
+                StatusMessageType.USER);
+        }
+
+        private void ApplyDetectedLayoutIfAny()
+        {
+            if (!String.IsNullOrEmpty(mDetectedLayoutBasename))
+            {
+                if (FlashMemoryLayout == null || !IsMemoryLayoutOK)
+                {
+                    LoadMemoryLayoutFile();
+                }
+            }
+            else if (mDetectedBootmodeLayout != null && mDetectedBootmodeLayout.Validate())
+            {
+                ApplyDetectedLayout(mDetectedBootmodeLayout);
+                return;
+            }
+
+            string basename = MemoryLayoutBasename(mMemoryLayoutFileName);
+            if (String.IsNullOrEmpty(basename) || !AvailableMemoryLayouts.Contains(basename) || mSelectedMemoryLayout == basename)
+            {
+                return;
+            }
+
+            mSelectedMemoryLayout = basename;
+            OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+        }
+
+        private void ApplyDetectedLayout(MemoryLayout layout)
+        {
+            FlashMemoryLayout = layout;
+            IsMemoryLayoutOK = true;
+
+            string autoDetectedString = $"Auto-detected: {layout.Size / 1024}KB, {layout.SectorSizes.Count} sectors";
+            if (!AvailableMemoryLayouts.Contains(autoDetectedString))
+            {
+                AvailableMemoryLayouts.Insert(0, autoDetectedString);
+            }
+            mSelectedMemoryLayout = autoDetectedString;
+
+            string tempError;
+            IsFlashFileOK = ValidateFileToFlash(FlashMemoryImage, FlashMemoryLayout, out tempError);
+            this["FileNameToFlash"] = tempError;
+
+            OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryLayout"));
+            OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutOK"));
+            OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+            OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+            OnPropertyChanged(new PropertyChangedEventArgs("FileNameToFlash"));
         }
 
         public string MemoryLayoutFileName
@@ -422,24 +513,12 @@ namespace ECUFlasher
                 if (!String.IsNullOrEmpty(value))
                 {
                     string memoryLayoutsDir = GetMemoryLayoutsDirectory();
-                    if (!String.IsNullOrEmpty(memoryLayoutsDir))
+                    string basename = MemoryLayoutBasename(value);
+                    if (!String.IsNullOrEmpty(memoryLayoutsDir) && !String.IsNullOrEmpty(basename)
+                        && AvailableMemoryLayouts.Contains(basename) && mSelectedMemoryLayout != basename)
                     {
-                        string fileName = Path.GetFileName(value);
-                        string basename = fileName;
-                        if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_EXT))
-                        {
-                            basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_EXT.Length);
-                        }
-                        else if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT))
-                        {
-                            basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT.Length);
-                        }
-
-                        if (AvailableMemoryLayouts.Contains(basename) && mSelectedMemoryLayout != basename)
-                        {
-                            mSelectedMemoryLayout = basename;
-                            OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
-                        }
+                        mSelectedMemoryLayout = basename;
+                        OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
                     }
                 }
                 else
@@ -471,6 +550,29 @@ namespace ECUFlasher
             }
         }
         private string mMemoryLayoutFileName;
+        private string mDetectedLayoutBasename;
+        private MemoryLayout mDetectedBootmodeLayout;
+
+        private static string MemoryLayoutBasename(string path)
+        {
+            string fileName = Path.GetFileName(path);
+            if (String.IsNullOrEmpty(fileName))
+            {
+                return null;
+            }
+
+            if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_EXT))
+            {
+                return fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_EXT.Length);
+            }
+
+            if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT))
+            {
+                return fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT.Length);
+            }
+
+            return fileName;
+        }
 
         public ObservableCollection<string> AvailableMemoryLayouts { get; private set; }
 
@@ -481,6 +583,13 @@ namespace ECUFlasher
                 // For bootmode, show auto-detected layout or placeholder
                 if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
                 {
+                    if (!String.IsNullOrEmpty(mSelectedMemoryLayout)
+                        && AvailableMemoryLayouts.Contains(mSelectedMemoryLayout)
+                        && !mSelectedMemoryLayout.StartsWith("Auto-detected"))
+                    {
+                        return mSelectedMemoryLayout;
+                    }
+
                     var bootstrapInterface = App.CommInterface as BootstrapInterface;
                     const byte DEVICE_ID_CORE_RUNNING = 0xAA;
 
@@ -611,7 +720,6 @@ namespace ECUFlasher
                 {
                     if (FlashMemoryLayout != null && FlashMemoryLayout.Validate())
                     {
-                        // Show auto-detected layout details
                         string tooltip = "Auto-detected layout (BootMode):\n";
                         tooltip += $"Base Address: 0x{FlashMemoryLayout.BaseAddress:X6}\n";
                         tooltip += $"Size: {FlashMemoryLayout.Size} bytes ({FlashMemoryLayout.Size / 1024} KB)\n";
@@ -629,6 +737,10 @@ namespace ECUFlasher
                         }
                     }
                     return "Memory layout will be auto-detected from flash device ID when read/write operation starts";
+                }
+                if (mDetectedBootmodeLayout != null && FlashMemoryLayout == mDetectedBootmodeLayout)
+                {
+                    return $"Bootmode-detected layout: {FlashMemoryLayout.Size / 1024}KB, {FlashMemoryLayout.SectorSizes.Count} sectors";
                 }
                 return MemoryLayoutFileName;
             }
@@ -664,19 +776,8 @@ namespace ECUFlasher
                     var files = Directory.GetFiles(memoryLayoutsDir, "*" + MemoryLayout.MEMORY_LAYOUT_FILE_EXT);
                     foreach (var file in files)
                     {
-                        string fileName = Path.GetFileName(file);
-                        // Remove the extension to get just the basename
-                        string basename = fileName;
-                        if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_EXT))
-                        {
-                            basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_EXT.Length);
-                        }
-                        else if (fileName.EndsWith(MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT))
-                        {
-                            basename = fileName.Substring(0, fileName.Length - MemoryLayout.MEMORY_LAYOUT_FILE_SHORT_EXT.Length);
-                        }
-
-                        if (!AvailableMemoryLayouts.Contains(basename))
+                        string basename = MemoryLayoutBasename(file);
+                        if (!String.IsNullOrEmpty(basename) && !AvailableMemoryLayouts.Contains(basename))
                         {
                             AvailableMemoryLayouts.Add(basename);
                         }
@@ -2127,17 +2228,8 @@ namespace ECUFlasher
                 App.OperationInProgress = false;
                 return false;
             }
-            App.DisplayStatusMessage($"Auto-detected flash layout: BaseAddress=0x{layout.BaseAddress:X6}, Size={layout.Size}, Sectors={layout.SectorSizes.Count}", StatusMessageType.USER);
-            FlashMemoryLayout = layout;
-            IsMemoryLayoutOK = true;
-            string autoDetectedString = $"Auto-detected: {layout.Size / 1024}KB, {layout.SectorSizes.Count} sectors";
-            if (!AvailableMemoryLayouts.Contains(autoDetectedString))
-            {
-                AvailableMemoryLayouts.Insert(0, autoDetectedString);
-            }
-            mSelectedMemoryLayout = autoDetectedString;
-            OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
-            OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+            ApplyBootmodeDetection(bootstrap.LastKnownFlashDeviceID, layout);
+            layout = FlashMemoryLayout;
             return true;
         }
 
