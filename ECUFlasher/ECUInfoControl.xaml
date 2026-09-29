@@ -90,7 +90,10 @@ Contact by Email: tony@nefariousmotorsports.com
                         <TextBlock Text="{Binding Path=DTC, StringFormat=P{0:X4}}" Margin="0,0,5,0"/>
                         <TextBlock Text="{Binding Path=DTC, Converter={StaticResource dtcNameConverter}}"/>
                     </StackPanel>
-                    <TextBlock Text="{Binding Path=Status, StringFormat=Status: 0x{0:X2}}"/><!--TODO: display readable status-->
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Path=Status, StringFormat=Status: 0x{0:X2}}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding Path=StatusText}"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </DataTemplate>

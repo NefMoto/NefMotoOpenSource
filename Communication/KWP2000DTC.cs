@@ -21,6 +21,7 @@ Contact by Email: tony@nefariousmotorsports.com
 using Shared;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Communication
 {
@@ -28,6 +29,67 @@ namespace Communication
     {
         public ushort DTC { get; set; }
         public byte Status { get; set; }
+
+        public string StatusText
+        {
+            get { return FormatSetStatusBits(Status); }
+        }
+
+        public static string FormatSetStatusBits(byte status)
+        {
+            var lines = new StringBuilder();
+
+            foreach (KWP2000DTCStatus bit in Enum.GetValues(typeof(KWP2000DTCStatus)))
+            {
+                byte bitValue = (byte)bit;
+
+                if (bitValue == 0 || (status & bitValue) != bitValue)
+                {
+                    continue;
+                }
+
+                string description = TrueDescription(bit);
+
+                if (description == null)
+                {
+                    continue;
+                }
+
+                if (lines.Length > 0)
+                {
+                    lines.Append(", ");
+                }
+
+                lines.Append(description);
+            }
+
+            return lines.ToString();
+        }
+
+        private static string TrueDescription(KWP2000DTCStatus bit)
+        {
+            switch (bit)
+            {
+                case KWP2000DTCStatus.PendingFaultPresent:
+                    return "pending now";
+                case KWP2000DTCStatus.PendingFaultState:
+                    return "pending this cycle";
+                case KWP2000DTCStatus.TestRunning:
+                    return "test running";
+                case KWP2000DTCStatus.TestInhibit:
+                    return "inhibited";
+                case KWP2000DTCStatus.TestReadiness:
+                    return "test incomplete";
+                case KWP2000DTCStatus.DTCStorageState:
+                    return "stored";
+                case KWP2000DTCStatus.ValidatedFaultPresent:
+                    return "validated now";
+                case KWP2000DTCStatus.ValidatedFaultState:
+                    return "validated this cycle";
+                default:
+                    return null;
+            }
+        }
     };
 
     [Flags]

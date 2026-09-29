@@ -945,6 +945,11 @@ namespace ECUFlasher
                 }
 
                 dtcOutput += "DTC: P" + dtc.DTC.ToString("X4") + " Status: 0x" + dtc.Status.ToString("X2") + " " + GetDTCName(dtc.DTC);
+
+                if (dtc.StatusText.Length > 0)
+                {
+                    dtcOutput += " (" + dtc.StatusText + ")";
+                }
             }
 
             App.DisplayStatusMessage(dtcOutput, StatusMessageType.USER);
