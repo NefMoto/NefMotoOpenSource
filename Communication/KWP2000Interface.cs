@@ -3225,7 +3225,7 @@ connectEndTime = connectStartTime + connectTime + 3;
             {
                 statusMessage += string.Format("{0:X2}", newBytes[x]) + ", ";
             }
-            DisplayStatusMessage(statusMessage, StatusMessageType.DEV);
+            DisplayStatusMessage(statusMessage, StatusMessageType.TRACE);
 #endif
         }
 
@@ -3758,10 +3758,10 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                 if (sentProperly)
                 {
-                    DisplayStatusMessage("Sent message with service ID " + GetServiceIDString(currentMessage.mServiceID), StatusMessageType.LOG);
+                    DisplayStatusMessage("Sent message with service ID " + GetServiceIDString(currentMessage.mServiceID), StatusMessageType.TRACE);
 #if DEBUG
                     //wrapped in DEBUG #if so we don't impact performance
-                    DisplayStatusMessage("Sent data: " + currentMessage.GetDataString(this), StatusMessageType.DEV);
+                    DisplayStatusMessage("Sent data: " + currentMessage.GetDataString(this), StatusMessageType.TRACE);
 #endif
                 }
                 else
@@ -3837,7 +3837,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                             mP2ECUResponseMaxTimeCurrent = CurrentTimingParameters.P2ECUResponseTimeMaxMs;
                             mP2ECUResponseTimeOut.Reset(); mP2ECUResponseTimeOut.Start();
 
-                            DisplayStatusMessage("Setting P2 max to " + mP2ECUResponseMaxTimeCurrent + "ms because we sent a message.", StatusMessageType.DEV);
+                            DisplayStatusMessage("Setting P2 max to " + mP2ECUResponseMaxTimeCurrent + "ms because we sent a message.", StatusMessageType.TRACE);
                         }
 
                         //we need to consume the echo even if the message is only partially sent
@@ -4150,14 +4150,14 @@ connectEndTime = connectStartTime + connectTime + 3;
                     if (receivedMessageOK)
                     {
                         mP2ECUResponseMaxTimeCurrent = CurrentTimingParameters.P2ECUResponseTimeMaxMs;
-                        DisplayStatusMessage("Setting P2 max to " + mP2ECUResponseMaxTimeCurrent + "ms because we received a complete message.", StatusMessageType.DEV);
+                        DisplayStatusMessage("Setting P2 max to " + mP2ECUResponseMaxTimeCurrent + "ms because we received a complete message.", StatusMessageType.TRACE);
 
                         keepLookingForMessage = false;
 
-                        DisplayStatusMessage("Received message with service ID: " + GetServiceIDString(message.mServiceID), StatusMessageType.LOG);
+                        DisplayStatusMessage("Received message with service ID: " + GetServiceIDString(message.mServiceID), StatusMessageType.TRACE);
 #if DEBUG
                         //wrapped in DEBUG #if so we don't impact performance
-                        DisplayStatusMessage("Received data: " + message.GetDataString(this), StatusMessageType.DEV);
+                        DisplayStatusMessage("Received data: " + message.GetDataString(this), StatusMessageType.TRACE);
 #endif
 
                         //ignore messages unless they are a response
@@ -4226,10 +4226,17 @@ connectEndTime = connectStartTime + connectTime + 3;
                                 {
                                     if (message.DataLength == 2)
                                     {
+                                        byte responseCode = message.mData[1];
+                                        // Routine-not-complete, response-pending, and busy-repeat are the
+                                        // normal poll replies during erase, checksum, and transfer.
+                                        bool inProgress = (responseCode == (byte)KWP2000ResponseCode.RoutineNotCompleteOrServiceInProgress)
+                                            || (responseCode == (byte)KWP2000ResponseCode.RequestCorrectlyReceived_ResponsePending)
+                                            || (responseCode == (byte)KWP2000ResponseCode.Busy_RepeastRequest);
                                         DisplayStatusMessage("Received negative response for service ID: " + GetServiceIDString(message.mData[0])
-                                            + ", with response code: " + GetResponseCodeString(message.mData[1]), StatusMessageType.LOG);
+                                            + ", with response code: " + GetResponseCodeString(responseCode),
+                                            inProgress ? StatusMessageType.TRACE : StatusMessageType.LOG);
 
-                                        if (message.mData[1] == (byte)KWP2000ResponseCode.RequestCorrectlyReceived_ResponsePending)
+                                        if (responseCode == (byte)KWP2000ResponseCode.RequestCorrectlyReceived_ResponsePending)
                                         {
                                             //only wait for another message if we are connected
                                             if (ConnectionStatus == ConnectionStatusType.Connected)
@@ -4238,10 +4245,10 @@ connectEndTime = connectStartTime + connectTime + 3;
                                                 isOKToFinishWaitingForResponse = false;//the real response is still coming
 
                                                 mP2ECUResponseMaxTimeCurrent = CurrentTimingParameters.P3TesterResponseTimeMaxMs;//set to busy wait max time
-                                                DisplayStatusMessage("Setting P2 max time to " + mP2ECUResponseMaxTimeCurrent + "ms and waiting for another message.", StatusMessageType.DEV);
+                                                DisplayStatusMessage("Setting P2 max time to " + mP2ECUResponseMaxTimeCurrent + "ms and waiting for another message.", StatusMessageType.TRACE);
                                             }
                                         }
-                                        else if (message.mData[1] == (byte)KWP2000ResponseCode.Busy_RepeastRequest)
+                                        else if (responseCode == (byte)KWP2000ResponseCode.Busy_RepeastRequest)
                                         {
                                             shouldTriggerMessageHandler = false;//we will need to resend the message
                                             shouldResendMessage = true;//we will need to resend the message

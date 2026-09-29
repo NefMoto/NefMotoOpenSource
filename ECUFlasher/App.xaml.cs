@@ -457,9 +457,8 @@ namespace ECUFlasher
             {
 #if DEBUG
                 Debug.Print(message);
-#else
-                if ((messageType != StatusMessageType.DEV) && (messageType != StatusMessageType.DEV_USER))
 #endif
+                if (IncludeStatusMessageInLogFile(messageType))
                 {
                     try
                     {
@@ -481,6 +480,20 @@ namespace ECUFlasher
                     DisplayApplicationStatusMessage(message, messageType);
                 }
             }
+        }
+
+        private static bool IncludeStatusMessageInLogFile(StatusMessageType messageType)
+        {
+            if (messageType == StatusMessageType.TRACE)
+            {
+                return false;
+            }
+
+#if DEBUG
+            return true;
+#else
+            return (messageType != StatusMessageType.DEV) && (messageType != StatusMessageType.DEV_USER);
+#endif
         }
 
         private void CreateLogFile()

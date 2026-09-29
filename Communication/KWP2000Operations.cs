@@ -2609,7 +2609,7 @@ namespace Communication
                     mReadAction.SetStartAddressAndNumBytes(addressToRead, numBytesToRead);
                     nextAction = mReadAction;
 
-                    CommInterface.DisplayStatusMessage("Reading address 0x" + addressToRead.ToString("X") + " with 0x" + numBytesToRead.ToString("X") + " bytes.", StatusMessageType.LOG);
+                    CommInterface.DisplayStatusMessage("Reading address 0x" + addressToRead.ToString("X") + " with 0x" + numBytesToRead.ToString("X") + " bytes.", StatusMessageType.TRACE);
                 }
 
                 mMyLastStartedAction = nextAction;
@@ -2677,7 +2677,7 @@ namespace Communication
                             Debug.Assert(readAction.ReadData != null);
                             Debug.Assert(readAction.ReadData.Length > 0);
 
-                            CommInterface.DisplayStatusMessage("Read address 0x" + readAction.mStartAddress.ToString("X") + " with 0x" + readAction.ReadData.Length.ToString("X") + " bytes.", StatusMessageType.LOG);
+                            CommInterface.DisplayStatusMessage("Read address 0x" + readAction.mStartAddress.ToString("X") + " with 0x" + readAction.ReadData.Length.ToString("X") + " bytes.", StatusMessageType.TRACE);
 
                             //swap the pending read and newly read lists
                             List<SynchronizedMemoryRegion> temp = mNewlyReadRegions;

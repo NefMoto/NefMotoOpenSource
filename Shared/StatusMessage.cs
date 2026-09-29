@@ -25,12 +25,16 @@ using System.Text;
 
 namespace Shared
 {
+    // USER and LOG always go to the log file. DEV and DEV_USER go to the log
+    // file in debug builds. TRACE is debugger output only: per-frame traffic
+    // during large reads and writes.
     public enum StatusMessageType
     {
         USER,
         LOG,
         DEV,
-        DEV_USER
+        DEV_USER,
+        TRACE
     };
 
     public enum UserPromptType

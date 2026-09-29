@@ -3263,7 +3263,7 @@ namespace Communication
                     {
                         HandleNextUploadMessageData(message.mData, out mCurrentMessageNumBytes);
 #if DEBUG
-                        DisplayStatusMessage("Received 0x" + mCurrentMessageNumBytes.ToString("X") + " bytes. 0x" + (mDataIndex + mCurrentMessageNumBytes).ToString("X") + " of 0x" + RawData.LongLength.ToString("X") + " received.", StatusMessageType.DEV);
+                        DisplayStatusMessage("Received 0x" + mCurrentMessageNumBytes.ToString("X") + " bytes. 0x" + (mDataIndex + mCurrentMessageNumBytes).ToString("X") + " of 0x" + RawData.LongLength.ToString("X") + " received.", StatusMessageType.TRACE);
 #endif
                         if(mCurrentMessageNumBytes > 0)
                         {
@@ -3279,7 +3279,7 @@ namespace Communication
                     else if (mTransferMode == TransferMode.DownloadToECU)
                     {
 #if DEBUG
-                        DisplayStatusMessage("Sent 0x" + mCurrentMessageNumBytes.ToString("X") + " bytes. 0x" + (mDataIndex + mCurrentMessageNumBytes).ToString("X") + " of 0x" + RawData.LongLength.ToString("X") + " sent.", StatusMessageType.DEV);
+                        DisplayStatusMessage("Sent 0x" + mCurrentMessageNumBytes.ToString("X") + " bytes. 0x" + (mDataIndex + mCurrentMessageNumBytes).ToString("X") + " of 0x" + RawData.LongLength.ToString("X") + " sent.", StatusMessageType.TRACE);
 #endif
                         HandlePositiveResponseMessage();
 
