@@ -2416,17 +2416,17 @@ namespace ECUFlasher
         public static IReadOnlyList<BootmodeEepromPresetOption> All { get; } = new List<BootmodeEepromPresetOption>
         {
             new BootmodeEepromPresetOption(
-                "ME7.5 - 95040 SSC P4.7 (512 B)",
-                BootstrapInterface.BootmodeEepromSettings.ForMe75()),
-            new BootmodeEepromPresetOption(
                 "ME7.1 - 95040 SSC P4.7 (512 B)",
                 BootstrapInterface.BootmodeEepromSettings.ForMe71()),
             new BootmodeEepromPresetOption(
-                "ME7.5 - 95040 XSSC P4.7 (512 B)",
-                MakeXssc(BootstrapInterface.BootmodeEepromSettings.ForMe75())),
+                "ME7.5 - 95040 SSC P4.7 (512 B)",
+                BootstrapInterface.BootmodeEepromSettings.ForMe75()),
             new BootmodeEepromPresetOption(
                 "ME7.1 - 95040 XSSC P4.7 (512 B)",
                 MakeXssc(BootstrapInterface.BootmodeEepromSettings.ForMe71())),
+            new BootmodeEepromPresetOption(
+                "ME7.5 - 95040 XSSC P4.7 (512 B)",
+                MakeXssc(BootstrapInterface.BootmodeEepromSettings.ForMe75())),
         };
 
         private static BootstrapInterface.BootmodeEepromSettings MakeXssc(BootstrapInterface.BootmodeEepromSettings baseSettings)

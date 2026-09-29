@@ -64,7 +64,7 @@ commit_parsers = [
   { message = "(?i)^docs?", group = "<!-- 02 -->Documentation" },
   { message = "(?i)^refactor", group = "<!-- 03 -->Refactor" },
   { message = "(?i)^chore\\(deps\\)", group = "<!-- 05 -->Dependencies" },
-  { message = "(?i)^(chore|ci|cosmetic|style)", group = "<!-- 04 -->Chore" },
+  { message = "(?i)^(chore|ci|cosmetic|style|ui)", group = "<!-- 04 -->Chore" },
   { message = "(?i)^deps", group = "<!-- 05 -->Dependencies" },
   { message = "^Bump", group = "<!-- 05 -->Dependencies" },
   { message = "^Merge pull request.*dependabot", group = "<!-- 05 -->Dependencies" },

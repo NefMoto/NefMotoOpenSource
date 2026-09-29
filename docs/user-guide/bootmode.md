@@ -62,8 +62,8 @@ On the Flashing tab, with **Boot Mode** connected:
 
 Presets:
 
-- `ME7.5 - 95040 SSC P4.7 (512 B)`
 - `ME7.1 - 95040 SSC P4.7 (512 B)`
+- `ME7.5 - 95040 SSC P4.7 (512 B)`
 - XSSC variants of the same (try if SSC fails)
 
 **Read EEPROM (Bootmode)** dumps the chip (not a KWP mirror). Saves a `.bin`.
