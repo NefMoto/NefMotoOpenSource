@@ -2037,6 +2037,120 @@ namespace ECUFlasher
             return true;
         }
 
+        internal const string ProgrammingFlagClearBlockList = "0x804000-0x805FFF, 0x806000-0x807FFF, and 0x808000-0x80FFFF";
+
+        private const string ProgrammingFlagClearStatus = "Checksumming 0x804000-0x80FFFF as 8KB, 8KB, and 32KB. No upload and no erase.";
+        private const string ProgrammingFlagClearMatched = "The 8KB, 8KB, and 32KB checksums matched.";
+        private const string ProgrammingFlagClearMismatch = "The 8KB, 8KB, and 32KB checksums did not all match.";
+
+        internal bool TryStartProgrammingFlagClear(Action<bool> afterComplete, bool confirm = false)
+        {
+            List<MemoryImage> blocks;
+            if (!TryGetProgrammingFlagClearBlocks(out blocks))
+            {
+                return false;
+            }
+
+            if (confirm)
+            {
+                string prompt = "Checksum 3 blocks from the loaded flash file:\n" + ProgrammingFlagClearBlockList + ".\n\n"
+                    + "0x800000-0x803FFF is not checksummed.\nNo block from 0x810000 on is checksummed.\n\n"
+                    + "No upload and no erase.\n\nContinue?";
+                if (App.DisplayUserPrompt("Checksum 8K+8K+32K", prompt, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
+                {
+                    return false;
+                }
+            }
+
+            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if (kwpViewModel == null)
+            {
+                App.DisplayStatusMessage("Checksumming the flash blocks requires a KWP2000 connection.", StatusMessageType.USER);
+                return false;
+            }
+
+            var security = new SecurityAccessAction.SecurityAccessSettings();
+            security.RequestSeed = kwpViewModel.SeedRequest;
+            security.SupportSpecialKey = kwpViewModel.ShouldSupportSpecialKey;
+            security.UseExtendedSeedRequest = kwpViewModel.ShouldUseExtendedSeedRequest;
+
+            mAfterProgrammingFlagClear = afterComplete;
+            var operation = new ChecksumFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, security, blocks);
+            StartFlashOperation(operation, this.ChecksumRestOfFirst64KCompleted, ProgrammingFlagClearStatus);
+            return true;
+        }
+
+        private bool TryGetProgrammingFlagClearBlocks(out List<MemoryImage> blocks)
+        {
+            blocks = null;
+
+            if (!IsBottomBootFirstBlock() || FlashMemoryImage == null || FlashMemoryImage.RawData == null)
+            {
+                App.DisplayStatusMessage("Load the bottom-boot layout and the matching flash file first.", StatusMessageType.USER);
+                return false;
+            }
+
+            var sectorImages = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(FlashMemoryImage.RawData, FlashMemoryLayout));
+            if (sectorImages.Count < 4
+                || sectorImages[1].StartAddress != 0x804000 || sectorImages[1].Size != 0x2000
+                || sectorImages[2].StartAddress != 0x806000 || sectorImages[2].Size != 0x2000
+                || sectorImages[3].StartAddress != 0x808000 || sectorImages[3].Size != 0x8000)
+            {
+                App.DisplayStatusMessage("The loaded layout does not have the 8KB, 8KB, and 32KB blocks after 0x803FFF.", StatusMessageType.USER);
+                return false;
+            }
+
+            blocks = new List<MemoryImage>
+            {
+                sectorImages[1],
+                sectorImages[2],
+                sectorImages[3]
+            };
+            return true;
+        }
+
+        private Action<bool> mAfterProgrammingFlagClear;
+
+        private void ChecksumRestOfFirst64KCompleted(Operation operation, bool success)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                App.OperationInProgress = false;
+
+                Action<bool> after = mAfterProgrammingFlagClear;
+                mAfterProgrammingFlagClear = null;
+
+                if (success)
+                {
+                    string matched = ProgrammingFlagClearMatched;
+                    if (after == null)
+                    {
+                        matched += " Key-cycle before reading DTCs again.";
+                    }
+
+                    App.DisplayStatusMessage(matched, StatusMessageType.USER);
+                }
+                else
+                {
+                    App.DisplayStatusMessage(ProgrammingFlagClearMismatch, StatusMessageType.USER);
+                }
+
+                if (after != null)
+                {
+                    after(success);
+                }
+            }));
+        }
+
+        private bool IsBottomBootFirstBlock()
+        {
+            return FlashMemoryLayout != null
+                && FlashMemoryLayout.SectorSizes != null
+                && FlashMemoryLayout.SectorSizes.Count > 1
+                && FlashMemoryLayout.BaseAddress == ChecksumFlashBlocksOperation.SectorAddress
+                && FlashMemoryLayout.SectorSizes[0] == ChecksumFlashBlocksOperation.SectorSize;
+        }
+
         private void CheckIfFlashMatches()
         {
             var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;

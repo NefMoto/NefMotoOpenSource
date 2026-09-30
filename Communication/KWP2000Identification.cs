@@ -39,7 +39,7 @@ namespace Communication
             UnUsed1 = 0x10,
             UnUsed2 = 0x20,
             UnUsed3 = 0x40,
-            FlashInconsistent = 0x80,//set when flashing starts, cleared when disconencted after flashing complete
+            FlashInconsistent = 0x80,//EEPROM flag at 0x1E8. Disconnect after a completed write does not clear it.
         };
 
         [Flags]

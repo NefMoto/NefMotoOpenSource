@@ -24,7 +24,6 @@ Contact by Email: tony@nefariousmotorsports.com
 
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Diagnostics;
 using System.Threading;
 using System.Linq;
@@ -221,6 +220,12 @@ namespace Communication
 
                             if (readIdentAction.IdentificationOption == (byte)KWP2000IdentificationOption.calibrationEquipmentSoftwareNumber)
                             {
+                                byte[] statusBytes = readIdentAction.IdentificationData;
+                                if ((statusBytes != null) && (statusBytes.Length > 0))
+                                {
+                                    string hex = BitConverter.ToString(statusBytes, 0, Math.Min(statusBytes.Length, 4)).Replace("-", " ");
+                                    CommInterface.DisplayStatusMessage("Flash status 1A 9C: " + hex, StatusMessageType.USER);
+                                }
                                 unsafe
                                 {
                                     if (readIdentAction.IdentificationData.Length >= sizeof(KWP2000FlashStatus))
@@ -572,6 +577,87 @@ namespace Communication
 
             return true;
         }
+    }
+
+    /// <summary>
+    /// Programming session, then a matching checksum of each supplied block. No upload and no erase.
+    /// </summary>
+    public class ChecksumFlashBlocksOperation : KWP2000Operation
+    {
+        public const uint SectorAddress = 0x800000;
+        public const uint SectorSize = 0x4000;
+
+        public ChecksumFlashBlocksOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings, IList<MemoryImage> blocks)
+            : base(commInterface)
+        {
+            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
+            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
+            EnableAutoNegotiateSecurity(securitySettings);
+
+            mBlocks = new List<MemoryImage>(blocks);
+            mTotalBytes = (uint)mBlocks.Sum(block => (long)block.Size);
+            mAllMatched = true;
+            mChecksum = new ValidateFlashChecksumAction(commInterface, mBlocks[0].StartAddress, mBlocks[0].RawData);
+        }
+
+        protected override CommunicationAction NextAction()
+        {
+            var nextAction = base.NextAction();
+
+            return nextAction ?? mChecksum;
+        }
+
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            if (action != mChecksum)
+            {
+                base.OnActionCompleted(action, success);
+                return;
+            }
+
+            MemoryImage block = mBlocks[mIndex];
+            bool matched = success && mChecksum.IsFlashChecksumCorrect;
+            mAllMatched &= matched;
+            CommInterface.DisplayStatusMessage("Checksum " + RangeText(block.StartAddress, block.Size) + (matched ? " matched." : success ? " reported a mismatch." : " failed."), StatusMessageType.USER);
+            if (!success)
+            {
+                OperationCompleted(false);
+                return;
+            }
+
+            mBytesChecked += block.Size;
+            OnUpdatePercentComplete(((float)mBytesChecked) / ((float)mTotalBytes) * 100.0f);
+
+            if (++mIndex >= mBlocks.Count)
+            {
+                OperationCompleted(mAllMatched);
+                return;
+            }
+
+            block = mBlocks[mIndex];
+            mChecksum = new ValidateFlashChecksumAction(KWP2000CommInterface, block.StartAddress, block.RawData);
+            Continue();
+        }
+
+        private static string RangeText(uint start, uint length)
+        {
+            return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
+        }
+
+        private void Continue()
+        {
+            if (!StartNextAction() || CurrentAction == null)
+            {
+                OperationCompleted(false);
+            }
+        }
+
+        private readonly IList<MemoryImage> mBlocks;
+        private readonly uint mTotalBytes;
+        private uint mBytesChecked;
+        private ValidateFlashChecksumAction mChecksum;
+        private int mIndex;
+        private bool mAllMatched;
     }
 
     public class ReadExternalFlashOperation : KWP2000Operation
