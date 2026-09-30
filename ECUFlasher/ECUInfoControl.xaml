@@ -167,6 +167,7 @@ Contact by Email: tony@nefariousmotorsports.com
 
             <WrapPanel Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
                 <Button Command="{Binding Path=ReadDTCsCommand}"/>
+                <Button Command="{Binding Path=ReadEepromMirrorCommand}"/>
                 <Button Command="{Binding Path=ClearDTCsCommand}"/>
                 <Button Command="{Binding Path=SaveDTCsCommand}"/>
                 <Button Command="{Binding Path=LoadDTCsCommand}"/>

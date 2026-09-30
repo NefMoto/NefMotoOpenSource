@@ -193,38 +193,10 @@ namespace ECUFlasher
                     {
                         _ReadDTCsCommand.WatchConnection(App);
                         _ReadDTCsCommand.AddWatchedProperty(App, "OperationInProgress");
+                        WatchDiagnosticSession(_ReadDTCsCommand);
                     }
 
-                    _ReadDTCsCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
-                    {
-                        if (App == null)
-                        {
-                            reasonsDisabled.Add("Internal program error");
-                            return false;
-                        }
-
-                        bool result = true;
-
-                        if (!App.CommInterface.IsConnected())
-                        {
-                            reasonsDisabled.Add("Not connected to ECU");
-                            result = false;
-                        }
-
-                        if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
-                        {
-                            reasonsDisabled.Add("Not connected with KWP2000 protocol");
-                            result = false;
-                        }
-
-                        if (App.OperationInProgress)
-                        {
-                            reasonsDisabled.Add("Another operation is in progress");
-                            result = false;
-                        }
-
-                        return result;
-                    };
+                    _ReadDTCsCommand.CanExecuteMethod = CanExecuteApplicationSessionCommand;
                 }
 
                 return _ReadDTCsCommand;
@@ -246,44 +218,124 @@ namespace ECUFlasher
                     {
                         _ClearDTCsCommand.WatchConnection(App);
                         _ClearDTCsCommand.AddWatchedProperty(App, "OperationInProgress");
+                        WatchDiagnosticSession(_ClearDTCsCommand);
                     }
 
-                    _ClearDTCsCommand.CanExecuteMethod = delegate(List<string> reasonsDisabled)
-                    {
-                        if (App == null)
-                        {
-                            reasonsDisabled.Add("Internal program error");
-                            return false;
-                        }
-
-                        bool result = true;
-
-                        if (!App.CommInterface.IsConnected())
-                        {
-                            reasonsDisabled.Add("Not connected to ECU");
-                            result = false;
-                        }
-
-                        if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
-                        {
-                            reasonsDisabled.Add("Not connected with KWP2000 protocol");
-                            result = false;
-                        }
-
-                        if (App.OperationInProgress)
-                        {
-                            reasonsDisabled.Add("Another operation is in progress");
-                            result = false;
-                        }
-
-                        return result;
-                    };
+                    _ClearDTCsCommand.CanExecuteMethod = CanExecuteApplicationSessionCommand;
                 }
 
                 return _ClearDTCsCommand;
             }
         }
         private ReactiveCommand _ClearDTCsCommand;
+
+        public ICommand ReadEepromMirrorCommand
+        {
+            get
+            {
+                if (_ReadEepromMirrorCommand == null)
+                {
+                    _ReadEepromMirrorCommand = new ReactiveCommand(this.OnReadEepromMirror);
+                    _ReadEepromMirrorCommand.Name = "Read EEPROM Mirror";
+                    _ReadEepromMirrorCommand.Description = "Read 16 bytes at 0x6001E0";
+
+                    if (App != null)
+                    {
+                        _ReadEepromMirrorCommand.WatchConnection(App);
+                        _ReadEepromMirrorCommand.AddWatchedProperty(App, "OperationInProgress");
+                        WatchDiagnosticSession(_ReadEepromMirrorCommand);
+                    }
+
+                    _ReadEepromMirrorCommand.CanExecuteMethod = CanExecuteApplicationSessionCommand;
+                }
+
+                return _ReadEepromMirrorCommand;
+            }
+        }
+        private ReactiveCommand _ReadEepromMirrorCommand;
+
+        private bool mDiagnosticSessionWatchAttached;
+
+        private void WatchDiagnosticSession(ReactiveCommand command)
+        {
+            AttachDiagnosticSessionWatch(command, App.CommInterface);
+            if (mDiagnosticSessionWatchAttached)
+            {
+                return;
+            }
+
+            mDiagnosticSessionWatchAttached = true;
+            App.PropertyChanged += (sender, e) =>
+            {
+                if (e.PropertyName != "CommInterface")
+                {
+                    return;
+                }
+
+                AttachDiagnosticSessionWatch(_ReadDTCsCommand, App.CommInterface);
+                AttachDiagnosticSessionWatch(_ClearDTCsCommand, App.CommInterface);
+                AttachDiagnosticSessionWatch(_ReadEepromMirrorCommand, App.CommInterface);
+            };
+        }
+
+        private static void AttachDiagnosticSessionWatch(ReactiveCommand command, CommunicationInterface commInterface)
+        {
+            if (command == null)
+            {
+                return;
+            }
+
+            KWP2000Interface kwp = commInterface as KWP2000Interface;
+            if (kwp == null)
+            {
+                return;
+            }
+
+            command.ReplaceWatchedProperty(kwp, "CurrentDiagnosticSessionType");
+        }
+
+        private bool CanExecuteApplicationSessionCommand(List<string> reasonsDisabled)
+        {
+            if (App == null)
+            {
+                reasonsDisabled.Add("Internal program error");
+                return false;
+            }
+
+            bool result = true;
+
+            if (!App.CommInterface.IsConnected())
+            {
+                reasonsDisabled.Add("Not connected to ECU");
+                result = false;
+            }
+
+            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+            {
+                reasonsDisabled.Add("Not connected with KWP2000 protocol");
+                result = false;
+            }
+
+            KWP2000Interface kwp = App.CommInterface as KWP2000Interface;
+            if ((kwp != null) && (kwp.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession))
+            {
+                reasonsDisabled.Add("ECU is in a programming session. Turn the ignition off first.");
+                result = false;
+            }
+
+            if (App.OperationInProgress)
+            {
+                reasonsDisabled.Add("Another operation is in progress");
+                result = false;
+            }
+
+            return result;
+        }
+
+        private void OnReadEepromMirror()
+        {
+            StartEepromMirrorFlagCheck(EepromMirrorReadPurpose.Display);
+        }
 
         private void OnClearDTCs()
         {
@@ -292,7 +344,14 @@ namespace ECUFlasher
 
             if(App.DisplayUserPrompt("Confirm Clear Diagnostic Information", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
             {
-                ClearDiagnosticInformation();
+                if (HasProgrammingEepromDtc(ECUDTCs))
+                {
+                    StartEepromMirrorFlagCheck(EepromMirrorReadPurpose.OfferBeforeDtcClear);
+                }
+                else
+                {
+                    StartTesterClear(false);
+                }
             }
         }
 
@@ -909,6 +968,12 @@ namespace ECUFlasher
                     ECUDTCs = new ObservableCollection<KWP2000DTCInfo>(readDTCOperation.DTCsRead);
                     DisplayDTCsRead(ECUDTCs);
 
+                    if (HasProgrammingEepromDtc(ECUDTCs))
+                    {
+                        StartEepromMirrorFlagCheck(EepromMirrorReadPurpose.WarnAfterDtcRead);
+                        return;
+                    }
+
                     App.DisplayStatusMessage("Reading all ECU DTCs succeeded.", StatusMessageType.USER);
                 }
                 else
@@ -919,6 +984,180 @@ namespace ECUFlasher
                 App.PercentOperationComplete = 100.0f;
                 App.OperationInProgress = false;
             }), null);
+        }
+
+        private const uint EepromMirrorPage30Address = 0x6001E0;
+        private const uint EepromMirrorPage30Size = 16;
+        private const byte EepromMirrorReadBlockSize = 20;
+        private const int EepromMirrorFlagIndex = 8;
+
+        private enum EepromMirrorReadPurpose
+        {
+            Display,
+            WarnAfterDtcRead,
+            OfferBeforeDtcClear
+        }
+
+        private EepromMirrorReadPurpose mEepromMirrorReadPurpose;
+        private bool mAdviseRebootAfterDtcClear;
+
+        private static bool HasProgrammingEepromDtc(IEnumerable<KWP2000DTCInfo> dtcs)
+        {
+            return dtcs.Any(dtc => dtc.DTC == 0x0602 || dtc.DTC == 0x1681);
+        }
+
+        private void EepromMirrorUnavailable(EepromMirrorReadPurpose purpose, string reason)
+        {
+            App.DisplayStatusMessage(reason, StatusMessageType.USER);
+            if (purpose == EepromMirrorReadPurpose.OfferBeforeDtcClear)
+            {
+                StartTesterClear(false);
+                return;
+            }
+
+            if (purpose == EepromMirrorReadPurpose.WarnAfterDtcRead)
+            {
+                App.DisplayStatusMessage("Reading all ECU DTCs succeeded.", StatusMessageType.USER);
+            }
+
+            FinishEepromMirrorRead();
+        }
+
+        private void StartEepromMirrorFlagCheck(EepromMirrorReadPurpose purpose)
+        {
+            mEepromMirrorReadPurpose = purpose;
+
+            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if (kwpViewModel == null)
+            {
+                EepromMirrorUnavailable(purpose, "EEPROM mirror check needs a KWP2000 connection.");
+                return;
+            }
+
+            App.OperationInProgress = true;
+            App.PercentOperationComplete = -1.0f;
+            App.DisplayStatusMessage("Reading EEPROM mirror page 30 at 0x6001E0.", StatusMessageType.USER);
+
+            var operation = new ReadMemoryOperation(
+                kwpViewModel.KWP2000CommInterface,
+                kwpViewModel.DesiredBaudRates,
+                EepromMirrorPage30Address,
+                EepromMirrorPage30Size,
+                EepromMirrorReadBlockSize);
+            App.CurrentOperation = operation;
+            operation.CompletedOperationEvent += this.EepromMirrorFlagCheckCompleted;
+            operation.Start();
+        }
+
+        private void EepromMirrorFlagCheckCompleted(Operation operation, bool success)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                operation.CompletedOperationEvent -= this.EepromMirrorFlagCheckCompleted;
+
+                EepromMirrorReadPurpose purpose = mEepromMirrorReadPurpose;
+                var read = operation as ReadMemoryOperation;
+                byte[] page = (success && read != null && read.mReadMemory != null) ? read.mReadMemory.RawData : null;
+                if (page == null || page.Length < EepromMirrorPage30Size)
+                {
+                    EepromMirrorUnavailable(purpose, "EEPROM mirror read at 0x6001E0 failed.");
+                }
+                else
+                {
+                    string hex = FormatEepromMirrorPage(page);
+                    byte flag = page[EepromMirrorFlagIndex];
+                    bool bitSet = (flag & 0x80) != 0;
+                    string notice = "EEPROM mirror byte 0x1E8 is 0x" + flag.ToString("X2")
+                        + (bitSet ? " (bit 7 set)" : " (bit 7 clear)")
+                        + ". Page: " + hex;
+                    App.DisplayStatusMessage(notice, StatusMessageType.USER);
+
+                    if (purpose == EepromMirrorReadPurpose.Display)
+                    {
+                        FinishEepromMirrorRead();
+                        return;
+                    }
+
+                    if (purpose == EepromMirrorReadPurpose.WarnAfterDtcRead)
+                    {
+                        if (bitSet)
+                        {
+                            App.DisplayUserPrompt(
+                                "Programming fault",
+                                notice + "\n\nClear DTCs offers the checksums that clear this state. A tester clear alone leaves it set.",
+                                UserPromptType.OK);
+                        }
+
+                        App.DisplayStatusMessage("Reading all ECU DTCs succeeded.", StatusMessageType.USER);
+                        FinishEepromMirrorRead();
+                        return;
+                    }
+
+                    if (bitSet)
+                    {
+                        string offer = notice
+                            + "\n\nTry to clear the DTC source by checksumming " + FlashingControl.ProgrammingFlagClearBlockList + " from the loaded flash file?"
+                            + "\nNo upload and no erase. The loaded file must match the ECU."
+                            + "\n\nOK checksums those blocks, then clears DTCs. Reboot after that."
+                            + "\nCancel clears DTCs only.";
+                        if (App.DisplayUserPrompt("Clear DTC source", offer, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+                        {
+                            var flashing = FindFlashingControl();
+                            if ((flashing != null) && flashing.TryStartProgrammingFlagClear(clearSuccess => StartTesterClear(true)))
+                            {
+                                return;
+                            }
+
+                            App.DisplayStatusMessage("Could not start the programming-fault clear.", StatusMessageType.USER);
+                        }
+                    }
+
+                    StartTesterClear(false);
+                    return;
+                }
+            }));
+        }
+
+        private void FinishEepromMirrorRead()
+        {
+            App.PercentOperationComplete = 100.0f;
+            App.OperationInProgress = false;
+        }
+
+        private void StartTesterClear(bool adviseReboot)
+        {
+            mAdviseRebootAfterDtcClear = adviseReboot;
+            ClearDiagnosticInformation();
+        }
+
+        private FlashingControl FindFlashingControl()
+        {
+            DependencyObject root = Window.GetWindow(this);
+            if (root == null)
+            {
+                return null;
+            }
+
+            return FindLogicalChild<FlashingControl>(root);
+        }
+
+        private static T FindLogicalChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            foreach (var dep in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+            {
+                var match = (dep as T) ?? FindLogicalChild<T>(dep);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private static string FormatEepromMirrorPage(byte[] page)
+        {
+            return string.Join(" ", page.Take((int)EepromMirrorPage30Size).Select((b, i) => i == EepromMirrorFlagIndex ? "[" + b.ToString("X2") + "]" : b.ToString("X2")));
         }
 
         public static string GetDTCName(ushort DTCnum)
@@ -984,7 +1223,13 @@ namespace ECUFlasher
                     App.DisplayStatusMessage("Clearing ECU diagnostic information failed.", StatusMessageType.USER);
                 }
 
+                if (mAdviseRebootAfterDtcClear)
+                {
+                    App.DisplayStatusMessage("Reboot the ECU before reading DTCs again.", StatusMessageType.USER);
+                }
+
                 operation.CompletedOperationEvent -= this.ClearDiagnosticInformationCompleted;
+                mAdviseRebootAfterDtcClear = false;
 
                 App.PercentOperationComplete = 100.0f;
                 App.OperationInProgress = false;
