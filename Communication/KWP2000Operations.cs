@@ -3201,64 +3201,6 @@ namespace Communication
         }
     };
 
-    public class DoesFlashChecksumMatchOperation : KWP2000SequencialOperation
-    {
-        public class DoesFlashChecksumMatchSettings
-        {
-            public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
-        }
-
-        public DoesFlashChecksumMatchOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, DoesFlashChecksumMatchSettings checkSettings, uint startAddress, byte[] data)
-            : base(commInterface)
-        {
-            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
-            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-            EnableAutoNegotiateSecurity(checkSettings.SecuritySettings);
-
-            mValidateAction = new ValidateFlashChecksumAction(commInterface, startAddress, data);
-            uint endAddress = (data.Length == 0) ? startAddress : startAddress + (uint)data.Length - 1;
-            mChecksumStatus = "Checksumming " + data.Length + " bytes from 0x" + startAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8") + ".";
-
-            mActionArray = new KWP2000Action[1];
-            mActionArray[0] = mValidateAction;
-        }
-
-        protected override void OnActionStarted(CommunicationAction action)
-        {
-            base.OnActionStarted(action);
-
-            if (action == mValidateAction)
-            {
-                CommInterface.DisplayStatusMessage(mChecksumStatus, StatusMessageType.USER);
-            }
-        }
-
-        protected override void OnActionCompleted(CommunicationAction action, bool success)
-        {
-            if (action == mValidateAction)
-            {
-                if (success)
-                {
-                    if (mValidateAction.IsFlashChecksumCorrect)
-                    {
-                        CommInterface.DisplayStatusMessage("Flash memory matches.", StatusMessageType.USER);
-                    }
-                    else
-                    {
-                        CommInterface.DisplayStatusMessage("Flash memory does not match.", StatusMessageType.USER);
-                    }
-                }
-            }
-
-            base.OnActionCompleted(action, success);
-        }
-
-        public bool DoesMatch { get { return mValidateAction.IsFlashChecksumCorrect;  } }
-
-        private ValidateFlashChecksumAction mValidateAction;
-        private string mChecksumStatus;
-    };
-
     public class ReadAllLocalIdentifiersOperation : KWP2000Operation
     {
         public ReadAllLocalIdentifiersOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
