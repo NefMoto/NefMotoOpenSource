@@ -26,10 +26,26 @@ using Shared;
 namespace NefMotoECUFlasher.Avalonia.ViewModels;
 
 /// <summary>
-/// Main window VM: protocol list, status bar placeholders, Exit and About.
+/// Main window VM: protocol list, connection panel host, status bar, Exit and About.
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
+    public MainWindowViewModel()
+    {
+        Devices = new DeviceSelectionViewModel();
+        _kwpConnection = new Kwp2000ConnectionViewModel(Devices, status => ConnectionStatusText = status);
+        _bootstrapConnection = new BootstrapConnectionViewModel(Devices, status => ConnectionStatusText = status);
+        ConnectionPanel = _kwpConnection;
+    }
+
+    private readonly Kwp2000ConnectionViewModel _kwpConnection;
+    private readonly BootstrapConnectionViewModel _bootstrapConnection;
+
+    public DeviceSelectionViewModel Devices { get; }
+
+    [ObservableProperty]
+    private object _connectionPanel;
+
     [ObservableProperty]
     private CommunicationInterface.Protocol _selectedProtocol = CommunicationInterface.Protocol.KWP2000;
 
@@ -52,6 +68,11 @@ public partial class MainWindowViewModel : ObservableObject
     {
         var desc = DescriptionAttributeConverterLogic.GetDescriptionAttribute(value) as string ?? value.ToString();
         SettingsTabHeader = $"{desc} Settings";
+        Devices.IsConnected = false;
+        ConnectionStatusText = "No Connection";
+        ConnectionPanel = value == CommunicationInterface.Protocol.BootMode
+            ? _bootstrapConnection
+            : _kwpConnection;
     }
 
     [RelayCommand]

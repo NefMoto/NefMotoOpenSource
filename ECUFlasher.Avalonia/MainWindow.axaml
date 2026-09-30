@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:NefMotoECUFlasher.Avalonia.ViewModels;assembly=NefMotoECUFlasher.Avalonia"
+        xmlns:views="clr-namespace:NefMotoECUFlasher.Avalonia.Views;assembly=NefMotoECUFlasher.Avalonia"
         xmlns:comm="clr-namespace:Communication;assembly=Communication"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
         x:Class="NefMotoECUFlasher.Avalonia.MainWindow"
@@ -13,6 +14,15 @@
         Width="800"
         Height="550"
         Background="{StaticResource BackgroundBrush}">
+
+    <Window.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:Kwp2000ConnectionViewModel}">
+            <views:Kwp2000ConnectionView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:BootstrapConnectionViewModel}">
+            <views:BootstrapConnectionView/>
+        </DataTemplate>
+    </Window.DataTemplates>
 
     <Grid RowDefinitions="Auto,Auto,*,Auto">
         <Menu Grid.Row="0" Background="{StaticResource MenuBarBrush}">
@@ -52,11 +62,10 @@
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
-            <ContentControl DockPanel.Dock="Right" VerticalAlignment="Top">
-                <TextBlock Text="Connection view (to be ported)"
-                           Foreground="{StaticResource ForegroundBrush}"
-                           Margin="4,4"/>
-            </ContentControl>
+            <ContentControl DockPanel.Dock="Right"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Stretch"
+                            Content="{Binding ConnectionPanel}"/>
         </DockPanel>
 
         <TabControl Grid.Row="2" Background="{StaticResource BackgroundBrush}">

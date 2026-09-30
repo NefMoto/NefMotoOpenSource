@@ -30,5 +30,6 @@ public partial class MainWindow : Window
         vm.OnExit = Close;
         vm.OnShowAbout = () => new AboutWindow().ShowDialog(this);
         DataContext = vm;
+        _ = vm.Devices.RefreshDevicesCommand.ExecuteAsync(null);
     }
 }

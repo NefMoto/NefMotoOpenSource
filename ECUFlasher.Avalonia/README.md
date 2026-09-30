@@ -34,7 +34,7 @@ dotnet run --project ECUFlasher.Avalonia\NefMotoECUFlasher.Avalonia.csproj
 | Solution / `make run-avalonia` | Done (this branch) |
 | Theme, banner, icon, converters | Done |
 | Main shell (menu, protocol ComboBox, tabs, status, About) | Done (shell only) |
-| KWP2000 / Boot Mode connection views | Not started |
+| KWP2000 / Boot Mode connection views | UI layout + device refresh; **connect is stubbed** |
 | ECU Info / Flashing / Data Logger / Settings content | Placeholders |
 | Window size persistence, packaging | Not started |
 | Cable I/O on macOS / Linux | Not implemented (see below) |
@@ -42,22 +42,26 @@ dotnet run --project ECUFlasher.Avalonia\NefMotoECUFlasher.Avalonia.csproj
 ## Layout
 
 - `App.axaml` — Fluent theme overrides, NefMoto colors, converter resources
-- `MainWindow.axaml` — menu, banner, protocol selector, connection placeholder, tabs, status bar
+- `MainWindow.axaml` — menu, banner, protocol selector, connection panel (KWP/Boot), tabs, status bar
+- `Views/Kwp2000ConnectionView.axaml` / `BootstrapConnectionView.axaml` — connection strips
 - `Views/AboutWindow.axaml` — version + links
-- `ViewModels/` — shell ViewModels (`CommunityToolkit.Mvvm`)
+- `ViewModels/` — shell + connection ViewModels (`CommunityToolkit.Mvvm`)
 - `Assets/` — banner, `.ico` / `.png` / `.icns`
 
 ## Next work (priority)
 
 **UI workalike first** (Windows cables already work). Defer deep OS-independent cable work until connection UI + ≥1 tab, or an explicit Mac/Linux hardware goal. Optional: short design note only — see local `plans/Avalonia-Porting-Plan.md` §0 / §15 (not in git).
 
-1. **Connection UI** — KWP2000 and Bootstrap connection / status / settings; non-WPF ViewModels. ← current focus
+1. **Wire real Connect** — replace connection stubs with shared/non-WPF protocol connect (lift from WPF VMs). ← current focus after layout
 2. **Tab content** — ECU Info or Flashing first, then Data Logger.
 3. **Status / log window** — Avalonia equivalent of `StatusWindow`.
 4. **Settings persistence** — without WPF `Properties.Settings`.
 5. **Polish** — validation, auto-scroll; optional ControlTemplates.
 6. **Packaging** — `dotnet publish` for Windows/macOS; optional `.app` for Dock icon.
 7. **Later — cable backends** — CH340 Unix enum/drain, then FTDI; extend `ICommunicationDevice` / `DeviceManager`, don’t invent a second HAL.
+8. **Later — `make installer` on macOS host** — run the existing WiX **Windows MSI** path from a Mac (pwsh / tooling); not a macOS `.pkg`. See local plan Phase 7.
+
+Connection strip already has baud / device / Refresh / method (KWP) / Connect-Disconnect / Cancel; Refresh uses `DeviceManager` (Windows-shaped; empty or failing on macOS is expected).
 
 Do not reintroduce WPF types into Shared/Communication.
 

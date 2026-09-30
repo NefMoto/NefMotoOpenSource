@@ -220,13 +220,24 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="Black"/>
             <Setter Property="CornerRadius" Value="3"/>
-            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Padding" Value="10,4"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="MinHeight" Value="24"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <!-- Fluent ContentPresenter can sit top-left unless centered explicitly -->
+        <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Button:pointerover">
             <Setter Property="Foreground" Value="Black"/>
             <Setter Property="Background" Value="#FFE8F0FF"/>
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFC8C8C8"/>
         </Style>
         <Style Selector="ProgressBar">
             <Setter Property="Background" Value="#FFE0E0E0"/>

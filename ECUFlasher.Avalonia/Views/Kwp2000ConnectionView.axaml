@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:NefMotoECUFlasher.Avalonia.ViewModels"
+             xmlns:comm="clr-namespace:Communication;assembly=Communication"
+             x:Class="NefMotoECUFlasher.Avalonia.Views.Kwp2000ConnectionView"
+             x:DataType="vm:Kwp2000ConnectionViewModel">
+  <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
+    <ComboBox Grid.Column="0" Grid.Row="0"
+              Margin="0,0,4,4"
+              MinWidth="110"
+              ToolTip.Tip="Desired Baud Rate"
+              IsEnabled="{Binding CanChangeConnectionOptions}"
+              ItemsSource="{Binding AvailableBaudRates}"
+              SelectedItem="{Binding DesiredBaudRate}">
+      <ComboBox.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Text="{Binding StringFormat={}{0} Baud}"/>
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+
+    <ComboBox Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2"
+              Margin="0,0,4,4"
+              MinWidth="160"
+              ToolTip.Tip="Communication device"
+              IsEnabled="{Binding Devices.CanSelectDevice}"
+              ItemsSource="{Binding Devices.Devices}"
+              SelectedItem="{Binding Devices.SelectedDevice}">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="comm:DeviceInfo">
+          <TextBlock Text="{Binding DisplayName}"/>
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+
+    <Button Grid.Column="3" Grid.Row="0"
+            Margin="0,0,0,4"
+            Content="Refresh Devices"
+            Command="{Binding Devices.RefreshDevicesCommand}"
+            ToolTip.Tip="Refresh the connected USB devices"/>
+
+    <ComboBox Grid.Column="1" Grid.Row="1"
+              Margin="0,0,4,0"
+              MinWidth="120"
+              ToolTip.Tip="Desired Connection Method"
+              IsEnabled="{Binding CanChangeConnectionOptions}"
+              ItemsSource="{Binding AvailableConnectionMethods}"
+              SelectedItem="{Binding DesiredConnectionMethod}">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:KwpConnectionMethod">
+          <TextBlock Text="{Binding Converter={StaticResource descriptionAttributeConverter}}"/>
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+
+    <Button Grid.Column="2" Grid.Row="1"
+            Margin="0,0,4,0"
+            HorizontalAlignment="Left"
+            Content="{Binding ConnectButtonText}"
+            Command="{Binding ToggleConnectCommand}"
+            ToolTip.Tip="Connect or disconnect (protocol connect still stubbed)"/>
+
+    <Button Grid.Column="3" Grid.Row="1"
+            Content="Cancel"
+            Command="{Binding CancelOperationCommand}"
+            ToolTip.Tip="Cancel current operation"/>
+  </Grid>
+</UserControl>
