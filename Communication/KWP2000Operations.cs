@@ -660,6 +660,103 @@ namespace Communication
         private bool mAllMatched;
     }
 
+    /// <summary>
+    /// Closing step for the programming flag: a 2-byte upload, transfer, and exit, then three matching checksums.
+    /// </summary>
+    // ME7 kernel: an accepted RequestUpload (the layout check sends one) blocks the 33 C5
+    // match streak until an upload finishes with RequestTransferExit. Three matches in a row
+    // with no open upload clear bit 7 of 95040 page 30/31 byte 8, which the login set.
+    internal class ProgrammingFlagCloser
+    {
+        private const int ChecksumCount = 3;
+
+        private enum Step
+        {
+            RequestUpload,
+            Transfer,
+            Exit,
+            Checksum
+        }
+
+        public ProgrammingFlagCloser(KWP2000Interface commInterface, uint uploadAddress, MemoryImage checksumBlock)
+        {
+            mCommInterface = commInterface;
+            mUploadAddress = uploadAddress;
+            mChecksumBlock = checksumBlock;
+            mMaxBlockSize = TransferDataAction.DEFAULT_MAX_BLOCK_SIZE;
+        }
+
+        public CommunicationAction NextAction()
+        {
+            switch (mStep)
+            {
+                case Step.RequestUpload:
+                {
+                    mCommInterface.DisplayStatusMessage("Closing the open upload: uploading 0x" + mUploadAddress.ToString("X8") + " to 0x" + (mUploadAddress + 1).ToString("X8") + ".", StatusMessageType.USER);
+                    return new RequestUploadFromECUAction(mCommInterface, mUploadAddress, 2, TransferDataAction.CompressionType.Uncompressed, TransferDataAction.EncryptionType.Unencrypted);
+                }
+                case Step.Transfer:
+                {
+                    return new TransferDataAction(mCommInterface, TransferDataAction.TransferMode.UploadFromECU, TransferDataAction.EncryptionType.Unencrypted, TransferDataAction.CompressionType.Uncompressed, mMaxBlockSize, new byte[2], null);
+                }
+                case Step.Exit:
+                {
+                    return new RequestTransferExitAction(mCommInterface);
+                }
+                default:
+                {
+                    mCommInterface.DisplayStatusMessage("Programming flag checksum " + (mChecksumsSent + 1) + " of " + ChecksumCount + ": 0x" + mChecksumBlock.StartAddress.ToString("X8") + " to 0x" + (mChecksumBlock.EndAddress - 1).ToString("X8") + ".", StatusMessageType.USER);
+                    return new ValidateFlashChecksumAction(mCommInterface, mChecksumBlock.StartAddress, mChecksumBlock.RawData);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns true when the closing step has ended, whether or not it succeeded.
+        /// </summary>
+        public bool OnActionCompleted(CommunicationAction action, bool success)
+        {
+            var checksum = action as ValidateFlashChecksumAction;
+            if (!success || ((checksum != null) && !checksum.IsFlashChecksumCorrect))
+            {
+                return End("Closing the programming flag failed at " + mStep + ". The flag may stay set.");
+            }
+
+            if (mStep == Step.RequestUpload)
+            {
+                mMaxBlockSize = ((RequestUploadFromECUAction)action).GetMaxBlockSize();
+                mStep = Step.Transfer;
+            }
+            else if (mStep == Step.Transfer)
+            {
+                mStep = Step.Exit;
+            }
+            else if (mStep == Step.Exit)
+            {
+                mStep = Step.Checksum;
+            }
+            else if (++mChecksumsSent == ChecksumCount)
+            {
+                return End("Sent " + ChecksumCount + " matching checksums with the upload closed. The programming flag should be clear.");
+            }
+
+            return false;
+        }
+
+        private bool End(string message)
+        {
+            mCommInterface.DisplayStatusMessage(message, StatusMessageType.USER);
+            return true;
+        }
+
+        private readonly KWP2000Interface mCommInterface;
+        private readonly uint mUploadAddress;
+        private readonly MemoryImage mChecksumBlock;
+        private Step mStep;
+        private byte mMaxBlockSize;
+        private int mChecksumsSent;
+    }
+
     public class ReadExternalFlashOperation : KWP2000Operation
     {
         public class ReadExternalFlashSettings
@@ -1386,7 +1483,6 @@ namespace Communication
 
             mTotalBytesValidated = 0;
             mValidatedEraseMode = true;
-            mForcedLastSectorForECUCompletion = false;
             mState = FlashingState.StartBlock;
 
             foreach (var block in mFlashBlockList)
@@ -1474,30 +1570,20 @@ namespace Communication
 
                         mState = FlashingState.StartBlock;
 
-                        //if we didn't find another block to flash, handle flashing the last block if necessary
+                        //if we didn't find another block to flash, we are done
                         if (mCurrentBlock.mFlashComplete)
                         {
-                            //if we have flashed all blocks and we finished with the last block we are done
                             mState = FlashingState.FinishedBlock;
 
-                            var lastBlock = mFlashBlockList.Last();
-
-                            // Sequential skip-all leaves mCurrentBlock == lastBlock, so the old
-                            // mCurrentBlock != lastBlock check never ran. ME7 stays in programming
-                            // mode unless a sector is actually programmed this session.
-                            if (!mForcedLastSectorForECUCompletion && !lastBlock.mWasErased)
+                            if (!mClearFlagAttempted)
                             {
-                                mForcedLastSectorForECUCompletion = true;
-                                mCurrentBlock = lastBlock;
-                                mCurrentBlock.mFlashComplete = false;
-                                mCurrentBlock.mFlashingIsRequired = true;//don't allow the sector to be skipped
-                                if (mTotalBytesValidated >= lastBlock.mMemoryImage.Size)
+                                mClearFlagAttempted = true;
+                                FlashBlock clearFlagBlock = mFlashBlockList.FirstOrDefault(b => b.mFlashComplete && b.mFlashSuccessful);
+                                if (clearFlagBlock != null)
                                 {
-                                    mTotalBytesValidated -= lastBlock.mMemoryImage.Size;
+                                    mClearFlag = new ProgrammingFlagCloser(KWP2000CommInterface, mFlashBlockList.First().mMemoryImage.StartAddress, clearFlagBlock.mMemoryImage);
+                                    mState = FlashingState.ClearFlag;
                                 }
-                                CommInterface.DisplayStatusMessage("Writing the last flash sector so the ECU can complete the programming session.", StatusMessageType.USER);
-
-                                mState = FlashingState.StartBlock;
                             }
                         }
                     }
@@ -1587,7 +1673,7 @@ namespace Communication
                         }
                         case FlashingState.CheckIfFlashRequired:
                         {
-                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length;
+                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length - 1;
                             CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if flashing is necessary for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, mCurrentBlock.mMemoryImage.RawData);
                             break;
@@ -1613,7 +1699,7 @@ namespace Communication
                                 blankData[x] = 0xFF;
                             }
 
-                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length;
+                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length - 1;
                             CommInterface.DisplayStatusMessage("Calculating flash checksum to verify if erase was successful for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, blankData);
                             break;
@@ -1664,17 +1750,28 @@ namespace Communication
                         }
                         case FlashingState.ValidateFlashedData:
                         {
-                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length;
+                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length - 1;
                             CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if flashing was successful for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, mCurrentBlock.mMemoryImage.RawData);
                             break;
                         }
+                        case FlashingState.ClearFlag:
+                        {
+                            nextAction = mClearFlag.NextAction();
+                            break;
+                        }
                         case FlashingState.FinishedBlock:
                         {
-                            CommInterface.DisplayStatusMessage("Disconnecting from ECU to force it to recognize successful completion of flash write.", StatusMessageType.USER);
-
                             OperationCompleted(true);//complete before disconnecting
-                            KWP2000CommInterface.DisconnectFromECU();
+                            if (mFlashBlockList.Any(block => block.mWasErased))
+                            {
+                                CommInterface.DisplayStatusMessage("A sector was erased. Disconnecting from ECU.", StatusMessageType.USER);
+                                KWP2000CommInterface.DisconnectFromECU();
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("No sector was erased. Leaving the connection open.", StatusMessageType.USER);
+                            }
 
                             //we are finished
                             nextAction = null;
@@ -1699,8 +1796,17 @@ namespace Communication
             //only pay attention to actions started by this code
             if(action == mMyLastStartedAction)
             {
+                if (mState == FlashingState.ClearFlag)
+                {
+                    if (mClearFlag.OnActionCompleted(action, success))
+                    {
+                        mState = FlashingState.StartBlock;
+                    }
+
+                    success = true;
+                }
                 #region ValidateChecksumAndCheckEraseMode
-                if (action is ValidateFlashChecksumAction)
+                else if (action is ValidateFlashChecksumAction)
                 {
                     if (mState == FlashingState.CheckIfFirstBlockAccidentallyErased)
                     {
@@ -2433,6 +2539,7 @@ namespace Communication
             MirrorCheckExitMirror,
             StartBlock,//intermediate state
             CheckIfFirstBlockAccidentallyErased,
+            ClearFlag,
             CheckIfFlashRequired,
             StartProgrammingBlock,//intermediate state
             EraseFlash,
@@ -2461,11 +2568,13 @@ namespace Communication
         private FlashingState mState;
         private List<FlashBlock> mFlashBlockList;
         private FlashBlock mCurrentBlock;
+        private bool mClearFlagAttempted;
+        private ProgrammingFlagCloser mClearFlag;
+
         private byte mMaxBlockSize;
         private bool mEraseEntireFlashAtOnce;
         private MemoryLayout mFlashMemoryLayout;
         private bool mValidatedEraseMode;
-        private bool mForcedLastSectorForECUCompletion;
 
         private uint mTotalBytesToFlash;
         private uint mTotalBytesValidated;
