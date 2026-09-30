@@ -71,6 +71,10 @@ namespace ECUFlasher
 
             InitializeComponent();
 
+#if DEBUG
+            AddDebugFlashButtons();
+#endif
+
             PopulateMemoryLayouts();
             if (App?.Preferences != null)
             {
@@ -918,53 +922,6 @@ namespace ECUFlasher
         }
         private ReactiveCommand _VerifyChecksumsCommand;
 
-        public ReactiveCommand CorrectChecksumsCommand
-        {
-            get
-            {
-                if (_CorrectChecksumsCommand == null)
-                {
-                    _CorrectChecksumsCommand = new ReactiveCommand(this.OnCorrectChecksums);
-                    _CorrectChecksumsCommand.Name = "Correct Checksums";
-                    _CorrectChecksumsCommand.Description = "Update checksums to correct values";
-
-                    if (App != null)
-                    {
-                        _CorrectChecksumsCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _CorrectChecksumsCommand.AddWatchedProperty(this, "IsFlashFileOK");
-                    }
-
-                    _CorrectChecksumsCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
-                    {
-                        if (App == null)
-                        {
-                            reasonsDisabled.Add("Internal program error");
-                            return false;
-                        }
-
-                        bool result = true;
-
-                        if (App.OperationInProgress)
-                        {
-                            reasonsDisabled.Add("Another operation is in progress");
-                            result = false;
-                        }
-
-                        if (!IsFlashFileOK)
-                        {
-                            reasonsDisabled.Add("Specified flash file is not correct");
-                            result = false;
-                        }
-
-                        return result;
-                    };
-                }
-
-                return _CorrectChecksumsCommand;
-            }
-        }
-        private ReactiveCommand _CorrectChecksumsCommand;
-
         private void OnVerifyChecksums()
         {
             App.CurrentOperation = new Checksum.ValidateChecksumsOperation(FlashMemoryImage.RawData);
@@ -1006,51 +963,6 @@ namespace ECUFlasher
                 else
                 {
                     App.DisplayStatusMessage("Failed to verify checksums are correct.", StatusMessageType.USER);
-                }
-            }));
-        }
-
-        private void OnCorrectChecksums()
-        {
-            App.CurrentOperation = new Checksum.CorrectChecksumsOperation(FlashMemoryImage.RawData);
-            App.CurrentOperation.CompletedOperationEvent += this.OnCorrectChecksumsCompleted;
-
-            App.OperationInProgress = true;
-            App.PercentOperationComplete = -1.0f;
-
-            App.DisplayStatusMessage("Correcting checksums.", StatusMessageType.USER);
-
-            App.CurrentOperation.Start();
-        }
-
-        private void OnCorrectChecksumsCompleted(Operation operation, bool success)
-        {
-            //UI should occur on the UI thread...
-            Dispatcher.Invoke((Action)(() =>
-            {
-                App.PercentOperationComplete = 100.0f;
-                App.OperationInProgress = false;
-
-                var correctOperation = operation as Checksum.CorrectChecksumsOperation;
-
-                App.DisplayStatusMessage("Corrected " + correctOperation.NumCorrectedChecksums + " of " + correctOperation.NumChecksums + " checksums.", StatusMessageType.USER);
-
-                if (success)
-                {
-                    App.DisplayStatusMessage("Checksums updated to correct values.", StatusMessageType.USER);
-
-                    if (FlashMemoryImage.SaveToFile(FileNameToFlash))
-                    {
-                        App.DisplayStatusMessage("Saved changes to file: " + FileNameToFlash, StatusMessageType.USER);
-                    }
-                    else
-                    {
-                        App.DisplayStatusMessage("Failed to save changes to file: " + FileNameToFlash, StatusMessageType.USER);
-                    }
-                }
-                else
-                {
-                    App.DisplayStatusMessage("Failed to correct checksums.", StatusMessageType.USER);
                 }
             }));
         }
@@ -2077,9 +1989,56 @@ namespace ECUFlasher
 
         internal const string ProgrammingFlagClearBlockList = "0x804000-0x805FFF, 0x806000-0x807FFF, and 0x808000-0x80FFFF";
 
+        public ReactiveCommand ChecksumRestOfFirst64KCommand
+        {
+            get
+            {
+                if (_ChecksumRestOfFirst64KCommand == null)
+                {
+                    var command = new ReactiveCommand(this.OnChecksumRestOfFirst64K);
+                    command.Name = "Checksum 8K+8K+32K";
+                    command.Description = "Checksum " + ProgrammingFlagClearBlockList + " from the loaded file. No upload and no erase.";
+
+                    if (App != null)
+                    {
+                        command.WatchConnection(App);
+                        command.AddWatchedProperty(App, "OperationInProgress");
+                        command.AddWatchedProperty(this, "IsFlashFileOK");
+                        command.AddWatchedProperty(this, "IsMemoryLayoutOK");
+                    }
+
+                    command.CanExecuteMethod = CanExecuteChecksumRestOfFirst64KCommand;
+                    _ChecksumRestOfFirst64KCommand = command;
+                }
+
+                return _ChecksumRestOfFirst64KCommand;
+            }
+        }
+        private ReactiveCommand _ChecksumRestOfFirst64KCommand;
+
         private const string ProgrammingFlagClearStatus = "Checksumming 0x804000-0x80FFFF as 8KB, 8KB, and 32KB. No upload and no erase.";
-        private const string ProgrammingFlagClearMatched = "The 8KB, 8KB, and 32KB checksums matched.";
-        private const string ProgrammingFlagClearMismatch = "The 8KB, 8KB, and 32KB checksums did not all match.";
+#if DEBUG
+        private void AddDebugFlashButtons()
+        {
+            AddDebugFlashButton(CheckIfFlashMatchesCommand, 0);
+            AddDebugFlashButton(ChecksumRestOfFirst64KCommand, 1);
+        }
+
+        private void AddDebugFlashButton(ReactiveCommand command, int column)
+        {
+            var button = new Button();
+            button.SetResourceReference(FrameworkElement.StyleProperty, "ReactiveCommandButtonStyle");
+            button.Command = command;
+            Grid.SetColumn(button, column);
+            Grid.SetRow(button, 2);
+            FlashActionGrid.Children.Add(button);
+        }
+#endif
+
+        private void OnChecksumRestOfFirst64K()
+        {
+            TryStartProgrammingFlagClear(null, true);
+        }
 
         internal bool TryStartProgrammingFlagClear(Action<bool> afterComplete, bool confirm = false)
         {
@@ -2107,15 +2066,19 @@ namespace ECUFlasher
                 return false;
             }
 
+            mAfterProgrammingFlagClear = afterComplete;
+            var operation = new ChecksumFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, GetSecuritySettings(kwpViewModel), blocks);
+            StartFlashOperation(operation, this.ChecksumRestOfFirst64KCompleted, ProgrammingFlagClearStatus);
+            return true;
+        }
+
+        private static SecurityAccessAction.SecurityAccessSettings GetSecuritySettings(KWP2000Interface_ViewModel kwpViewModel)
+        {
             var security = new SecurityAccessAction.SecurityAccessSettings();
             security.RequestSeed = kwpViewModel.SeedRequest;
             security.SupportSpecialKey = kwpViewModel.ShouldSupportSpecialKey;
             security.UseExtendedSeedRequest = kwpViewModel.ShouldUseExtendedSeedRequest;
-
-            mAfterProgrammingFlagClear = afterComplete;
-            var operation = new ChecksumFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, security, blocks);
-            StartFlashOperation(operation, this.ChecksumRestOfFirst64KCompleted, ProgrammingFlagClearStatus);
-            return true;
+            return security;
         }
 
         private bool TryGetProgrammingFlagClearBlocks(out List<MemoryImage> blocks)
@@ -2138,12 +2101,7 @@ namespace ECUFlasher
                 return false;
             }
 
-            blocks = new List<MemoryImage>
-            {
-                sectorImages[1],
-                sectorImages[2],
-                sectorImages[3]
-            };
+            blocks = sectorImages.GetRange(1, 3);
             return true;
         }
 
@@ -2160,24 +2118,64 @@ namespace ECUFlasher
 
                 if (success)
                 {
-                    string matched = ProgrammingFlagClearMatched;
-                    if (after == null)
-                    {
-                        matched += " Key-cycle before reading DTCs again.";
-                    }
-
-                    App.DisplayStatusMessage(matched, StatusMessageType.USER);
+                    App.DisplayStatusMessage("The 8KB, 8KB, and 32KB checksums matched." + (after == null ? " Key-cycle before reading DTCs again." : ""), StatusMessageType.USER);
                 }
                 else
                 {
-                    App.DisplayStatusMessage(ProgrammingFlagClearMismatch, StatusMessageType.USER);
+                    App.DisplayStatusMessage("The 8KB, 8KB, and 32KB checksums did not all match.", StatusMessageType.USER);
                 }
 
-                if (after != null)
-                {
-                    after(success);
-                }
+                after?.Invoke(success);
             }));
+        }
+
+        private bool CanExecuteChecksumRestOfFirst64KCommand(List<string> reasonsDisabled)
+        {
+            if (App == null)
+            {
+                reasonsDisabled.Add("Internal program error");
+                return false;
+            }
+
+            bool result = true;
+
+            if (!App.CommInterface.IsConnected())
+            {
+                reasonsDisabled.Add("Not connected to ECU");
+                result = false;
+            }
+
+            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+            {
+                reasonsDisabled.Add("Requires a KWP2000 connection");
+                result = false;
+            }
+
+            if (App.OperationInProgress)
+            {
+                reasonsDisabled.Add("Another operation is in progress");
+                result = false;
+            }
+
+            if (!IsMemoryLayoutOK)
+            {
+                reasonsDisabled.Add("Specified memory layout is not correct");
+                result = false;
+            }
+
+            if (!IsFlashFileOK)
+            {
+                reasonsDisabled.Add("Specified flash file is not correct");
+                result = false;
+            }
+
+            if (!IsBottomBootFirstBlock())
+            {
+                reasonsDisabled.Add("First sector must be 16KB at 0x800000");
+                result = false;
+            }
+
+            return result;
         }
 
         private bool IsBottomBootFirstBlock()
@@ -2199,20 +2197,9 @@ namespace ECUFlasher
                 return;
             }
 
-            var settings = new DoesFlashChecksumMatchOperation.DoesFlashChecksumMatchSettings();
-            settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
-            settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
-            settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
-
-            App.CurrentOperation = new DoesFlashChecksumMatchOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, FlashMemoryLayout.BaseAddress, FlashMemoryImage.RawData);
-            App.CurrentOperation.CompletedOperationEvent += this.CheckIfFlashMatchesOperationCompleted;
-
-            App.OperationInProgress = true;
-            App.PercentOperationComplete = -1.0f;
-
-            App.DisplayStatusMessage("Checking if flash matches flash file.", StatusMessageType.USER);
-
-            App.CurrentOperation.Start();
+            var sectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(FlashMemoryImage.RawData, FlashMemoryLayout));
+            var operation = new ChecksumFlashBlocksOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, GetSecuritySettings(KWP2000CommViewModel), sectors);
+            StartFlashOperation(operation, this.CheckIfFlashMatchesOperationCompleted, "Checking if flash matches flash file, one checksum per sector.");
         }
 
         private void CheckIfFlashMatchesOperationCompleted(Operation operation, bool success)
@@ -2220,30 +2207,9 @@ namespace ECUFlasher
             //UI should occur on the UI thread...
             Dispatcher.Invoke((Action)(() =>
             {
-                var matchOperation = (DoesFlashChecksumMatchOperation)operation;
-
-                string statusMessage = "";
-
-                if (success)
-                {
-                    string matchMessage = "";
-
-                    if (matchOperation.DoesMatch)
-                    {
-                        matchMessage = "Flash memory matches flash file.";
-                    }
-                    else
-                    {
-                        matchMessage = "Flash memory does not match flash file.";
-                    }
-
-                    statusMessage = "Checking if flash matches succeeded.";
-                    statusMessage += "\n" + matchMessage;
-                }
-                else
-                {
-                    statusMessage = "Checking if flash matches failed.";
-                }
+                string statusMessage = success
+                    ? "Flash memory matches flash file."
+                    : "One or more sectors differ (see the list above) or the checksum failed.";
 
                 operation.CompletedOperationEvent -= this.CheckIfFlashMatchesOperationCompleted;
 
@@ -2297,9 +2263,7 @@ namespace ECUFlasher
             settings.VerifyWrittenData = verify;
             settings.EraseEntireFlashAtOnce = false;
             settings.FlashMemoryLayout = flashMemoryLayout;
-            settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
-            settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
-            settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+            settings.SecuritySettings = GetSecuritySettings(KWP2000CommViewModel);
 
             var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(flashMemoryImage, flashMemoryLayout);
 
@@ -2468,9 +2432,7 @@ namespace ECUFlasher
             settings.OnlyReadNonMatchingSectors = onlyReadRequiredSectors;
             settings.VerifyReadData = shouldVerifyReadData;
             settings.ChecksumRanges = checksumRanges;
-            settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
-            settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
-            settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
+            settings.SecuritySettings = GetSecuritySettings(KWP2000CommViewModel);
 
             var operation = new ReadExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
             StartFlashOperation(operation, operationCompletedDel, "Reading ECU flash memory.");

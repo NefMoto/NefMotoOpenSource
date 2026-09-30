@@ -58,11 +58,11 @@ Contact by Email: tony@nefariousmotorsports.com
                 IsEnabled="{Binding Path=IsMemoryLayoutEnabled}"
                 ToolTip="{Binding Path=MemoryLayoutToolTip}"/>
         </Grid>
-        <Grid DockPanel.Dock="Top">
+        <Grid DockPanel.Dock="Top" x:Name="FlashActionGrid">
             <Grid.RowDefinitions>
                 <RowDefinition/>
                 <RowDefinition/>
-                <RowDefinition/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
@@ -75,7 +75,6 @@ Contact by Email: tony@nefariousmotorsports.com
             <Button Command="{Binding Path=WriteEntireFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="0"/>
             <Button Command="{Binding Path=WriteDiffFlashCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="1"/>
             <Button Command="{Binding Path=VerifyChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="0"/>
-            <Button Command="{Binding Path=CheckIfFlashMatchesCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="2"/>
             <StackPanel Orientation="Horizontal" Grid.Column="2" Grid.Row="1" Margin="8,0,0,0">
                 <CheckBox x:Name="chkVerifyWrite" VerticalAlignment="Center" IsChecked="True" IsEnabled="{Binding Path=IsVerifyWriteEnabled}"/>
                 <Label>Verify Write</Label>
@@ -90,7 +89,6 @@ Contact by Email: tony@nefariousmotorsports.com
                 SelectedItem="{Binding Path=SelectedEepromPreset, Mode=TwoWay}"
                 DisplayMemberPath="DisplayName"
                 ToolTip="Bootmode SPI EEPROM preset (physical 95040 chip)"/>
-            <!-- <Button Command="{Binding Path=CorrectChecksumsCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="2" Grid.Row="1" IsEnabled="true"/>-->
         </Grid>
         <!--<Image DockPanel.Dock="Bottom" Source="{Binding Path=FlashMemoryImage.RawData, Converter={StaticResource byteArrayToBitmapConverter}}"/>-->
         <ECUFlasher:StatusWindow DataContext="{Binding Path=App}" DockPanel.Dock="Bottom"/>
