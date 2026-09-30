@@ -40,14 +40,14 @@ The connection controls are at the **top of the window**, not on a tab.
 
 Tabs after you are connected:
 
-- **KWP2000 Info** — ident and DTCs (**Read ECU Info**, **Read DTCs**, **Clear DTCs**)
+- **KWP2000 Info** — ident and DTCs (**Read ECU Info**, **Read DTCs**, **Read EEPROM Mirror**, **Clear DTCs**)
 - **KWP2000 Flashing** — read/write ([Flashing](flashing.md))
 - **KWP2000 Logging** — live variables. It is not [ME7Logger](https://nefariousmotorsports.com/forum/).
 - **KWP2000 Settings** — address, timings, **Verify cable in dumb mode**, **Slow init timing log**
 
 ## Logging and DTCs
 
-**KWP2000 Info:** **Read DTCs**, **Clear DTCs**, save/load a DTCs file. Clearing DTCs does not fix an underlying fault.
+**KWP2000 Info:** **Read DTCs**, **Read EEPROM Mirror**, **Clear DTCs**, save/load a DTCs file. Those three buttons stay disabled in a programming session. **Read EEPROM Mirror** reports the page at `0x6001E0` and does not clear anything. For `P0602` or `P1681`, see [P0602](clearing-P0602.md).
 
 **KWP2000 Logging:** live variables while KWP2000 is connected. This is not [ME7Logger](https://nefariousmotorsports.com/forum/). After a flash write, logging stays broken until a complete power cycle ([Flashing](flashing.md#after-a-successful-write)).
 

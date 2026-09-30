@@ -50,6 +50,7 @@ On **KWP2000 Flashing**, the layout combo is **disabled**. Layout comes from the
 - **Full Read Flash** / **Full Write Flash**
 - **Diff Read Flash** is not supported in bootmode (the loader has no checksum-for-range)
 - **Verify Write** is forced off for bootmode flash write
+- **Verify Read** is off in bootmode. A bootmode full read sends no `0xC5`
 - Variant (ME7 vs Simos3 vs EDC15) is taken from the detected layout base (ME7 `0x800000`, Simos3/EDC15 `0x400000`). There is no separate variant dropdown.
 
 **Choose Flash File** still loads a `.bin` for write.

@@ -8,13 +8,14 @@ Project overview, features, and requirements: [README.md](../README.md).
 
 - [Getting started](user-guide/getting-started.md) — install, cable, first connect, bench vs in-car, DTCs, logs
 - [Flashing](user-guide/flashing.md) — KWP read/write, layouts, checksums
+- [P0602](user-guide/clearing-P0602.md) — same fault as `P1681`: the stored flag, and what clears it
 - [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM
 - [Troubleshooting](user-guide/troubleshooting.md) — symptom index, FAQ, what to attach on a bug report
 
 ## Developer / maintainer
 
 - [KWP2000.md](KWP2000.md) — bench results, connect timing, RAM kernel after write, settings persistence
-- [P1681-P0602.md](P1681-P0602.md) — `P0602` on this `4B0906018CH` with `06A906032NL`, and why `4B0906018DQ` is not written here
+- [P1681-P0602.md](P1681-P0602.md) — regression guide for `P0602` on a `4B0906018CH`: measurements, the `NL` kernel logic, the ASM listing, and the diagrams
 - [BUILDING.md](BUILDING.md) — build from source
 - [RELEASE.md](RELEASE.md) — how releases are tagged and published
 
