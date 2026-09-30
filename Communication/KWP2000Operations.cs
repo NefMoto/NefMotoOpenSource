@@ -759,11 +759,26 @@ namespace Communication
 
     public class ReadExternalFlashOperation : KWP2000Operation
     {
+        public struct UploadRange
+        {
+            public uint StartAddress;
+            public uint Size;
+
+            public UploadRange(uint startAddress, uint size)
+            {
+                StartAddress = startAddress;
+                Size = size;
+            }
+        }
+
         public class ReadExternalFlashSettings
         {
             public bool CheckIfSectorReadRequired = true;
             public bool OnlyReadNonMatchingSectors = false;
             public bool VerifyReadData = true;
+
+            // Null checksums every uploaded sector when VerifyReadData is true.
+            public UploadRange[] ChecksumRanges = null;
 
             public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
         }
@@ -797,6 +812,7 @@ namespace Communication
             CheckIfSectorsRequireRead = readSettings.CheckIfSectorReadRequired;
             OnlyReadRequiredSectors = readSettings.OnlyReadNonMatchingSectors;
             ShouldVerifyReadSectors = readSettings.VerifyReadData;
+            mChecksumRanges = readSettings.ChecksumRanges;
 
             ElapsedTimeReadingUnrequiredSectors = TimeSpan.Zero;
             ElapsedTimeCheckingIfSectorsRequireReading = TimeSpan.Zero;
@@ -818,6 +834,13 @@ namespace Communication
         public bool CheckIfSectorsRequireRead { get; private set; }
         public bool OnlyReadRequiredSectors { get; private set; }
         public bool ShouldVerifyReadSectors { get; private set; }
+        public bool WasCancelled { get { return mCancelRequested; } }
+
+        private bool ShouldChecksumSector(MemoryImage image)
+        {
+            return (mChecksumRanges == null) || (mChecksumRanges.Length == 0)
+                || mChecksumRanges.Any(range => (image.StartAddress == range.StartAddress) && (image.Size == range.Size));
+        }
 
         public TimeSpan ElapsedTimeReadingUnrequiredSectors { get; private set; }
         public TimeSpan ElapsedTimeCheckingIfSectorsRequireReading { get; private set; }
@@ -834,9 +857,13 @@ namespace Communication
 
             if (nextAction == null)
             {
-                var currentMemoryImage = mCurrentBlock.Current;
+                MemoryImage currentMemoryImage = null;
+                if (mState != ReadingState.FinishedAll)
+                {
+                    currentMemoryImage = mCurrentBlock.Current;
+                }
 
-                if (currentMemoryImage != null)
+                if ((currentMemoryImage != null) || (mState == ReadingState.ClearFlagAfterFailure))
                 {
                     if (mState == ReadingState.Start)
                     {
@@ -844,8 +871,9 @@ namespace Communication
 
                         mCurrentSectorRequiresRead = true;
 
-                        //we can only do checksum calculations if we are sure we can do a successful request upload.
-                        //otherwise we can cause a "Programming Not Finished" error code to be stored by an incorrect checksum calculation.
+                        // The layout check leaves an accepted RequestUpload open. Until an upload ends with
+                        // RequestTransferExit, the ME7 kernel does not count matching checksums toward
+                        // clearing the programming flag, so checksum only after one sector has been uploaded.
                         if (CheckIfSectorsRequireRead && mHasVerfiedRequestUploadSupported)
                         {
                             mState = ReadingState.CheckIfReadRequired;
@@ -898,7 +926,7 @@ namespace Communication
                         }
                         case ReadingState.CheckIfReadRequired:
                         {
-                            uint endAddress = currentMemoryImage.StartAddress + (uint)currentMemoryImage.RawData.Length;
+                            uint endAddress = currentMemoryImage.StartAddress + (uint)currentMemoryImage.RawData.Length - 1;
                             CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if reading is necessary for range: 0x" + currentMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, currentMemoryImage.StartAddress, currentMemoryImage.RawData);
                             break;
@@ -920,7 +948,7 @@ namespace Communication
                         }
                         case ReadingState.ValidateReadData:
                         {
-                            uint endAddress = currentMemoryImage.StartAddress + (uint)currentMemoryImage.RawData.Length;
+                            uint endAddress = currentMemoryImage.StartAddress + (uint)currentMemoryImage.RawData.Length - 1;
                             CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if reading was successful for range: 0x" + currentMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, currentMemoryImage.StartAddress, currentMemoryImage.RawData);
                             break;
@@ -930,9 +958,9 @@ namespace Communication
                             nextAction = null;
                             break;
                         }
-                        case ReadingState.CompleteFailedReadWithChecksumCalculation:
+                        case ReadingState.ClearFlagAfterFailure:
                         {
-                            nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mFlashBlockList.Last().EndAddress, new byte[2]);//this is here so the ECU thinks the last operation completed
+                            nextAction = mClearFlag.NextAction();
                             break;
                         }
                         default:
@@ -954,120 +982,122 @@ namespace Communication
             //only pay attention to actions this code started
             if (action == mMyLastStartedAction)
             {
-                if (action is ValidateFlashChecksumAction)
+                if (mState == ReadingState.ClearFlagAfterFailure)
                 {
-                    if (mState == ReadingState.CompleteFailedReadWithChecksumCalculation)
+                    if (mClearFlag.OnActionCompleted(action, success))
                     {
-                        CommInterface.DisplayStatusMessage("Finished forcing ECU to recognize that failed read operation is complete.", StatusMessageType.USER);
-
                         success = false;//to ensure this is recognized as a failure
                         OperationCompleted(false);
                     }
                     else
                     {
-                        switch (mState)
+                        success = true;
+                    }
+                }
+                else if (action is ValidateFlashChecksumAction)
+                {
+                    switch (mState)
+                    {
+                        case ReadingState.CheckIfReadRequired:
                         {
-                            case ReadingState.CheckIfReadRequired:
+                            ElapsedTimeCheckingIfSectorsRequireReading += action.ActionElapsedTime;
+
+                            if (!mCurrentSectorRequiresRead)
                             {
-                                ElapsedTimeCheckingIfSectorsRequireReading += action.ActionElapsedTime;
-
-                                if (!mCurrentSectorRequiresRead)
-                                {
-                                    ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-                                }
-
-                                break;
+                                ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
                             }
-                            case ReadingState.ValidateReadData:
-                            {
-                                ElapsedTimeVerifyingReadSectors += action.ActionElapsedTime;
 
-                                break;
-                            }
+                            break;
                         }
-
-                        bool currentBlockFinished = false;
-
-                        if (mState == ReadingState.ValidateReadData)
+                        case ReadingState.ValidateReadData:
                         {
-                            mNumAttemptsForCurrentBlock++;
+                            ElapsedTimeVerifyingReadSectors += action.ActionElapsedTime;
+
+                            break;
                         }
+                    }
 
-                        if (success)
-                        {
-                            if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
-                            {
-                                if (mState == ReadingState.CheckIfReadRequired)
-                                {
-                                    mCurrentSectorRequiresRead = false;
+                    bool currentBlockFinished = false;
 
-                                    if (OnlyReadRequiredSectors)
-                                    {
-                                        CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, skipping read.", StatusMessageType.USER);
-                                        currentBlockFinished = true;
-                                    }
-                                    else
-                                    {
-                                        CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, but reading anyway.", StatusMessageType.USER);
-                                    }
-                                }
-                                else
-                                {
-                                    Debug.Assert(mState == ReadingState.ValidateReadData);
+                    if (mState == ReadingState.ValidateReadData)
+                    {
+                        mNumAttemptsForCurrentBlock++;
+                    }
 
-                                    currentBlockFinished = true;
-                                    CommInterface.DisplayStatusMessage("Flash checksum matches read data, reading was successful.", StatusMessageType.USER);
-                                }
-                            }
-                            else
-                            {
-                                if (mState == ReadingState.CheckIfReadRequired)
-                                {
-                                    CommInterface.DisplayStatusMessage("Flash checksum does not match, reading flash data is necessary.", StatusMessageType.USER);
-                                }
-                                else
-                                {
-                                    Debug.Assert(mState == ReadingState.ValidateReadData);
-
-                                    if (mNumAttemptsForCurrentBlock <= 3)
-                                    {
-                                        CommInterface.DisplayStatusMessage("Flash checksum does not match, trying to read flash data again.", StatusMessageType.USER);
-                                    }
-                                    else
-                                    {
-                                        CommInterface.DisplayStatusMessage("Flash checksum still does not match after 3 attempts, giving up and skipping.", StatusMessageType.USER);
-                                        currentBlockFinished = true;
-                                    }
-                                }
-                            }
-                        }
-                        else if (action.CompletedWithoutCommunicationError)
+                    if (success)
+                    {
+                        if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
                         {
                             if (mState == ReadingState.CheckIfReadRequired)
                             {
-                                CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches, reading anyways.", StatusMessageType.USER);
+                                mCurrentSectorRequiresRead = false;
+
+                                if (OnlyReadRequiredSectors)
+                                {
+                                    CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, skipping read.", StatusMessageType.USER);
+                                    currentBlockFinished = true;
+                                }
+                                else
+                                {
+                                    CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, but reading anyway.", StatusMessageType.USER);
+                                }
                             }
                             else
                             {
                                 Debug.Assert(mState == ReadingState.ValidateReadData);
 
-                                CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches, assuming read was successful.", StatusMessageType.USER);
                                 currentBlockFinished = true;
+                                CommInterface.DisplayStatusMessage("Flash checksum matches read data, reading was successful.", StatusMessageType.USER);
                             }
-
-                            success = true;
                         }
-
-                        if (success)
+                        else
                         {
-                            if (currentBlockFinished)
+                            if (mState == ReadingState.CheckIfReadRequired)
                             {
-                                mState = ReadingState.FinishedBlock;
+                                CommInterface.DisplayStatusMessage("Flash checksum does not match, reading flash data is necessary.", StatusMessageType.USER);
                             }
                             else
                             {
-                                mState = ReadingState.RequestUpload;
+                                Debug.Assert(mState == ReadingState.ValidateReadData);
+
+                                if (mNumAttemptsForCurrentBlock <= 3)
+                                {
+                                    CommInterface.DisplayStatusMessage("Flash checksum does not match, trying to read flash data again.", StatusMessageType.USER);
+                                }
+                                else
+                                {
+                                    CommInterface.DisplayStatusMessage("Flash checksum still does not match after 3 attempts, giving up and skipping.", StatusMessageType.USER);
+                                    currentBlockFinished = true;
+                                }
                             }
+                        }
+                    }
+                    else if (action.CompletedWithoutCommunicationError)
+                    {
+                        if (mState == ReadingState.CheckIfReadRequired)
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches, reading anyways.", StatusMessageType.USER);
+                        }
+                        else
+                        {
+                            Debug.Assert(mState == ReadingState.ValidateReadData);
+
+                            CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches, assuming read was successful.", StatusMessageType.USER);
+                            currentBlockFinished = true;
+                        }
+
+                        success = true;
+                    }
+
+                    if (success)
+                    {
+                        if (currentBlockFinished)
+                        {
+                            mState = ReadingState.FinishedBlock;
+                        }
+                        else
+                        {
+                            mState = ReadingState.RequestUpload;
                         }
                     }
                 }
@@ -1162,12 +1192,19 @@ namespace Communication
                                 }
                             }
                         }
-                        else if (ShouldVerifyReadSectors)
+                        else if (ShouldVerifyReadSectors && ShouldChecksumSector(mCurrentBlock.Current))
                         {
                             mState = ReadingState.ValidateReadData;
                         }
                         else
                         {
+                            if (ShouldVerifyReadSectors)
+                            {
+                                MemoryImage uploaded = mCurrentBlock.Current;
+                                uint uploadedEnd = uploaded.StartAddress + uploaded.Size - 1;
+                                CommInterface.DisplayStatusMessage("Uploaded 0x" + uploaded.StartAddress.ToString("X8") + " to 0x" + uploadedEnd.ToString("X8") + ". No checksum.", StatusMessageType.USER);
+                            }
+
                             mState = ReadingState.FinishedBlock;
                         }
                     }
@@ -1327,6 +1364,12 @@ namespace Communication
                     mTotalBytesValidated += mCurrentBlock.Current.Size;
                     OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToRead) * 100.0f);
 
+                    // More than 3 attempts means the sector was skipped with a checksum mismatch.
+                    if ((mFirstFinishedBlock == null) && (mNumAttemptsForCurrentBlock <= 3))
+                    {
+                        mFirstFinishedBlock = mCurrentBlock.Current;
+                    }
+
                     mNumAttemptsForCurrentBlock = 0;
 
                     if (!mCurrentBlock.MoveNext())
@@ -1339,22 +1382,49 @@ namespace Communication
                     }
                 }
 
-                if (!success && (mState != ReadingState.CompleteFailedReadWithChecksumCalculation))
+                if (mCancelRequested && (mState != ReadingState.ClearFlagAfterFailure) && (mState != ReadingState.FinishedAll))
                 {
-                    CommInterface.DisplayStatusMessage("Reading ECU flash memory failed. Trying to force ECU to recognize read operation is complete.", StatusMessageType.USER);
+                    success = false;
+                }
+
+                if (!success && (mState != ReadingState.ClearFlagAfterFailure))
+                {
+                    CommInterface.DisplayStatusMessage(mCancelRequested ? "Reading ECU flash memory cancelled." : "Reading ECU flash memory failed.", StatusMessageType.USER);
                     if (KWP2000CommInterface.CurrentDiagnosticSessionType != KWP2000DiagnosticSessionType.ProgrammingSession)
                     {
                         KWP2000SettingsDefaults.LogMe75Pin121Hint(CommInterface);
                     }
 
-                    mState = ReadingState.CompleteFailedReadWithChecksumCalculation;
-                    success = true;
+                    if (mFirstFinishedBlock != null)
+                    {
+                        mClearFlag = new ProgrammingFlagCloser(KWP2000CommInterface, mFlashBlockList.First().StartAddress, mFirstFinishedBlock);
+                        mState = ReadingState.ClearFlagAfterFailure;
+                        success = true;
+                    }
+                    else
+                    {
+                        CommInterface.DisplayStatusMessage("No sector finished, so the programming flag stays set. Use Clear DTCs.", StatusMessageType.USER);
+                    }
                 }
             }
 
             mMyLastStartedAction = null;
 
             base.OnActionCompleted(action, success);
+        }
+
+        public override void Abort()
+        {
+            // A second cancel, or nothing to close with, stops immediately.
+            bool closeFirst = IsRunning && !mCancelRequested && (mFirstFinishedBlock != null) && (mState != ReadingState.ClearFlagAfterFailure);
+            mCancelRequested = true;
+            if (closeFirst)
+            {
+                CommInterface.DisplayStatusMessage("Cancelling after the current request, then closing the programming flag. Cancel again to stop now.", StatusMessageType.USER);
+                return;
+            }
+
+            base.Abort();
         }
 
         private void NotifyBytesReadHandler(UInt32 newAmountWritten, UInt32 totalWritten, UInt32 totalToWrite)
@@ -1381,7 +1451,7 @@ namespace Communication
             ValidateReadData,
             FinishedBlock,
             FinishedAll,
-            CompleteFailedReadWithChecksumCalculation
+            ClearFlagAfterFailure
         }
 
         private CommunicationAction mMyLastStartedAction;
@@ -1390,6 +1460,10 @@ namespace Communication
         private IEnumerator<MemoryImage> mCurrentBlock;
         private byte mMaxBlockSize;
         private bool mHasVerfiedRequestUploadSupported;
+        private readonly UploadRange[] mChecksumRanges;
+        private MemoryImage mFirstFinishedBlock;
+        private ProgrammingFlagCloser mClearFlag;
+        private volatile bool mCancelRequested;
         private int mNumAttemptsForCurrentBlock;
         private uint mCurrentBlockBytesRead;
         private uint mTotalBytesToRead;

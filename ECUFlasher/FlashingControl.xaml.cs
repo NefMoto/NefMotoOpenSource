@@ -119,6 +119,7 @@ namespace ECUFlasher
                 OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
                 OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
                 OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyWriteEnabled"));
+                OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyReadEnabled"));
                 OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
 
                 // Switching protocol replaces CommInterface. CurrentProtocol does not change on the old object.
@@ -141,6 +142,7 @@ namespace ECUFlasher
                 OnPropertyChanged(new PropertyChangedEventArgs("IsMemoryLayoutEnabled"));
                 OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
                 OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyWriteEnabled"));
+                OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyReadEnabled"));
                 OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
 
                 // Re-validate memory layout when protocol changes (to clear errors for bootmode)
@@ -748,15 +750,17 @@ namespace ECUFlasher
 
         public bool IsVerifyWriteEnabled
         {
-            get
-            {
-                // Disable for bootmode - verify write is not supported
-                if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
-                {
-                    return false;
-                }
-                return true;
-            }
+            get { return IsNotBootmode(); }
+        }
+
+        public bool IsVerifyReadEnabled
+        {
+            get { return IsNotBootmode() && IsBottomBootFirstBlock(); }
+        }
+
+        private bool IsNotBootmode()
+        {
+            return App.CommInterface == null || App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode;
         }
 
         private string GetMemoryLayoutsDirectory()
@@ -1493,9 +1497,43 @@ namespace ECUFlasher
                     App.OperationInProgress = true;
                     App.PercentOperationComplete = 0.0f;
 
-                    OnReadExternalFlashStarted(false, false, false, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted);
+                    bool verifyRead = false;
+                    ReadExternalFlashOperation.UploadRange[] checksumRanges = null;
+                    if (IsNotBootmode() && IsBottomBootFirstBlock())
+                    {
+                        verifyRead = true;
+                        if (chkVerifyRead.IsChecked != true)
+                        {
+                            checksumRanges = FirstFourSectorChecksumRanges(FlashMemoryLayout);
+                            if (checksumRanges == null)
+                            {
+                                verifyRead = false;
+                            }
+                        }
+                    }
+
+                    OnReadExternalFlashStarted(false, false, verifyRead, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted, checksumRanges);
                 }
             }
+        }
+
+        private static ReadExternalFlashOperation.UploadRange[] FirstFourSectorChecksumRanges(MemoryLayout layout)
+        {
+            if ((layout == null) || (layout.SectorSizes == null) || (layout.SectorSizes.Count < 4))
+            {
+                return null;
+            }
+
+            var ranges = new ReadExternalFlashOperation.UploadRange[4];
+            uint address = layout.BaseAddress;
+            for (int i = 0; i < ranges.Length; i++)
+            {
+                uint size = layout.SectorSizes[i];
+                ranges[i] = new ReadExternalFlashOperation.UploadRange(address, size);
+                address += size;
+            }
+
+            return ranges;
         }
 
         public ObservableCollection<BootmodeEepromPresetOption> AvailableEepromPresets { get; private set; }
@@ -1993,7 +2031,7 @@ namespace ECUFlasher
                 }
                 else
                 {
-                    statusMessage = "Reading ECU flash memory failed.";
+                    statusMessage = (readFlashOperation?.WasCancelled == true) ? "Reading ECU flash memory cancelled." : "Reading ECU flash memory failed.";
                 }
 
                 App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
@@ -2378,7 +2416,7 @@ namespace ECUFlasher
             operation.Start();
         }
 
-        private void OnReadExternalFlashStarted(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel)
+        private void OnReadExternalFlashStarted(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel, ReadExternalFlashOperation.UploadRange[] checksumRanges = null)
         {
             if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
             {
@@ -2386,7 +2424,7 @@ namespace ECUFlasher
             }
             else
             {
-                OnReadExternalFlashStarted_KWP2000(checkIfReadRequired, onlyReadRequiredSectors, shouldVerifyReadData, baseImage, flashLayout, operationCompletedDel);
+                OnReadExternalFlashStarted_KWP2000(checkIfReadRequired, onlyReadRequiredSectors, shouldVerifyReadData, baseImage, flashLayout, operationCompletedDel, checksumRanges);
             }
         }
 
@@ -2411,7 +2449,7 @@ namespace ECUFlasher
             StartFlashOperation(operation, operationCompletedDel, "Reading ECU flash memory via BootMode.");
         }
 
-        private void OnReadExternalFlashStarted_KWP2000(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel)
+        private void OnReadExternalFlashStarted_KWP2000(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel, ReadExternalFlashOperation.UploadRange[] checksumRanges = null)
         {
             if (flashLayout == null)
             {
@@ -2429,6 +2467,7 @@ namespace ECUFlasher
             settings.CheckIfSectorReadRequired = checkIfReadRequired;
             settings.OnlyReadNonMatchingSectors = onlyReadRequiredSectors;
             settings.VerifyReadData = shouldVerifyReadData;
+            settings.ChecksumRanges = checksumRanges;
             settings.SecuritySettings.RequestSeed = KWP2000CommViewModel.SeedRequest;
             settings.SecuritySettings.SupportSpecialKey = KWP2000CommViewModel.ShouldSupportSpecialKey;
             settings.SecuritySettings.UseExtendedSeedRequest = KWP2000CommViewModel.ShouldUseExtendedSeedRequest;
@@ -2509,6 +2548,7 @@ namespace ECUFlasher
                     _FlashMemoryLayout = value;
 
                     OnPropertyChanged(new PropertyChangedEventArgs("FlashMemoryLayout"));
+                    OnPropertyChanged(new PropertyChangedEventArgs("IsVerifyReadEnabled"));
                 }
             }
         }

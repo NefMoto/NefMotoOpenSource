@@ -917,10 +917,14 @@ namespace ECUFlasher
                 {
                     DisplayStatusMessage("Cancelling current operation.", StatusMessageType.USER);
 
-                    CurrentOperation.Abort();
+                    var operation = CurrentOperation;
+                    operation.Abort();
 
                     //set these incase the operation completed handler doesn't clean up properly
-                    OperationInProgress = false;
+                    if (!operation.IsRunning)
+                    {
+                        OperationInProgress = false;
+                    }
                 }
             }
         }
