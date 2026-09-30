@@ -28,9 +28,15 @@ Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB). The documented b
 
 ## Read
 
-- **Full Read Flash** — whole layout
-- **Diff Read Flash** — only sectors that differ from the loaded file
-- **Check if Flash Matches** — compare the loaded file to the ECU with one KWP checksum. Nothing is saved. Disabled in bootmode.
+- **Full Read Flash** — whole layout, checksummed as **Verify Read** sets (below), then saved. Bootmode and layouts whose sector 0 is not 16 KB at `0x800000` upload with no checksum.
+- **Diff Read Flash** — sectors that differ from the loaded file. The first sector is always uploaded. Later matching sectors are checksum skips.
+
+**Cancel Current Operation** during a KWP read waits for the current request, then clears the EEPROM bit behind `P0602` before it stops, and reports "Reading ECU flash memory cancelled." Cancel again to stop at once; that leaves the bit set, as does a cancel before the first sector finishes.
+
+Debug builds add one row. A release build does not show it.
+
+- **Check if Flash Matches** — one KWP checksum per sector of the loaded file, listing any sectors that differ. Nothing is saved. Disabled in bootmode. A matching file clears the EEPROM bit behind `P0602`, because three matching checksums in a row clear it.
+- **Checksum 8K+8K+32K** — checksum sectors 1, 2, and 3 (`0x804000`–`0x805FFF`, `0x806000`–`0x807FFF`, and `0x808000`–`0x80FFFF`) from the loaded file. No upload and no erase. Enabled only when sector 0 is 16 KB at `0x800000`. **Clear DTCs** offers the same checksum when the last DTC read had `P0602` or `P1681` and bit 7 is set at EEPROM `0x1E8`. **Read DTCs** only warns. **Read EEPROM Mirror** reports that page and does not offer the checksum.
 
 Engine off. Confirmation dialogs include the ME7.5 pin 121 hint when connected over KWP.
 
@@ -40,13 +46,16 @@ If addressable flash extends past the selected layout (512KB chip mirrored into 
 - **No** — continue with this layout
 - **Cancel** — abort
 
-A matching sample is strong evidence of mirroring, not proof of chip size. A mismatch usually means the layout is too small (try `29F800`). Example: `06A 906 032 CL` — [issue #80](https://github.com/NefMoto/NefMotoOpenSource/issues/80).
+A matching sample is strong evidence of mirroring, not proof of chip size. A mismatch usually means the layout is too small (try `29F800`). Example: [issue #80](https://github.com/NefMoto/NefMotoOpenSource/issues/80).
 
 ## Write
 
 - **Full Write Flash** — every sector in the layout
-- **Diff Write Flash** — sectors whose ECU checksum does not match the file
+- **Diff Write Flash** — sectors whose ECU checksum does not match the file. A full match skips every sector, does not erase, and leaves the connection open. A write that erases a sector still disconnects at the end.
 - **Verify Write** — checked by default on KWP (read-back after program)
+- **Verify Read** — checked by default. Checked, a bottom-boot KWP full read checksums every sector. Unchecked, that read checksums only sectors 0–3. Disabled in bootmode and when sector 0 is not 16 KB at `0x800000`.
+
+A KWP write that finishes (full or diff) ends with a 2-byte upload at the start of flash and three checksums of a sector that matches the file. That clears the EEPROM bit behind `P0602` ([P0602](clearing-P0602.md)).
 
 Confirmation requires: valid file and layout (BT vs BB must match the chip), engine not running, battery at least 12 V, adaptations will reset, the process can run uninterrupted.
 
@@ -79,5 +88,6 @@ Do not use entire-flash erase to “fix” a BT/BB mismatch.
 ## Next
 
 - [Bootmode](bootmode.md)
+- [P0602](clearing-P0602.md)
 - [Troubleshooting](troubleshooting.md)
 - [Getting started](getting-started.md)

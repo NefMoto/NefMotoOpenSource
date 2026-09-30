@@ -49,6 +49,10 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 
 Developer detail: [Flashing](flashing.md#after-a-successful-write) and [KWP2000.md](../KWP2000.md#ram-kernel-after-write-this_is_the_ram_program).
 
+## P0602 or P1681 after a flash
+
+`P1681` is the same fault as `P0602`. After a tester clear, `P0602` can return on the next key cycle while a flag in the ECU's EEPROM stays set. A write that finishes clears that flag. [P0602](clearing-P0602.md).
+
 ## Bootmode NAK or wrong ACK
 
 - Try **57600** or **38400**. Prefer those for first contact. 9600/19200 can fail non-deterministically on CH340 (wrong ACKs, NAK, readback errors) — USB latency/buffering, jitter, or voltage, not baud error. Prefer FTDI at those lower rates. [Bootmode](bootmode.md#baud), [issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44)
