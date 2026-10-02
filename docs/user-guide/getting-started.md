@@ -57,7 +57,7 @@ Slow init is the default. Use it on the bench and in the car unless you already 
 
 - **Connect address** on the Settings tab: `0x01` (default) or `0x11`. See [Which connect address](#which-connect-address).
 - Wait **at least 2.6 seconds** after a failed attempt before clicking Connect again. The ECU needs that idle time between slow inits.
-- In the car, K-line often goes through the cluster. That is slower and less predictable than a direct bench wire. If the handshake misses the address complement, that is [issue #95](https://github.com/NefMoto/NefMotoOpenSource/issues/95), not a CH340 5-baud failure.
+- In the car, K-line often goes through the cluster. That is slower and less predictable than a direct bench wire. A miss of the address complement is a handshake miss, not a CH340 5-baud failure.
 - **Verify cable in dumb mode** is on by default. A failure there usually means the adapter is not in dumb pass-through, or TX/RX echo is wrong.
 
 On the documented bench units (one ME7.1 and one ME7.5, both 29F800), slow init and fast init both work with FTDI and CH340. Other flash images may differ. There is no automatic fallback from fast to slow.

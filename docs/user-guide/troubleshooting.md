@@ -24,8 +24,7 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 - Enable **Slow init timing log** and retry. Compare the handshake against a known-good cable if you have one. Clone cables fail on FTDI and CH340; that is not a CH340-only 5-baud bug.
 - If you just tried **Fast Init**, wait 2.6 seconds, then slow init.
 - Bench: stable +12 V and ground; K-line actually on the ECU. ME7.5: pin 121 at +12 V for programming — [Getting started — Bench](getting-started.md#bench-vs-in-the-car).
-- In-car: cluster on the K-line. A miss of the address complement is [issue #95](https://github.com/NefMoto/NefMotoOpenSource/issues/95), not “CH340 cannot send the address.”
-- This is not [issue #100](https://github.com/NefMoto/NefMotoOpenSource/issues/100) (write hang **after** ident, when connect already succeeded).
+- In-car: cluster on the K-line. A miss of the address complement is a handshake miss, not “CH340 cannot send the address.”
 
 ## Fast init fails
 
@@ -86,10 +85,6 @@ Yes/No/Cancel prompt about persistent data on a sector that is **not** the boot 
 - **Verify Checksums** is on the **KWP2000 Flashing** tab (there is no separate Checksum tab).
 - After a write, verify can fail if the session dropped or the layout was wrong — see [Wrong Flash Layout](#wrong-flash-layout) and [Flashing](flashing.md).
 
-## Write hangs after ident
-
-Connect already succeeded; the hang is during write. That is [issue #100](https://github.com/NefMoto/NefMotoOpenSource/issues/100), not a slow-init failure. There is no documented workaround that is the “normal” write path. Attach the log.
-
 ## Reporting a problem
 
 - Use **File → Open Log File** and attach a slice around the failure (connect attempt, handshake, first error).
@@ -105,7 +100,7 @@ Connect already succeeded; the hang is during write. That is [issue #100](https:
 
 **Will my HEX-V2 / HEX-NET work?** No.
 
-**In-car OK?** Often yes on ME7.1 with slow init; cluster K-line varies. [issue #95](https://github.com/NefMoto/NefMotoOpenSource/issues/95)
+**In-car OK?** Often yes on ME7.1 with slow init; cluster K-line varies.
 
 **CH340 OK?** Yes for KWP, same path as FTDI. Bootmode: prefer 57600/38400; see [Bootmode](bootmode.md#baud).
 

@@ -68,7 +68,6 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### Known Issues
 
-- [Issue #100](https://github.com/NefMoto/NefMotoOpenSource/issues/100) — KWP write hang after ident. [Troubleshooting](docs/user-guide/troubleshooting.md#write-hangs-after-ident)
 - [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103) — wrong BT/BB layout aborts with **Wrong Flash Layout**. Pick the opposite layout and **Diff Write Flash**. [Troubleshooting](docs/user-guide/troubleshooting.md#wrong-flash-layout), [Flashing](docs/user-guide/flashing.md#after-an-abort)
 - Other issues: [GitHub Issues](https://github.com/NefMoto/NefMotoOpenSource/issues)
 

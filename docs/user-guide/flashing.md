@@ -61,8 +61,6 @@ Confirmation requires: valid file and layout (BT vs BB must match the chip), eng
 
 **ME7.5 (121-pin) on the bench:** pin 121 must be at +12 V for KWP read/write. Same switched +12 V as pins 3, 21, and 62. Top right pin on the small connector. Ident can succeed while a programming session fails if 121 is floating.
 
-Known: [issue #100](https://github.com/NefMoto/NefMotoOpenSource/issues/100) — write can hang after ident. Connect already worked. Attach the log; there is no documented “normal” workaround.
-
 ### After a successful write
 
 Ident may show `THIS-IS-THE-RAM-PROGRAM` (hyphens vary) until a **complete** power cycle (ME7.5: all +12 off, including pin 121). Logging, DTCs, and engine start stay broken until then. The string is not a brick. Reconnect with **Slow Init**. [KWP2000.md](../KWP2000.md#ram-kernel-after-write-this_is_the_ram_program)
