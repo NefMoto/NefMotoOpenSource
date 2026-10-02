@@ -93,6 +93,10 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal(1, result.PagesInvalid);
             Assert.False(result.AllChecksumPagesValid);
             Assert.Contains("failed", result.FormatStatusMessage());
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, result.PageChecksumKinds[1]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, result.PageChecksumKinds[2]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Exempt, result.PageChecksumKinds[28]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.None, result.PageChecksumKinds[0]);
         }
 
         [Fact]

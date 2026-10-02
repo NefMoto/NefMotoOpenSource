@@ -82,7 +82,7 @@ Yes/No/Cancel prompt about persistent data on a sector that is **not** the boot 
 ## Flash verify or checksum fail
 
 - Confirm the file matches the layout you selected.
-- **Verify Checksums** is on the **KWP2000 Flashing** tab (there is no separate Checksum tab).
+- **Verify Checksums** is on the **Flashing** tab (there is no separate Checksum tab).
 - After a write, verify can fail if the session dropped or the layout was wrong — see [Wrong Flash Layout](#wrong-flash-layout) and [Flashing](flashing.md).
 
 ## Reporting a problem

@@ -1,8 +1,8 @@
 # Flashing
 
-KWP2000 flash read and write on the **KWP2000 Flashing** tab. Connect first ([Getting started](getting-started.md)). Back up with a **read** before any write.
+Flash read and write on the **Flashing** tab, for KWP2000 and bootmode. Connect first ([Getting started](getting-started.md)). Back up with a **read** before any write.
 
-EEPROM buttons on the same tab are bootmode-only. See [Bootmode](bootmode.md).
+Physical 95040 read/write is the **Bootmode EEPROM** tab. See [Bootmode](bootmode.md).
 
 If a write fails, see [Troubleshooting](troubleshooting.md).
 

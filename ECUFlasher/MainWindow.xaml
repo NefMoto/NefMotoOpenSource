@@ -105,15 +105,18 @@ Contact by Email: tony@nefariousmotorsports.com
                         SelectedItem="{Binding Path=App.DesiredProtocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"/>
             <ContentControl Content="{Binding Path=App.CommInterfaceViewModel}" DockPanel.Dock="Right" VerticalAlignment="Top"/>
         </DockPanel>
-        <TabControl Grid.Row="2" Background="{DynamicResource BackgroundBrush}" Grid.ColumnSpan="2">
+        <TabControl x:Name="MainTabs" Grid.Row="2" Background="{DynamicResource BackgroundBrush}" Grid.ColumnSpan="2">
             <TabItem Header="KWP2000 Info">
                 <ECUFlasher:ECUInfoControl/>
             </TabItem>
-            <TabItem Header="KWP2000 Flashing">
+            <TabItem Header="Flashing">
                 <ECUFlasher:FlashingControl/>
             </TabItem>
-            <TabItem Header="KWP2000 Logging">
+            <TabItem x:Name="KwpLoggingTab" Header="KWP2000 Logging">
                 <ECUFlasher:DataLoggerControl/>
+            </TabItem>
+            <TabItem x:Name="BootmodeEepromTab" Header="Bootmode EEPROM">
+                <ECUFlasher:EepromControl/>
             </TabItem>
             <TabItem>
                 <TabItem.Header>

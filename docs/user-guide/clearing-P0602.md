@@ -23,6 +23,8 @@ Logging in to a programming session sets the flag. Three matching checksums in a
 
 A tester clear by itself leaves the flag set, and `P0602` returns on the next key cycle.
 
+**Bootmode EEPROM** → **Clear P0602** clears bit 7 on the loaded image at `0x1E8` and `0x1F8`. **Write EEPROM** programs that image. That edits the chip directly. It is separate from the KWP checksum clear above. [Bootmode](bootmode.md#bootmode-eeprom).
+
 ```mermaid
 flowchart TD
     startNode["P0602 or P1681 on the last read, and the flag is 0x80"]

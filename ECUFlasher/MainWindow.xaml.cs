@@ -21,6 +21,7 @@ Contact by Email: tony@nefariousmotorsports.com
 using System.ComponentModel;
 using System.Windows;
 using System.Runtime.InteropServices;
+using Communication;
 using Shared;
 
 namespace ECUFlasher
@@ -37,7 +38,35 @@ namespace ECUFlasher
 
             InitializeComponent();
 
+            App.PropertyChanged += OnAppPropertyChanged;
+            Closed += OnClosed;
+            UpdateProtocolTabs();
+
             Loaded += OnLoaded;
+        }
+
+        private void OnClosed(object sender, System.EventArgs e)
+        {
+            App.PropertyChanged -= OnAppPropertyChanged;
+        }
+
+        private void OnAppPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == "DesiredProtocol")
+            {
+                UpdateProtocolTabs();
+            }
+        }
+
+        private void UpdateProtocolTabs()
+        {
+            bool boot = App != null && App.DesiredProtocol == CommunicationInterface.Protocol.BootMode;
+            BootmodeEepromTab.Visibility = boot ? Visibility.Visible : Visibility.Collapsed;
+            KwpLoggingTab.Visibility = boot ? Visibility.Collapsed : Visibility.Visible;
+            if ((!boot && MainTabs.SelectedItem == BootmodeEepromTab) || (boot && MainTabs.SelectedItem == KwpLoggingTab))
+            {
+                MainTabs.SelectedIndex = 0;
+            }
         }
 
         void OnLoaded(object sender, RoutedEventArgs e)

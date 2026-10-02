@@ -26,7 +26,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### ECU Operations
 
 - Read and write flash memory with verification
-- Read and write physical SPI EEPROM (95040) in bootmode (ME7.1 / ME7.5)
+- Read and write physical SPI EEPROM (95040) in bootmode (ME7.1 / ME7.5), including immo off, lockout reset, and clearing the `P0602` flag on the loaded image
 - Erase flash sectors
 - Read ECU identification information (KWP2000 and Bootmode)
 - Bootmode ECU information: Device ID, CPU family, system registers (SYSCON, BUSCON, ADDRSEL), memory status

@@ -1,0 +1,291 @@
+<!--
+Nefarious Motorsports ME7 ECU Flasher
+Copyright (C) 2026  Nefarious Motorsports Inc
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Contact by Email: nyet@nyet.org
+-->
+
+<ECUFlasher:BaseUserControl x:Class="ECUFlasher.EepromControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ECUFlasher="clr-namespace:ECUFlasher"
+    Background="{StaticResource BackgroundBrush}"
+    BorderBrush="{StaticResource BackgroundBrush}"
+    DataContext="{Binding RelativeSource={RelativeSource Self}}">
+
+    <ECUFlasher:BaseUserControl.Resources>
+        <SolidColorBrush x:Key="EepromChecksumOkBrush" Color="#C8E6C9"/>
+        <SolidColorBrush x:Key="EepromChecksumBadBrush" Color="#FFCDD2"/>
+        <SolidColorBrush x:Key="EepromChecksumExemptBrush" Color="#E0E0E0"/>
+        <SolidColorBrush x:Key="EepromImmoStatusBrush" Color="#BBDEFB"/>
+        <SolidColorBrush x:Key="EepromSkcBrush" Color="#FFE0B2"/>
+        <SolidColorBrush x:Key="EepromP0602Brush" Color="#FFF59D"/>
+        <SolidColorBrush x:Key="EepromLockoutBrush" Color="#B2DFDB"/>
+        <SolidColorBrush x:Key="EepromEcuPnBrush" Color="#E1BEE7"/>
+        <SolidColorBrush x:Key="EepromToolIdBrush" Color="#B2EBF2"/>
+        <SolidColorBrush x:Key="EepromVinBrush" Color="#C5CAE9"/>
+        <SolidColorBrush x:Key="EepromImmoIdBrush" Color="#E6EE9C"/>
+
+        <Style x:Key="EepromByteStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="LineHeight" Value="16"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="1,0"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="ChecksumOk">
+                    <Setter Property="Background" Value="{StaticResource EepromChecksumOkBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ChecksumBad">
+                    <Setter Property="Background" Value="{StaticResource EepromChecksumBadBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ChecksumExempt">
+                    <Setter Property="Background" Value="{StaticResource EepromChecksumExemptBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ImmoStatus">
+                    <Setter Property="Background" Value="{StaticResource EepromImmoStatusBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="Skc">
+                    <Setter Property="Background" Value="{StaticResource EepromSkcBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="P0602Flag">
+                    <Setter Property="Background" Value="{StaticResource EepromP0602Brush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="Lockout">
+                    <Setter Property="Background" Value="{StaticResource EepromLockoutBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="Empty">
+                    <Setter Property="Background" Value="#6B6B6B"/>
+                    <Setter Property="Foreground" Value="#BDBDBD"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="EepromLegendSwatchStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="LineHeight" Value="16"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Padding" Value="2,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="Empty">
+                    <Setter Property="Background" Value="#6B6B6B"/>
+                    <Setter Property="Foreground" Value="#BDBDBD"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ImmoStatus">
+                    <Setter Property="Background" Value="{StaticResource EepromImmoStatusBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="Skc">
+                    <Setter Property="Background" Value="{StaticResource EepromSkcBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="P0602Flag">
+                    <Setter Property="Background" Value="{StaticResource EepromP0602Brush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="Lockout">
+                    <Setter Property="Background" Value="{StaticResource EepromLockoutBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ChecksumOk">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="#69F0AE"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ChecksumBad">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="#FF8A80"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="EepromLegendLabelStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="LineHeight" Value="16"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="Empty">
+                    <Setter Property="Foreground" Value="#9E9E9E"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="EepromAsciiCharStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="LineHeight" Value="16"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="EcuPn">
+                    <Setter Property="Background" Value="{StaticResource EepromEcuPnBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ToolId">
+                    <Setter Property="Background" Value="{StaticResource EepromToolIdBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="Vin">
+                    <Setter Property="Background" Value="{StaticResource EepromVinBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="ImmoId">
+                    <Setter Property="Background" Value="{StaticResource EepromImmoIdBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="Empty">
+                    <Setter Property="Foreground" Value="#9E9E9E"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="EepromRowLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="LineHeight" Value="16"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="Empty">
+                    <Setter Property="Foreground" Value="#9E9E9E"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </ECUFlasher:BaseUserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="3*" MinHeight="100"/>
+            <RowDefinition Height="5"/>
+            <RowDefinition Height="100" MinHeight="100"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0">
+            <DockPanel Margin="4,4,4,0" LastChildFill="False">
+                <ComboBox DockPanel.Dock="Right" HorizontalAlignment="Right" MinWidth="220" Margin="8,4,4,4" VerticalAlignment="Center"
+                    Style="{StaticResource ValidationComboBoxStyle}"
+                    ItemsSource="{Binding Path=AvailableEepromPresets}"
+                    SelectedItem="{Binding Path=SelectedEepromPreset, Mode=TwoWay}"
+                    DisplayMemberPath="DisplayName"
+                    ToolTip="Bootmode SPI EEPROM preset (physical 95040 chip)"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button Command="{Binding Path=OpenEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                    <Button Command="{Binding Path=ReadBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                    <Button Command="{Binding Path=ImmoOffCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                    <Button Command="{Binding Path=ResetLockoutCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                    <Button Command="{Binding Path=ClearP0602Command}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                </StackPanel>
+            </DockPanel>
+            <StackPanel Orientation="Horizontal" Margin="4,0,4,0">
+                <Button Command="{Binding Path=SaveEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                <Button Command="{Binding Path=WriteBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                <CheckBox x:Name="chkBackupBeforeWrite" VerticalAlignment="Center" Margin="8,0,0,0"
+                    IsChecked="{Binding Path=BackupBeforeWrite, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <Label VerticalAlignment="Center">Backup before write</Label>
+                <CheckBox x:Name="chkVerifyWrite" VerticalAlignment="Center" Margin="8,0,0,0" IsChecked="True"/>
+                <Label VerticalAlignment="Center">Verify Write</Label>
+            </StackPanel>
+        </StackPanel>
+        <DockPanel Grid.Row="1">
+        <TextBlock DockPanel.Dock="Bottom" Margin="8,0,8,4" Text="{Binding Path=WritePendingText}"
+            Foreground="#FFE082" FontWeight="Bold" TextWrapping="Wrap">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Path=HasWritePending}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <ItemsControl DockPanel.Dock="Bottom" Margin="8,2,8,2" ItemsSource="{Binding Path=Legend}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                        <TextBlock Text="{Binding Swatch}" Style="{StaticResource EepromLegendSwatchStyle}"/>
+                        <TextBlock Text="{Binding Caption}" Style="{StaticResource EepromLegendLabelStyle}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Border Margin="8,0,8,0" Padding="5" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="Transparent">
+        <Border CornerRadius="0" BorderThickness="1" BorderBrush="White" Background="Transparent">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" BorderThickness="0">
+            <ItemsControl ItemsSource="{Binding Path=Pages}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="0,1">
+                            <TextBlock Text="{Binding Offset}" Width="52" Style="{StaticResource EepromRowLabelStyle}"/>
+                            <ItemsControl ItemsSource="{Binding Cells}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Hex}" Style="{StaticResource EepromByteStyle}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding Ascii}" Margin="8,0,0,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Text}" Style="{StaticResource EepromAsciiCharStyle}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+        </Border>
+        </Border>
+        </DockPanel>
+        <GridSplitter Grid.Row="2" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" Height="5" HorizontalAlignment="Stretch"/>
+        <ECUFlasher:StatusWindow Grid.Row="3" DataContext="{Binding Path=App}"/>
+    </Grid>
+</ECUFlasher:BaseUserControl>
