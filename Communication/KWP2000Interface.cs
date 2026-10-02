@@ -341,8 +341,8 @@ namespace Communication
         //functional 0x10 NO (configured by internal rom handler)
         //functional 0xFE YES (configured by external flash handler)
         //functional 0x02 UNTESTED (configured by external RAM handler)
-        //physical 0x11 NO
-        //physical 0x01 YES on images whose address filter compares against 0x01; ME7.5 and many ME7.1 images want 0x10 (issue #123)
+        //physical 0x11 is in FASTINIT_KWP2000_PHYSICAL_TARGETS; bench units gave no reply. Some images set the physical RAM byte to 0x11 when the low word of RAM 0xE048 matches an image constant
+        //physical 0x01 YES on images whose address filter compares against 0x01; 8E0909518, 06A906032NL, and the 4B0906018CH family want 0x10 (issue #123)
 
         public bool ConnectToECUSlowInit(byte connectAddress)
         {

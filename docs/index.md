@@ -15,6 +15,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 ## Developer / maintainer
 
 - [KWP2000.md](KWP2000.md) — bench results, connect timing, RAM kernel after write, settings persistence
+- [ME7-K-line-addresses.md](ME7-K-line-addresses.md) — slow-init and fast-init addresses per ME7 image, from firmware analysis
 - [P1681-P0602.md](P1681-P0602.md) — regression guide for `P0602` on a `4B0906018CH`: measurements, the `NL` kernel logic, the ASM listing, and the diagrams
 - [BUILDING.md](BUILDING.md) — build from source
 - [RELEASE.md](RELEASE.md) — how releases are tagged and published
