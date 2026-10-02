@@ -55,12 +55,27 @@ Tabs after you are connected:
 
 Slow init is the default. Use it on the bench and in the car unless you already know fast init works on that ECU.
 
-- Leave **Connect address** on the Settings tab at the default. ME7 bench units use `0x01`. Do not set a one-shot address of `0x11` (an internal retry path; it will not sync as a user address). Address meaning and hex detail: [KWP2000.md](../KWP2000.md).
+- **Connect address** on the Settings tab: `0x01` (default) or `0x11`. See [Which connect address](#which-connect-address).
 - Wait **at least 2.6 seconds** after a failed attempt before clicking Connect again. The ECU needs that idle time between slow inits.
 - In the car, K-line often goes through the cluster. That is slower and less predictable than a direct bench wire. If the handshake misses the address complement, that is [issue #95](https://github.com/NefMoto/NefMotoOpenSource/issues/95), not a CH340 5-baud failure.
 - **Verify cable in dumb mode** is on by default. A failure there usually means the adapter is not in dumb pass-through, or TX/RX echo is wrong.
 
 On the documented bench units (one ME7.1 and one ME7.5, both 29F800), slow init and fast init both work with FTDI and CH340. Other flash images may differ. There is no automatic fallback from fast to slow.
+
+### Which connect address
+
+- **`0x01` (default)** works on every ME7. On many ECUs it first runs a short exchange in the older KWP1281 protocol (the log shows `KWP1281 connect info:`), then a second slow init switches to KWP2000. About 10 seconds from Connect on the bench.
+- **`0x11`** goes straight to KWP2000. About 5 seconds from Connect on the bench.
+
+Use `0x01`:
+
+- After a flash write or abort, while the ECU may still be on the programming kernel. `0x11` has not been tested there.
+- If `0x11` does not connect. Some ECUs go straight to KWP2000 at `0x01` (no `KWP1281 connect info:` in the log); they have no `0x11` and `0x01` is already fast.
+- In a car where the cluster interferes with `0x11` on the K-line.
+
+Use `0x11` to connect faster, for example for **KWP2000 Logging**. With the engine running, `0x01` is expected to need a third slow init (about 15 seconds) because the ECU only hands over from KWP1281 with the engine stopped; `0x11` should not be affected. This comes from firmware analysis and has not been tested on a running engine.
+
+**Connect address** is not saved; it returns to `0x01` when you restart the app. Address meaning and hex detail: [KWP2000.md](../KWP2000.md#connect-ui).
 
 ## Fast init
 
