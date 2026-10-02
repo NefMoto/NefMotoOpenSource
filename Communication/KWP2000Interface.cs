@@ -158,6 +158,8 @@ namespace Communication
         public const byte DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS = 0x11;//KWP2000 address after KWP1281 handoff (Connect_SlowInit retry, Even parity)—not a reliable one-shot user connect on ME7.1 bench
 
         public const byte DEFAULT_ECU_FASTINIT_KWP2000_PHYSICAL_ADDRESS = 0x01;//KWP2000 physical address when using fast init
+        //physical targets tried in order, one per connection attempt; ME7.5 and many ME7.1 images drop any other physical target
+        private static readonly byte[] FASTINIT_KWP2000_PHYSICAL_TARGETS = { 0x10, 0x01, 0x11 };
         public const byte DEFUALT_ECU_FASTINIT_KWP2000_FUNCTIONAL_ADDRESS_EXTERNAL_FLASH = 0xFE;
         public const byte DEFUALT_ECU_FASTINIT_KWP2000_FUNCTIONAL_ADDRESS_EXTERNAL_RAM = 0x02;
         public const byte DEFUALT_ECU_FASTINIT_KWP2000_FUNCTIONAL_ADDRESS_INTERNAL_ROM = 0x10;
@@ -339,7 +341,7 @@ namespace Communication
         //functional 0xFE YES (configured by external flash handler)
         //functional 0x02 UNTESTED (configured by external RAM handler)
         //physical 0x11 NO
-        //physical 0x01 YES
+        //physical 0x01 YES on images whose address filter compares against 0x01; ME7.5 and many ME7.1 images want 0x10 (issue #123)
 
         public bool ConnectToECUSlowInit(byte connectAddress)
         {
@@ -909,6 +911,7 @@ namespace Communication
         protected Stopwatch mP3TesterRequestTimeOut;
         protected Stopwatch mDisconnectTimeOut;
         protected uint mNumConnectionAttemptsRemaining = 0;
+        private readonly Stopwatch mFastInitRequestSentWatch = new Stopwatch();
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////
         //PROTECTED METHODS
@@ -3089,9 +3092,24 @@ connectEndTime = connectStartTime + connectTime + 3;
 
             DisplayStatusMessage("Starting fast init connection.", StatusMessageType.USER);
 
+            int attempt = (int)(NumConnectionAttempts - mNumConnectionAttemptsRemaining - 1);
+            byte target = mConnectAddress;
+            if (mConnectAddressMode == KWP2000AddressMode.Physical)
+            {
+                byte[] targets = new[] { FASTINIT_KWP2000_PHYSICAL_TARGETS[0], mConnectAddress }.Concat(FASTINIT_KWP2000_PHYSICAL_TARGETS).Distinct().ToArray();
+                target = targets[attempt % targets.Length];
+            }
+
+            //an unanswered previous attempt left the line idle since its request
+            long idleWaitMS = idleTimeMS;
+            if ((attempt > 0) && mFastInitRequestSentWatch.IsRunning)
+            {
+                idleWaitMS = Math.Max(0, idleTimeMS - mFastInitRequestSentWatch.ElapsedMilliseconds);
+            }
+
             lock (mCommunicationDevice)
             {
-                DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
+                DisplayStatusMessage("Connecting to address 0x" + target.ToString("X2") + ".", StatusMessageType.USER);
 
                 if (mCommunicationDevice.SetBaudRate((uint)KWP2000BaudRates.BAUD_DEFAULT))
                 {
@@ -3101,7 +3119,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                     //DisplayStatusMessage(string.Format("Timer is high resolution: {0}", Stopwatch.IsHighResolution));
                     //DisplayStatusMessage(string.Format("Timer frequency: {0}", Stopwatch.Frequency));
 
-                    var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, mConnectAddress, (byte)KWP2000ServiceID.StartCommunication, 0, null);
+                    var startCommMessage = new KWP2000Message(mConnectAddressMode, TESTER_ADDRESS, target, (byte)KWP2000ServiceID.StartCommunication, 0, null);
                     SendMessage(startCommMessage);//queue the message
 
                     byte[] startCommMessageDataBytes = startCommMessage.GetMessageDataBytes(this);
@@ -3109,7 +3127,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                     if (mCommunicationDevice.SetBreak(false))//let the line return to normal high state
                     {
                         watch.Start();
-                        long overshootMs = WaitUntilElapsedMs(watch, idleTimeMS);
+                        long overshootMs = WaitUntilElapsedMs(watch, idleWaitMS);
 
                         //timing is more accurate when done before setting break
                         //lowEndTime = watch.ElapsedMilliseconds + lowTime + offset;
@@ -3130,6 +3148,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                                 if (TransmitMessage(startCommMessageDataBytes, false, 1))
                                 {
+                                    mFastInitRequestSentWatch.Restart();
                                     waitingForConnect = true;
                                 }
                                 else
@@ -3147,7 +3166,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                             DisplayStatusMessage("Failed to set break on device.", StatusMessageType.LOG);
                         }
 
-                        LogWaitUntilOvershoot("fast-init-idle", idleTimeMS, overshootMs);
+                        LogWaitUntilOvershoot("fast-init-idle", idleWaitMS, overshootMs);
                     }
                     else
                     {

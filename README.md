@@ -62,7 +62,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### ECU Support
 
 - **ME7.x** — primary target; full KWP2000 and bootmode. Most flash chips are 29F800BB (1MB) or 29F400BB (512KB). [Flashing](docs/user-guide/flashing.md#layout)
-- **ME7.5 fast init** — not supported on one bench unit. Use **slow init**. Other ME7.5 images may differ. [Getting started](docs/user-guide/getting-started.md#fast-init), [KWP2000.md](docs/KWP2000.md)
+- **Fast init** — tries several ECU addresses, one per connection attempt ([issue #123](https://github.com/NefMoto/NefMotoOpenSource/issues/123)). Works on the ME7.1 and ME7.5 bench units. An ECU that ignores the first address connects a few seconds later. [Getting started](docs/user-guide/getting-started.md#fast-init), [KWP2000.md](docs/KWP2000.md)
 - **Simos 3.x / EDC15** — bootmode flash (layout auto-detect). [Bootmode](docs/user-guide/bootmode.md)
 - Some ECUs need different connect timing. [Getting started](docs/user-guide/getting-started.md#connect-with-slow-init)
 

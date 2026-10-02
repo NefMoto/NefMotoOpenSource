@@ -30,7 +30,7 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 ## Fast init fails
 
 - Switch to **Slow Init**. There is no automatic fallback.
-- On the documented ME7.5 bench unit, fast init fails and slow init works on the same cable. That is expected for that unit. Other ME7.5 images may differ. [KWP2000.md](../KWP2000.md)
+- Check the log for one `Connecting to address 0x..` line per attempt. If you see only one, set **Attempts** on the Settings tab back to 3; fast init needs several attempts to try each address. [Getting started](getting-started.md#fast-init), [KWP2000.md](../KWP2000.md)
 - After a flash write or abort, the ECU may still be on the RAM programming kernel. Prefer slow init. Do not change fast-init address mode to hunt for it. [issue #106](https://github.com/NefMoto/NefMotoOpenSource/issues/106)
 
 ## Connect works, programming or flash fails
