@@ -19,7 +19,7 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 ## Slow init fails
 
 - Wait **at least 2.6 seconds** between attempts.
-- Confirm **Slow Init**, baud **10400**, default connect address. See [Getting started](getting-started.md#connect-with-slow-init).
+- Confirm **Slow Init**, baud **10400**, connect address `0x01`. If `0x11` fails and `0x01` works, the ECU has no `0x11`. See [Which connect address](getting-started.md#which-connect-address).
 - Adapter in **dumb** mode (no protocol translation). **Verify cable in dumb mode** on **KWP2000 Settings**.
 - Enable **Slow init timing log** and retry. Compare the handshake against a known-good cable if you have one. Clone cables fail on FTDI and CH340; that is not a CH340-only 5-baud bug.
 - If you just tried **Fast Init**, wait 2.6 seconds, then slow init.
@@ -100,6 +100,8 @@ Connect already succeeded; the hang is during write. That is [issue #100](https:
 ## FAQ
 
 **Slow or fast init?** Slow init is the default. Use fast only when you know it works. Fast init takes significantly less time to connect, but is not always supported. [Getting started](getting-started.md#connect-with-slow-init)
+
+**Slow init address `0x01` or `0x11`?** `0x01` works everywhere. `0x11` connects in about half the time on ECUs that support it; not after a flash write. [Which connect address](getting-started.md#which-connect-address)
 
 **Will my HEX-V2 / HEX-NET work?** No.
 

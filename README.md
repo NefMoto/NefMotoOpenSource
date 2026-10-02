@@ -20,7 +20,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### Connection Methods
 
-- **Slow Init** - The default. More reliable across multiple environments.
+- **Slow Init** - The default. More reliable across multiple environments. Connect address `0x01` (default, works everywhere) or `0x11` (direct KWP2000, about twice as fast on ECUs that support it). [Which connect address](docs/user-guide/getting-started.md#which-connect-address)
 - **Fast Init** - Connects much faster. Use this when you know it works reliably.
 
 ### ECU Operations

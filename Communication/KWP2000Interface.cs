@@ -155,7 +155,8 @@ namespace Communication
         public const byte TESTER_ADDRESS = 0xF1;
 
         public const byte DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS = 0x01;//typical user connect address for slow init (KWP1281-first path)
-        public const byte DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS = 0x11;//KWP2000 address after KWP1281 handoff (Connect_SlowInit retry, Even parity)—not a reliable one-shot user connect on ME7.1 bench
+        public const byte DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS = 0x11;//KWP2000 address after KWP1281 handoff (Connect_SlowInit retry)
+        //ME7 compares all 8 bits of the 5-baud address with its table and ignores parity, so bit 7 must be 0: send 8N1, not 7O1 (0x11 would go out as 0x91)
 
         public const byte DEFAULT_ECU_FASTINIT_KWP2000_PHYSICAL_ADDRESS = 0x01;//KWP2000 physical address when using fast init
         //physical targets tried in order, one per connection attempt; ME7.5 and many ME7.1 images drop any other physical target
@@ -2592,11 +2593,11 @@ namespace Communication
                 if (mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS)
                 {
                     DisplayStatusMessage("Slow init: user address 0x01 - KWP1281-first path; app may retry at 0x"
-                        + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + " (Even parity) internally.", StatusMessageType.LOG);
+                        + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + " internally.", StatusMessageType.LOG);
                 }
                 else if (mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS)
                 {
-                    DisplayStatusMessage("Slow init: user address 0x11 - direct one-shot KWP2000 slow init (no KWP1281 first). May fail on ME7 bench; 0x01 is the usual working address.", StatusMessageType.LOG);
+                    DisplayStatusMessage("Slow init: user address 0x11 - direct KWP2000 slow init (no KWP1281 first). Images that start KWP2000 at 0x01 have no 0x11 entry.", StatusMessageType.LOG);
                 }
 
                 //wait for the required idle time
@@ -2605,7 +2606,7 @@ namespace Communication
                 long overshootMs = WaitUntilElapsedMs(watch, idleTime);
 
                 DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
-                slowInitSuccess = SendSlowInit(mConnectAddress, SlowInitDataBits.Seven, SlowInitParity.Odd, out keyByte1, out keyByte2);
+                slowInitSuccess = SendSlowInit(mConnectAddress, SlowInitDataBits.Eight, SlowInitParity.None, out keyByte1, out keyByte2);
                 LogWaitUntilOvershoot("slow-init-idle", idleTime, overshootMs);
 
                 if (slowInitSuccess)
@@ -2625,7 +2626,7 @@ namespace Communication
                         overshootMs = WaitUntilElapsedMs(watch, TimeBetweenSlowInitForKWP2000MS);
 
                         DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
-                        slowInitSuccess = SendSlowInit(mConnectAddress, SlowInitDataBits.Seven, SlowInitParity.Odd, out keyByte1, out keyByte2);
+                        slowInitSuccess = SendSlowInit(mConnectAddress, SlowInitDataBits.Eight, SlowInitParity.None, out keyByte1, out keyByte2);
                         LogWaitUntilOvershoot("kwp1281-gap", TimeBetweenSlowInitForKWP2000MS, overshootMs);
 
                         if (slowInitSuccess)
@@ -2653,7 +2654,7 @@ namespace Communication
                     if((mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS) && (keyByte1 == KWP_1281_PROTOCOL_KEY_BYTE_1) && (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
                     {
                         DisplayStatusMessage("Slow init: KWP1281 at 0x01 again - third attempt at 0x"
-                            + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + " Even parity.", StatusMessageType.LOG);
+                            + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + ".", StatusMessageType.LOG);
                         KWP1281RunShortSession();
 
                         //wait additional time to give the ECU time to switch to KWP2000
@@ -2663,7 +2664,7 @@ namespace Communication
                         //we don't set the mConnectAddress here because we are overriding it and don't want to set it
                         connectAddressOverride = DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS;
                         DisplayStatusMessage("Connecting to address 0x" + connectAddressOverride.ToString("X2") + ".", StatusMessageType.USER);
-                        slowInitSuccess = SendSlowInit(connectAddressOverride, SlowInitDataBits.Seven, SlowInitParity.Even, out keyByte1, out keyByte2);
+                        slowInitSuccess = SendSlowInit(connectAddressOverride, SlowInitDataBits.Eight, SlowInitParity.None, out keyByte1, out keyByte2);
                         LogWaitUntilOvershoot("kwp1281-gap-0x11", TimeBetweenSlowInitForKWP2000MS, overshootMs);
 
                         if (slowInitSuccess)
