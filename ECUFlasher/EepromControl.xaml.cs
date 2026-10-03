@@ -600,7 +600,8 @@ namespace ECUFlasher
 
         private void OnReadBootmodeEepromCompleted(Operation operation, bool success)
         {
-            Dispatcher.Invoke((Action)(() =>
+            // BeginInvoke so a dialog in the completion does not block the comm thread.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 operation.CompletedOperationEvent -= OnReadBootmodeEepromCompleted;
 
@@ -724,7 +725,8 @@ namespace ECUFlasher
 
         private void OnWriteBootmodeEepromCompleted(Operation operation, bool success)
         {
-            Dispatcher.Invoke((Action)(() =>
+            // BeginInvoke so a failure dialog does not block the comm thread.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 operation.CompletedOperationEvent -= OnWriteBootmodeEepromCompleted;
 

@@ -175,14 +175,19 @@ namespace Communication
             }
         }
 
-        protected KWP2000Message SendMessage(byte serviceID)
+        protected void AttachResponsesFinishedHandler(KWP2000Message message)
         {
-            var message = KWP2000CommInterface.SendMessage(serviceID);
-
             if (message != null)
             {
                 message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
             }
+        }
+
+        protected KWP2000Message SendMessage(byte serviceID)
+        {
+            var message = KWP2000CommInterface.SendMessage(serviceID);
+
+            AttachResponsesFinishedHandler(message);
 
             return message;
         }
@@ -191,10 +196,7 @@ namespace Communication
         {
             var message = KWP2000CommInterface.SendMessage(serviceID, data);
 
-            if (message != null)
-            {
-                message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
-            }
+            AttachResponsesFinishedHandler(message);
 
             return message;
         }
@@ -203,10 +205,7 @@ namespace Communication
         {
             var message = KWP2000CommInterface.SendMessage(serviceID, maxNumRetries, data);
 
-            if (message != null)
-            {
-                message.ResponsesFinishedEvent += this.FinishedReceivingResponsesHandler;
-            }
+            AttachResponsesFinishedHandler(message);
 
             return message;
         }
@@ -1978,14 +1977,18 @@ namespace Communication
                 }
             }
 
+            KWP2000Message requestMessage;
+
             if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestDownload)
             {
-                KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, address, requestSize, dataFormat);
+                requestMessage = KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, address, requestSize, dataFormat);
             }
             else
             {
-                KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, address, requestSize, dataFormat);
+                requestMessage = KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, address, requestSize, dataFormat);
             }
+
+            AttachResponsesFinishedHandler(requestMessage);
         }
 
         protected void HandleResponse(bool didRequestWork, byte failureResponseCode)
@@ -2977,18 +2980,22 @@ namespace Communication
                 {
                     uint endAddress = mAddress + mSize - 1;
 
+                    KWP2000Message requestMessage = null;
+
                     if (mOperationType == (byte)KWP2000ServiceID.RequestDownload)
                     {
-                        KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mAddress, mSize, mFormat);
+                        requestMessage = KWP2000MessageHelpers.SendRequestDownloadMessage(KWP2000CommInterface, mAddress, mSize, mFormat);
 
                         DisplayStatusMessage("Requesting download to ECU for address range 0x" + mAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8") + ".", StatusMessageType.USER);
                     }
                     else if (mOperationType == (byte)KWP2000ServiceID.RequestUpload)
                     {
-                        KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mAddress, mSize, mFormat);
+                        requestMessage = KWP2000MessageHelpers.SendRequestUploadMessage(KWP2000CommInterface, mAddress, mSize, mFormat);
 
                         DisplayStatusMessage("Requesting upload from ECU for address range 0x" + mAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8") + ".", StatusMessageType.USER);
                     }
+
+                    AttachResponsesFinishedHandler(requestMessage);
 
                     started = true;
                 }

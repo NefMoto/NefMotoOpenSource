@@ -225,16 +225,15 @@ namespace Communication
 
         protected override bool OnOperationCompleted(bool success)
         {
-            bool wasRunning = IsRunning;
-
+            // OperationCompleted clears IsRunning before this runs, so a wasRunning
+            // read here is always false and used to skip this cleanup. Abort's
+            // ActionCompleted handler returns while IsRunning is false, so this
+            // does not start the next action.
             bool result = base.OnOperationCompleted(success);
 
-            if(wasRunning)
-            {
-                CommInterface.ConnectionStatusChangedEvent -= this.ConnectionChangedHandler;
+            CommInterface.ConnectionStatusChangedEvent -= this.ConnectionChangedHandler;
 
-                AbortCurrentAction();
-            }
+            AbortCurrentAction();
 
             return result;
         }
@@ -536,6 +535,7 @@ namespace Communication
 
         private readonly DisplayStatusMessageDelegate mDisplayStatusMessage;
         public event DisplayUserPrompt mDisplayUserPrompt;
+        public event BeginDisplayUserPromptDelegate mBeginDisplayUserPrompt;
 
         public void DisplayStatusMessage(string message, StatusMessageType messageType)
         {
@@ -552,6 +552,22 @@ namespace Communication
             }
 
             return result;
+        }
+
+        public void BeginDisplayUserPrompt(string title, string message, UserPromptType promptType, Action<UserPromptResult> completed)
+        {
+            if (completed == null)
+            {
+                return;
+            }
+
+            if (mBeginDisplayUserPrompt != null)
+            {
+                mBeginDisplayUserPrompt(title, message, promptType, completed);
+                return;
+            }
+
+            completed(DisplayUserPrompt(title, message, promptType));
         }
 
         [Conditional("PROFILE_EVENT_DISPATCH")]
