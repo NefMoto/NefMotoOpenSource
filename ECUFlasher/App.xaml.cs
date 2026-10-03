@@ -451,6 +451,24 @@ namespace ECUFlasher
             return result;
         }
 
+        internal void BeginDisplayUserPrompt(string title, string message, UserPromptType promptType, Action<UserPromptResult> completed)
+        {
+            if (completed == null)
+            {
+                return;
+            }
+
+            // Prompts from the K-line thread must not wait here. SendReceiveThread
+            // is the only place tester present is sent.
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => BeginDisplayUserPrompt(title, message, promptType, completed)));
+                return;
+            }
+
+            completed(DisplayUserPrompt(title, message, promptType));
+        }
+
         internal void DisplayStatusMessage(string message, StatusMessageType messageType)
         {
             if (message != null)
@@ -733,8 +751,8 @@ namespace ECUFlasher
                             DisplayStatusMessage("Failed to open log file: " + ex.Message, StatusMessageType.USER);
                         }
                     });
-                    _OpenLogFileCommand.Name = "Open Log File";
-                    _OpenLogFileCommand.Description = "Open the log file";
+                    _OpenLogFileCommand.Name = "Open App Log";
+                    _OpenLogFileCommand.Description = "Open the app log";
                 }
 
                 return _OpenLogFileCommand;
@@ -772,8 +790,8 @@ namespace ECUFlasher
                             DisplayStatusMessage("Failed to open log file location: " + ex.Message, StatusMessageType.USER);
                         }
                     });
-                    _OpenLogFileLocationCommand.Name = "Open Log File Location";
-                    _OpenLogFileLocationCommand.Description = "Open the log file location";
+                    _OpenLogFileLocationCommand.Name = "Open App Log Location";
+                    _OpenLogFileLocationCommand.Description = "Open the app log folder";
                 }
 
                 return _OpenLogFileLocationCommand;
@@ -790,8 +808,8 @@ namespace ECUFlasher
                 if (_ClearLogFileCommand == null)
                 {
                     _ClearLogFileCommand = new ReactiveCommand(this.OnClearLogFile);
-                    _ClearLogFileCommand.Name = "Clear Log File";
-                    _ClearLogFileCommand.Description = "Clear the contents of the log file.";
+                    _ClearLogFileCommand.Name = "Clear App Log";
+                    _ClearLogFileCommand.Description = "Clear the app log";
                 }
 
                 return _ClearLogFileCommand;

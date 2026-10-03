@@ -2442,7 +2442,7 @@ namespace ECUFlasher
 
         private const string LOG_FILE_SHORT_EXT = ".xml";
         private const string LOG_FILE_EXT = ".Log" + LOG_FILE_SHORT_EXT;
-        private readonly string LOG_FILE_FILTER = "Log File (*" + LOG_FILE_EXT + ")|*" + LOG_FILE_EXT;
+        private readonly string LOG_FILE_FILTER = "Data Log (*" + LOG_FILE_EXT + ")|*" + LOG_FILE_EXT;
 
         public ICommand SaveLogFileCommand
         {
@@ -2451,8 +2451,8 @@ namespace ECUFlasher
                 if (_SaveLogFileCommand == null)
                 {
                     _SaveLogFileCommand = new ReactiveCommand(this.OnSaveLogFile);
-                    _SaveLogFileCommand.Name = "Save Log";
-                    _SaveLogFileCommand.Description = "Save recorded variables to log file";
+                    _SaveLogFileCommand.Name = "Save Data Log";
+                    _SaveLogFileCommand.Description = "Save recorded variables to a data log";
 
                     _SaveLogFileCommand.AddWatchedCollection(this, "LogEntries", LogEntries);
 
@@ -2481,7 +2481,7 @@ namespace ECUFlasher
             dialog.DefaultExt = LOG_FILE_EXT;//gets long extensions to work properly when they are added to a filename when saved
             dialog.Filter = LOG_FILE_FILTER;
             dialog.OverwritePrompt = true;
-            dialog.Title = "Select Where to Save Log File";
+            dialog.Title = "Select Where to Save Data Log";
 
             if (App.ShowFileDialog(dialog) == true)
             {
@@ -2612,8 +2612,8 @@ namespace ECUFlasher
                 if (_LoadLogFileCommand == null)
                 {
                     _LoadLogFileCommand = new ReactiveCommand(this.OnLoadLogFile);
-                    _LoadLogFileCommand.Name = "Load Log";
-                    _LoadLogFileCommand.Description = "Load recorded variables from log file";
+                    _LoadLogFileCommand.Name = "Load Data Log";
+                    _LoadLogFileCommand.Description = "Load recorded variables from a data log";
 
                     _LoadLogFileCommand.AddWatchedProperty(this, "IsReadingVariables");
 
@@ -2642,7 +2642,7 @@ namespace ECUFlasher
             dialog.Filter = LOG_FILE_FILTER;
             dialog.CheckFileExists = true;
             dialog.CheckPathExists = true;
-            dialog.Title = "Select Log File to Load";
+            dialog.Title = "Select Data Log to Load";
 
             if (App.ShowFileDialog(dialog) == true)
             {

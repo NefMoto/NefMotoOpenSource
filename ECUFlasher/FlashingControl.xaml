@@ -44,14 +44,12 @@ Contact by Email: tony@nefariousmotorsports.com
                 <RowDefinition/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Grid.Row="0" Margin="5,0,5,0" Command="{Binding Path=ChooseFlashFileCommand}" Style="{StaticResource ReactiveCommandButtonStyle}"/>
-            <TextBox Grid.Column="1" Grid.Row="0" Style="{StaticResource ReadOnlyValidationTextBoxStyle}"
+            <TextBox Grid.Column="0" Grid.Row="0" Style="{StaticResource ReadOnlyValidationTextBoxStyle}"
                 Text="{Binding Path=FileNameToFlash, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=true, ValidatesOnDataErrors=true}"/>
-            <ComboBox Grid.Column="2" Grid.Row="0" MinWidth="80" Margin="5,0,0,0"
+            <ComboBox Grid.Column="1" Grid.Row="0" MinWidth="80" Margin="5,0,0,0"
                 Style="{StaticResource ValidationComboBoxStyle}"
                 ItemsSource="{Binding Path=AvailableMemoryLayouts}"
                 SelectedItem="{Binding Path=SelectedMemoryLayout, Mode=TwoWay}"
@@ -61,8 +59,6 @@ Contact by Email: tony@nefariousmotorsports.com
         <Grid DockPanel.Dock="Top" x:Name="FlashActionGrid">
             <Grid.RowDefinitions>
                 <RowDefinition/>
-                <RowDefinition/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
@@ -81,14 +77,6 @@ Contact by Email: tony@nefariousmotorsports.com
                 <CheckBox x:Name="chkVerifyRead" VerticalAlignment="Center" Margin="12,0,0,0" IsChecked="True" IsEnabled="{Binding Path=IsVerifyReadEnabled}"/>
                 <Label>Verify Read</Label>
             </StackPanel>
-            <Button Command="{Binding Path=ReadBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="0" Grid.Row="3"/>
-            <Button Command="{Binding Path=WriteBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Grid.Column="1" Grid.Row="3"/>
-            <ComboBox Grid.Column="2" Grid.Row="3" MinWidth="200" Margin="5,5,0,5" HorizontalAlignment="Right"
-                Style="{StaticResource ValidationComboBoxStyle}"
-                ItemsSource="{Binding Path=AvailableEepromPresets}"
-                SelectedItem="{Binding Path=SelectedEepromPreset, Mode=TwoWay}"
-                DisplayMemberPath="DisplayName"
-                ToolTip="Bootmode SPI EEPROM preset (physical 95040 chip)"/>
         </Grid>
         <!--<Image DockPanel.Dock="Bottom" Source="{Binding Path=FlashMemoryImage.RawData, Converter={StaticResource byteArrayToBitmapConverter}}"/>-->
         <ECUFlasher:StatusWindow DataContext="{Binding Path=App}" DockPanel.Dock="Bottom"/>

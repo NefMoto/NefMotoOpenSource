@@ -9,7 +9,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 - [Getting started](user-guide/getting-started.md) — install, cable, first connect, bench vs in-car, DTCs, logs
 - [Flashing](user-guide/flashing.md) — KWP read/write, layouts, checksums
 - [P0602](user-guide/clearing-P0602.md) — same fault as `P1681`: the stored flag, and what clears it
-- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM
+- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical 95040 (immo, lockout, `P0602` flag)
 - [Troubleshooting](user-guide/troubleshooting.md) — symptom index, FAQ, what to attach on a bug report
 
 ## Developer / maintainer

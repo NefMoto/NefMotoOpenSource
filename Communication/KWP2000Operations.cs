@@ -74,31 +74,31 @@ namespace Communication
                                 desiredBaudRate = mDesiredBaudRates.First();
                             }
 
-                            if (mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate))
+                            bool shouldStart = mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate);
+
+                            if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
                             {
-                                if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-                                {
-                                    mState = State.CheckProgrammingSessionPreconditions;
-                                }
-                                else
-                                {
-                                    mState = State.StartDiagnosticSession;
-                                }
+                                // Already in the programming session: skip the precondition read.
+                                // Default timing still logs in before StartDiagnosticSession.
+                                mState = shouldStart ? State.CheckProgrammingSessionPreconditions : State.SwitchToDefaultTimingForProgrammingSession;
+                            }
+                            else if (shouldStart && mShouldAutoNegotiateSecurity)
+                            {
+                                mState = State.PreNegotiateSecurityForProgrammingSession;
+                            }
+                            else if (shouldStart)
+                            {
+                                mState = State.StartDiagnosticSession;
+                            }
+                            else if (!mShouldAutoStartDiagnosticSession && mShouldAutoNegotiateSecurity)
+                            {
+                                // ReadMemory stays in the current session and logs in there.
+                                // A development session does not serve ReadMemoryByAddress.
+                                mState = State.PreNegotiateSecurityForProgrammingSession;
                             }
                             else
                             {
-                                if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-                                {
-                                    //fall through
-                                    mState = State.CheckProgrammingSessionPreconditions;
-                                    goto case State.CheckProgrammingSessionPreconditions;
-                                }
-                                else
-                                {
-                                    //fall through
-                                    mState = State.StartDiagnosticSession;
-                                    goto case State.StartDiagnosticSession;
-                                }
+                                mState = StateAfterStartDiagnosticSession();
                             }
 
                             break;
@@ -112,6 +112,10 @@ namespace Communication
                         {
                             if (mShouldAutoNegotiateSecurity)
                             {
+                                // DQ answers StartDiagnosticSession with 7F 10 33 until this login.
+                                // That key sets bit 12 of [0xE074], so the login inside the programming
+                                // session gets a zero seed and must still send its key. A development
+                                // session stops after this login.
                                 mState = State.PreNegotiateSecurityForProgrammingSession;
                             }
                             else
@@ -122,37 +126,19 @@ namespace Communication
                         }
                         case State.PreNegotiateSecurityForProgrammingSession:
                         {
-                            mState = State.StartDiagnosticSession;
+                            mState = mShouldAutoStartDiagnosticSession
+                                ? State.StartDiagnosticSession
+                                : StateAfterStartDiagnosticSession();
                             break;
                         }
                         case State.StartDiagnosticSession:
                         {
-                            if (mShouldAutoNegotiateTiming)
-                            {
-                                mState = State.NegotiateTiming;
-                            }
-                            else if (mShouldAutoNegotiateSecurity)
-                            {
-                                mState = State.NegotiateSecurity;
-                            }
-                            else
-                            {
-                                mState = State.Finished;
-                            }
-
+                            mState = StateAfterStartDiagnosticSession();
                             break;
                         }
                         case State.NegotiateTiming:
                         {
-                            if (mShouldAutoNegotiateSecurity)
-                            {
-                                mState = State.NegotiateSecurity;
-                            }
-                            else
-                            {
-                                mState = State.Finished;
-                            }
-
+                            mState = NeedsInSessionSecurity() ? State.NegotiateSecurity : State.Finished;
                             break;
                         }
                         case State.NegotiateSecurity:
@@ -252,17 +238,8 @@ namespace Communication
                                                 }
                                             }
 
-                                            var promptResult = CommInterface.DisplayUserPrompt("Programming Session Preconditions Not Met", warning + "\n" + reasons + "\n\n Do you want to attempt to continue?", UserPromptType.OK_CANCEL);
-
-                                            if (promptResult == UserPromptResult.OK)
-                                            {
-                                                success = true;
-                                                CommInterface.DisplayStatusMessage("Continuing despite programming session preconditions not being met.", StatusMessageType.USER);
-                                            }
-                                            else
-                                            {
-                                                CommInterface.DisplayStatusMessage("Stopping because programming session preconditions have not been met.", StatusMessageType.USER);
-                                            }
+                                            DeferPreconditionsPrompt(action, warning + "\n" + reasons + "\n\n Do you want to attempt to continue?");
+                                            return;
                                         }
                                         else
                                         {
@@ -285,6 +262,8 @@ namespace Communication
                 #region PreNegotiateSecurityForProgrammingSession
                 else if (mState == State.PreNegotiateSecurityForProgrammingSession)
                 {
+                    // CH, HL, and NL reject this login (GeneralReject or ServiceNotSupported).
+                    // It does not count. DQ accepts it. A timeout still fails the operation.
                     success = action.CompletedWithoutCommunicationError;
                 }
                 #endregion
@@ -306,6 +285,16 @@ namespace Communication
             mDesiredDiagnosticSessionType = sessionType;
             mDesiredBaudRates = baudRates;
             mShouldAutoStartDiagnosticSession = true;
+
+            // DQ answers StartDiagnosticSession with 7F 10 33 for these sessions until a login.
+            // A later EnableAutoNegotiateSecurity replaces these settings.
+            if (!mShouldAutoNegotiateSecurity
+                && ((sessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                    || (sessionType == KWP2000DiagnosticSessionType.DevelopmentSession)))
+            {
+                var settings = KWP2000CommInterface.SecuritySettings ?? new SecurityAccessAction.SecurityAccessSettings();
+                EnableAutoNegotiateSecurity(settings);
+            }
         }
 
         protected void EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType sessionType, uint baudRate)
@@ -326,6 +315,63 @@ namespace Communication
             mSecuritySettings = settings;
         }
 
+        protected void EnableProgrammingSession(IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings)
+        {
+            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
+            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
+            EnableAutoNegotiateSecurity(securitySettings);
+        }
+
+        protected static string RangeText(uint start, uint length)
+        {
+            return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
+        }
+
+        // Post the dialog and return to SendReceiveThread. That loop is the only tester-present sender.
+        protected void PostUserPrompt(string title, string message, UserPromptType promptType, Action<UserPromptResult> apply)
+        {
+            mAwaitingUserPrompt = true;
+            CommInterface.BeginDisplayUserPrompt(title, message, promptType, result =>
+            {
+                lock (this)
+                {
+                    if (!IsRunning || !mAwaitingUserPrompt)
+                    {
+                        mAwaitingUserPrompt = false;
+                        return;
+                    }
+
+                    mAwaitingUserPrompt = false;
+                    apply(result);
+                }
+            });
+        }
+
+        protected bool UserPromptIsPending
+        {
+            get { return mAwaitingUserPrompt; }
+        }
+
+        private void DeferPreconditionsPrompt(CommunicationAction action, string message)
+        {
+            PostUserPrompt(
+                "Programming Session Preconditions Not Met",
+                message,
+                UserPromptType.OK_CANCEL,
+                result =>
+                {
+                    bool success = result == UserPromptResult.OK;
+                    CommInterface.DisplayStatusMessage(
+                        success
+                            ? "Continuing despite programming session preconditions not being met."
+                            : "Stopping because programming session preconditions have not been met.",
+                        StatusMessageType.USER);
+
+                    mMyLastStartedAction = null;
+                    base.OnActionCompleted(action, success);
+                });
+        }
+
         private enum State
         {
             Begin,
@@ -336,6 +382,28 @@ namespace Communication
             NegotiateTiming,
             NegotiateSecurity,
             Finished
+        }
+
+        private State StateAfterStartDiagnosticSession()
+        {
+            if (mShouldAutoNegotiateTiming)
+            {
+                return State.NegotiateTiming;
+            }
+
+            if (NeedsInSessionSecurity())
+            {
+                return State.NegotiateSecurity;
+            }
+
+            return State.Finished;
+        }
+
+        private bool NeedsInSessionSecurity()
+        {
+            // The programming-session kernel clears 0x381B30. The pre-session key sets bit 12
+            // of [0xE074], so this login gets a zero seed and must still send its key.
+            return mShouldAutoNegotiateSecurity && (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession);
         }
 
         protected KWP2000Interface KWP2000CommInterface
@@ -362,6 +430,7 @@ namespace Communication
         private SecurityAccessAction.SecurityAccessSettings mSecuritySettings;
 
         private CommunicationAction mMyLastStartedAction;
+        private bool mAwaitingUserPrompt;
     };
 
     public abstract class KWP2000SequencialOperation : KWP2000Operation
@@ -405,15 +474,28 @@ namespace Communication
         public ReadMemoryOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, uint numBytes, byte maxBlockSize)
             : base(commInterface)
         {
+            // NL serves ReadMemoryByAddress only in a development session. The connect
+            // session answers 7F 23 11. DQ's development session does too; the clear path
+            // continues when this read fails. A rejected pre-session login does not abort.
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
             mReadMemory = null;
-
             mReadMemoryAction = new ReadMemoryAction(commInterface, startAddress, numBytes, maxBlockSize, null);
 
             mActionArray = new KWP2000Action[1];
             mActionArray[0] = mReadMemoryAction;
+        }
+
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            if (!success && action.CompletedWithoutCommunicationError && (action is SecurityAccessAction))
+            {
+                // CH rejects the login before a session. The read still has to run.
+                success = true;
+            }
+
+            base.OnActionCompleted(action, success);
         }
 
         protected override bool OnOperationCompleted(bool success)
@@ -428,6 +510,15 @@ namespace Communication
 
         public MemoryImage mReadMemory;
         protected ReadMemoryAction mReadMemoryAction;
+
+        public byte FailureResponseCode
+        {
+            get
+            {
+                return (mReadMemoryAction != null) ? mReadMemoryAction.FailureResponseCode : (byte)0;
+            }
+        }
+
     };
 
     public class WriteMemoryOperation : KWP2000SequencialOperation
@@ -577,6 +668,143 @@ namespace Communication
 
             return true;
         }
+
+        public static string PassedStatus(uint offset)
+        {
+            return "Mirror check passed: sample at layout offset 0x" + offset.ToString("X") + " matches the region above the layout. Continuing with this layout.";
+        }
+
+        public const string FailedStatus = "Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).";
+        public const string ContinueTitle = "Flash does not appear mirrored";
+        public const string ContinueBody = "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?";
+    }
+
+    internal static class LayoutValidationText
+    {
+        public static void Apply(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool actionSucceeded, bool completedWithoutCommunicationError, out bool completed, out bool layoutIsValid, out bool possiblyMirrored, out string message)
+        {
+            completed = true;
+            layoutIsValid = false;
+            possiblyMirrored = false;
+            message = null;
+
+            if (actionSucceeded)
+            {
+                if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
+                {
+                    layoutIsValid = true;
+                    message = "Memory layout is valid.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
+                {
+                    possiblyMirrored = true;
+                    message = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
+                {
+                    message = "Start address is not a valid address in flash memory.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
+                {
+                    message = "End address is not a valid address in flash memory.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
+                {
+                    message = "Start address is not the start of flash memory.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
+                {
+                    message = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete
+                    || result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
+                    || result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+                {
+                    completed = false;
+                    message = "Validation did not complete.";
+                }
+                else
+                {
+                    Debug.Fail("Unknown memory layout validation result");
+                    completed = false;
+                    message = "Unknown validation result.";
+                }
+            }
+            else if (completedWithoutCommunicationError)
+            {
+                completed = false;
+                message = ValidateStartAndEndAddressesWithRequestUploadDownloadAction.SpecificFailureStatusMessage(result);
+                if (message == null)
+                {
+                    message = "Memory layout validation failed.";
+                }
+            }
+        }
+
+        public static bool MustAbort(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            return (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
+                || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected);
+        }
+
+        public static void ContinuePrompt(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool writing, out string title, out string body)
+        {
+            string verb = writing ? "writing" : "reading";
+            string specific = ValidateStartAndEndAddressesWithRequestUploadDownloadAction.SpecificFailureStatusMessage(result);
+            if (specific != null)
+            {
+                title = (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
+                    ? "Security access is not granted"
+                    : (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                        ? "RequestUpload is not supported"
+                        : "RequestUpload was rejected";
+                body = specific;
+                return;
+            }
+
+            title = "Unable to validate memory layout";
+            body = "Unable to validate memory layout. Do you want to continue " + verb + " flash memory without validating the memory layout?";
+
+            if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
+            {
+                title = "RequestDownload is not supported";
+                body = "The ECU reports that RequestDownload is not supported. Do you want to continue " + verb + " flash memory without validating the memory layout?";
+            }
+            else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+            {
+                title = "RequestDownload was rejected";
+                body = "The ECU rejected the RequestDownload service. Do you want to continue " + verb + " flash memory without validating the memory layout?";
+            }
+        }
+
+        public static bool TryFailurePrompt(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool validationCompleted, bool layoutIsValid, bool writing, out string title, out string body, out UserPromptType promptType, out bool continueOnOk)
+        {
+            title = null;
+            body = null;
+            promptType = UserPromptType.OK;
+            continueOnOk = false;
+
+            if (!validationCompleted)
+            {
+                ContinuePrompt(result, writing, out title, out body);
+                continueOnOk = !MustAbort(result);
+                promptType = continueOnOk ? UserPromptType.OK_CANCEL : UserPromptType.OK;
+                return true;
+            }
+
+            if (!layoutIsValid)
+            {
+                string verb = writing ? "writing" : "reading";
+                title = "Memory layout appears invalid";
+                body = "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue " + verb + " flash memory?";
+                promptType = UserPromptType.OK_CANCEL;
+                continueOnOk = true;
+                return true;
+            }
+
+            return false;
+        }
     }
 
     /// <summary>
@@ -590,15 +818,15 @@ namespace Communication
         public ChecksumFlashBlocksOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings, IList<MemoryImage> blocks)
             : base(commInterface)
         {
-            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
-            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-            EnableAutoNegotiateSecurity(securitySettings);
+            EnableProgrammingSession(baudRates, securitySettings);
 
             mBlocks = new List<MemoryImage>(blocks);
             mTotalBytes = (uint)mBlocks.Sum(block => (long)block.Size);
             mAllMatched = true;
             mChecksum = new ValidateFlashChecksumAction(commInterface, mBlocks[0].StartAddress, mBlocks[0].RawData);
         }
+
+        public bool ReportedMismatch { get; private set; }
 
         protected override CommunicationAction NextAction()
         {
@@ -617,6 +845,11 @@ namespace Communication
 
             MemoryImage block = mBlocks[mIndex];
             bool matched = success && mChecksum.IsFlashChecksumCorrect;
+            if (!matched && success)
+            {
+                ReportedMismatch = true;
+            }
+
             mAllMatched &= matched;
             CommInterface.DisplayStatusMessage("Checksum " + RangeText(block.StartAddress, block.Size) + (matched ? " matched." : success ? " reported a mismatch." : " failed."), StatusMessageType.USER);
             if (!success)
@@ -639,11 +872,6 @@ namespace Communication
             Continue();
         }
 
-        private static string RangeText(uint start, uint length)
-        {
-            return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
-        }
-
         private void Continue()
         {
             if (!StartNextAction() || CurrentAction == null)
@@ -658,6 +886,100 @@ namespace Communication
         private ValidateFlashChecksumAction mChecksum;
         private int mIndex;
         private bool mAllMatched;
+    }
+
+    /// <summary>
+    /// Uploads the given blocks into their existing buffers. No layout probe and no checksum.
+    /// </summary>
+    public class ReadFlashBlocksOperation : KWP2000Operation
+    {
+        private enum Step
+        {
+            Upload,
+            Transfer,
+            Exit
+        }
+
+        public ReadFlashBlocksOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings, IList<MemoryImage> blocks)
+            : base(commInterface)
+        {
+            EnableProgrammingSession(baudRates, securitySettings);
+
+            mBlocks = new List<MemoryImage>(blocks);
+            mStep = Step.Upload;
+            mMaxBlockSize = TransferDataAction.DEFAULT_MAX_BLOCK_SIZE;
+        }
+
+        protected override CommunicationAction NextAction()
+        {
+            var nextAction = base.NextAction();
+            if (nextAction != null)
+            {
+                return nextAction;
+            }
+
+            MemoryImage block = mBlocks[mIndex];
+            if (mStep == Step.Upload)
+            {
+                CommInterface.DisplayStatusMessage("Reading " + RangeText(block.StartAddress, block.Size) + " from the ECU.", StatusMessageType.USER);
+                mCurrent = new RequestUploadFromECUAction(KWP2000CommInterface, block.StartAddress, block.Size, TransferDataAction.CompressionType.Uncompressed, TransferDataAction.EncryptionType.Unencrypted);
+            }
+            else if (mStep == Step.Transfer)
+            {
+                mCurrent = new TransferDataAction(KWP2000CommInterface, TransferDataAction.TransferMode.UploadFromECU, TransferDataAction.EncryptionType.Unencrypted, TransferDataAction.CompressionType.Uncompressed, mMaxBlockSize, block.RawData, null);
+            }
+            else
+            {
+                mCurrent = new RequestTransferExitAction(KWP2000CommInterface);
+            }
+
+            return mCurrent;
+        }
+
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            if (action != mCurrent)
+            {
+                base.OnActionCompleted(action, success);
+                return;
+            }
+
+            if (!success)
+            {
+                OperationCompleted(false);
+                return;
+            }
+
+            if (mStep == Step.Upload)
+            {
+                mMaxBlockSize = ((RequestUploadFromECUAction)action).GetMaxBlockSize();
+                mStep = Step.Transfer;
+            }
+            else if (mStep == Step.Transfer)
+            {
+                mStep = Step.Exit;
+            }
+            else if (++mIndex >= mBlocks.Count)
+            {
+                OperationCompleted(true);
+                return;
+            }
+            else
+            {
+                mStep = Step.Upload;
+            }
+
+            if (!StartNextAction() || CurrentAction == null)
+            {
+                OperationCompleted(false);
+            }
+        }
+
+        private readonly IList<MemoryImage> mBlocks;
+        private CommunicationAction mCurrent;
+        private Step mStep;
+        private int mIndex;
+        private byte mMaxBlockSize;
     }
 
     /// <summary>
@@ -1172,24 +1494,14 @@ namespace Communication
                         {
                             if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check passed: sample at layout offset 0x" + mMirrorCheckOffset.ToString("X") + " matches the region above the layout. Continuing with this layout.", StatusMessageType.USER);
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.PassedStatus(mMirrorCheckOffset), StatusMessageType.USER);
                                 mState = ReadingState.Start;
                             }
                             else
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).", StatusMessageType.USER);
-                                var continueAnyway = CommInterface.DisplayUserPrompt(
-                                    "Flash does not appear mirrored",
-                                    "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?",
-                                    UserPromptType.OK_CANCEL);
-                                if (continueAnyway == UserPromptResult.OK)
-                                {
-                                    mState = ReadingState.Start;
-                                }
-                                else
-                                {
-                                    success = false;
-                                }
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.FailedStatus, StatusMessageType.USER);
+                                AskReadPrompt(action, MirroredFlashLayoutHelper.ContinueTitle, MirroredFlashLayoutHelper.ContinueBody, UserPromptType.OK_CANCEL, true);
+                                return;
                             }
                         }
                         else if (ShouldVerifyReadSectors && ShouldChecksumSector(mCurrentBlock.Current))
@@ -1217,63 +1529,8 @@ namespace Communication
 
                     string validationMesage = null;
 
-                    if (success)
-                    {
-                        var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-
-                        if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
-                        {
-                            layoutIsValid = true;
-                            validationMesage = "Memory layout is valid.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
-                        {
-                            possiblyMirrored = true;
-                            validationMesage = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
-                        {
-                            validationMesage = "Start address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
-                        {
-                            validationMesage = "End address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
-                        {
-                            validationMesage = "Start address is not the start of flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
-                        {
-                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else
-                        {
-                            Debug.Fail("Unknown memory layout validation result");
-
-                            validationCompleted = false;
-                            validationMesage = "Unknown validation result.";
-                        }
-                    }
-                    else if (action.CompletedWithoutCommunicationError)
-                    {
-                        validationCompleted = false;
-
-                        validationMesage = "Memory layout validation failed.";
-                    }
+                    var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                    LayoutValidationText.Apply(validationResult, success, action.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
 
                     if (validationMesage != null)
                     {
@@ -1284,81 +1541,77 @@ namespace Communication
 
                     if (possiblyMirrored)
                     {
-                        var promptResult = CommInterface.DisplayUserPrompt(
+                        PostUserPrompt(
                             "Memory layout may be ambiguous",
                             MirroredFlashLayoutHelper.PromptMessage(false),
-                            UserPromptType.CONTINUE_CHECK_CANCEL);
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = ReadingState.Start;
-                        }
-                        else if (promptResult == UserPromptResult.CHECK)
-                        {
-                            MirroredFlashLayoutHelper.ChooseCompareSample(
-                                mFlashBlockList.First().StartAddress,
-                                mFlashBlockList.Last().EndAddress,
-                                out mMirrorCheckOffset,
-                                out mMirrorCheckSize);
-                            mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
-                            mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
-                            success = true;
-                            mState = ReadingState.MirrorCheckRequestPrimary;
-                        }
-                        else
-                        {
-                            success = false;
-                        }
+                            UserPromptType.CONTINUE_CHECK_CANCEL,
+                            result => ApplyReadMirrorLayoutPrompt(action, result));
+                        return;
                     }
-                    else if (!success)
+
+                    string promptTitle;
+                    string promptBody;
+                    UserPromptType promptType;
+                    bool continueOnOk;
+                    if (!success && LayoutValidationText.TryFailurePrompt(validationResult, validationCompleted, layoutIsValid, false, out promptTitle, out promptBody, out promptType, out continueOnOk))
                     {
-                        var promptResult = UserPromptResult.CANCEL;
-                        string promptTitle = "Unable to validate memory layout";
-                        string promptBody = "Unable to validate memory layout. Do you want to continue reading flash memory without validating the memory layout?";
-
-                        if (!validationCompleted)
-                        {
-                            var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-                            if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-                            {
-                                promptTitle = "RequestUpload is not supported";
-                                promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
-                            {
-                                promptTitle = "RequestUpload was rejected";
-                                promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
-                            {
-                                promptTitle = "RequestDownload is not supported";
-                                promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue reading flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                            {
-                                promptTitle = "RequestDownload was rejected";
-                                promptBody = "The ECU rejected the RequestDownload service. Do you want to continue reading flash memory without validating the memory layout?";
-                            }
-                            promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
-                        }
-                        else if (!layoutIsValid)
-                        {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue reading flash memory?", UserPromptType.OK_CANCEL);
-                        }
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = ReadingState.Start;
-                        }
+                        AskReadPrompt(action, promptTitle, promptBody, promptType, continueOnOk);
+                        return;
                     }
                     else if (success)
                     {
                         mState = ReadingState.Start;
                     }
                 }
+            }
 
+            FinishReadAction(action, success);
+        }
+
+        private void ApplyReadMirrorLayoutPrompt(CommunicationAction action, UserPromptResult promptResult)
+        {
+            bool success = false;
+
+            if (promptResult == UserPromptResult.OK)
+            {
+                success = true;
+                mState = ReadingState.Start;
+            }
+            else if (promptResult == UserPromptResult.CHECK)
+            {
+                MirroredFlashLayoutHelper.ChooseCompareSample(
+                    mFlashBlockList.First().StartAddress,
+                    mFlashBlockList.Last().EndAddress,
+                    out mMirrorCheckOffset,
+                    out mMirrorCheckSize);
+                mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
+                mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
+                success = true;
+                mState = ReadingState.MirrorCheckRequestPrimary;
+            }
+
+            FinishReadAction(action, success);
+        }
+
+        private void AskReadPrompt(CommunicationAction action, string title, string message, UserPromptType promptType, bool continueOnOk)
+        {
+            PostUserPrompt(title, message, promptType, result =>
+            {
+                bool success = false;
+                if (continueOnOk && (result == UserPromptResult.OK))
+                {
+                    success = true;
+                    mState = ReadingState.Start;
+                }
+
+                FinishReadAction(action, success);
+            });
+        }
+
+        private void FinishReadAction(CommunicationAction action, bool success)
+        {
+            if (action == mMyLastStartedAction)
+            {
                 if (mState == ReadingState.FinishedBlock)
                 {
                     mTotalBytesValidated += mCurrentBlock.Current.Size;
@@ -2066,23 +2319,30 @@ namespace Communication
                                     + selectedName + " layout, chip looks " + suspectedName + ".",
                                     StatusMessageType.USER);
 
-                                CommInterface.DisplayUserPrompt("Wrong Flash Layout",
+                                DeferWritePrompt(
+                                    action,
+                                    "Wrong Flash Layout",
                                     "Erase failed at 0x" + startAddress.ToString("X8") + "-0x" + endAddress.ToString("X8")
                                     + ". Selected layout is " + selectedName + "; this chip looks " + suspectedName + "."
                                     + " Re-flash with " + oppositeName + ".",
-                                    UserPromptType.OK);
+                                    UserPromptType.OK,
+                                    result => false);
+                                return;
                             }
                             else if (((EraseFlashAction)action).FailedBecauseOfPersistentData)
                             {
-                                var promptResult = CommInterface.DisplayUserPrompt("Sector Erase Failed",
+                                DeferWritePrompt(
+                                    action,
+                                    "Sector Erase Failed",
                                     "Failed to erase the memory sector. The new data being flashed likely conflicts with the ECU's persistent data. The persistent ECU data can be replaced by erasing the entire flash memory before programming. If the ECU may contains a non-standard flash memory chip, it could be causing the erase to fail."
                                     + "\n\nPress Yes, to erase the entire ECU flash memory and restart the flashing process."
                                     + "\nPress No, to skip flashing this sector and continue the flashing process."
                                     + "\nPress Cancel, to abort the flashing process."
                                     + "\n\nWARNING: Only erase the entire flash memory if you have a good communication connection with the ECU. If flashing fails after erasing the entire flash memory, it is likely the ECU will no longer boot, and will have to be reflashed on the bench using boot mode."
-                                    + " This software does NOT support boot mode.", UserPromptType.YES_NO_CANCEL);
-
-                                success = ApplyEraseFailurePromptResult(promptResult);
+                                    + " This software does NOT support boot mode.",
+                                    UserPromptType.YES_NO_CANCEL,
+                                    ApplyEraseFailurePromptResult);
+                                return;
                             }
                             else//regular failure
                             {
@@ -2214,24 +2474,14 @@ namespace Communication
                             }
                             else if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check passed: sample at layout offset 0x" + mMirrorCheckOffset.ToString("X") + " matches the region above the layout. Continuing with this layout.", StatusMessageType.USER);
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.PassedStatus(mMirrorCheckOffset), StatusMessageType.USER);
                                 mState = FlashingState.StartBlock;
                             }
                             else
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).", StatusMessageType.USER);
-                                var continueAnyway = CommInterface.DisplayUserPrompt(
-                                    "Flash does not appear mirrored",
-                                    "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?",
-                                    UserPromptType.OK_CANCEL);
-                                if (continueAnyway == UserPromptResult.OK)
-                                {
-                                    mState = FlashingState.StartBlock;
-                                }
-                                else
-                                {
-                                    success = false;
-                                }
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.FailedStatus, StatusMessageType.USER);
+                                AskWritePrompt(action, MirroredFlashLayoutHelper.ContinueTitle, MirroredFlashLayoutHelper.ContinueBody, UserPromptType.OK_CANCEL, true);
+                                return;
                             }
                         }
                     }
@@ -2247,23 +2497,31 @@ namespace Communication
 
                                 //start flashing from the first incomplete block
                                 mState = FlashingState.StartBlock;
+                                success = true;
                             }
                             else
                             {
-                                var promptResult = CommInterface.DisplayUserPrompt("Flash Programming Sector Failed", "Flash programming failed on the current sector. Press OK to retry programming the current sector, or Cancel to abort flash programming.", UserPromptType.OK_CANCEL);
+                                DeferWritePrompt(
+                                    action,
+                                    "Flash Programming Sector Failed",
+                                    "Flash programming failed on the current sector. Press OK to retry programming the current sector, or Cancel to abort flash programming.",
+                                    UserPromptType.OK_CANCEL,
+                                    result =>
+                                    {
+                                        if (result == UserPromptResult.OK)
+                                        {
+                                            //start flashing from the current block
+                                            mState = FlashingState.StartProgrammingBlock;
+                                        }
+                                        else
+                                        {
+                                            OperationCompleted(false);
+                                        }
 
-                                if (promptResult == UserPromptResult.OK)
-                                {
-                                    //start flashing from the current block
-                                    mState = FlashingState.StartProgrammingBlock;
-                                }
-                                else
-                                {
-                                    OperationCompleted(false);
-                                }
+                                        return true;
+                                    });
+                                return;
                             }
-
-                            success = true;
                         }
                         //else
                         //{
@@ -2319,63 +2577,8 @@ namespace Communication
 
                     string validationMesage = null;
 
-                    if (success)
-                    {
-                        var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-
-                        if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
-                        {
-                            layoutIsValid = true;
-                            validationMesage = "Memory layout is valid.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
-                        {
-                            possiblyMirrored = true;
-                            validationMesage = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
-                        {
-                            validationMesage = "Start address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
-                        {
-                            validationMesage = "End address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
-                        {
-                            validationMesage = "Start address is not the start of flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
-                        {
-                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else
-                        {
-                            Debug.Fail("Unknown memory layout validation result");
-
-                            validationCompleted = false;
-                            validationMesage = "Unknown validation result.";
-                        }
-                    }
-                    else if (action.CompletedWithoutCommunicationError)
-                    {
-                        validationCompleted = false;
-
-                        validationMesage = "Memory layout validation failed.";
-                    }
+                    var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                    LayoutValidationText.Apply(validationResult, success, action.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
 
                     if (validationMesage != null)
                     {
@@ -2386,74 +2589,22 @@ namespace Communication
 
                     if (possiblyMirrored)
                     {
-                        var promptResult = CommInterface.DisplayUserPrompt(
+                        PostUserPrompt(
                             "Memory layout may be ambiguous",
                             MirroredFlashLayoutHelper.PromptMessage(true),
-                            UserPromptType.CONTINUE_CHECK_CANCEL);
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = FlashingState.StartBlock;
-                        }
-                        else if (promptResult == UserPromptResult.CHECK)
-                        {
-                            MirroredFlashLayoutHelper.ChooseCompareSample(
-                                mFlashBlockList.First().mMemoryImage.StartAddress,
-                                mFlashBlockList.Last().mMemoryImage.EndAddress,
-                                out mMirrorCheckOffset,
-                                out mMirrorCheckSize);
-                            mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
-                            mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
-                            success = true;
-                            mState = FlashingState.MirrorCheckRequestPrimary;
-                        }
-                        else
-                        {
-                            success = false;
-                        }
+                            UserPromptType.CONTINUE_CHECK_CANCEL,
+                            result => ApplyWriteMirrorLayoutPrompt(action, result));
+                        return;
                     }
-                    else if (!success)
+
+                    string promptTitle;
+                    string promptBody;
+                    UserPromptType promptType;
+                    bool continueOnOk;
+                    if (!success && LayoutValidationText.TryFailurePrompt(validationResult, validationCompleted, layoutIsValid, true, out promptTitle, out promptBody, out promptType, out continueOnOk))
                     {
-                        var promptResult = UserPromptResult.CANCEL;
-                        string promptTitle = "Unable to validate memory layout";
-                        string promptBody = "Unable to validate memory layout. Do you want to continue writing flash memory without validating the memory layout?";
-
-                        if (!validationCompleted)
-                        {
-                            var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-                            if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-                            {
-                                promptTitle = "RequestUpload is not supported";
-                                promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
-                            {
-                                promptTitle = "RequestUpload was rejected";
-                                promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
-                            {
-                                promptTitle = "RequestDownload is not supported";
-                                promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue writing flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                            {
-                                promptTitle = "RequestDownload was rejected";
-                                promptBody = "The ECU rejected the RequestDownload service. Do you want to continue writing flash memory without validating the memory layout?";
-                            }
-                            promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
-                        }
-                        else if (!layoutIsValid)
-                        {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue writing flash memory?", UserPromptType.OK_CANCEL);
-                        }
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = FlashingState.StartBlock;
-                        }
+                        AskWritePrompt(action, promptTitle, promptBody, promptType, continueOnOk);
+                        return;
                     }
                     else if (success)
                     {
@@ -2461,54 +2612,124 @@ namespace Communication
                     }
                 }
                 #endregion
-                #region FinishedBlock
-                if (mState == FlashingState.FinishedBlock)
-                {
-                    //erase flash and validate flashed data checksums are the only two actions that will allow for a retry
-                    if (!mCurrentBlock.mFlashComplete)
-                    {
-                        int MAX_FLASH_BLOCK_RETRIES = 3;
-
-                        if (mCurrentBlock.mNumFlashAttempts <= MAX_FLASH_BLOCK_RETRIES)
-                        {
-                            CommInterface.DisplayStatusMessage("Previous flash attempt failed, will retry.", StatusMessageType.USER);
-                        }
-                        else
-                        {
-                            CommInterface.DisplayStatusMessage("Previous flashing attempts have failed " + MAX_FLASH_BLOCK_RETRIES + " times, giving up and skipping.", StatusMessageType.USER);
-                            mCurrentBlock.mFlashComplete = true;
-                        }
-                    }
-
-                    //did we finish the current block?
-                    if (mCurrentBlock.mFlashComplete)
-                    {
-                        //update the stats
-                        mTotalBytesValidated += mCurrentBlock.mMemoryImage.Size;
-                        OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToFlash) * 100.0f);
-
-                        if (!mEraseEntireFlashAtOnce && !mValidatedEraseMode && mCurrentBlock.mWasErased && (mCurrentBlock != mFlashBlockList.First()))
-                        {
-                            mState = FlashingState.CheckIfFirstBlockAccidentallyErased;
-                        }
-                    }
-                }
-                #endregion
+                ApplyFinishedWriteBlock();
             }
 
+            FinishWriteAction(action, success);
+        }
+
+        private void ApplyFinishedWriteBlock()
+        {
+            if (mState != FlashingState.FinishedBlock)
+            {
+                return;
+            }
+
+            //erase flash and validate flashed data checksums are the only two actions that will allow for a retry
+            if (!mCurrentBlock.mFlashComplete)
+            {
+                int MAX_FLASH_BLOCK_RETRIES = 3;
+
+                if (mCurrentBlock.mNumFlashAttempts <= MAX_FLASH_BLOCK_RETRIES)
+                {
+                    CommInterface.DisplayStatusMessage("Previous flash attempt failed, will retry.", StatusMessageType.USER);
+                }
+                else
+                {
+                    CommInterface.DisplayStatusMessage("Previous flashing attempts have failed " + MAX_FLASH_BLOCK_RETRIES + " times, giving up and skipping.", StatusMessageType.USER);
+                    mCurrentBlock.mFlashComplete = true;
+                }
+            }
+
+            //did we finish the current block?
+            if (mCurrentBlock.mFlashComplete)
+            {
+                //update the stats
+                mTotalBytesValidated += mCurrentBlock.mMemoryImage.Size;
+                OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToFlash) * 100.0f);
+
+                if (!mEraseEntireFlashAtOnce && !mValidatedEraseMode && mCurrentBlock.mWasErased && (mCurrentBlock != mFlashBlockList.First()))
+                {
+                    mState = FlashingState.CheckIfFirstBlockAccidentallyErased;
+                }
+            }
+        }
+
+        private void ApplyWriteMirrorLayoutPrompt(CommunicationAction action, UserPromptResult promptResult)
+        {
+            bool success = false;
+
+            if (promptResult == UserPromptResult.OK)
+            {
+                success = true;
+                mState = FlashingState.StartBlock;
+            }
+            else if (promptResult == UserPromptResult.CHECK)
+            {
+                MirroredFlashLayoutHelper.ChooseCompareSample(
+                    mFlashBlockList.First().mMemoryImage.StartAddress,
+                    mFlashBlockList.Last().mMemoryImage.EndAddress,
+                    out mMirrorCheckOffset,
+                    out mMirrorCheckSize);
+                mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
+                mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
+                success = true;
+                mState = FlashingState.MirrorCheckRequestPrimary;
+            }
+
+            FinishWriteAfterPrompt(action, success);
+        }
+
+        private void AskWritePrompt(CommunicationAction action, string title, string message, UserPromptType promptType, bool continueOnOk)
+        {
+            DeferWritePrompt(action, title, message, promptType, result =>
+            {
+                if (continueOnOk && (result == UserPromptResult.OK))
+                {
+                    mState = FlashingState.StartBlock;
+                    return true;
+                }
+
+                return false;
+            });
+        }
+
+        private void DeferWritePrompt(CommunicationAction action, string title, string message, UserPromptType promptType, Func<UserPromptResult, bool> apply)
+        {
+            PostUserPrompt(title, message, promptType, result => FinishWriteAfterPrompt(action, apply(result)));
+        }
+
+        private void FinishWriteAfterPrompt(CommunicationAction action, bool success)
+        {
+            ApplyFinishedWriteBlock();
+            FinishWriteAction(action, success);
+        }
+
+        private void FinishWriteAction(CommunicationAction action, bool success)
+        {
             if (!success && !action.CompletedWithoutCommunicationError)
             {
-                if (HandleCommunicationErrorPrompt())
+                BeginCommunicationErrorPrompt(continuing =>
                 {
-                    KWP2000CommInterface.DisconnectFromECU();
+                    if (continuing)
+                    {
+                        KWP2000CommInterface.DisconnectFromECU();
+                        NoteWaitingToReconnect();
+                    }
 
-                    CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
-                }
+                    FinishWriteTail(action, success);
+                });
+                return;
             }
 
+            FinishWriteTail(action, success);
+        }
+
+        private void FinishWriteTail(CommunicationAction action, bool success)
+        {
             mMyLastStartedAction = null;
 
-            if(!mWaitingToReconnect)
+            if (!mWaitingToReconnect)
             {
                 base.OnActionCompleted(action, success);
             }
@@ -2517,34 +2738,42 @@ namespace Communication
         bool mWaitingToReconnect = false;
         bool mUserPromptedToContinueAfterCommunicationFailure = false;
 
-        protected bool HandleCommunicationErrorPrompt()
+        private void NoteWaitingToReconnect()
         {
-            bool continuingAfterReconnect = false;
+            CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
+        }
 
-            if (!mUserPromptedToContinueAfterCommunicationFailure)
+        private void BeginCommunicationErrorPrompt(Action<bool> after)
+        {
+            if (mUserPromptedToContinueAfterCommunicationFailure || UserPromptIsPending)
             {
-                mUserPromptedToContinueAfterCommunicationFailure = true;
-
-                UserPromptResult promptResult = CommInterface.DisplayUserPrompt("Communication Error", "A communication error was encountered while flashing. Press Cancel to abort, or OK to continue after reconnecting.", UserPromptType.OK_CANCEL);
-
-                if (promptResult == UserPromptResult.OK)
-                {
-                    mWaitingToReconnect = true;
-
-                    if (mTransferDataActionToResume != null)
-                    {
-                        mState = FlashingState.TransferData;//resume the current transfer data action
-                    }
-                    else
-                    {
-                        mState = FlashingState.StartProgrammingBlock;//start flashing from the current block
-                    }
-                }
-
-                continuingAfterReconnect = mWaitingToReconnect;
+                after(mWaitingToReconnect);
+                return;
             }
 
-            return continuingAfterReconnect;
+            mUserPromptedToContinueAfterCommunicationFailure = true;
+            PostUserPrompt(
+                "Communication Error",
+                "A communication error was encountered while flashing. Press Cancel to abort, or OK to continue after reconnecting.",
+                UserPromptType.OK_CANCEL,
+                result =>
+                {
+                    if (result == UserPromptResult.OK)
+                    {
+                        mWaitingToReconnect = true;
+
+                        if (mTransferDataActionToResume != null)
+                        {
+                            mState = FlashingState.TransferData;//resume the current transfer data action
+                        }
+                        else
+                        {
+                            mState = FlashingState.StartProgrammingBlock;//start flashing from the current block
+                        }
+                    }
+
+                    after(mWaitingToReconnect);
+                });
         }
 
         protected override void OnConnectionChanged(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
@@ -2564,29 +2793,41 @@ namespace Communication
                     {
                         if (!success)
                         {
-                            if (HandleCommunicationErrorPrompt())
+                            BeginCommunicationErrorPrompt(continuing =>
                             {
-                                CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
-                            }
+                                if (continuing)
+                                {
+                                    NoteWaitingToReconnect();
+                                }
+
+                                if (!mWaitingToReconnect)
+                                {
+                                    OperationCompleted(success);
+                                }
+                            });
+                            return;
                         }
 
-                        if(!mWaitingToReconnect)
-                        {
-                            OperationCompleted(success);
-                        }
+                        OperationCompleted(success);
                     }
                 }
             }
-            else if (status == CommunicationInterface.ConnectionStatusType.Disconnected)
+            else if ((status == CommunicationInterface.ConnectionStatusType.Disconnected) && !UserPromptIsPending)
             {
-                HandleCommunicationErrorPrompt();
+                BeginCommunicationErrorPrompt(continuing => FinishConnectionChange(commInterface, status, willReconnect));
+                return;
             }
 
+            FinishConnectionChange(commInterface, status, willReconnect);
+        }
+
+        private void FinishConnectionChange(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
+        {
             base.OnConnectionChanged(commInterface, status, willReconnect);
 
             if (mWaitingToReconnect && (status == CommunicationInterface.ConnectionStatusType.Disconnected))
             {
-                CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
+                NoteWaitingToReconnect();
             }
         }
 
