@@ -41,8 +41,9 @@ The connection controls are at the **top of the window**, not on a tab.
 Tabs after you are connected:
 
 - **KWP2000 Info** — ident and DTCs (**Read ECU Info**, **Read DTCs**, **Read EEPROM Mirror**, **Clear DTCs**)
-- **KWP2000 Flashing** — read/write ([Flashing](flashing.md))
-- **KWP2000 Logging** — live variables. It is not [ME7Logger](https://nefariousmotorsports.com/forum/).
+- **Flashing** — KWP2000 and bootmode read/write ([Flashing](flashing.md))
+- **KWP2000 Logging** — live variables. It is not [ME7Logger](https://nefariousmotorsports.com/forum/). Hidden when the protocol combo is **Boot Mode**.
+- **Bootmode EEPROM** — physical 95040 read/write, immo off, lockout reset, and clear `P0602` ([Bootmode](bootmode.md)). Hidden unless the protocol combo is **Boot Mode**.
 - **KWP2000 Settings** — address, timings, **Verify cable in dumb mode**, **Slow init timing log**
 
 ## Logging and DTCs
@@ -88,6 +89,7 @@ ECUs differ in which address they answer during fast init. Fast init tries one a
 Saved in `preferences.json` next to the log file:
 
 - Protocol, KWP baud, **Slow Init** / **Fast Init**, **Slow init timing log**
+- Bootmode EEPROM **Backup before write**
 
 Not saved (reset when you restart the app):
 
@@ -123,7 +125,7 @@ Session log:
 
 `%AppData%` is the **roaming** profile folder (`C:\Users\<you>\AppData\Roaming` on current Windows, not `AppData\Local`).
 
-`preferences.json` is in the same folder. Use **File → Open Log File** or **Open Log File Location** when reporting connect or flash problems. That file is not the data-logger tab save.
+`preferences.json` is in the same folder. Use **Help → App Log → Open App Log** or **Open App Log Location** when reporting connect or flash problems. That file is not a data log.
 
 ## Next
 

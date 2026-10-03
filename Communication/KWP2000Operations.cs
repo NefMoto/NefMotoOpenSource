@@ -74,31 +74,31 @@ namespace Communication
                                 desiredBaudRate = mDesiredBaudRates.First();
                             }
 
-                            if (mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate))
+                            bool shouldStart = mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate);
+
+                            if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
                             {
-                                if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-                                {
-                                    mState = State.CheckProgrammingSessionPreconditions;
-                                }
-                                else
-                                {
-                                    mState = State.StartDiagnosticSession;
-                                }
+                                // Already in the programming session: skip the precondition read.
+                                // Default timing still logs in before StartDiagnosticSession.
+                                mState = shouldStart ? State.CheckProgrammingSessionPreconditions : State.SwitchToDefaultTimingForProgrammingSession;
+                            }
+                            else if (shouldStart && mShouldAutoNegotiateSecurity)
+                            {
+                                mState = State.PreNegotiateSecurityForProgrammingSession;
+                            }
+                            else if (shouldStart)
+                            {
+                                mState = State.StartDiagnosticSession;
+                            }
+                            else if (!mShouldAutoStartDiagnosticSession && mShouldAutoNegotiateSecurity)
+                            {
+                                // ReadMemory stays in the current session and logs in there.
+                                // A development session does not serve ReadMemoryByAddress.
+                                mState = State.PreNegotiateSecurityForProgrammingSession;
                             }
                             else
                             {
-                                if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-                                {
-                                    //fall through
-                                    mState = State.CheckProgrammingSessionPreconditions;
-                                    goto case State.CheckProgrammingSessionPreconditions;
-                                }
-                                else
-                                {
-                                    //fall through
-                                    mState = State.StartDiagnosticSession;
-                                    goto case State.StartDiagnosticSession;
-                                }
+                                mState = StateAfterStartDiagnosticSession();
                             }
 
                             break;
@@ -112,6 +112,10 @@ namespace Communication
                         {
                             if (mShouldAutoNegotiateSecurity)
                             {
+                                // DQ answers StartDiagnosticSession with 7F 10 33 until this login.
+                                // That key sets bit 12 of [0xE074], so the login inside the programming
+                                // session gets a zero seed and must still send its key. A development
+                                // session stops after this login.
                                 mState = State.PreNegotiateSecurityForProgrammingSession;
                             }
                             else
@@ -122,37 +126,19 @@ namespace Communication
                         }
                         case State.PreNegotiateSecurityForProgrammingSession:
                         {
-                            mState = State.StartDiagnosticSession;
+                            mState = mShouldAutoStartDiagnosticSession
+                                ? State.StartDiagnosticSession
+                                : StateAfterStartDiagnosticSession();
                             break;
                         }
                         case State.StartDiagnosticSession:
                         {
-                            if (mShouldAutoNegotiateTiming)
-                            {
-                                mState = State.NegotiateTiming;
-                            }
-                            else if (mShouldAutoNegotiateSecurity)
-                            {
-                                mState = State.NegotiateSecurity;
-                            }
-                            else
-                            {
-                                mState = State.Finished;
-                            }
-
+                            mState = StateAfterStartDiagnosticSession();
                             break;
                         }
                         case State.NegotiateTiming:
                         {
-                            if (mShouldAutoNegotiateSecurity)
-                            {
-                                mState = State.NegotiateSecurity;
-                            }
-                            else
-                            {
-                                mState = State.Finished;
-                            }
-
+                            mState = NeedsInSessionSecurity() ? State.NegotiateSecurity : State.Finished;
                             break;
                         }
                         case State.NegotiateSecurity:
@@ -285,6 +271,8 @@ namespace Communication
                 #region PreNegotiateSecurityForProgrammingSession
                 else if (mState == State.PreNegotiateSecurityForProgrammingSession)
                 {
+                    // CH, HL, and NL reject this login (GeneralReject or ServiceNotSupported).
+                    // It does not count. DQ accepts it. A timeout still fails the operation.
                     success = action.CompletedWithoutCommunicationError;
                 }
                 #endregion
@@ -306,6 +294,16 @@ namespace Communication
             mDesiredDiagnosticSessionType = sessionType;
             mDesiredBaudRates = baudRates;
             mShouldAutoStartDiagnosticSession = true;
+
+            // DQ answers StartDiagnosticSession with 7F 10 33 for these sessions until a login.
+            // A later EnableAutoNegotiateSecurity replaces these settings.
+            if (!mShouldAutoNegotiateSecurity
+                && ((sessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                    || (sessionType == KWP2000DiagnosticSessionType.DevelopmentSession)))
+            {
+                var settings = KWP2000CommInterface.SecuritySettings ?? new SecurityAccessAction.SecurityAccessSettings();
+                EnableAutoNegotiateSecurity(settings);
+            }
         }
 
         protected void EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType sessionType, uint baudRate)
@@ -326,6 +324,18 @@ namespace Communication
             mSecuritySettings = settings;
         }
 
+        protected void EnableProgrammingSession(IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings)
+        {
+            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
+            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
+            EnableAutoNegotiateSecurity(securitySettings);
+        }
+
+        protected static string RangeText(uint start, uint length)
+        {
+            return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
+        }
+
         private enum State
         {
             Begin,
@@ -336,6 +346,28 @@ namespace Communication
             NegotiateTiming,
             NegotiateSecurity,
             Finished
+        }
+
+        private State StateAfterStartDiagnosticSession()
+        {
+            if (mShouldAutoNegotiateTiming)
+            {
+                return State.NegotiateTiming;
+            }
+
+            if (NeedsInSessionSecurity())
+            {
+                return State.NegotiateSecurity;
+            }
+
+            return State.Finished;
+        }
+
+        private bool NeedsInSessionSecurity()
+        {
+            // The programming-session kernel clears 0x381B30. The pre-session key sets bit 12
+            // of [0xE074], so this login gets a zero seed and must still send its key.
+            return mShouldAutoNegotiateSecurity && (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession);
         }
 
         protected KWP2000Interface KWP2000CommInterface
@@ -405,15 +437,28 @@ namespace Communication
         public ReadMemoryOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, uint startAddress, uint numBytes, byte maxBlockSize)
             : base(commInterface)
         {
+            // NL serves ReadMemoryByAddress only in a development session. The connect
+            // session answers 7F 23 11. DQ's development session does too; the clear path
+            // continues when this read fails. A rejected pre-session login does not abort.
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
             mReadMemory = null;
-
             mReadMemoryAction = new ReadMemoryAction(commInterface, startAddress, numBytes, maxBlockSize, null);
 
             mActionArray = new KWP2000Action[1];
             mActionArray[0] = mReadMemoryAction;
+        }
+
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            if (!success && action.CompletedWithoutCommunicationError && (action is SecurityAccessAction))
+            {
+                // CH rejects the login before a session. The read still has to run.
+                success = true;
+            }
+
+            base.OnActionCompleted(action, success);
         }
 
         protected override bool OnOperationCompleted(bool success)
@@ -428,6 +473,15 @@ namespace Communication
 
         public MemoryImage mReadMemory;
         protected ReadMemoryAction mReadMemoryAction;
+
+        public byte FailureResponseCode
+        {
+            get
+            {
+                return (mReadMemoryAction != null) ? mReadMemoryAction.FailureResponseCode : (byte)0;
+            }
+        }
+
     };
 
     public class WriteMemoryOperation : KWP2000SequencialOperation
@@ -579,6 +633,106 @@ namespace Communication
         }
     }
 
+    internal static class LayoutValidationText
+    {
+        public static void Apply(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool actionSucceeded, bool completedWithoutCommunicationError, out bool completed, out bool layoutIsValid, out bool possiblyMirrored, out string message)
+        {
+            completed = true;
+            layoutIsValid = false;
+            possiblyMirrored = false;
+            message = null;
+
+            if (actionSucceeded)
+            {
+                if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
+                {
+                    layoutIsValid = true;
+                    message = "Memory layout is valid.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
+                {
+                    possiblyMirrored = true;
+                    message = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
+                {
+                    message = "Start address is not a valid address in flash memory.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
+                {
+                    message = "End address is not a valid address in flash memory.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
+                {
+                    message = "Start address is not the start of flash memory.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
+                {
+                    message = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
+                }
+                else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete
+                    || result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
+                    || result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+                {
+                    completed = false;
+                    message = "Validation did not complete.";
+                }
+                else
+                {
+                    Debug.Fail("Unknown memory layout validation result");
+                    completed = false;
+                    message = "Unknown validation result.";
+                }
+            }
+            else if (completedWithoutCommunicationError)
+            {
+                completed = false;
+                message = ValidateStartAndEndAddressesWithRequestUploadDownloadAction.SpecificFailureStatusMessage(result);
+                if (message == null)
+                {
+                    message = "Memory layout validation failed.";
+                }
+            }
+        }
+
+        public static bool MustAbort(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            return (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
+                || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected);
+        }
+
+        public static void ContinuePrompt(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool writing, out string title, out string body)
+        {
+            string verb = writing ? "writing" : "reading";
+            string specific = ValidateStartAndEndAddressesWithRequestUploadDownloadAction.SpecificFailureStatusMessage(result);
+            if (specific != null)
+            {
+                title = (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
+                    ? "Security access is not granted"
+                    : (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                        ? "RequestUpload is not supported"
+                        : "RequestUpload was rejected";
+                body = specific;
+                return;
+            }
+
+            title = "Unable to validate memory layout";
+            body = "Unable to validate memory layout. Do you want to continue " + verb + " flash memory without validating the memory layout?";
+
+            if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
+            {
+                title = "RequestDownload is not supported";
+                body = "The ECU reports that RequestDownload is not supported. Do you want to continue " + verb + " flash memory without validating the memory layout?";
+            }
+            else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
+            {
+                title = "RequestDownload was rejected";
+                body = "The ECU rejected the RequestDownload service. Do you want to continue " + verb + " flash memory without validating the memory layout?";
+            }
+        }
+    }
+
     /// <summary>
     /// Programming session, then a matching checksum of each supplied block. No upload and no erase.
     /// </summary>
@@ -590,15 +744,15 @@ namespace Communication
         public ChecksumFlashBlocksOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings, IList<MemoryImage> blocks)
             : base(commInterface)
         {
-            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
-            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-            EnableAutoNegotiateSecurity(securitySettings);
+            EnableProgrammingSession(baudRates, securitySettings);
 
             mBlocks = new List<MemoryImage>(blocks);
             mTotalBytes = (uint)mBlocks.Sum(block => (long)block.Size);
             mAllMatched = true;
             mChecksum = new ValidateFlashChecksumAction(commInterface, mBlocks[0].StartAddress, mBlocks[0].RawData);
         }
+
+        public bool ReportedMismatch { get; private set; }
 
         protected override CommunicationAction NextAction()
         {
@@ -617,6 +771,11 @@ namespace Communication
 
             MemoryImage block = mBlocks[mIndex];
             bool matched = success && mChecksum.IsFlashChecksumCorrect;
+            if (!matched && success)
+            {
+                ReportedMismatch = true;
+            }
+
             mAllMatched &= matched;
             CommInterface.DisplayStatusMessage("Checksum " + RangeText(block.StartAddress, block.Size) + (matched ? " matched." : success ? " reported a mismatch." : " failed."), StatusMessageType.USER);
             if (!success)
@@ -639,11 +798,6 @@ namespace Communication
             Continue();
         }
 
-        private static string RangeText(uint start, uint length)
-        {
-            return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
-        }
-
         private void Continue()
         {
             if (!StartNextAction() || CurrentAction == null)
@@ -658,6 +812,100 @@ namespace Communication
         private ValidateFlashChecksumAction mChecksum;
         private int mIndex;
         private bool mAllMatched;
+    }
+
+    /// <summary>
+    /// Uploads the given blocks into their existing buffers. No layout probe and no checksum.
+    /// </summary>
+    public class ReadFlashBlocksOperation : KWP2000Operation
+    {
+        private enum Step
+        {
+            Upload,
+            Transfer,
+            Exit
+        }
+
+        public ReadFlashBlocksOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings, IList<MemoryImage> blocks)
+            : base(commInterface)
+        {
+            EnableProgrammingSession(baudRates, securitySettings);
+
+            mBlocks = new List<MemoryImage>(blocks);
+            mStep = Step.Upload;
+            mMaxBlockSize = TransferDataAction.DEFAULT_MAX_BLOCK_SIZE;
+        }
+
+        protected override CommunicationAction NextAction()
+        {
+            var nextAction = base.NextAction();
+            if (nextAction != null)
+            {
+                return nextAction;
+            }
+
+            MemoryImage block = mBlocks[mIndex];
+            if (mStep == Step.Upload)
+            {
+                CommInterface.DisplayStatusMessage("Reading " + RangeText(block.StartAddress, block.Size) + " from the ECU.", StatusMessageType.USER);
+                mCurrent = new RequestUploadFromECUAction(KWP2000CommInterface, block.StartAddress, block.Size, TransferDataAction.CompressionType.Uncompressed, TransferDataAction.EncryptionType.Unencrypted);
+            }
+            else if (mStep == Step.Transfer)
+            {
+                mCurrent = new TransferDataAction(KWP2000CommInterface, TransferDataAction.TransferMode.UploadFromECU, TransferDataAction.EncryptionType.Unencrypted, TransferDataAction.CompressionType.Uncompressed, mMaxBlockSize, block.RawData, null);
+            }
+            else
+            {
+                mCurrent = new RequestTransferExitAction(KWP2000CommInterface);
+            }
+
+            return mCurrent;
+        }
+
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            if (action != mCurrent)
+            {
+                base.OnActionCompleted(action, success);
+                return;
+            }
+
+            if (!success)
+            {
+                OperationCompleted(false);
+                return;
+            }
+
+            if (mStep == Step.Upload)
+            {
+                mMaxBlockSize = ((RequestUploadFromECUAction)action).GetMaxBlockSize();
+                mStep = Step.Transfer;
+            }
+            else if (mStep == Step.Transfer)
+            {
+                mStep = Step.Exit;
+            }
+            else if (++mIndex >= mBlocks.Count)
+            {
+                OperationCompleted(true);
+                return;
+            }
+            else
+            {
+                mStep = Step.Upload;
+            }
+
+            if (!StartNextAction() || CurrentAction == null)
+            {
+                OperationCompleted(false);
+            }
+        }
+
+        private readonly IList<MemoryImage> mBlocks;
+        private CommunicationAction mCurrent;
+        private Step mStep;
+        private int mIndex;
+        private byte mMaxBlockSize;
     }
 
     /// <summary>
@@ -1217,63 +1465,8 @@ namespace Communication
 
                     string validationMesage = null;
 
-                    if (success)
-                    {
-                        var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-
-                        if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
-                        {
-                            layoutIsValid = true;
-                            validationMesage = "Memory layout is valid.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
-                        {
-                            possiblyMirrored = true;
-                            validationMesage = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
-                        {
-                            validationMesage = "Start address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
-                        {
-                            validationMesage = "End address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
-                        {
-                            validationMesage = "Start address is not the start of flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
-                        {
-                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else
-                        {
-                            Debug.Fail("Unknown memory layout validation result");
-
-                            validationCompleted = false;
-                            validationMesage = "Unknown validation result.";
-                        }
-                    }
-                    else if (action.CompletedWithoutCommunicationError)
-                    {
-                        validationCompleted = false;
-
-                        validationMesage = "Memory layout validation failed.";
-                    }
+                    var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                    LayoutValidationText.Apply(validationResult, success, action.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
 
                     if (validationMesage != null)
                     {
@@ -1314,33 +1507,20 @@ namespace Communication
                     else if (!success)
                     {
                         var promptResult = UserPromptResult.CANCEL;
-                        string promptTitle = "Unable to validate memory layout";
-                        string promptBody = "Unable to validate memory layout. Do you want to continue reading flash memory without validating the memory layout?";
 
                         if (!validationCompleted)
                         {
-                            var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-                            if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                            string promptTitle;
+                            string promptBody;
+                            LayoutValidationText.ContinuePrompt(validationResult, false, out promptTitle, out promptBody);
+                            if (LayoutValidationText.MustAbort(validationResult))
                             {
-                                promptTitle = "RequestUpload is not supported";
-                                promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
+                                CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK);
                             }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
+                            else
                             {
-                                promptTitle = "RequestUpload was rejected";
-                                promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue reading flash memory without validating the memory layout?";
+                                promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
                             }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
-                            {
-                                promptTitle = "RequestDownload is not supported";
-                                promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue reading flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                            {
-                                promptTitle = "RequestDownload was rejected";
-                                promptBody = "The ECU rejected the RequestDownload service. Do you want to continue reading flash memory without validating the memory layout?";
-                            }
-                            promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
                         }
                         else if (!layoutIsValid)
                         {
@@ -2319,63 +2499,8 @@ namespace Communication
 
                     string validationMesage = null;
 
-                    if (success)
-                    {
-                        var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-
-                        if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid)
-                        {
-                            layoutIsValid = true;
-                            validationMesage = "Memory layout is valid.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.PossiblyMirrored)
-                        {
-                            possiblyMirrored = true;
-                            validationMesage = "Addressable flash extends past this layout (possible 512KB mirror or larger chip).";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartInvalid)
-                        {
-                            validationMesage = "Start address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndInvalid)
-                        {
-                            validationMesage = "End address is not a valid address in flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest)
-                        {
-                            validationMesage = "Start address is not the start of flash memory.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)
-                        {
-                            validationMesage = "End address is not the end of flash memory. The ECU may have a larger flash chip than the selected layout (try 29F800), or flash may extend beyond this layout.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.ValidationDidNotComplete)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else if (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported
-                            || validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                        {
-                            validationCompleted = false;
-                            validationMesage = "Validation did not complete.";
-                        }
-                        else
-                        {
-                            Debug.Fail("Unknown memory layout validation result");
-
-                            validationCompleted = false;
-                            validationMesage = "Unknown validation result.";
-                        }
-                    }
-                    else if (action.CompletedWithoutCommunicationError)
-                    {
-                        validationCompleted = false;
-
-                        validationMesage = "Memory layout validation failed.";
-                    }
+                    var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                    LayoutValidationText.Apply(validationResult, success, action.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
 
                     if (validationMesage != null)
                     {
@@ -2416,33 +2541,20 @@ namespace Communication
                     else if (!success)
                     {
                         var promptResult = UserPromptResult.CANCEL;
-                        string promptTitle = "Unable to validate memory layout";
-                        string promptBody = "Unable to validate memory layout. Do you want to continue writing flash memory without validating the memory layout?";
 
                         if (!validationCompleted)
                         {
-                            var validationResultForPrompt = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-                            if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                            string promptTitle;
+                            string promptBody;
+                            LayoutValidationText.ContinuePrompt(validationResult, true, out promptTitle, out promptBody);
+                            if (LayoutValidationText.MustAbort(validationResult))
                             {
-                                promptTitle = "RequestUpload is not supported";
-                                promptBody = "The ECU reports that RequestUpload is not supported. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
+                                CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK);
                             }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)
+                            else
                             {
-                                promptTitle = "RequestUpload was rejected";
-                                promptBody = "The ECU rejected the RequestUpload service. RequestUpload may have been disabled by aftermarket engine software. Do you want to continue writing flash memory without validating the memory layout?";
+                                promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
                             }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadNotSupported)
-                            {
-                                promptTitle = "RequestDownload is not supported";
-                                promptBody = "The ECU reports that RequestDownload is not supported. Do you want to continue writing flash memory without validating the memory layout?";
-                            }
-                            else if (validationResultForPrompt == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestDownloadRejected)
-                            {
-                                promptTitle = "RequestDownload was rejected";
-                                promptBody = "The ECU rejected the RequestDownload service. Do you want to continue writing flash memory without validating the memory layout?";
-                            }
-                            promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
                         }
                         else if (!layoutIsValid)
                         {

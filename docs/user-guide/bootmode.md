@@ -4,7 +4,7 @@ Bootmode is a different protocol on the same K-line: the C167 bootstrap loader i
 
 Connect setup and cables: [Getting started](getting-started.md). NAK / wrong ACK: [Troubleshooting](troubleshooting.md#bootmode-nak-or-wrong-ack).
 
-Flash read/write still uses the **KWP2000 Flashing** tab. The protocol combo at the top of the window must be **Boot Mode**.
+Flash read/write uses the **Flashing** tab. The protocol combo at the top of the window must be **Boot Mode**. **KWP2000 Logging** is hidden in Boot Mode.
 
 ## When to use it
 
@@ -12,7 +12,7 @@ Flash read/write still uses the **KWP2000 Flashing** tab. The protocol combo at 
 - Entire-flash erase left the ECU unable to boot
 - Physical 95040 dump or write (not the KWP EEPROM mirror)
 
-Simos 3.x and EDC15: bootmode flash only (layout auto-detect). EEPROM presets on the Flashing tab are ME7.1 / ME7.5.
+Simos 3.x and EDC15: bootmode flash only (layout auto-detect). EEPROM presets on the **Bootmode EEPROM** tab are ME7.1 / ME7.5.
 
 ## Entry and power
 
@@ -45,7 +45,7 @@ Then **KWP2000 Info** → **Read ECU Info** (device ID, CPU family, SYSCON / BUS
 
 ## Flash
 
-On **KWP2000 Flashing**, the layout combo is **disabled**. Layout comes from the flash device ID (`FC_GETSTATE`). Tooltip shows base address, size, and sector count when detection succeeded.
+On **Flashing**, the layout combo is **disabled**. Layout comes from the flash device ID (`FC_GETSTATE`). Tooltip shows base address, size, and sector count when detection succeeded.
 
 - **Full Read Flash** / **Full Write Flash**
 - **Diff Read Flash** is not supported in bootmode (the loader has no checksum-for-range)
@@ -53,13 +53,13 @@ On **KWP2000 Flashing**, the layout combo is **disabled**. Layout comes from the
 - **Verify Read** is off in bootmode. A bootmode full read sends no `0xC5`
 - Variant (ME7 vs Simos3 vs EDC15) is taken from the detected layout base (ME7 `0x800000`, Simos3/EDC15 `0x400000`). There is no separate variant dropdown.
 
-**Choose Flash File** still loads a `.bin` for write.
+**File > Choose Flash File** still loads a `.bin` for write.
 
 After EEPROM access, the EEPROM driver has overwritten the flash driver at `0xF600`. Re-detect flash (disconnect / reconnect or **Read ECU Info**) before another flash read/write.
 
-## EEPROM (physical 95040)
+## Bootmode EEPROM
 
-On the Flashing tab, with **Boot Mode** connected:
+On the **Bootmode EEPROM** tab, which is hidden unless the protocol combo is **Boot Mode**. Read and write need a bootmode connection. **Read EEPROM Mirror** stays on **KWP2000 Info**; that is the KWP page at `0x6001E0`, not this chip.
 
 Presets:
 
@@ -67,17 +67,21 @@ Presets:
 - `ME7.5 - 95040 SSC P4.7 (512 B)`
 - XSSC variants of the same (try if SSC fails)
 
-**Read EEPROM (Bootmode)** dumps the chip (not a KWP mirror). Saves a `.bin`.
+The grid is read-only: 32 pages of 16 bytes. With no image loaded it stays on screen as grey `00`s, and the legend stays grey. After a read or open, the legend shows the Immo, SKC, `P0602`, and Lockout values, then Checksum **ok** in green or **not ok** in red. The ASCII column highlights the ECU part number at `0x1C2` (11 characters), both tool ID copies at `0x1E2` and `0x1F2` (6 characters), both VIN copies (`0xB5`–`0xB9` plus `0xD0`–`0xDB`, and `0xC5`–`0xC9` plus `0xE0`–`0xEB`), and both immobilizer IDs (`0xDC` plus `0xF0`–`0xFC`, and `0xEC` plus `0x100`–`0x10C`). Hover a highlighted character for the field name. A non-printable byte is `.`.
 
-**Write EEPROM (Bootmode)** programs the chip. Immobilizer / VIN / adaptations can change. Backup first.
+**Load EEPROM File** displays a file. **Read EEPROM** dumps the chip and shows it. It does not ask for confirmation. **Save EEPROM File** writes the image on screen to a `.bin`. None of those program the chip.
 
-If ME7 95040 data-page checksums are invalid:
+**Write EEPROM** programs that image. It stays disabled until an image is loaded. Immobilizer / VIN / adaptations can change. If data-page checksums are invalid:
 
-- **Yes** — correct data-page checksums, then continue (pages 28–29 HW/SW ID are left unchanged)
-- **No** — write the file as-is
+- **Yes** — correct data-page checksums, then continue (pages 28–29 are left unchanged)
+- **No** — write the image as-is
 - **Cancel** — abort
 
-Size mismatch: only the file length is written (no pad to 512 B). Confirm or cancel.
+**Immo Off**, **Reset Lockout**, and **Clear P0602** edit the image on screen only. Each stays disabled when no image is loaded. **Reset Lockout** also stays disabled when the lockout bytes are already `00 00`. When immo is already off, that button reads **Immo On**. When bit 7 is already clear, that button reads **Set P0602**. The legend sits under the hex. Read, load, save, and edit results are lines in the status window. A line under the legend says a write is still pending. **Backup before write** starts on and is remembered in `preferences.json`. When it is on, a pending edit asks for a `.bin` of the image from before those edits. **Verify Write** applies.
+
+- **Immo Off** sets `0x012` and `0x022` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Page 1 and page 2 checksums are corrected.
+- **Reset Lockout** sets `0x1EC`–`0x1ED` and `0x1FC`–`0x1FD` to `00 00`. The `P0602` flag and counters stay. Page 30 and page 31 checksums are corrected when those bytes change. This is the lockout field measured on ME7.5.
+- **Clear P0602** clears bit 7 at `0x1E8` and `0x1F8`. **Set P0602** sets that bit. Other bits, counters, and lockout bytes stay. Page 30 and page 31 checksums are corrected when those bytes change.
 
 ## Next
 

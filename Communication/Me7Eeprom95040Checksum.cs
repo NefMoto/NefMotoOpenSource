@@ -31,6 +31,14 @@ namespace Communication
         public const int PageSize = 16;
         public const int PageCount = 32;
 
+        public enum PageChecksumKind
+        {
+            None,
+            Ok,
+            Bad,
+            Exempt
+        }
+
         private const ushort ChecksumPresentMask = 0x0001;
         private const ushort ChecksumBitMask = 0x0040;
 
@@ -70,6 +78,9 @@ namespace Communication
                 get { return PagesInvalid == 0 && PagesChecked > 0; }
             }
 
+            /// <summary>One entry per page. Exempt pages are Exempt even when the formula happens to match.</summary>
+            public PageChecksumKind[] PageChecksumKinds { get; set; }
+
             /// <summary>User-facing summary for status log / prompts.</summary>
             public string FormatStatusMessage(bool warnOnly = false)
             {
@@ -108,6 +119,7 @@ namespace Communication
         public static ValidationResult Validate(byte[] data, int dataOffset = 0)
         {
             var result = new ValidationResult();
+            result.PageChecksumKinds = new PageChecksumKind[PageCount];
 
             if (data == null || data.Length < dataOffset + EepromSize)
             {
@@ -131,6 +143,7 @@ namespace Communication
                 if (IsChecksumExemptPage(page))
                 {
                     result.PagesExempt++;
+                    result.PageChecksumKinds[page] = PageChecksumKind.Exempt;
                     if (!match)
                     {
                         result.PagesExemptMismatch++;
@@ -142,6 +155,11 @@ namespace Communication
                 if (!match)
                 {
                     result.PagesInvalid++;
+                    result.PageChecksumKinds[page] = PageChecksumKind.Bad;
+                }
+                else
+                {
+                    result.PageChecksumKinds[page] = PageChecksumKind.Ok;
                 }
             }
 
@@ -164,6 +182,33 @@ namespace Communication
             }
 
             return unchecked((ushort)(-sum));
+        }
+
+        /// <summary>
+        /// Writes the Bosch checksum for one page. Exempt pages and pages with no checksum are left unchanged.
+        /// </summary>
+        public static void WritePageChecksum(byte[] data, int page, int dataOffset = 0)
+        {
+            if (data == null || page < 0 || page >= PageCount || IsChecksumExemptPage(page))
+            {
+                return;
+            }
+
+            if (data.Length < dataOffset + EepromSize)
+            {
+                return;
+            }
+
+            ushort descriptor = PageDescriptors[page];
+            if ((descriptor & ChecksumPresentMask) == 0)
+            {
+                return;
+            }
+
+            int pageOffset = dataOffset + (page * PageSize);
+            ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, descriptor);
+            data[pageOffset + 14] = (byte)(expected & 0xFF);
+            data[pageOffset + 15] = (byte)(expected >> 8);
         }
 
         /// <summary>

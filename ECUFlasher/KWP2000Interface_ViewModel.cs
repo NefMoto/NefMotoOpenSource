@@ -60,6 +60,16 @@ namespace ECUFlasher
                 DesiredConnectionMethod = (ConnectionMethod)prefs.DesiredKWP2000ConnectionMethod;
                 EnableSlowInitTimingLog = prefs.EnableSlowInitTimingLog;
             }
+
+            CopySecuritySettingsToInterface();
+        }
+
+        private void CopySecuritySettingsToInterface()
+        {
+            var settings = KWP2000CommInterface.SecuritySettings;
+            settings.RequestSeed = _SeedRequest;
+            settings.SupportSpecialKey = _ShouldSupportSpecialKey;
+            settings.UseExtendedSeedRequest = _ShouldUseExtendedSeedRequest;
         }
 
         void ConnectionStatusChangedEvent(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
@@ -432,6 +442,7 @@ namespace ECUFlasher
                 if (_SeedRequest != value)
                 {
                     _SeedRequest = value;
+                    CopySecuritySettingsToInterface();
                     OnPropertyChanged(new PropertyChangedEventArgs("SeedRequest"));
                 }
             }
@@ -447,6 +458,7 @@ namespace ECUFlasher
                 if (_ShouldUseExtendedSeedRequest != value)
                 {
                     _ShouldUseExtendedSeedRequest = value;
+                    CopySecuritySettingsToInterface();
                     OnPropertyChanged(new PropertyChangedEventArgs("ShouldUseExtendedSeedRequest"));
                 }
             }
@@ -462,6 +474,7 @@ namespace ECUFlasher
                 if (_ShouldSupportSpecialKey != value)
                 {
                     _ShouldSupportSpecialKey = value;
+                    CopySecuritySettingsToInterface();
                     OnPropertyChanged(new PropertyChangedEventArgs("ShouldSupportSpecialKey"));
                 }
             }

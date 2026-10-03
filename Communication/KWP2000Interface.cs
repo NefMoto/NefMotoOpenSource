@@ -1033,6 +1033,10 @@ namespace Communication
 
         internal bool ProgrammingSessionStartPending { get; private set; }
 
+        // Seed the UI last configured. Programming and development session starts use it
+        // unless the operation passes its own SecurityAccessSettings.
+        public SecurityAccessAction.SecurityAccessSettings SecuritySettings { get; } = new SecurityAccessAction.SecurityAccessSettings();
+
         internal void NotifyProgrammingSessionStartAttempt()
         {
             ProgrammingSessionStartPending = true;
