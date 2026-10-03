@@ -36,7 +36,7 @@ Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB). The documented b
 Debug builds add one row. A release build does not show it.
 
 - **Check if Flash Matches** — one KWP checksum per sector of the loaded file, listing any sectors that differ. Nothing is saved. Disabled in bootmode. A matching file clears the EEPROM bit behind `P0602`, because three matching checksums in a row clear it.
-- **Checksum 8K+8K+32K** — checksum sectors 1, 2, and 3 (`0x804000`–`0x805FFF`, `0x806000`–`0x807FFF`, and `0x808000`–`0x80FFFF`) from the loaded file. No upload and no erase. Enabled only when sector 0 is 16 KB at `0x800000`. **Clear DTCs** offers the same checksum when the last DTC read had `P0602` or `P1681` and bit 7 is set at EEPROM `0x1E8`. **Read DTCs** only warns. **Read EEPROM Mirror** reports that page and does not offer the checksum.
+- **Checksum 8K+8K+32K** — checksum sectors 1, 2, and 3 (`0x804000`–`0x805FFF`, `0x806000`–`0x807FFF`, and `0x808000`–`0x80FFFF`) from the loaded file. Enabled only when sector 0 is 16 KB at `0x800000`. A mismatch names that file, reads those sectors from the ECU, and checksums the bytes just read. If the ECU stops answering before a checksum comes back, the file is not named. **Clear DTCs** offers the same checksum when the last DTC read had `P0602` or `P1681` and either bit 7 is set at EEPROM `0x1E8` or the mirror page cannot be read. **Read DTCs** only warns. **Read EEPROM Mirror** reports that page and does not offer the checksum.
 
 Engine off. Confirmation dialogs include the ME7.5 pin 121 hint when connected over KWP.
 

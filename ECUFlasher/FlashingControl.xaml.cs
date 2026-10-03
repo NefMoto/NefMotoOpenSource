@@ -1624,7 +1624,7 @@ namespace ECUFlasher
                 {
                     var command = new ReactiveCommand(this.OnChecksumRestOfFirst64K);
                     command.Name = "Checksum 8K+8K+32K";
-                    command.Description = "Checksum " + ProgrammingFlagClearBlockList + " from the loaded file. No upload and no erase.";
+                    command.Description = "Checksum " + ProgrammingFlagClearBlockList + " from the loaded file. A mismatch reads those sectors from the ECU and checksums them again.";
 
                     if (App != null)
                     {
@@ -1643,7 +1643,7 @@ namespace ECUFlasher
         }
         private ReactiveCommand _ChecksumRestOfFirst64KCommand;
 
-        private const string ProgrammingFlagClearStatus = "Checksumming 0x804000-0x80FFFF as 8KB, 8KB, and 32KB. No upload and no erase.";
+        private const string ProgrammingFlagClearStatus = "Checksumming 0x804000-0x80FFFF as 8KB, 8KB, and 32KB.";
 #if DEBUG
         private void AddDebugFlashButtons()
         {
@@ -1680,7 +1680,7 @@ namespace ECUFlasher
             {
                 string prompt = "Checksum 3 blocks from the loaded flash file:\n" + ProgrammingFlagClearBlockList + ".\n\n"
                     + "0x800000-0x803FFF is not checksummed.\nNo block from 0x810000 on is checksummed.\n\n"
-                    + "No upload and no erase.\n\nContinue?";
+                    + "If they do not match, those sectors are read from the ECU and checksummed again.\n\nContinue?";
                 if (App.DisplayUserPrompt("Checksum 8K+8K+32K", prompt, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
                 {
                     return false;
@@ -1694,9 +1694,10 @@ namespace ECUFlasher
                 return false;
             }
 
+            mProgrammingFlagClearReadRetry = false;
+            mProgrammingFlagClearBlocks = blocks;
             mAfterProgrammingFlagClear = afterComplete;
-            var operation = new ChecksumFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, GetSecuritySettings(kwpViewModel), blocks);
-            StartFlashOperation(operation, this.ChecksumRestOfFirst64KCompleted, ProgrammingFlagClearStatus);
+            StartProgrammingFlagChecksum(kwpViewModel, ProgrammingFlagClearStatus);
             return true;
         }
 
@@ -1734,27 +1735,77 @@ namespace ECUFlasher
         }
 
         private Action<bool> mAfterProgrammingFlagClear;
+        private List<MemoryImage> mProgrammingFlagClearBlocks;
+        private bool mProgrammingFlagClearReadRetry;
+
+        private void StartProgrammingFlagChecksum(KWP2000Interface_ViewModel kwpViewModel, string status)
+        {
+            var operation = new ChecksumFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, GetSecuritySettings(kwpViewModel), mProgrammingFlagClearBlocks);
+            StartFlashOperation(operation, this.ChecksumRestOfFirst64KCompleted, status);
+        }
 
         private void ChecksumRestOfFirst64KCompleted(Operation operation, bool success)
         {
             Dispatcher.Invoke((Action)(() =>
             {
-                App.OperationInProgress = false;
-
-                Action<bool> after = mAfterProgrammingFlagClear;
-                mAfterProgrammingFlagClear = null;
+                operation.CompletedOperationEvent -= this.ChecksumRestOfFirst64KCompleted;
 
                 if (success)
                 {
-                    App.DisplayStatusMessage("The 8KB, 8KB, and 32KB checksums matched." + (after == null ? " Key-cycle before reading DTCs again." : ""), StatusMessageType.USER);
-                }
-                else
-                {
-                    App.DisplayStatusMessage("The 8KB, 8KB, and 32KB checksums did not all match.", StatusMessageType.USER);
+                    FinishProgrammingFlagClear(true, "The 8KB, 8KB, and 32KB checksums matched.");
+                    return;
                 }
 
-                after?.Invoke(success);
+                var checksum = operation as ChecksumFlashBlocksOperation;
+                var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                if ((checksum != null) && checksum.ReportedMismatch && !mProgrammingFlagClearReadRetry && (mProgrammingFlagClearBlocks != null) && (kwpViewModel != null))
+                {
+                    mProgrammingFlagClearReadRetry = true;
+                    string loadedFile = String.IsNullOrEmpty(FileNameToFlash) ? "The loaded flash file" : FileNameToFlash;
+                    this["FileNameToFlash"] = loadedFile + " does not have the correct checksums for sectors 1, 2, and 3.";
+                    App.DisplayStatusMessage(loadedFile + " does not have the correct checksums. Reading those sectors from the ECU.", StatusMessageType.USER);
+                    var read = new ReadFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, GetSecuritySettings(kwpViewModel), mProgrammingFlagClearBlocks);
+                    StartFlashOperation(read, this.ProgrammingFlagClearReadCompleted, "Reading sectors 1, 2, and 3 from the ECU.");
+                    return;
+                }
+
+                if ((checksum == null) || !checksum.ReportedMismatch)
+                {
+                    FinishProgrammingFlagClear(false, "The ECU stopped answering before the checksums. The loaded file was not compared.");
+                    return;
+                }
+
+                FinishProgrammingFlagClear(false, "The 8KB, 8KB, and 32KB checksums did not all match.");
             }));
+        }
+
+        private void ProgrammingFlagClearReadCompleted(Operation operation, bool success)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                operation.CompletedOperationEvent -= this.ProgrammingFlagClearReadCompleted;
+
+                var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                if (success && (kwpViewModel != null) && (mProgrammingFlagClearBlocks != null))
+                {
+                    StartProgrammingFlagChecksum(kwpViewModel, "Checksumming the sectors just read from the ECU.");
+                    return;
+                }
+
+                FinishProgrammingFlagClear(false, "Could not read sectors 1, 2, and 3 from the ECU.");
+            }));
+        }
+
+        private void FinishProgrammingFlagClear(bool success, string message)
+        {
+            App.OperationInProgress = false;
+
+            Action<bool> after = mAfterProgrammingFlagClear;
+            mAfterProgrammingFlagClear = null;
+            mProgrammingFlagClearReadRetry = false;
+
+            App.DisplayStatusMessage(message + (success && (after == null) ? " Key-cycle before reading DTCs again." : ""), StatusMessageType.USER);
+            after?.Invoke(success);
         }
 
         private bool CanExecuteChecksumRestOfFirst64KCommand(List<string> reasonsDisabled)
