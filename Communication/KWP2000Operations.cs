@@ -74,31 +74,30 @@ namespace Communication
                                 desiredBaudRate = mDesiredBaudRates.First();
                             }
 
-                            if (mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate))
+                            bool shouldStart = mShouldAutoStartDiagnosticSession && StartDiagnosticSessionAction.ShouldStartDiagnosticSession(KWP2000CommInterface, mDesiredDiagnosticSessionType, desiredBaudRate);
+
+                            if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
                             {
-                                if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-                                {
-                                    mState = State.CheckProgrammingSessionPreconditions;
-                                }
-                                else
-                                {
-                                    mState = State.StartDiagnosticSession;
-                                }
+                                // Already in the programming session: skip the precondition read.
+                                // Default timing still logs in before StartDiagnosticSession.
+                                mState = shouldStart ? State.CheckProgrammingSessionPreconditions : State.SwitchToDefaultTimingForProgrammingSession;
+                            }
+                            else if (shouldStart && mShouldAutoNegotiateSecurity)
+                            {
+                                mState = State.PreNegotiateSecurityForProgrammingSession;
+                            }
+                            else if (shouldStart)
+                            {
+                                mState = State.StartDiagnosticSession;
+                            }
+                            else if (!mShouldAutoStartDiagnosticSession && mShouldAutoNegotiateSecurity)
+                            {
+                                // A security-only operation logs in without opening a session.
+                                mState = State.PreNegotiateSecurityForProgrammingSession;
                             }
                             else
                             {
-                                if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-                                {
-                                    //fall through
-                                    mState = State.CheckProgrammingSessionPreconditions;
-                                    goto case State.CheckProgrammingSessionPreconditions;
-                                }
-                                else
-                                {
-                                    //fall through
-                                    mState = State.StartDiagnosticSession;
-                                    goto case State.StartDiagnosticSession;
-                                }
+                                mState = StateAfterStartDiagnosticSession();
                             }
 
                             break;
@@ -112,6 +111,10 @@ namespace Communication
                         {
                             if (mShouldAutoNegotiateSecurity)
                             {
+                                // DQ answers StartDiagnosticSession with 7F 10 33 until this login.
+                                // That key sets bit 12 of [0xE074], so the login inside the programming
+                                // session gets a zero seed and must still send its key. A development
+                                // session stops after this login.
                                 mState = State.PreNegotiateSecurityForProgrammingSession;
                             }
                             else
@@ -122,37 +125,19 @@ namespace Communication
                         }
                         case State.PreNegotiateSecurityForProgrammingSession:
                         {
-                            mState = State.StartDiagnosticSession;
+                            mState = mShouldAutoStartDiagnosticSession
+                                ? State.StartDiagnosticSession
+                                : StateAfterStartDiagnosticSession();
                             break;
                         }
                         case State.StartDiagnosticSession:
                         {
-                            if (mShouldAutoNegotiateTiming)
-                            {
-                                mState = State.NegotiateTiming;
-                            }
-                            else if (mShouldAutoNegotiateSecurity)
-                            {
-                                mState = State.NegotiateSecurity;
-                            }
-                            else
-                            {
-                                mState = State.Finished;
-                            }
-
+                            mState = StateAfterStartDiagnosticSession();
                             break;
                         }
                         case State.NegotiateTiming:
                         {
-                            if (mShouldAutoNegotiateSecurity)
-                            {
-                                mState = State.NegotiateSecurity;
-                            }
-                            else
-                            {
-                                mState = State.Finished;
-                            }
-
+                            mState = NeedsInSessionSecurity() ? State.NegotiateSecurity : State.Finished;
                             break;
                         }
                         case State.NegotiateSecurity:
@@ -285,6 +270,8 @@ namespace Communication
                 #region PreNegotiateSecurityForProgrammingSession
                 else if (mState == State.PreNegotiateSecurityForProgrammingSession)
                 {
+                    // CH, HL, and NL reject this login (GeneralReject or ServiceNotSupported).
+                    // It does not count. DQ accepts it. A timeout still fails the operation.
                     success = action.CompletedWithoutCommunicationError;
                 }
                 #endregion
@@ -306,6 +293,16 @@ namespace Communication
             mDesiredDiagnosticSessionType = sessionType;
             mDesiredBaudRates = baudRates;
             mShouldAutoStartDiagnosticSession = true;
+
+            // DQ answers StartDiagnosticSession with 7F 10 33 for these sessions until a login.
+            // A later EnableAutoNegotiateSecurity replaces these settings.
+            if (!mShouldAutoNegotiateSecurity
+                && ((sessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                    || (sessionType == KWP2000DiagnosticSessionType.DevelopmentSession)))
+            {
+                var settings = KWP2000CommInterface.SecuritySettings ?? new SecurityAccessAction.SecurityAccessSettings();
+                EnableAutoNegotiateSecurity(settings);
+            }
         }
 
         protected void EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType sessionType, uint baudRate)
@@ -336,6 +333,28 @@ namespace Communication
             NegotiateTiming,
             NegotiateSecurity,
             Finished
+        }
+
+        private State StateAfterStartDiagnosticSession()
+        {
+            if (mShouldAutoNegotiateTiming)
+            {
+                return State.NegotiateTiming;
+            }
+
+            if (NeedsInSessionSecurity())
+            {
+                return State.NegotiateSecurity;
+            }
+
+            return State.Finished;
+        }
+
+        private bool NeedsInSessionSecurity()
+        {
+            // The programming-session kernel clears 0x381B30. The pre-session key sets bit 12
+            // of [0xE074], so this login gets a zero seed and must still send its key.
+            return mShouldAutoNegotiateSecurity && (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession);
         }
 
         protected KWP2000Interface KWP2000CommInterface

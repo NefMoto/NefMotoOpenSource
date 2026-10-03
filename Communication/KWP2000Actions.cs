@@ -2659,23 +2659,15 @@ namespace Communication
                         byte[] seedArray = new byte[message.mData.Length - 1];
                         Buffer.BlockCopy(message.mData, 1, seedArray, 0, message.mData.Length - 1);
 
-                        bool isUnlocked = true;
-
-                        //a response of all zeros means the ecu is already unlocked
-                        foreach (byte currByte in seedArray)
+                        // Send a key for any seed that has 4 bytes, including zeros. The programming
+                        // kernel returns zeros when bit 12 of [0xE074] is set, and RequestUpload still
+                        // requires the key that sets 0x381B30. A seed with no bytes is already open.
+                        if (seedArray.Length >= 4)
                         {
-                            if (currByte != 0)
-                            {
-                                isUnlocked = false;
-                                break;
-                            }
-                        }
+                            byte[] seed4 = new byte[4];
+                            Buffer.BlockCopy(seedArray, 0, seed4, 0, 4);
 
-                        if (!isUnlocked)
-                        {
-                            byte[] sendKeyArray = null;
-
-                            sendKeyArray = GenerateVAGExternalRAMSendKey(seedArray);
+                            byte[] sendKeyArray = GenerateVAGExternalRAMSendKey(seed4);
 
                             byte[] messageData = new byte[sendKeyArray.Length + 1];
                             messageData[0] = mSendKey;
@@ -2687,8 +2679,27 @@ namespace Communication
                         }
                         else
                         {
-                            DisplayStatusMessage("Security access granted.", StatusMessageType.USER);
-                            ActionCompleted(true);
+                            bool isUnlocked = true;
+
+                            foreach (byte currByte in seedArray)
+                            {
+                                if (currByte != 0)
+                                {
+                                    isUnlocked = false;
+                                    break;
+                                }
+                            }
+
+                            if (isUnlocked)
+                            {
+                                DisplayStatusMessage("Security access granted.", StatusMessageType.USER);
+                                ActionCompleted(true);
+                            }
+                            else
+                            {
+                                DisplayStatusMessage("Security access denied due to unexpected seed length.", StatusMessageType.USER);
+                                ActionCompleted(false);
+                            }
                         }
                     }
                     //check for a response to our send key second message
