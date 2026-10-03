@@ -22,7 +22,7 @@ Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB). The documented b
 
 ## File
 
-**Choose Flash File** loads a `.bin` (or any file). Size must match the selected layout.
+**File > Choose Flash File** loads a `.bin` (or any file). Size must match the selected layout. The path stays in the box on the Flashing tab.
 
 **Verify Checksums** checks ME7 checksums in the loaded file. There is no separate Checksum tab. **Correct Checksums** is not on the tab.
 

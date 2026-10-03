@@ -6,7 +6,7 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 
 `%AppData%` is the **roaming** profile folder (`C:\Users\<you>\AppData\Roaming` on current Windows, not `AppData\Local`).
 
-**File → Open Log File** or **Open Log File Location**. This is not the **KWP2000 Logging** tab save.
+**Help → App Log → Open App Log** or **Open App Log Location**. This is not a data log.
 
 ## Device not in the list
 
@@ -87,7 +87,7 @@ Yes/No/Cancel prompt about persistent data on a sector that is **not** the boot 
 
 ## Reporting a problem
 
-- Use **File → Open Log File** and attach a slice around the failure (connect attempt, handshake, first error).
+- Use **Help → App Log → Open App Log** and attach a slice around the failure (connect attempt, handshake, first error).
 - Say: protocol (KWP vs Boot Mode), Slow vs Fast init, baud, FTDI vs CH340 vs Ross-Tech, in-car vs bench, ECU (ME7.1 / ME7.5 / other), layout XML if flashing.
 - Redact VIN or other personal data if it appears. Binary dumps are not required for a connect bug.
 - Open an issue: <https://github.com/NefMoto/NefMotoOpenSource/issues>

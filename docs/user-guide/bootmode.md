@@ -53,7 +53,7 @@ On **Flashing**, the layout combo is **disabled**. Layout comes from the flash d
 - **Verify Read** is off in bootmode. A bootmode full read sends no `0xC5`
 - Variant (ME7 vs Simos3 vs EDC15) is taken from the detected layout base (ME7 `0x800000`, Simos3/EDC15 `0x400000`). There is no separate variant dropdown.
 
-**Choose Flash File** still loads a `.bin` for write.
+**File > Choose Flash File** still loads a `.bin` for write.
 
 After EEPROM access, the EEPROM driver has overwritten the flash driver at `0xF600`. Re-detect flash (disconnect / reconnect or **Read ECU Info**) before another flash read/write.
 

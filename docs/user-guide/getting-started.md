@@ -125,7 +125,7 @@ Session log:
 
 `%AppData%` is the **roaming** profile folder (`C:\Users\<you>\AppData\Roaming` on current Windows, not `AppData\Local`).
 
-`preferences.json` is in the same folder. Use **File → Open Log File** or **Open Log File Location** when reporting connect or flash problems. That file is not the data-logger tab save.
+`preferences.json` is in the same folder. Use **Help → App Log → Open App Log** or **Open App Log Location** when reporting connect or flash problems. That file is not a data log.
 
 ## Next
 

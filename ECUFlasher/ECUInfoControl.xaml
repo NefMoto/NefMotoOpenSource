@@ -162,7 +162,6 @@ Contact by Email: tony@nefariousmotorsports.com
                             SelectedItem="{Binding Path=ReadInfoSessionType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=true, ValidatesOnExceptions=true}"
                             ToolTip="Desired diagnostic session type for reading ECU info" ToolTipService.ShowOnDisabled="True"/>
                 <Button Name="ReadInfoButton" Command="{Binding Path=ReadInfoCommand}"/>
-                <Button Command="{Binding Path=SaveInfoCommand}"/>
             </WrapPanel>
 
             <WrapPanel Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
@@ -170,7 +169,6 @@ Contact by Email: tony@nefariousmotorsports.com
                 <Button Command="{Binding Path=ReadEepromMirrorCommand}"/>
                 <Button Command="{Binding Path=ClearDTCsCommand}"/>
                 <Button Command="{Binding Path=SaveDTCsCommand}"/>
-                <Button Command="{Binding Path=LoadDTCsCommand}"/>
             </WrapPanel>
 
             <GridSplitter Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Width="5" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns" VerticalAlignment="Stretch"/>

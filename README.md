@@ -77,7 +77,7 @@ Session log: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger
 
 `%AppData%` is the **roaming** profile folder (`C:\Users\<you>\AppData\Roaming` on current Windows, not `AppData\Local`).
 
-Preferences (`preferences.json`) live in the same folder. Use **File → Open Log File** (or **Open Log File Location**) when reporting connect or flash problems. This is not the data-logger tab save.
+Preferences (`preferences.json`) live in the same folder. Use **Help → App Log → Open App Log** (or **Open App Log Location**) when reporting connect or flash problems. This is not a data log.
 
 ## Building
 

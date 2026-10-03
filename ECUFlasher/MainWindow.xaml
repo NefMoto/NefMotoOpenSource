@@ -87,14 +87,25 @@ Contact by Email: tony@nefariousmotorsports.com
                 <Style TargetType="MenuItem" BasedOn="{StaticResource ReactiveCommandMenuItemStyle}"/>
             </Menu.Resources>
             <MenuItem Header="_File">
-                <MenuItem Command="{Binding Path=App.OpenLogFileCommand}"/>
-                <MenuItem Command="{Binding Path=App.OpenLogFileLocationCommand}"/>
+                <MenuItem Command="{Binding ElementName=Flashing, Path=ChooseFlashFileCommand}"/>
                 <Separator/>
-                <MenuItem Command="{Binding Path=App.ClearLogFileCommand}"/>
+                <MenuItem Command="{Binding ElementName=EcuInfo, Path=LoadDTCsCommand}"/>
+                <Separator/>
+                <MenuItem Header="Data Log">
+                    <MenuItem Command="{Binding ElementName=DataLogger, Path=LoadLogFileCommand}"/>
+                    <MenuItem Command="{Binding ElementName=DataLogger, Path=LoadVariableDefinitionsFromFileCommand}"/>
+                    <MenuItem Command="{Binding ElementName=DataLogger, Path=LoadReadVariablesFromFileCommand}"/>
+                </MenuItem>
                 <Separator/>
                 <MenuItem Command="{Binding Path=App.ExitCommand}" Header="_Exit"/>
             </MenuItem>
             <MenuItem Header="_Help">
+                <MenuItem Header="App Log">
+                    <MenuItem Command="{Binding Path=App.OpenLogFileCommand}"/>
+                    <MenuItem Command="{Binding Path=App.OpenLogFileLocationCommand}"/>
+                    <MenuItem Command="{Binding Path=App.ClearLogFileCommand}"/>
+                </MenuItem>
+                <Separator/>
                 <MenuItem Command="{Binding Path=App.ShowAboutDialogCommand}" Header="_About..." ToolTip="Show information about NefMotoECUFlasher"/>
             </MenuItem>
         </Menu>
@@ -107,13 +118,13 @@ Contact by Email: tony@nefariousmotorsports.com
         </DockPanel>
         <TabControl x:Name="MainTabs" Grid.Row="2" Background="{DynamicResource BackgroundBrush}" Grid.ColumnSpan="2">
             <TabItem Header="KWP2000 Info">
-                <ECUFlasher:ECUInfoControl/>
+                <ECUFlasher:ECUInfoControl x:Name="EcuInfo"/>
             </TabItem>
             <TabItem Header="Flashing">
-                <ECUFlasher:FlashingControl/>
+                <ECUFlasher:FlashingControl x:Name="Flashing"/>
             </TabItem>
             <TabItem x:Name="KwpLoggingTab" Header="KWP2000 Logging">
-                <ECUFlasher:DataLoggerControl/>
+                <ECUFlasher:DataLoggerControl x:Name="DataLogger"/>
             </TabItem>
             <TabItem x:Name="BootmodeEepromTab" Header="Bootmode EEPROM">
                 <ECUFlasher:EepromControl/>
