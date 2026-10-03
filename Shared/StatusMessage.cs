@@ -61,6 +61,7 @@ namespace Shared
 
     public delegate void DisplayStatusMessageDelegate(string message, StatusMessageType messageType);
     public delegate UserPromptResult DisplayUserPrompt(string title, string message, UserPromptType promptType);
+    public delegate void BeginDisplayUserPromptDelegate(string title, string message, UserPromptType promptType, Action<UserPromptResult> completed);
 }
 
 // vi: set sw=4 ts=8 expandtab:

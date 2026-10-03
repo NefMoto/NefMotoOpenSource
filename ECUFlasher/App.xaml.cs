@@ -451,6 +451,24 @@ namespace ECUFlasher
             return result;
         }
 
+        internal void BeginDisplayUserPrompt(string title, string message, UserPromptType promptType, Action<UserPromptResult> completed)
+        {
+            if (completed == null)
+            {
+                return;
+            }
+
+            // Prompts from the K-line thread must not wait here. SendReceiveThread
+            // is the only place tester present is sent.
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => BeginDisplayUserPrompt(title, message, promptType, completed)));
+                return;
+            }
+
+            completed(DisplayUserPrompt(title, message, promptType));
+        }
+
         internal void DisplayStatusMessage(string message, StatusMessageType messageType)
         {
             if (message != null)
