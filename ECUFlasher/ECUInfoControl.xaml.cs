@@ -339,8 +339,8 @@ namespace ECUFlasher
 
         private void OnClearDTCs()
         {
-            string confirmationMessage = "Are you sure you want to clear diagnostic information?";
-            confirmationMessage += "\n\nClick OK to confirm, otherwise Cancel.";
+            string confirmationMessage = "Click OK to confirm, otherwise Cancel.";
+            confirmationMessage += "\n\nAre you sure you want to clear diagnostic information?";
 
             if(App.DisplayUserPrompt("Confirm Clear Diagnostic Information", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
             {
@@ -1011,7 +1011,7 @@ namespace ECUFlasher
             App.DisplayStatusMessage(reason, StatusMessageType.USER);
             if (purpose == EepromMirrorReadPurpose.OfferBeforeDtcClear)
             {
-                StartTesterClear(false);
+                OfferProgrammingFlagClear(reason + " P0602 or P1681 is on the DTC list, so the checksum sequence still runs.");
                 return;
             }
 
@@ -1051,7 +1051,9 @@ namespace ECUFlasher
 
         private void EepromMirrorFlagCheckCompleted(Operation operation, bool success)
         {
-            Dispatcher.Invoke((Action)(() =>
+            // BeginInvoke so a prompt does not block the KWP send thread. A modal Invoke
+            // stops tester present, and the ECU drops the link after P3.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 operation.CompletedOperationEvent -= this.EepromMirrorFlagCheckCompleted;
 
@@ -1060,7 +1062,24 @@ namespace ECUFlasher
                 byte[] page = (success && read != null && read.mReadMemory != null) ? read.mReadMemory.RawData : null;
                 if (page == null || page.Length < EepromMirrorPage30Size)
                 {
-                    EepromMirrorUnavailable(purpose, "EEPROM mirror read at 0x6001E0 failed.");
+                    string reason;
+                    if ((read != null) && (read.FailureResponseCode == (byte)KWP2000ResponseCode.ServiceNotSupported))
+                    {
+                        reason = "The ECU does not support reading the EEPROM mirror in this session.";
+                    }
+                    else
+                    {
+                        reason = "EEPROM mirror read at 0x6001E0 failed.";
+                        if ((read != null) && (read.FailureResponseCode != 0))
+                        {
+                            string codeName = Enum.IsDefined(typeof(KWP2000ResponseCode), read.FailureResponseCode)
+                                ? Enum.GetName(typeof(KWP2000ResponseCode), read.FailureResponseCode)
+                                : "0x" + read.FailureResponseCode.ToString("X2");
+                            reason += " ECU reports " + codeName + ".";
+                        }
+                    }
+
+                    EepromMirrorUnavailable(purpose, reason);
                 }
                 else
                 {
@@ -1095,27 +1114,41 @@ namespace ECUFlasher
 
                     if (bitSet)
                     {
-                        string offer = notice
-                            + "\n\nTry to clear the DTC source by checksumming " + FlashingControl.ProgrammingFlagClearBlockList + " from the loaded flash file?"
-                            + "\nNo upload and no erase. The loaded file must match the ECU."
-                            + "\n\nOK checksums those blocks, then clears DTCs. Reboot after that."
-                            + "\nCancel clears DTCs only.";
-                        if (App.DisplayUserPrompt("Clear DTC source", offer, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
-                        {
-                            var flashing = FindFlashingControl();
-                            if ((flashing != null) && flashing.TryStartProgrammingFlagClear(clearSuccess => StartTesterClear(true)))
-                            {
-                                return;
-                            }
-
-                            App.DisplayStatusMessage("Could not start the programming-fault clear.", StatusMessageType.USER);
-                        }
+                        OfferProgrammingFlagClear(notice);
+                        return;
                     }
 
                     StartTesterClear(false);
                     return;
                 }
             }));
+        }
+
+        private void OfferProgrammingFlagClear(string notice)
+        {
+            string offer = notice
+                + "\n\nIf the file does not match, those sectors are read from the ECU and checksummed again."
+                + "\n\nTry to clear the DTC source by checksumming " + FlashingControl.ProgrammingFlagClearBlockList + " from the loaded flash file?"
+                + "\n\nOK checksums those blocks. Cancel clears DTCs only."
+                ;
+            if (App.DisplayUserPrompt("Clear DTC source", offer, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+            {
+                var flashing = FindFlashingControl();
+                if ((flashing != null) && flashing.TryStartProgrammingFlagClear(checksumsMatched =>
+                {
+                    if (checksumsMatched)
+                    {
+                        App.DisplayStatusMessage("The ECU is still in programming mode, so the DTC list was not cleared. Turn the ignition off, reconnect, and clear DTCs.", StatusMessageType.USER);
+                    }
+                }))
+                {
+                    return;
+                }
+
+                App.DisplayStatusMessage("Could not start the programming-fault clear.", StatusMessageType.USER);
+            }
+
+            StartTesterClear(false);
         }
 
         private void FinishEepromMirrorRead()

@@ -1723,6 +1723,7 @@ namespace Communication
             StartIsntLowest,
             EndIsntHighest,
             ValidationDidNotComplete,
+            SecurityAccessNotGranted,
             RequestUploadNotSupported,
             RequestUploadRejected,
             RequestDownloadNotSupported,
@@ -1730,6 +1731,30 @@ namespace Communication
         }
 
         public Result ValidationResult { get; protected set; }
+
+        /// <summary>
+        /// User-facing status when validation stopped for a reason other than the layout itself.
+        /// Null when the caller should use its generic failure text.
+        /// </summary>
+        public static string SpecificFailureStatusMessage(Result result)
+        {
+            if (result == Result.SecurityAccessNotGranted)
+            {
+                return "ECU reports that security access is not granted.";
+            }
+
+            if (result == Result.RequestUploadNotSupported)
+            {
+                return "ECU reports RequestUpload service is not supported. RequestUpload may have been disabled by aftermarket engine software.";
+            }
+
+            if (result == Result.RequestUploadRejected)
+            {
+                return "ECU reports RequestUpload was rejected. RequestUpload may have been disabled by aftermarket engine software.";
+            }
+
+            return null;
+        }
 
         public ValidateStartAndEndAddressesWithRequestUploadDownloadAction(KWP2000Interface commInterface, uint startAddress, uint endAddress)
             : base(commInterface)
@@ -1797,7 +1822,6 @@ namespace Communication
                                 }
                                 else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
                                 {
-                                    DisplayStatusMessage("Validation failed, ECU reports RequestUpload service is not supported. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestUploadNotSupported;
                                 }
                                 else
@@ -1823,7 +1847,6 @@ namespace Communication
                                 }
                                 else if (mMemoryTestServiceID == (byte)KWP2000ServiceID.RequestUpload)
                                 {
-                                    DisplayStatusMessage("Validation failed, ECU reports RequestUpload was rejected. RequestUpload may have been disabled by aftermarket engine software.", StatusMessageType.USER);
                                     ValidationResult = Result.RequestUploadRejected;
                                     handled = true;
                                     ActionCompleted(false);
@@ -1837,9 +1860,7 @@ namespace Communication
                             }
                             else if (message.mData[1] == (byte)KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested)
                             {
-                                DisplayStatusMessage("Validation failed, ECU reports that security access is not granted.", StatusMessageType.USER);
-
-                                ValidationResult = Result.ValidationDidNotComplete;
+                                ValidationResult = Result.SecurityAccessNotGranted;
 
                                 handled = true;
                                 ActionCompleted(false);
@@ -2310,6 +2331,13 @@ namespace Communication
                     if (KWP2000Interface.IsNegativeResponseToRequest((byte)KWP2000ServiceID.ReadMemoryByAddress, message, out responseCode))
                     {
                         FailureResponseCode = responseCode;
+                        if (responseCode != (byte)KWP2000ResponseCode.ServiceNotSupported)
+                        {
+                            DisplayStatusMessage("Read memory by address failed, ECU reports " + KWP2000CommInterface.GetResponseCodeString(responseCode) + ".", StatusMessageType.USER);
+                        }
+
+                        handled = true;
+                        ActionCompleted(false);
                     }
                 }
 
@@ -2659,23 +2687,15 @@ namespace Communication
                         byte[] seedArray = new byte[message.mData.Length - 1];
                         Buffer.BlockCopy(message.mData, 1, seedArray, 0, message.mData.Length - 1);
 
-                        bool isUnlocked = true;
-
-                        //a response of all zeros means the ecu is already unlocked
-                        foreach (byte currByte in seedArray)
+                        // Send a key for any seed that has 4 bytes, including zeros. The programming
+                        // kernel returns zeros when bit 12 of [0xE074] is set, and RequestUpload still
+                        // requires the key that sets 0x381B30. A seed with no bytes is already open.
+                        if (seedArray.Length >= 4)
                         {
-                            if (currByte != 0)
-                            {
-                                isUnlocked = false;
-                                break;
-                            }
-                        }
+                            byte[] seed4 = new byte[4];
+                            Buffer.BlockCopy(seedArray, 0, seed4, 0, 4);
 
-                        if (!isUnlocked)
-                        {
-                            byte[] sendKeyArray = null;
-
-                            sendKeyArray = GenerateVAGExternalRAMSendKey(seedArray);
+                            byte[] sendKeyArray = GenerateVAGExternalRAMSendKey(seed4);
 
                             byte[] messageData = new byte[sendKeyArray.Length + 1];
                             messageData[0] = mSendKey;
@@ -2687,8 +2707,27 @@ namespace Communication
                         }
                         else
                         {
-                            DisplayStatusMessage("Security access granted.", StatusMessageType.USER);
-                            ActionCompleted(true);
+                            bool isUnlocked = true;
+
+                            foreach (byte currByte in seedArray)
+                            {
+                                if (currByte != 0)
+                                {
+                                    isUnlocked = false;
+                                    break;
+                                }
+                            }
+
+                            if (isUnlocked)
+                            {
+                                DisplayStatusMessage("Security access granted.", StatusMessageType.USER);
+                                ActionCompleted(true);
+                            }
+                            else
+                            {
+                                DisplayStatusMessage("Security access denied due to unexpected seed length.", StatusMessageType.USER);
+                                ActionCompleted(false);
+                            }
                         }
                     }
                     //check for a response to our send key second message

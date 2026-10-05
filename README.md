@@ -26,7 +26,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 ### ECU Operations
 
 - Read and write flash memory with verification
-- Read and write physical SPI EEPROM (95040) in bootmode (ME7.1 / ME7.5)
+- Read and write physical SPI EEPROM (95040) in bootmode (ME7.1 / ME7.5), including immo off, lockout reset, and clearing the `P0602` flag on the loaded image
 - Erase flash sectors
 - Read ECU identification information (KWP2000 and Bootmode)
 - Bootmode ECU information: Device ID, CPU family, system registers (SYSCON, BUSCON, ADDRSEL), memory status
@@ -77,7 +77,7 @@ Session log: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger
 
 `%AppData%` is the **roaming** profile folder (`C:\Users\<you>\AppData\Roaming` on current Windows, not `AppData\Local`).
 
-Preferences (`preferences.json`) live in the same folder. Use **File → Open Log File** (or **Open Log File Location**) when reporting connect or flash problems. This is not the data-logger tab save.
+Preferences (`preferences.json`) live in the same folder. Use **Help → App Log → Open App Log** (or **Open App Log Location**) when reporting connect or flash problems. This is not a data log.
 
 ## Building
 

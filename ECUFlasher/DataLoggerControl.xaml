@@ -291,14 +291,10 @@ Contact by Email: tony@nefariousmotorsports.com
             <MenuItem Header="Definitions">
                 <MenuItem Command="{Binding Path=AddVariableDefinitionCommand}"/>
                 <MenuItem Command="{Binding Path=DataContext.RemoveVariableDefinitionCommand}" CommandParameter="{Binding ElementName=VariableDefinitionsListBox, Path=SelectedItems}"/>
-                <MenuItem Command="{Binding Path=SaveVariableDefinitionsToFileCommand}"/>
-                <MenuItem Command="{Binding Path=LoadVariableDefinitionsFromFileCommand}"/>
             </MenuItem>
             <MenuItem Header="Read Variables">
                 <MenuItem Command="{Binding Path=DataContext.AddReadVariableCommand}" CommandParameter="{Binding ElementName=VariableDefinitionsListBox, Path=SelectedItems}"/>
                 <MenuItem Command="{Binding Path=RemoveReadVariableCommand}" CommandParameter="{Binding ElementName=ReadVariablesListBox, Path=SelectedItems}"/>
-                <MenuItem Command="{Binding Path=SaveReadVariablesToFileCommand}"/>
-                <MenuItem Command="{Binding Path=LoadReadVariablesFromFileCommand}"/>
             </MenuItem>
         </Menu>
         <Grid HorizontalAlignment="Stretch" DockPanel.Dock="Top">
@@ -349,10 +345,6 @@ Contact by Email: tony@nefariousmotorsports.com
                 </Border>
                 <Border>
                     <WrapPanel Orientation="Horizontal">
-                        <StackPanel Orientation="Horizontal">
-                            <Button Command="{Binding Path=SaveLogFileCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" />
-                            <Button Command="{Binding Path=LoadLogFileCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" />
-                        </StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Button Style="{StaticResource PlayPauseLogButtonStyle}" />
                             <Label Content="Speed:"/>

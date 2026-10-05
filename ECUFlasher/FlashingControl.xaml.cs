@@ -66,9 +66,6 @@ namespace ECUFlasher
             AvailableMemoryLayouts = new ObservableCollection<string>();
             SelectedMemoryLayout = null;
 
-            AvailableEepromPresets = new ObservableCollection<BootmodeEepromPresetOption>(BootmodeEepromPresetOption.All);
-            SelectedEepromPreset = AvailableEepromPresets[0];
-
             InitializeComponent();
 
 #if DEBUG
@@ -1448,376 +1445,6 @@ namespace ECUFlasher
             return ranges;
         }
 
-        public ObservableCollection<BootmodeEepromPresetOption> AvailableEepromPresets { get; private set; }
-
-        public BootmodeEepromPresetOption SelectedEepromPreset
-        {
-            get { return _SelectedEepromPreset; }
-            set
-            {
-                if (_SelectedEepromPreset != value)
-                {
-                    _SelectedEepromPreset = value;
-                    OnPropertyChanged(new PropertyChangedEventArgs("SelectedEepromPreset"));
-                }
-            }
-        }
-        private BootmodeEepromPresetOption _SelectedEepromPreset;
-
-        public ReactiveCommand ReadBootmodeEepromCommand
-        {
-            get
-            {
-                if (_ReadBootmodeEepromCommand == null)
-                {
-                    _ReadBootmodeEepromCommand = CreateBootmodeEepromCommand(
-                        this.OnReadBootmodeEeprom,
-                        "Read EEPROM (Bootmode)",
-                        "Read physical SPI EEPROM (95040) via bootmode; overwrites flash driver until reloaded",
-                        CanExecuteBootmodeEepromCommand);
-                }
-
-                return _ReadBootmodeEepromCommand;
-            }
-        }
-        private ReactiveCommand _ReadBootmodeEepromCommand;
-
-        public ReactiveCommand WriteBootmodeEepromCommand
-        {
-            get
-            {
-                if (_WriteBootmodeEepromCommand == null)
-                {
-                    _WriteBootmodeEepromCommand = CreateBootmodeEepromCommand(
-                        this.OnWriteBootmodeEeprom,
-                        "Write EEPROM (Bootmode)",
-                        "Write physical SPI EEPROM (95040) via bootmode; immo/security risk - backup first",
-                        CanExecuteBootmodeEepromCommand);
-                }
-
-                return _WriteBootmodeEepromCommand;
-            }
-        }
-        private ReactiveCommand _WriteBootmodeEepromCommand;
-
-        private ReactiveCommand CreateBootmodeEepromCommand(
-            Action execute,
-            string name,
-            string description,
-            ReactiveCommand.CanExecuteDelegate canExecute)
-        {
-            var command = new ReactiveCommand(execute);
-            command.Name = name;
-            command.Description = description;
-
-            if (App != null)
-            {
-                command.WatchConnection(App);
-                command.AddWatchedProperty(App, "OperationInProgress");
-                command.AddWatchedProperty(this, "SelectedEepromPreset");
-            }
-
-            command.CanExecuteMethod = canExecute;
-            return command;
-        }
-
-        private bool CanExecuteBootmodeEepromCommand(List<string> reasonsDisabled)
-        {
-            if (App == null)
-            {
-                reasonsDisabled.Add("Internal program error");
-                return false;
-            }
-
-            bool result = true;
-
-            if (!App.CommInterface.IsConnected())
-            {
-                reasonsDisabled.Add("Not connected to ECU");
-                result = false;
-            }
-
-            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
-            {
-                reasonsDisabled.Add("Requires BootMode protocol (not KWP)");
-                result = false;
-            }
-
-            if (SelectedEepromPreset == null)
-            {
-                reasonsDisabled.Add("No EEPROM preset selected");
-                result = false;
-            }
-
-            if (App.OperationInProgress)
-            {
-                reasonsDisabled.Add("Another operation is in progress");
-                result = false;
-            }
-
-            return result;
-        }
-
-        private BootstrapInterface TryGetBootstrapInterface()
-        {
-            var bootstrap = App.CommInterface as BootstrapInterface;
-            if (bootstrap == null)
-            {
-                App.DisplayStatusMessage("Bootmode interface not available.", StatusMessageType.USER);
-            }
-
-            return bootstrap;
-        }
-
-        private void StartBootmodeEepromOperation(CommunicationOperation operation, Operation.CompletedOperationDelegate completedHandler)
-        {
-            App.OperationInProgress = true;
-            App.PercentOperationComplete = 0.0f;
-            operation.CompletedOperationEvent += completedHandler;
-            App.CurrentOperation = operation;
-            operation.Start();
-        }
-
-        private static string FormatOperationElapsed(TimeSpan elapsed)
-        {
-            return elapsed.Hours.ToString("D2") + ":"
-                + elapsed.Minutes.ToString("D2") + ":"
-                + elapsed.Seconds.ToString("D2");
-        }
-
-        private void FinishBootmodeEepromUi(bool success, string promptTitle, string statusMessage)
-        {
-            App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
-            App.DisplayUserPrompt(promptTitle, statusMessage, UserPromptType.OK);
-
-            if (success)
-            {
-                App.PercentOperationComplete = 100.0f;
-            }
-
-            App.CurrentOperation = null;
-            App.OperationInProgress = false;
-        }
-
-        private void OnReadBootmodeEeprom()
-        {
-            if (!ReadBootmodeEepromCommand.IsEnabled || SelectedEepromPreset == null)
-            {
-                return;
-            }
-
-            var bootstrap = TryGetBootstrapInterface();
-            if (bootstrap == null)
-            {
-                return;
-            }
-
-            string confirm =
-                "Read physical SPI EEPROM (not the KWP mirror).\n\n"
-                + "Preset: " + SelectedEepromPreset.DisplayName + "\n"
-                + "This uploads the EEPROM driver over the flash driver at 0xF600.\n"
-                + "Reload/re-detect flash before any flash read/write afterward.\n\n"
-                + "Continue?";
-
-            if (App.DisplayUserPrompt("Confirm Bootmode EEPROM Read", confirm, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
-            {
-                return;
-            }
-
-            var operation = new BootmodeReadEepromOperation(bootstrap, SelectedEepromPreset.Settings);
-            StartBootmodeEepromOperation(operation, OnReadBootmodeEepromCompleted);
-        }
-
-        private void OnReadBootmodeEepromCompleted(Operation operation, bool success)
-        {
-            Dispatcher.Invoke((Action)(() =>
-            {
-                operation.CompletedOperationEvent -= OnReadBootmodeEepromCompleted;
-
-                var readOp = operation as BootmodeReadEepromOperation;
-                string statusMessage;
-
-                if (success && readOp != null && readOp.ReadMemory != null)
-                {
-                    success = SaveBootmodeEepromFile(readOp.ReadMemory);
-                    if (success)
-                    {
-                        statusMessage = "Reading EEPROM succeeded in: "
-                            + FormatOperationElapsed(operation.OperationElapsedTime) + ".";
-                    }
-                    else
-                    {
-                        statusMessage = "EEPROM was read but not saved.";
-                    }
-                }
-                else
-                {
-                    statusMessage = "Reading EEPROM failed.";
-                    success = false;
-                }
-
-                FinishBootmodeEepromUi(success, "Bootmode EEPROM Read Finished", statusMessage);
-            }), null);
-        }
-
-        private bool SaveBootmodeEepromFile(MemoryImage readMemory)
-        {
-            var dialog = new SaveFileDialog();
-            dialog.DefaultExt = ".bin";
-            dialog.Filter = "EEPROM binary (*.bin)|*.bin|All files (*.*)|*.*";
-            dialog.AddExtension = true;
-            dialog.OverwritePrompt = true;
-            dialog.Title = "Save Bootmode EEPROM Dump";
-            dialog.FileName = "eeprom-95040.bin";
-
-            if (App.ShowFileDialog(dialog) != true)
-            {
-                return false;
-            }
-
-            if (!readMemory.SaveToFile(dialog.FileName))
-            {
-                App.DisplayStatusMessage("Failed to save EEPROM dump to: " + dialog.FileName, StatusMessageType.USER);
-                return false;
-            }
-
-            App.DisplayStatusMessage("Saved EEPROM dump to: " + dialog.FileName, StatusMessageType.USER);
-            return true;
-        }
-
-        private void OnWriteBootmodeEeprom()
-        {
-            if (!WriteBootmodeEepromCommand.IsEnabled || SelectedEepromPreset == null)
-            {
-                return;
-            }
-
-            var bootstrap = TryGetBootstrapInterface();
-            if (bootstrap == null)
-            {
-                return;
-            }
-
-            var openDialog = new OpenFileDialog();
-            openDialog.DefaultExt = ".bin";
-            openDialog.Filter = "EEPROM binary (*.bin)|*.bin|All files (*.*)|*.*";
-            openDialog.CheckFileExists = true;
-            openDialog.Title = "Select EEPROM Image to Write";
-
-            if (App.ShowFileDialog(openDialog) != true)
-            {
-                return;
-            }
-
-            byte[] dataToWrite;
-            try
-            {
-                dataToWrite = File.ReadAllBytes(openDialog.FileName);
-            }
-            catch (Exception ex)
-            {
-                App.DisplayStatusMessage("Failed to read EEPROM file: " + ex.Message, StatusMessageType.USER);
-                return;
-            }
-
-            if (dataToWrite.Length == 0)
-            {
-                App.DisplayStatusMessage("EEPROM file is empty.", StatusMessageType.USER);
-                return;
-            }
-
-            if (dataToWrite.Length > SelectedEepromPreset.Settings.Size)
-            {
-                App.DisplayStatusMessage(
-                    $"EEPROM file is {dataToWrite.Length} bytes; preset allows at most {SelectedEepromPreset.Settings.Size}.",
-                    StatusMessageType.USER);
-                return;
-            }
-
-            if (dataToWrite.Length != SelectedEepromPreset.Settings.Size)
-            {
-                string sizeWarn =
-                    $"File is {dataToWrite.Length} bytes; preset size is {SelectedEepromPreset.Settings.Size}.\n"
-                    + "Only the file length will be written (not a full-chip pad).\n\nContinue?";
-                if (App.DisplayUserPrompt("EEPROM Size Mismatch", sizeWarn, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
-                {
-                    return;
-                }
-            }
-
-            if (SelectedEepromPreset.Settings.EepromType == BootstrapInterface.BootmodeEepromType.Type95040
-                && dataToWrite.Length >= Me7Eeprom95040Checksum.EepromSize)
-            {
-                var checksum = Me7Eeprom95040Checksum.Validate(dataToWrite);
-                if (!checksum.AllChecksumPagesValid)
-                {
-                    string csPrompt =
-                        $"ME7 95040 data-page checksums are invalid ({checksum.PagesInvalid} bad / {checksum.PagesChecked} checked).\n"
-                        + "Pages 28-29 (HW/SW ID) are ignored and will not be changed.\n\n"
-                        + "Yes = correct data-page checksums, then continue\n"
-                        + "No = write the file as-is\n"
-                        + "Cancel = abort";
-
-                    UserPromptResult csResult = App.DisplayUserPrompt(
-                        "EEPROM Checksums Invalid",
-                        csPrompt,
-                        UserPromptType.YES_NO_CANCEL);
-
-                    if (csResult == UserPromptResult.CANCEL || csResult == UserPromptResult.NONE)
-                    {
-                        return;
-                    }
-
-                    if (csResult == UserPromptResult.YES)
-                    {
-                        int pagesUpdated = Me7Eeprom95040Checksum.CorrectChecksums(dataToWrite);
-                        App.DisplayStatusMessage(
-                            $"Corrected {pagesUpdated} EEPROM data-page checksum(s); pages 28-29 left unchanged.",
-                            StatusMessageType.USER);
-                    }
-                }
-            }
-
-            bool verify = chkVerifyWrite.IsChecked == true;
-
-            string confirm =
-                "WRITE physical SPI EEPROM (not KWP mirror).\n\n"
-                + "File: " + openDialog.FileName + "\n"
-                + "Size: " + dataToWrite.Length + " bytes\n"
-                + "Preset: " + SelectedEepromPreset.DisplayName + "\n"
-                + "Verify after write: " + (verify ? "yes" : "no") + "\n\n"
-                + "This can affect immobilizer / VIN / adaptations.\n"
-                + "Backup the chip first. Wrong image can brick the ECU.\n"
-                + "Flash driver at 0xF600 will be overwritten.\n\n"
-                + "Continue?";
-
-            if (App.DisplayUserPrompt("Confirm Bootmode EEPROM Write", confirm, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
-            {
-                return;
-            }
-
-            var operation = new BootmodeWriteEepromOperation(
-                bootstrap,
-                SelectedEepromPreset.Settings,
-                dataToWrite,
-                verify);
-            StartBootmodeEepromOperation(operation, OnWriteBootmodeEepromCompleted);
-        }
-
-        private void OnWriteBootmodeEepromCompleted(Operation operation, bool success)
-        {
-            Dispatcher.Invoke((Action)(() =>
-            {
-                operation.CompletedOperationEvent -= OnWriteBootmodeEepromCompleted;
-
-                string statusMessage = success
-                    ? "Writing EEPROM succeeded in: " + FormatOperationElapsed(operation.OperationElapsedTime) + "."
-                    : "Writing EEPROM failed.";
-
-                FinishBootmodeEepromUi(success, "Bootmode EEPROM Write Finished", statusMessage);
-            }), null);
-        }
-
         public ReactiveCommand ReadDiffFlashCommand
         {
             get
@@ -1997,7 +1624,7 @@ namespace ECUFlasher
                 {
                     var command = new ReactiveCommand(this.OnChecksumRestOfFirst64K);
                     command.Name = "Checksum 8K+8K+32K";
-                    command.Description = "Checksum " + ProgrammingFlagClearBlockList + " from the loaded file. No upload and no erase.";
+                    command.Description = "Checksum " + ProgrammingFlagClearBlockList + " from the loaded file. A mismatch reads those sectors from the ECU and checksums them again.";
 
                     if (App != null)
                     {
@@ -2016,10 +1643,11 @@ namespace ECUFlasher
         }
         private ReactiveCommand _ChecksumRestOfFirst64KCommand;
 
-        private const string ProgrammingFlagClearStatus = "Checksumming 0x804000-0x80FFFF as 8KB, 8KB, and 32KB. No upload and no erase.";
+        private const string ProgrammingFlagClearStatus = "Checksumming 0x804000-0x80FFFF as 8KB, 8KB, and 32KB.";
 #if DEBUG
         private void AddDebugFlashButtons()
         {
+            FlashActionGrid.RowDefinitions.Add(new RowDefinition());
             AddDebugFlashButton(CheckIfFlashMatchesCommand, 0);
             AddDebugFlashButton(ChecksumRestOfFirst64KCommand, 1);
         }
@@ -2052,7 +1680,7 @@ namespace ECUFlasher
             {
                 string prompt = "Checksum 3 blocks from the loaded flash file:\n" + ProgrammingFlagClearBlockList + ".\n\n"
                     + "0x800000-0x803FFF is not checksummed.\nNo block from 0x810000 on is checksummed.\n\n"
-                    + "No upload and no erase.\n\nContinue?";
+                    + "If they do not match, those sectors are read from the ECU and checksummed again.\n\nContinue?";
                 if (App.DisplayUserPrompt("Checksum 8K+8K+32K", prompt, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
                 {
                     return false;
@@ -2066,9 +1694,10 @@ namespace ECUFlasher
                 return false;
             }
 
+            mProgrammingFlagClearReadRetry = false;
+            mProgrammingFlagClearBlocks = blocks;
             mAfterProgrammingFlagClear = afterComplete;
-            var operation = new ChecksumFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, GetSecuritySettings(kwpViewModel), blocks);
-            StartFlashOperation(operation, this.ChecksumRestOfFirst64KCompleted, ProgrammingFlagClearStatus);
+            StartProgrammingFlagChecksum(kwpViewModel, ProgrammingFlagClearStatus);
             return true;
         }
 
@@ -2106,27 +1735,77 @@ namespace ECUFlasher
         }
 
         private Action<bool> mAfterProgrammingFlagClear;
+        private List<MemoryImage> mProgrammingFlagClearBlocks;
+        private bool mProgrammingFlagClearReadRetry;
+
+        private void StartProgrammingFlagChecksum(KWP2000Interface_ViewModel kwpViewModel, string status)
+        {
+            var operation = new ChecksumFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, GetSecuritySettings(kwpViewModel), mProgrammingFlagClearBlocks);
+            StartFlashOperation(operation, this.ChecksumRestOfFirst64KCompleted, status);
+        }
 
         private void ChecksumRestOfFirst64KCompleted(Operation operation, bool success)
         {
             Dispatcher.Invoke((Action)(() =>
             {
-                App.OperationInProgress = false;
-
-                Action<bool> after = mAfterProgrammingFlagClear;
-                mAfterProgrammingFlagClear = null;
+                operation.CompletedOperationEvent -= this.ChecksumRestOfFirst64KCompleted;
 
                 if (success)
                 {
-                    App.DisplayStatusMessage("The 8KB, 8KB, and 32KB checksums matched." + (after == null ? " Key-cycle before reading DTCs again." : ""), StatusMessageType.USER);
-                }
-                else
-                {
-                    App.DisplayStatusMessage("The 8KB, 8KB, and 32KB checksums did not all match.", StatusMessageType.USER);
+                    FinishProgrammingFlagClear(true, "The 8KB, 8KB, and 32KB checksums matched.");
+                    return;
                 }
 
-                after?.Invoke(success);
+                var checksum = operation as ChecksumFlashBlocksOperation;
+                var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                if ((checksum != null) && checksum.ReportedMismatch && !mProgrammingFlagClearReadRetry && (mProgrammingFlagClearBlocks != null) && (kwpViewModel != null))
+                {
+                    mProgrammingFlagClearReadRetry = true;
+                    string loadedFile = String.IsNullOrEmpty(FileNameToFlash) ? "The loaded flash file" : FileNameToFlash;
+                    this["FileNameToFlash"] = loadedFile + " does not have the correct checksums for sectors 1, 2, and 3.";
+                    App.DisplayStatusMessage(loadedFile + " does not have the correct checksums. Reading those sectors from the ECU.", StatusMessageType.USER);
+                    var read = new ReadFlashBlocksOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, GetSecuritySettings(kwpViewModel), mProgrammingFlagClearBlocks);
+                    StartFlashOperation(read, this.ProgrammingFlagClearReadCompleted, "Reading sectors 1, 2, and 3 from the ECU.");
+                    return;
+                }
+
+                if ((checksum == null) || !checksum.ReportedMismatch)
+                {
+                    FinishProgrammingFlagClear(false, "The ECU stopped answering before the checksums. The loaded file was not compared.");
+                    return;
+                }
+
+                FinishProgrammingFlagClear(false, "The 8KB, 8KB, and 32KB checksums did not all match.");
             }));
+        }
+
+        private void ProgrammingFlagClearReadCompleted(Operation operation, bool success)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                operation.CompletedOperationEvent -= this.ProgrammingFlagClearReadCompleted;
+
+                var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                if (success && (kwpViewModel != null) && (mProgrammingFlagClearBlocks != null))
+                {
+                    StartProgrammingFlagChecksum(kwpViewModel, "Checksumming the sectors just read from the ECU.");
+                    return;
+                }
+
+                FinishProgrammingFlagClear(false, "Could not read sectors 1, 2, and 3 from the ECU.");
+            }));
+        }
+
+        private void FinishProgrammingFlagClear(bool success, string message)
+        {
+            App.OperationInProgress = false;
+
+            Action<bool> after = mAfterProgrammingFlagClear;
+            mAfterProgrammingFlagClear = null;
+            mProgrammingFlagClearReadRetry = false;
+
+            App.DisplayStatusMessage(message + (success && (after == null) ? " Key-cycle before reading DTCs again." : ""), StatusMessageType.USER);
+            after?.Invoke(success);
         }
 
         private bool CanExecuteChecksumRestOfFirst64KCommand(List<string> reasonsDisabled)
@@ -2618,46 +2297,6 @@ namespace ECUFlasher
         }
     }
 
-    /// <summary>UI option for bootmode SPI EEPROM presets (ME7.1/7.5, SSC/XSSC).</summary>
-    public sealed class BootmodeEepromPresetOption
-    {
-        public string DisplayName { get; private set; }
-        public BootstrapInterface.BootmodeEepromSettings Settings { get; private set; }
-
-        public BootmodeEepromPresetOption(string displayName, BootstrapInterface.BootmodeEepromSettings settings)
-        {
-            DisplayName = displayName;
-            Settings = settings;
-        }
-
-        public static IReadOnlyList<BootmodeEepromPresetOption> All { get; } = new List<BootmodeEepromPresetOption>
-        {
-            new BootmodeEepromPresetOption(
-                "ME7.1 - 95040 SSC P4.7 (512 B)",
-                BootstrapInterface.BootmodeEepromSettings.ForMe71()),
-            new BootmodeEepromPresetOption(
-                "ME7.5 - 95040 SSC P4.7 (512 B)",
-                BootstrapInterface.BootmodeEepromSettings.ForMe75()),
-            new BootmodeEepromPresetOption(
-                "ME7.1 - 95040 XSSC P4.7 (512 B)",
-                MakeXssc(BootstrapInterface.BootmodeEepromSettings.ForMe71())),
-            new BootmodeEepromPresetOption(
-                "ME7.5 - 95040 XSSC P4.7 (512 B)",
-                MakeXssc(BootstrapInterface.BootmodeEepromSettings.ForMe75())),
-        };
-
-        private static BootstrapInterface.BootmodeEepromSettings MakeXssc(BootstrapInterface.BootmodeEepromSettings baseSettings)
-        {
-            return new BootstrapInterface.BootmodeEepromSettings
-            {
-                Periph = BootstrapInterface.BootmodeEepromPeriph.XSSC,
-                EepromType = baseSettings.EepromType,
-                PortNumber = baseSettings.PortNumber,
-                PinNumber = baseSettings.PinNumber,
-                Size = baseSettings.Size
-            };
-        }
-    }
 }
 
 // vi: set sw=4 ts=8 expandtab:

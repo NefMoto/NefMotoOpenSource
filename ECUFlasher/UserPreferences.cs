@@ -56,6 +56,7 @@ namespace ECUFlasher
         public KwpConnectionMethod DesiredKWP2000ConnectionMethod { get; set; } = KwpConnectionMethod.SlowInit;
         public bool EnableSlowInitTimingLog { get; set; }
         public uint DesiredBootModeBaudRate { get; set; }
+        public bool BackupBeforeWrite { get; set; } = true;
 
         public static UserPreferences Load(string path, out string error, out string migratedFrom)
         {
