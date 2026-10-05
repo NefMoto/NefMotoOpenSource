@@ -238,17 +238,8 @@ namespace Communication
                                                 }
                                             }
 
-                                            var promptResult = CommInterface.DisplayUserPrompt("Programming Session Preconditions Not Met", warning + "\n" + reasons + "\n\n Do you want to attempt to continue?", UserPromptType.OK_CANCEL);
-
-                                            if (promptResult == UserPromptResult.OK)
-                                            {
-                                                success = true;
-                                                CommInterface.DisplayStatusMessage("Continuing despite programming session preconditions not being met.", StatusMessageType.USER);
-                                            }
-                                            else
-                                            {
-                                                CommInterface.DisplayStatusMessage("Stopping because programming session preconditions have not been met.", StatusMessageType.USER);
-                                            }
+                                            DeferPreconditionsPrompt(action, warning + "\n" + reasons + "\n\n Do you want to attempt to continue?");
+                                            return;
                                         }
                                         else
                                         {
@@ -336,6 +327,51 @@ namespace Communication
             return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
         }
 
+        // Post the dialog and return to SendReceiveThread. That loop is the only tester-present sender.
+        protected void PostUserPrompt(string title, string message, UserPromptType promptType, Action<UserPromptResult> apply)
+        {
+            mAwaitingUserPrompt = true;
+            CommInterface.BeginDisplayUserPrompt(title, message, promptType, result =>
+            {
+                lock (this)
+                {
+                    if (!IsRunning || !mAwaitingUserPrompt)
+                    {
+                        mAwaitingUserPrompt = false;
+                        return;
+                    }
+
+                    mAwaitingUserPrompt = false;
+                    apply(result);
+                }
+            });
+        }
+
+        protected bool UserPromptIsPending
+        {
+            get { return mAwaitingUserPrompt; }
+        }
+
+        private void DeferPreconditionsPrompt(CommunicationAction action, string message)
+        {
+            PostUserPrompt(
+                "Programming Session Preconditions Not Met",
+                message,
+                UserPromptType.OK_CANCEL,
+                result =>
+                {
+                    bool success = result == UserPromptResult.OK;
+                    CommInterface.DisplayStatusMessage(
+                        success
+                            ? "Continuing despite programming session preconditions not being met."
+                            : "Stopping because programming session preconditions have not been met.",
+                        StatusMessageType.USER);
+
+                    mMyLastStartedAction = null;
+                    base.OnActionCompleted(action, success);
+                });
+        }
+
         private enum State
         {
             Begin,
@@ -394,6 +430,7 @@ namespace Communication
         private SecurityAccessAction.SecurityAccessSettings mSecuritySettings;
 
         private CommunicationAction mMyLastStartedAction;
+        private bool mAwaitingUserPrompt;
     };
 
     public abstract class KWP2000SequencialOperation : KWP2000Operation
@@ -631,6 +668,15 @@ namespace Communication
 
             return true;
         }
+
+        public static string PassedStatus(uint offset)
+        {
+            return "Mirror check passed: sample at layout offset 0x" + offset.ToString("X") + " matches the region above the layout. Continuing with this layout.";
+        }
+
+        public const string FailedStatus = "Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).";
+        public const string ContinueTitle = "Flash does not appear mirrored";
+        public const string ContinueBody = "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?";
     }
 
     internal static class LayoutValidationText
@@ -730,6 +776,34 @@ namespace Communication
                 title = "RequestDownload was rejected";
                 body = "The ECU rejected the RequestDownload service. Do you want to continue " + verb + " flash memory without validating the memory layout?";
             }
+        }
+
+        public static bool TryFailurePrompt(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool validationCompleted, bool layoutIsValid, bool writing, out string title, out string body, out UserPromptType promptType, out bool continueOnOk)
+        {
+            title = null;
+            body = null;
+            promptType = UserPromptType.OK;
+            continueOnOk = false;
+
+            if (!validationCompleted)
+            {
+                ContinuePrompt(result, writing, out title, out body);
+                continueOnOk = !MustAbort(result);
+                promptType = continueOnOk ? UserPromptType.OK_CANCEL : UserPromptType.OK;
+                return true;
+            }
+
+            if (!layoutIsValid)
+            {
+                string verb = writing ? "writing" : "reading";
+                title = "Memory layout appears invalid";
+                body = "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue " + verb + " flash memory?";
+                promptType = UserPromptType.OK_CANCEL;
+                continueOnOk = true;
+                return true;
+            }
+
+            return false;
         }
     }
 
@@ -1420,24 +1494,14 @@ namespace Communication
                         {
                             if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check passed: sample at layout offset 0x" + mMirrorCheckOffset.ToString("X") + " matches the region above the layout. Continuing with this layout.", StatusMessageType.USER);
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.PassedStatus(mMirrorCheckOffset), StatusMessageType.USER);
                                 mState = ReadingState.Start;
                             }
                             else
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).", StatusMessageType.USER);
-                                var continueAnyway = CommInterface.DisplayUserPrompt(
-                                    "Flash does not appear mirrored",
-                                    "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?",
-                                    UserPromptType.OK_CANCEL);
-                                if (continueAnyway == UserPromptResult.OK)
-                                {
-                                    mState = ReadingState.Start;
-                                }
-                                else
-                                {
-                                    success = false;
-                                }
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.FailedStatus, StatusMessageType.USER);
+                                AskReadPrompt(action, MirroredFlashLayoutHelper.ContinueTitle, MirroredFlashLayoutHelper.ContinueBody, UserPromptType.OK_CANCEL, true);
+                                return;
                             }
                         }
                         else if (ShouldVerifyReadSectors && ShouldChecksumSector(mCurrentBlock.Current))
@@ -1477,68 +1541,77 @@ namespace Communication
 
                     if (possiblyMirrored)
                     {
-                        var promptResult = CommInterface.DisplayUserPrompt(
+                        PostUserPrompt(
                             "Memory layout may be ambiguous",
                             MirroredFlashLayoutHelper.PromptMessage(false),
-                            UserPromptType.CONTINUE_CHECK_CANCEL);
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = ReadingState.Start;
-                        }
-                        else if (promptResult == UserPromptResult.CHECK)
-                        {
-                            MirroredFlashLayoutHelper.ChooseCompareSample(
-                                mFlashBlockList.First().StartAddress,
-                                mFlashBlockList.Last().EndAddress,
-                                out mMirrorCheckOffset,
-                                out mMirrorCheckSize);
-                            mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
-                            mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
-                            success = true;
-                            mState = ReadingState.MirrorCheckRequestPrimary;
-                        }
-                        else
-                        {
-                            success = false;
-                        }
+                            UserPromptType.CONTINUE_CHECK_CANCEL,
+                            result => ApplyReadMirrorLayoutPrompt(action, result));
+                        return;
                     }
-                    else if (!success)
+
+                    string promptTitle;
+                    string promptBody;
+                    UserPromptType promptType;
+                    bool continueOnOk;
+                    if (!success && LayoutValidationText.TryFailurePrompt(validationResult, validationCompleted, layoutIsValid, false, out promptTitle, out promptBody, out promptType, out continueOnOk))
                     {
-                        var promptResult = UserPromptResult.CANCEL;
-
-                        if (!validationCompleted)
-                        {
-                            string promptTitle;
-                            string promptBody;
-                            LayoutValidationText.ContinuePrompt(validationResult, false, out promptTitle, out promptBody);
-                            if (LayoutValidationText.MustAbort(validationResult))
-                            {
-                                CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK);
-                            }
-                            else
-                            {
-                                promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
-                            }
-                        }
-                        else if (!layoutIsValid)
-                        {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue reading flash memory?", UserPromptType.OK_CANCEL);
-                        }
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = ReadingState.Start;
-                        }
+                        AskReadPrompt(action, promptTitle, promptBody, promptType, continueOnOk);
+                        return;
                     }
                     else if (success)
                     {
                         mState = ReadingState.Start;
                     }
                 }
+            }
 
+            FinishReadAction(action, success);
+        }
+
+        private void ApplyReadMirrorLayoutPrompt(CommunicationAction action, UserPromptResult promptResult)
+        {
+            bool success = false;
+
+            if (promptResult == UserPromptResult.OK)
+            {
+                success = true;
+                mState = ReadingState.Start;
+            }
+            else if (promptResult == UserPromptResult.CHECK)
+            {
+                MirroredFlashLayoutHelper.ChooseCompareSample(
+                    mFlashBlockList.First().StartAddress,
+                    mFlashBlockList.Last().EndAddress,
+                    out mMirrorCheckOffset,
+                    out mMirrorCheckSize);
+                mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
+                mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
+                success = true;
+                mState = ReadingState.MirrorCheckRequestPrimary;
+            }
+
+            FinishReadAction(action, success);
+        }
+
+        private void AskReadPrompt(CommunicationAction action, string title, string message, UserPromptType promptType, bool continueOnOk)
+        {
+            PostUserPrompt(title, message, promptType, result =>
+            {
+                bool success = false;
+                if (continueOnOk && (result == UserPromptResult.OK))
+                {
+                    success = true;
+                    mState = ReadingState.Start;
+                }
+
+                FinishReadAction(action, success);
+            });
+        }
+
+        private void FinishReadAction(CommunicationAction action, bool success)
+        {
+            if (action == mMyLastStartedAction)
+            {
                 if (mState == ReadingState.FinishedBlock)
                 {
                     mTotalBytesValidated += mCurrentBlock.Current.Size;
@@ -2246,23 +2319,30 @@ namespace Communication
                                     + selectedName + " layout, chip looks " + suspectedName + ".",
                                     StatusMessageType.USER);
 
-                                CommInterface.DisplayUserPrompt("Wrong Flash Layout",
+                                DeferWritePrompt(
+                                    action,
+                                    "Wrong Flash Layout",
                                     "Erase failed at 0x" + startAddress.ToString("X8") + "-0x" + endAddress.ToString("X8")
                                     + ". Selected layout is " + selectedName + "; this chip looks " + suspectedName + "."
                                     + " Re-flash with " + oppositeName + ".",
-                                    UserPromptType.OK);
+                                    UserPromptType.OK,
+                                    result => false);
+                                return;
                             }
                             else if (((EraseFlashAction)action).FailedBecauseOfPersistentData)
                             {
-                                var promptResult = CommInterface.DisplayUserPrompt("Sector Erase Failed",
+                                DeferWritePrompt(
+                                    action,
+                                    "Sector Erase Failed",
                                     "Failed to erase the memory sector. The new data being flashed likely conflicts with the ECU's persistent data. The persistent ECU data can be replaced by erasing the entire flash memory before programming. If the ECU may contains a non-standard flash memory chip, it could be causing the erase to fail."
                                     + "\n\nPress Yes, to erase the entire ECU flash memory and restart the flashing process."
                                     + "\nPress No, to skip flashing this sector and continue the flashing process."
                                     + "\nPress Cancel, to abort the flashing process."
                                     + "\n\nWARNING: Only erase the entire flash memory if you have a good communication connection with the ECU. If flashing fails after erasing the entire flash memory, it is likely the ECU will no longer boot, and will have to be reflashed on the bench using boot mode."
-                                    + " This software does NOT support boot mode.", UserPromptType.YES_NO_CANCEL);
-
-                                success = ApplyEraseFailurePromptResult(promptResult);
+                                    + " This software does NOT support boot mode.",
+                                    UserPromptType.YES_NO_CANCEL,
+                                    ApplyEraseFailurePromptResult);
+                                return;
                             }
                             else//regular failure
                             {
@@ -2394,24 +2474,14 @@ namespace Communication
                             }
                             else if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check passed: sample at layout offset 0x" + mMirrorCheckOffset.ToString("X") + " matches the region above the layout. Continuing with this layout.", StatusMessageType.USER);
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.PassedStatus(mMirrorCheckOffset), StatusMessageType.USER);
                                 mState = FlashingState.StartBlock;
                             }
                             else
                             {
-                                CommInterface.DisplayStatusMessage("Mirror check failed: sample does not match. This layout is likely too small (try 29F800 for a 1MB chip).", StatusMessageType.USER);
-                                var continueAnyway = CommInterface.DisplayUserPrompt(
-                                    "Flash does not appear mirrored",
-                                    "The sample above the layout does not match the layout range. A 1MB layout (29F800) is probably required.\n\nContinue with this layout anyway?",
-                                    UserPromptType.OK_CANCEL);
-                                if (continueAnyway == UserPromptResult.OK)
-                                {
-                                    mState = FlashingState.StartBlock;
-                                }
-                                else
-                                {
-                                    success = false;
-                                }
+                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.FailedStatus, StatusMessageType.USER);
+                                AskWritePrompt(action, MirroredFlashLayoutHelper.ContinueTitle, MirroredFlashLayoutHelper.ContinueBody, UserPromptType.OK_CANCEL, true);
+                                return;
                             }
                         }
                     }
@@ -2427,23 +2497,31 @@ namespace Communication
 
                                 //start flashing from the first incomplete block
                                 mState = FlashingState.StartBlock;
+                                success = true;
                             }
                             else
                             {
-                                var promptResult = CommInterface.DisplayUserPrompt("Flash Programming Sector Failed", "Flash programming failed on the current sector. Press OK to retry programming the current sector, or Cancel to abort flash programming.", UserPromptType.OK_CANCEL);
+                                DeferWritePrompt(
+                                    action,
+                                    "Flash Programming Sector Failed",
+                                    "Flash programming failed on the current sector. Press OK to retry programming the current sector, or Cancel to abort flash programming.",
+                                    UserPromptType.OK_CANCEL,
+                                    result =>
+                                    {
+                                        if (result == UserPromptResult.OK)
+                                        {
+                                            //start flashing from the current block
+                                            mState = FlashingState.StartProgrammingBlock;
+                                        }
+                                        else
+                                        {
+                                            OperationCompleted(false);
+                                        }
 
-                                if (promptResult == UserPromptResult.OK)
-                                {
-                                    //start flashing from the current block
-                                    mState = FlashingState.StartProgrammingBlock;
-                                }
-                                else
-                                {
-                                    OperationCompleted(false);
-                                }
+                                        return true;
+                                    });
+                                return;
                             }
-
-                            success = true;
                         }
                         //else
                         //{
@@ -2511,61 +2589,22 @@ namespace Communication
 
                     if (possiblyMirrored)
                     {
-                        var promptResult = CommInterface.DisplayUserPrompt(
+                        PostUserPrompt(
                             "Memory layout may be ambiguous",
                             MirroredFlashLayoutHelper.PromptMessage(true),
-                            UserPromptType.CONTINUE_CHECK_CANCEL);
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = FlashingState.StartBlock;
-                        }
-                        else if (promptResult == UserPromptResult.CHECK)
-                        {
-                            MirroredFlashLayoutHelper.ChooseCompareSample(
-                                mFlashBlockList.First().mMemoryImage.StartAddress,
-                                mFlashBlockList.Last().mMemoryImage.EndAddress,
-                                out mMirrorCheckOffset,
-                                out mMirrorCheckSize);
-                            mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
-                            mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
-                            success = true;
-                            mState = FlashingState.MirrorCheckRequestPrimary;
-                        }
-                        else
-                        {
-                            success = false;
-                        }
+                            UserPromptType.CONTINUE_CHECK_CANCEL,
+                            result => ApplyWriteMirrorLayoutPrompt(action, result));
+                        return;
                     }
-                    else if (!success)
+
+                    string promptTitle;
+                    string promptBody;
+                    UserPromptType promptType;
+                    bool continueOnOk;
+                    if (!success && LayoutValidationText.TryFailurePrompt(validationResult, validationCompleted, layoutIsValid, true, out promptTitle, out promptBody, out promptType, out continueOnOk))
                     {
-                        var promptResult = UserPromptResult.CANCEL;
-
-                        if (!validationCompleted)
-                        {
-                            string promptTitle;
-                            string promptBody;
-                            LayoutValidationText.ContinuePrompt(validationResult, true, out promptTitle, out promptBody);
-                            if (LayoutValidationText.MustAbort(validationResult))
-                            {
-                                CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK);
-                            }
-                            else
-                            {
-                                promptResult = CommInterface.DisplayUserPrompt(promptTitle, promptBody, UserPromptType.OK_CANCEL);
-                            }
-                        }
-                        else if (!layoutIsValid)
-                        {
-                            promptResult = CommInterface.DisplayUserPrompt("Memory layout appears invalid", "Memory layout appears invalid. The ECU may expose more addressable flash than this layout covers (common with 512KB chips mirrored into 1MB). Try a larger layout, or continue if you are sure this layout matches the physical chip. Continue writing flash memory?", UserPromptType.OK_CANCEL);
-                        }
-
-                        if (promptResult == UserPromptResult.OK)
-                        {
-                            success = true;
-                            mState = FlashingState.StartBlock;
-                        }
+                        AskWritePrompt(action, promptTitle, promptBody, promptType, continueOnOk);
+                        return;
                     }
                     else if (success)
                     {
@@ -2573,54 +2612,124 @@ namespace Communication
                     }
                 }
                 #endregion
-                #region FinishedBlock
-                if (mState == FlashingState.FinishedBlock)
-                {
-                    //erase flash and validate flashed data checksums are the only two actions that will allow for a retry
-                    if (!mCurrentBlock.mFlashComplete)
-                    {
-                        int MAX_FLASH_BLOCK_RETRIES = 3;
-
-                        if (mCurrentBlock.mNumFlashAttempts <= MAX_FLASH_BLOCK_RETRIES)
-                        {
-                            CommInterface.DisplayStatusMessage("Previous flash attempt failed, will retry.", StatusMessageType.USER);
-                        }
-                        else
-                        {
-                            CommInterface.DisplayStatusMessage("Previous flashing attempts have failed " + MAX_FLASH_BLOCK_RETRIES + " times, giving up and skipping.", StatusMessageType.USER);
-                            mCurrentBlock.mFlashComplete = true;
-                        }
-                    }
-
-                    //did we finish the current block?
-                    if (mCurrentBlock.mFlashComplete)
-                    {
-                        //update the stats
-                        mTotalBytesValidated += mCurrentBlock.mMemoryImage.Size;
-                        OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToFlash) * 100.0f);
-
-                        if (!mEraseEntireFlashAtOnce && !mValidatedEraseMode && mCurrentBlock.mWasErased && (mCurrentBlock != mFlashBlockList.First()))
-                        {
-                            mState = FlashingState.CheckIfFirstBlockAccidentallyErased;
-                        }
-                    }
-                }
-                #endregion
+                ApplyFinishedWriteBlock();
             }
 
+            FinishWriteAction(action, success);
+        }
+
+        private void ApplyFinishedWriteBlock()
+        {
+            if (mState != FlashingState.FinishedBlock)
+            {
+                return;
+            }
+
+            //erase flash and validate flashed data checksums are the only two actions that will allow for a retry
+            if (!mCurrentBlock.mFlashComplete)
+            {
+                int MAX_FLASH_BLOCK_RETRIES = 3;
+
+                if (mCurrentBlock.mNumFlashAttempts <= MAX_FLASH_BLOCK_RETRIES)
+                {
+                    CommInterface.DisplayStatusMessage("Previous flash attempt failed, will retry.", StatusMessageType.USER);
+                }
+                else
+                {
+                    CommInterface.DisplayStatusMessage("Previous flashing attempts have failed " + MAX_FLASH_BLOCK_RETRIES + " times, giving up and skipping.", StatusMessageType.USER);
+                    mCurrentBlock.mFlashComplete = true;
+                }
+            }
+
+            //did we finish the current block?
+            if (mCurrentBlock.mFlashComplete)
+            {
+                //update the stats
+                mTotalBytesValidated += mCurrentBlock.mMemoryImage.Size;
+                OnUpdatePercentComplete(((float)mTotalBytesValidated) / ((float)mTotalBytesToFlash) * 100.0f);
+
+                if (!mEraseEntireFlashAtOnce && !mValidatedEraseMode && mCurrentBlock.mWasErased && (mCurrentBlock != mFlashBlockList.First()))
+                {
+                    mState = FlashingState.CheckIfFirstBlockAccidentallyErased;
+                }
+            }
+        }
+
+        private void ApplyWriteMirrorLayoutPrompt(CommunicationAction action, UserPromptResult promptResult)
+        {
+            bool success = false;
+
+            if (promptResult == UserPromptResult.OK)
+            {
+                success = true;
+                mState = FlashingState.StartBlock;
+            }
+            else if (promptResult == UserPromptResult.CHECK)
+            {
+                MirroredFlashLayoutHelper.ChooseCompareSample(
+                    mFlashBlockList.First().mMemoryImage.StartAddress,
+                    mFlashBlockList.Last().mMemoryImage.EndAddress,
+                    out mMirrorCheckOffset,
+                    out mMirrorCheckSize);
+                mMirrorCheckPrimaryData = new byte[mMirrorCheckSize];
+                mMirrorCheckMirrorData = new byte[mMirrorCheckSize];
+                success = true;
+                mState = FlashingState.MirrorCheckRequestPrimary;
+            }
+
+            FinishWriteAfterPrompt(action, success);
+        }
+
+        private void AskWritePrompt(CommunicationAction action, string title, string message, UserPromptType promptType, bool continueOnOk)
+        {
+            DeferWritePrompt(action, title, message, promptType, result =>
+            {
+                if (continueOnOk && (result == UserPromptResult.OK))
+                {
+                    mState = FlashingState.StartBlock;
+                    return true;
+                }
+
+                return false;
+            });
+        }
+
+        private void DeferWritePrompt(CommunicationAction action, string title, string message, UserPromptType promptType, Func<UserPromptResult, bool> apply)
+        {
+            PostUserPrompt(title, message, promptType, result => FinishWriteAfterPrompt(action, apply(result)));
+        }
+
+        private void FinishWriteAfterPrompt(CommunicationAction action, bool success)
+        {
+            ApplyFinishedWriteBlock();
+            FinishWriteAction(action, success);
+        }
+
+        private void FinishWriteAction(CommunicationAction action, bool success)
+        {
             if (!success && !action.CompletedWithoutCommunicationError)
             {
-                if (HandleCommunicationErrorPrompt())
+                BeginCommunicationErrorPrompt(continuing =>
                 {
-                    KWP2000CommInterface.DisconnectFromECU();
+                    if (continuing)
+                    {
+                        KWP2000CommInterface.DisconnectFromECU();
+                        NoteWaitingToReconnect();
+                    }
 
-                    CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
-                }
+                    FinishWriteTail(action, success);
+                });
+                return;
             }
 
+            FinishWriteTail(action, success);
+        }
+
+        private void FinishWriteTail(CommunicationAction action, bool success)
+        {
             mMyLastStartedAction = null;
 
-            if(!mWaitingToReconnect)
+            if (!mWaitingToReconnect)
             {
                 base.OnActionCompleted(action, success);
             }
@@ -2629,34 +2738,42 @@ namespace Communication
         bool mWaitingToReconnect = false;
         bool mUserPromptedToContinueAfterCommunicationFailure = false;
 
-        protected bool HandleCommunicationErrorPrompt()
+        private void NoteWaitingToReconnect()
         {
-            bool continuingAfterReconnect = false;
+            CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
+        }
 
-            if (!mUserPromptedToContinueAfterCommunicationFailure)
+        private void BeginCommunicationErrorPrompt(Action<bool> after)
+        {
+            if (mUserPromptedToContinueAfterCommunicationFailure || UserPromptIsPending)
             {
-                mUserPromptedToContinueAfterCommunicationFailure = true;
-
-                UserPromptResult promptResult = CommInterface.DisplayUserPrompt("Communication Error", "A communication error was encountered while flashing. Press Cancel to abort, or OK to continue after reconnecting.", UserPromptType.OK_CANCEL);
-
-                if (promptResult == UserPromptResult.OK)
-                {
-                    mWaitingToReconnect = true;
-
-                    if (mTransferDataActionToResume != null)
-                    {
-                        mState = FlashingState.TransferData;//resume the current transfer data action
-                    }
-                    else
-                    {
-                        mState = FlashingState.StartProgrammingBlock;//start flashing from the current block
-                    }
-                }
-
-                continuingAfterReconnect = mWaitingToReconnect;
+                after(mWaitingToReconnect);
+                return;
             }
 
-            return continuingAfterReconnect;
+            mUserPromptedToContinueAfterCommunicationFailure = true;
+            PostUserPrompt(
+                "Communication Error",
+                "A communication error was encountered while flashing. Press Cancel to abort, or OK to continue after reconnecting.",
+                UserPromptType.OK_CANCEL,
+                result =>
+                {
+                    if (result == UserPromptResult.OK)
+                    {
+                        mWaitingToReconnect = true;
+
+                        if (mTransferDataActionToResume != null)
+                        {
+                            mState = FlashingState.TransferData;//resume the current transfer data action
+                        }
+                        else
+                        {
+                            mState = FlashingState.StartProgrammingBlock;//start flashing from the current block
+                        }
+                    }
+
+                    after(mWaitingToReconnect);
+                });
         }
 
         protected override void OnConnectionChanged(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
@@ -2676,29 +2793,41 @@ namespace Communication
                     {
                         if (!success)
                         {
-                            if (HandleCommunicationErrorPrompt())
+                            BeginCommunicationErrorPrompt(continuing =>
                             {
-                                CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
-                            }
+                                if (continuing)
+                                {
+                                    NoteWaitingToReconnect();
+                                }
+
+                                if (!mWaitingToReconnect)
+                                {
+                                    OperationCompleted(success);
+                                }
+                            });
+                            return;
                         }
 
-                        if(!mWaitingToReconnect)
-                        {
-                            OperationCompleted(success);
-                        }
+                        OperationCompleted(success);
                     }
                 }
             }
-            else if (status == CommunicationInterface.ConnectionStatusType.Disconnected)
+            else if ((status == CommunicationInterface.ConnectionStatusType.Disconnected) && !UserPromptIsPending)
             {
-                HandleCommunicationErrorPrompt();
+                BeginCommunicationErrorPrompt(continuing => FinishConnectionChange(commInterface, status, willReconnect));
+                return;
             }
 
+            FinishConnectionChange(commInterface, status, willReconnect);
+        }
+
+        private void FinishConnectionChange(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
+        {
             base.OnConnectionChanged(commInterface, status, willReconnect);
 
             if (mWaitingToReconnect && (status == CommunicationInterface.ConnectionStatusType.Disconnected))
             {
-                CommInterface.DisplayStatusMessage("Waiting for user to reconnect to ECU before continuing...", StatusMessageType.USER);
+                NoteWaitingToReconnect();
             }
         }
 

@@ -80,6 +80,7 @@ namespace ECUFlasher
             if ((App != null) && (CommInterface != null))
             {
                 CommInterface.mDisplayUserPrompt += App.DisplayUserPrompt;
+                CommInterface.mBeginDisplayUserPrompt += App.BeginDisplayUserPrompt;
             }
         }
 

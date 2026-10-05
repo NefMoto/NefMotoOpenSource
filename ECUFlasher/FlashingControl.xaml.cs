@@ -1277,8 +1277,8 @@ namespace ECUFlasher
 
         private void OnWriteFlashCompleted(Operation operation, bool success)
         {
-            //UI should occur on the UI thread...
-            Dispatcher.Invoke((Action)(() =>
+            // BeginInvoke so the finished dialog does not block the KWP send thread.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 string statusMessage = OnWriteExternalFlashCompleted(operation, success);
 
@@ -1545,8 +1545,8 @@ namespace ECUFlasher
 
         private void OnReadFlashCompleted(Operation operation, bool success)
         {
-            //UI should occur on the UI thread...
-            Dispatcher.Invoke((Action)(() =>
+            // BeginInvoke so the finished dialog does not block the KWP send thread.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 var readFlashOperation = operation as ReadExternalFlashOperation;
 
@@ -1883,8 +1883,8 @@ namespace ECUFlasher
 
         private void CheckIfFlashMatchesOperationCompleted(Operation operation, bool success)
         {
-            //UI should occur on the UI thread...
-            Dispatcher.Invoke((Action)(() =>
+            // BeginInvoke so the finished dialog does not block the KWP send thread.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 string statusMessage = success
                     ? "Flash memory matches flash file."
