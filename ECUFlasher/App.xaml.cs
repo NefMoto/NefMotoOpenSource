@@ -162,6 +162,7 @@ namespace ECUFlasher
             // Device enumeration can block on some systems (WMI, COM port probes).
             // Defer until after the main window loads so startup does not appear hung.
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(BeginRefreshDevices));
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(BeginStartupUpdateCheck));
         }
 
         protected override void OnExit(ExitEventArgs e)
@@ -872,6 +873,207 @@ namespace ECUFlasher
             }
         }
         private ReactiveCommand _ShowAboutDialogCommand;
+        #endregion
+
+        #region CheckForUpdatesCommand
+        public ReactiveCommand CheckForUpdatesCommand
+        {
+            get
+            {
+                if (_CheckForUpdatesCommand == null)
+                {
+                    _CheckForUpdatesCommand = new ReactiveCommand(delegate() {
+                        BeginUpdateCheck(true);
+                    });
+                    _CheckForUpdatesCommand.Name = "Check for Updates...";
+                    _CheckForUpdatesCommand.Description = "Check GitHub for a newer NefMotoECUFlasher release";
+                }
+
+                return _CheckForUpdatesCommand;
+            }
+        }
+        private ReactiveCommand _CheckForUpdatesCommand;
+
+        public bool CheckForUpdatesAtStartup
+        {
+            get { return Preferences.CheckForUpdatesAtStartup; }
+            set
+            {
+                if (Preferences.CheckForUpdatesAtStartup != value)
+                {
+                    Preferences.CheckForUpdatesAtStartup = value;
+                    OnPropertyChanged(new PropertyChangedEventArgs("CheckForUpdatesAtStartup"));
+                }
+            }
+        }
+
+        private int _updateCheckInProgress;
+
+        private void BeginStartupUpdateCheck()
+        {
+            if (!UpdateChecker.FakeUpdateRequested)
+            {
+                if (!Preferences.CheckForUpdatesAtStartup)
+                {
+                    DisplayStatusMessage("Update check: disabled at startup.", StatusMessageType.LOG);
+                    return;
+                }
+
+                var last = Preferences.LastUpdateCheckUtc;
+                if (last.HasValue && (DateTime.UtcNow - last.Value) < TimeSpan.FromHours(24))
+                {
+                    DisplayStatusMessage("Update check: skipped, last check was " + last.Value.ToString("u", CultureInfo.InvariantCulture) + ".", StatusMessageType.LOG);
+                    return;
+                }
+            }
+
+            BeginUpdateCheck(false);
+        }
+
+        private void BeginUpdateCheck(bool userRequested)
+        {
+            if (Interlocked.CompareExchange(ref _updateCheckInProgress, 1, 0) != 0)
+            {
+                if (userRequested)
+                {
+                    DisplayStatusMessage("Update check already in progress.", StatusMessageType.USER);
+                }
+                return;
+            }
+
+            string currentVersion = GetFullVersion();
+
+            Task.Run(async () =>
+            {
+                UpdateCheckResult result;
+                try
+                {
+                    result = await UpdateChecker.CheckAsync(currentVersion);
+                }
+                catch (Exception ex)
+                {
+                    result = new UpdateCheckResult { Status = UpdateCheckStatus.Failed, Error = ex.Message };
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _updateCheckInProgress, 0);
+                }
+
+                _ = Dispatcher.BeginInvoke(new Action(() => OnUpdateCheckCompleted(result, currentVersion, userRequested)));
+            });
+        }
+
+        private void OnUpdateCheckCompleted(UpdateCheckResult result, string currentVersion, bool userRequested)
+        {
+            if (result.Fake)
+            {
+                DisplayStatusMessage("Update check: " + UpdateChecker.FakeUpdateVariable + " set, reporting fake release " + result.Release.TagName, StatusMessageType.LOG);
+            }
+            else if (!userRequested && ((result.Status == UpdateCheckStatus.UpToDate) || (result.Status == UpdateCheckStatus.NewerAvailable)))
+            {
+                Preferences.LastUpdateCheckUtc = DateTime.UtcNow;
+                try
+                {
+                    SavePreferences();
+                }
+                catch (Exception ex)
+                {
+                    DisplayStatusMessage("Settings save failed after update check: " + ex.Message, StatusMessageType.LOG);
+                }
+            }
+
+            const string title = "Check for Updates";
+
+            switch (result.Status)
+            {
+                case UpdateCheckStatus.NewerAvailable:
+                {
+                    string tag = result.Release.TagName;
+                    string url = result.Release.HtmlUrl;
+
+                    DisplayStatusMessage("Update available: " + tag + " (running " + currentVersion + "). Release page: " + url, OperationInProgress ? StatusMessageType.USER : StatusMessageType.LOG);
+
+                    if (OperationInProgress)
+                    {
+                        break;
+                    }
+
+                    var dialog = new UpdateDialog(currentVersion, result.NewerReleases, OpenUrl);
+                    if ((MainWindow != null) && MainWindow.IsLoaded)
+                    {
+                        dialog.Owner = MainWindow;
+                    }
+                    else
+                    {
+                        dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                    }
+                    dialog.ShowDialog();
+                    break;
+                }
+                case UpdateCheckStatus.UpToDate:
+                {
+                    string message = "Running the latest version (" + currentVersion + ").";
+                    if (userRequested)
+                    {
+                        DisplayUserPrompt(title, message, UserPromptType.OK);
+                    }
+                    else
+                    {
+                        DisplayStatusMessage("Update check: " + message, StatusMessageType.LOG);
+                    }
+                    break;
+                }
+                case UpdateCheckStatus.CurrentVersionUnparseable:
+                {
+                    string message = "This build's version (" + currentVersion + ") cannot be compared with releases.";
+                    if (userRequested)
+                    {
+                        DisplayUserPrompt(title, message, UserPromptType.OK);
+                    }
+                    else
+                    {
+                        DisplayStatusMessage("Update check: skipped. " + message, StatusMessageType.LOG);
+                    }
+                    break;
+                }
+                case UpdateCheckStatus.Failed:
+                {
+                    string message = "Update check failed: " + result.Error;
+                    if (userRequested)
+                    {
+                        DisplayUserPrompt(title, message, UserPromptType.OK);
+                    }
+                    else
+                    {
+                        DisplayStatusMessage(message, StatusMessageType.LOG);
+                    }
+                    break;
+                }
+            }
+        }
+
+        private void OpenUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                return;
+            }
+
+            DisplayStatusMessage("Opening " + url, StatusMessageType.LOG);
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                DisplayStatusMessage("Failed to open " + url + ": " + ex.Message, StatusMessageType.USER);
+            }
+        }
         #endregion
 
         #region ExitCommand
