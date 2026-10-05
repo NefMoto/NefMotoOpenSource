@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.ComponentModel;
+using System.Windows;
 
 using Shared;
 using Communication;
@@ -74,6 +75,84 @@ namespace ECUFlasher
 
         void ConnectionStatusChangedEvent(CommunicationInterface commInterface, CommunicationInterface.ConnectionStatusType status, bool willReconnect)
         {
+            if (status != CommunicationInterface.ConnectionStatusType.Connected)
+            {
+                return;
+            }
+
+            if (!KWP2000CommInterface.ConsumeSlowInitFellThroughToKwp2000Address())
+            {
+                return;
+            }
+
+            RunOnUi(StartSlowInitFallbackBaud);
+        }
+
+        private static void RunOnUi(Action action)
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if ((dispatcher != null) && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(action);
+            }
+            else
+            {
+                action();
+            }
+        }
+
+        // Second 0x01 was still KWP1281, so 0x11 opened the session. Request the
+        // connect-bar baud now. At 10400 there is no faster rate to ask for.
+        private void StartSlowInitFallbackBaud()
+        {
+            if ((App == null) || !KWP2000CommInterface.IsConnected() || App.OperationInProgress)
+            {
+                return;
+            }
+
+            var rates = (DesiredBaudRates != null) ? new List<uint>(DesiredBaudRates) : null;
+            uint baud = ((rates != null) && (rates.Count > 0)) ? rates[0] : (uint)KWP2000BaudRates.BAUD_10400;
+            if (baud <= (uint)KWP2000BaudRates.BAUD_10400)
+            {
+                KWP2000CommInterface.DisplayStatusMessage("Baud stays at 10400 until a read or write.", StatusMessageType.USER);
+                return;
+            }
+
+            KWP2000CommInterface.DisplayStatusMessage("Switching to " + baud + " baud.", StatusMessageType.USER);
+            CopySecuritySettingsToInterface();
+
+            App.OperationInProgress = true;
+            App.PercentOperationComplete = -1.0f;
+
+            var operation = new SlowInitFallbackBaudOperation(KWP2000CommInterface, rates);
+            App.CurrentOperation = operation;
+            operation.CompletedOperationEvent += SlowInitFallbackBaudCompleted;
+            operation.Start();
+        }
+
+        private void SlowInitFallbackBaudCompleted(Operation operation, bool success)
+        {
+            operation.CompletedOperationEvent -= SlowInitFallbackBaudCompleted;
+            RunOnUi(() =>
+            {
+                if (App == null)
+                {
+                    return;
+                }
+
+                if (!success)
+                {
+                    KWP2000CommInterface.DisplayStatusMessage("Switching baud did not finish.", StatusMessageType.USER);
+                }
+
+                if (App.CurrentOperation == operation)
+                {
+                    App.CurrentOperation = null;
+                }
+
+                App.PercentOperationComplete = 100.0f;
+                App.OperationInProgress = false;
+            });
         }
 
         public KWP2000Interface KWP2000CommInterface
