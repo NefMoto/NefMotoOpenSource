@@ -106,6 +106,10 @@ Contact by Email: tony@nefariousmotorsports.com
                     <MenuItem Command="{Binding Path=App.ClearLogFileCommand}"/>
                 </MenuItem>
                 <Separator/>
+                <MenuItem Command="{Binding Path=App.CheckForUpdatesCommand}"/>
+                <MenuItem Header="Check for Updates at Startup" IsCheckable="True" ToolTip="Check GitHub for a newer release at most once a day when the app starts"
+                            IsChecked="{Binding Path=App.CheckForUpdatesAtStartup, Mode=TwoWay}"/>
+                <Separator/>
                 <MenuItem Command="{Binding Path=App.ShowAboutDialogCommand}" Header="_About..." ToolTip="Show information about NefMotoECUFlasher"/>
             </MenuItem>
         </Menu>

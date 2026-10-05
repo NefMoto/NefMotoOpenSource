@@ -57,6 +57,8 @@ namespace ECUFlasher
         public bool EnableSlowInitTimingLog { get; set; }
         public uint DesiredBootModeBaudRate { get; set; }
         public bool BackupBeforeWrite { get; set; } = true;
+        public bool CheckForUpdatesAtStartup { get; set; } = true;
+        public DateTime? LastUpdateCheckUtc { get; set; }
 
         public static UserPreferences Load(string path, out string error, out string migratedFrom)
         {

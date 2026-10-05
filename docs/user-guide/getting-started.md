@@ -13,6 +13,28 @@ If connect fails, see [Troubleshooting](troubleshooting.md).
 
 To build from source instead, see [BUILDING.md](../BUILDING.md).
 
+## Update check
+
+At startup the app asks GitHub (`api.github.com`) for the list of releases, at most once every 24 hours. If a newer release exists, a window shows the release notes for every version newer than yours, with these buttons:
+
+- **Download MSI** opens the installer link in your browser. It is hidden if the release has no MSI.
+- **View Latest Release** opens the GitHub release page.
+- **Close** does nothing.
+
+The app never downloads or installs anything itself; you run the new MSI yourself.
+
+- **Help → Check for Updates...** checks right away and also reports when you are up to date.
+- **Help → Check for Updates at Startup** turns the startup check off or on.
+- Pre-releases (`-rc` tags) are only offered when the running build is itself a pre-release.
+- During a read or write, a found update is written to the status text instead of opening the window.
+- Builds from source without a release tag cannot be compared, so the startup check skips them.
+
+For testing, set the environment variable `NEFMOTO_FAKE_UPDATE=1` before starting the app. Every check then reports a fake newer version without contacting GitHub, and the log records that the fake was active:
+
+```powershell
+$env:NEFMOTO_FAKE_UPDATE=1; & 'C:\Program Files\NefMotoECUFlasher\NefMotoECUFlasher.exe'
+```
+
 ## Cable
 
 You need **either**:
@@ -90,6 +112,7 @@ Saved in `preferences.json` next to the log file:
 
 - Protocol, KWP baud, **Slow Init** / **Fast Init**, **Slow init timing log**
 - Bootmode EEPROM **Backup before write**
+- **Check for Updates at Startup** and the time of the last startup check
 
 Not saved (reset when you restart the app):
 
