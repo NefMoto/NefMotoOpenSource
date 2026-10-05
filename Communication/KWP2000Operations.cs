@@ -80,7 +80,11 @@ namespace Communication
                             {
                                 // Already in the programming session: skip the precondition read.
                                 // Default timing still logs in before StartDiagnosticSession.
-                                mState = shouldStart ? State.CheckProgrammingSessionPreconditions : State.SwitchToDefaultTimingForProgrammingSession;
+                                // The 0x11 slow-init fallback also skips it: that read can open a dialog,
+                                // and the baud request has to go out while tester present is still at 10400.
+                                mState = (shouldStart && !mSkipProgrammingSessionPreconditions)
+                                    ? State.CheckProgrammingSessionPreconditions
+                                    : State.SwitchToDefaultTimingForProgrammingSession;
                             }
                             else if (shouldStart && mShouldAutoNegotiateSecurity)
                             {
@@ -322,6 +326,11 @@ namespace Communication
             EnableAutoNegotiateSecurity(securitySettings);
         }
 
+        protected void SkipProgrammingSessionPreconditions()
+        {
+            mSkipProgrammingSessionPreconditions = true;
+        }
+
         protected static string RangeText(uint start, uint length)
         {
             return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
@@ -420,6 +429,7 @@ namespace Communication
 
         private State mState;
         private bool mShouldAutoStartDiagnosticSession;
+        private bool mSkipProgrammingSessionPreconditions;
         private IEnumerable<uint> mDesiredBaudRates;
         private KWP2000DiagnosticSessionType mDesiredDiagnosticSessionType;
 
@@ -432,6 +442,18 @@ namespace Communication
         private CommunicationAction mMyLastStartedAction;
         private bool mAwaitingUserPrompt;
     };
+
+    // Issue #127. After slow init falls through to 0x11, request the connect-bar baud
+    // before tester present sits at 10400. No precondition dialog.
+    public class SlowInitFallbackBaudOperation : KWP2000Operation
+    {
+        public SlowInitFallbackBaudOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
+            : base(commInterface)
+        {
+            SkipProgrammingSessionPreconditions();
+            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
+        }
+    }
 
     public abstract class KWP2000SequencialOperation : KWP2000Operation
     {

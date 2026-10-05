@@ -1076,6 +1076,7 @@ namespace Communication
                         //reset all of the communication state when we start trying to connect,
                         //this way we can respect the old settings when we start connecting
                         shouldReset = true;
+                        mSlowInitFellThroughToKwp2000Address = false;
                     }
                     else if (_ConnectionStatus == ConnectionStatusType.Connected)
                     {
@@ -2570,9 +2571,20 @@ namespace Communication
             }
         }
 
+        // Second 0x01 was still KWP1281 and 0x11 opened KWP2000. The connect bar baud
+        // is requested once this is consumed. Cleared when a new attempt starts.
+        public bool ConsumeSlowInitFellThroughToKwp2000Address()
+        {
+            bool value = mSlowInitFellThroughToKwp2000Address;
+            mSlowInitFellThroughToKwp2000Address = false;
+            return value;
+        }
+        private bool mSlowInitFellThroughToKwp2000Address;
+
         protected bool Connect_SlowInit()
         {
             bool slowInitSuccess = false;
+            bool fellThroughToKwp2000Address = false;
             byte keyByte1; byte keyByte2;
 
             DisplayStatusMessage("Starting slow init connection.", StatusMessageType.USER);
@@ -2673,6 +2685,7 @@ namespace Communication
 
                         if (slowInitSuccess)
                         {
+                            fellThroughToKwp2000Address = true;
                             DisplayStatusMessage("Slow init succeeded.", StatusMessageType.USER);
                         }
                         else
@@ -2719,6 +2732,8 @@ namespace Communication
 #else
                             {
                                 slowInitSuccess = true;
+                                // Set before Connected. The status event is what consumes the flag.
+                                mSlowInitFellThroughToKwp2000Address = fellThroughToKwp2000Address;
                                 ConnectionStatus = ConnectionStatusType.Connected;
                             }
 #endif

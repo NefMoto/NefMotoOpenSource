@@ -101,6 +101,8 @@ Not saved (reset when you restart the app):
 
 **In the car:** ignition on as required by the car; engine usually off for programming. Expect cluster traffic on K-line. Prefer slow init. Patience on retries.
 
+On older ME7.1, slow init at `0x01` answers KWP1281 twice. Connect then uses `0x11` and requests the baud on the connect bar (124800 on a fresh install). That opens a programming session, so **Read DTCs** stays off until an ignition cycle. The status line is `Switching to 124800 baud.` A second `0x01` that is already KWP2000 stays at 10400 until a read or write. Leave the baud box at 10400 and that `0x11` connect stays at 10400 too.
+
 **On the bench:** direct K-line to the ECU, stable ground and +12 V, adapter in dumb mode.
 
 Typical ME7 K-line is ECU pin 43, which is OBD pin 7. Confirm against a pinout for your connector.
