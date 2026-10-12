@@ -872,6 +872,21 @@ namespace ECUFlasher
             }
         }
 
+        private void OnFlashFilePathOpen(object sender, MouseButtonEventArgs e)
+        {
+            if (ChooseFlashFileCommand.CanExecute(null))
+            {
+                ChooseFlashFileCommand.Execute(null);
+            }
+
+            e.Handled = true;
+        }
+
+        private void OnFlashFilePathContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            e.Handled = true;
+        }
+
         public ReactiveCommand VerifyChecksumsCommand
         {
             get

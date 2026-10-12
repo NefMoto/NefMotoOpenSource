@@ -88,9 +88,7 @@ Contact by Email: tony@nefariousmotorsports.com
             </Menu.Resources>
             <MenuItem Header="_File">
                 <MenuItem Command="{Binding ElementName=Flashing, Path=ChooseFlashFileCommand}"/>
-                <Separator/>
                 <MenuItem Command="{Binding ElementName=EcuInfo, Path=LoadDTCsCommand}"/>
-                <Separator/>
                 <MenuItem Header="Data Log">
                     <MenuItem Command="{Binding ElementName=DataLogger, Path=LoadLogFileCommand}"/>
                     <MenuItem Command="{Binding ElementName=DataLogger, Path=LoadVariableDefinitionsFromFileCommand}"/>

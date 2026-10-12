@@ -48,7 +48,10 @@ Contact by Email: tony@nefariousmotorsports.com
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBox Grid.Column="0" Grid.Row="0" Style="{StaticResource ReadOnlyValidationTextBoxStyle}"
-                Text="{Binding Path=FileNameToFlash, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=true, ValidatesOnDataErrors=true}"/>
+                Text="{Binding Path=FileNameToFlash, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=true, ValidatesOnDataErrors=true}"
+                MouseDoubleClick="OnFlashFilePathOpen"
+                PreviewMouseRightButtonUp="OnFlashFilePathOpen"
+                ContextMenuOpening="OnFlashFilePathContextMenuOpening"/>
             <ComboBox Grid.Column="1" Grid.Row="0" MinWidth="80" Margin="5,0,0,0"
                 Style="{StaticResource ValidationComboBoxStyle}"
                 ItemsSource="{Binding Path=AvailableMemoryLayouts}"
