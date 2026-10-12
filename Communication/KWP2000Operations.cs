@@ -21,6 +21,8 @@ Contact by Email: tony@nefariousmotorsports.com
 //#define LOG_PERFORMANCE
 // Treat boot-cluster checksums as a miss (diff-write on an unchanged image). Do not commit enabled.
 //#define FORCE_BOOT_CLUSTER_CHECKSUM_MISMATCH
+// Treat the first non-boot sector as a miss so a diff write repeats that one sector. Do not commit enabled.
+//#define FORCE_NON_BOOT_SECTOR_CHECKSUM_MISMATCH
 
 using System;
 using System.Collections.Generic;
@@ -2203,6 +2205,27 @@ namespace Communication
                                 && mFlashMemoryLayout.IsBootClusterSector(sectorIndex))
                             {
                                 CommInterface.DisplayStatusMessage("FORCE_BOOT_CLUSTER_CHECKSUM_MISMATCH: treating boot-cluster sector as a checksum miss.", StatusMessageType.USER);
+                                checksumCorrect = false;
+                            }
+#endif
+#if FORCE_NON_BOOT_SECTOR_CHECKSUM_MISMATCH
+                            int nonBootSectorIndex = mFlashBlockList.IndexOf(mCurrentBlock);
+                            int firstNonBoot = -1;
+                            if (mFlashMemoryLayout != null)
+                            {
+                                int sectorCount = (mFlashMemoryLayout.SectorSizes == null) ? 0 : mFlashMemoryLayout.SectorSizes.Count;
+                                for (int i = 0; i < sectorCount; i++)
+                                {
+                                    if (!mFlashMemoryLayout.IsBootClusterSector(i))
+                                    {
+                                        firstNonBoot = i;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (checksumCorrect && (nonBootSectorIndex == firstNonBoot))
+                            {
+                                CommInterface.DisplayStatusMessage("FORCE_NON_BOOT_SECTOR_CHECKSUM_MISMATCH: treating sector 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " as a checksum miss.", StatusMessageType.USER);
                                 checksumCorrect = false;
                             }
 #endif
