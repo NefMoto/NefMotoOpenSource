@@ -192,12 +192,20 @@ Contact by Email: nyet@nyet.org
         </Grid.RowDefinitions>
         <StackPanel Grid.Row="0">
             <DockPanel Margin="4,4,4,0" LastChildFill="False">
-                <ComboBox DockPanel.Dock="Right" HorizontalAlignment="Right" MinWidth="220" Margin="8,4,4,4" VerticalAlignment="Center"
-                    Style="{StaticResource ValidationComboBoxStyle}"
-                    ItemsSource="{Binding Path=AvailableEepromPresets}"
-                    SelectedItem="{Binding Path=SelectedEepromPreset, Mode=TwoWay}"
-                    DisplayMemberPath="DisplayName"
-                    ToolTip="Bootmode SPI EEPROM preset (physical 95040 chip)"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ComboBox MinWidth="140" Margin="8,4,4,4" VerticalAlignment="Center"
+                        Style="{StaticResource ValidationComboBoxStyle}"
+                        ItemsSource="{Binding Path=AvailableChipSelects}"
+                        SelectedItem="{Binding Path=SelectedChipSelect, Mode=TwoWay}"
+                        DisplayMemberPath="DisplayName"
+                        ToolTip="EEPROM chip select. EDC15 uses I2C and has no pin."/>
+                    <ComboBox MinWidth="180" Margin="4,4,4,4" VerticalAlignment="Center"
+                        Style="{StaticResource ValidationComboBoxStyle}"
+                        ItemsSource="{Binding Path=AvailableDevices}"
+                        SelectedItem="{Binding Path=SelectedDevice, Mode=TwoWay}"
+                        DisplayMemberPath="DisplayName"
+                        ToolTip="EEPROM type, peripheral, and size"/>
+                </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <Button Command="{Binding Path=OpenEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
                     <Button Command="{Binding Path=ReadBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>

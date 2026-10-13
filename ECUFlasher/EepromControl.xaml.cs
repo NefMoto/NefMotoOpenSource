@@ -36,8 +36,11 @@ namespace ECUFlasher
         {
             Pages = new ObservableCollection<EepromPageRow>();
             Legend = new ObservableCollection<EepromLegendItem>();
-            AvailableEepromPresets = new ObservableCollection<BootmodeEepromPresetOption>(BootmodeEepromPresetOption.All);
-            SelectedEepromPreset = AvailableEepromPresets[0];
+            AvailableChipSelects = new ObservableCollection<BootmodeEepromCatalog.ChipSelect>(BootmodeEepromCatalog.ChipSelects);
+            AvailableDevices = new ObservableCollection<BootmodeEepromCatalog.Device>(BootmodeEepromCatalog.SpiDevices);
+            _SelectedChipSelect = AvailableChipSelects[0];
+            _SelectedDevice = BootmodeEepromCatalog.DefaultSpiDevice;
+            _devicesAreI2c = false;
             if (App?.Preferences != null)
             {
                 _BackupBeforeWrite = App.Preferences.BackupBeforeWrite;
@@ -53,7 +56,9 @@ namespace ECUFlasher
 
         public ObservableCollection<EepromLegendItem> Legend { get; private set; }
 
-        public ObservableCollection<BootmodeEepromPresetOption> AvailableEepromPresets { get; private set; }
+        public ObservableCollection<BootmodeEepromCatalog.ChipSelect> AvailableChipSelects { get; private set; }
+
+        public ObservableCollection<BootmodeEepromCatalog.Device> AvailableDevices { get; private set; }
 
         public bool BackupBeforeWrite
         {
@@ -96,19 +101,81 @@ namespace ECUFlasher
             get { return _WritePendingText.Length > 0; }
         }
 
-        public BootmodeEepromPresetOption SelectedEepromPreset
+        public BootmodeEepromCatalog.ChipSelect SelectedChipSelect
         {
-            get { return _SelectedEepromPreset; }
+            get { return _SelectedChipSelect; }
             set
             {
-                if (_SelectedEepromPreset != value)
+                if (value == null || ReferenceEquals(_SelectedChipSelect, value))
                 {
-                    _SelectedEepromPreset = value;
-                    OnPropertyChanged(new PropertyChangedEventArgs("SelectedEepromPreset"));
+                    return;
                 }
+
+                _SelectedChipSelect = value;
+                OnPropertyChanged(new PropertyChangedEventArgs("SelectedChipSelect"));
+                SyncDeviceList();
             }
         }
-        private BootmodeEepromPresetOption _SelectedEepromPreset;
+        private BootmodeEepromCatalog.ChipSelect _SelectedChipSelect;
+        private bool _devicesAreI2c;
+
+        public BootmodeEepromCatalog.Device SelectedDevice
+        {
+            get { return _SelectedDevice; }
+            set
+            {
+                if (value == null || ReferenceEquals(_SelectedDevice, value))
+                {
+                    return;
+                }
+
+                _SelectedDevice = value;
+                OnPropertyChanged(new PropertyChangedEventArgs("SelectedDevice"));
+                RefreshGrid();
+            }
+        }
+        private BootmodeEepromCatalog.Device _SelectedDevice;
+
+        private void SyncDeviceList()
+        {
+            bool wantI2c = _SelectedChipSelect != null && _SelectedChipSelect.I2c;
+            if (_devicesAreI2c == wantI2c)
+            {
+                return;
+            }
+
+            _devicesAreI2c = wantI2c;
+            AvailableDevices.Clear();
+            foreach (BootmodeEepromCatalog.Device device in wantI2c
+                ? BootmodeEepromCatalog.I2cDevices
+                : BootmodeEepromCatalog.SpiDevices)
+            {
+                AvailableDevices.Add(device);
+            }
+
+            SelectedDevice = wantI2c
+                ? BootmodeEepromCatalog.DefaultI2cDevice
+                : BootmodeEepromCatalog.DefaultSpiDevice;
+        }
+
+        private BootstrapInterface.BootmodeEepromSettings CurrentSettings()
+        {
+            if (SelectedChipSelect == null || SelectedDevice == null)
+            {
+                return null;
+            }
+
+            return BootmodeEepromCatalog.ToSettings(SelectedChipSelect, SelectedDevice);
+        }
+
+        private bool Is95040Layout(byte[] image)
+        {
+            return SelectedDevice != null
+                && SelectedDevice.EepromType == BootstrapInterface.BootmodeEepromType.Type95040
+                && SelectedDevice.Size == Me7Eeprom95040Checksum.EepromSize
+                && image != null
+                && image.Length == Me7Eeprom95040Checksum.EepromSize;
+        }
 
         public ReactiveCommand OpenEepromCommand
         {
@@ -118,7 +185,7 @@ namespace ECUFlasher
                 {
                     _OpenEepromCommand = new ReactiveCommand(this.OnOpenEeprom);
                     _OpenEepromCommand.Name = "Load EEPROM File";
-                    _OpenEepromCommand.Description = "Load a 512-byte 95040 image. Does not write the chip.";
+                    _OpenEepromCommand.Description = "Load an EEPROM image of the selected device size. Does not write the chip.";
 
                     if (App != null)
                     {
@@ -142,7 +209,7 @@ namespace ECUFlasher
                     _ReadBootmodeEepromCommand = CreateBootmodeEepromCommand(
                         this.OnReadBootmodeEeprom,
                         "Read EEPROM",
-                        "Read physical SPI EEPROM (95040) via bootmode; overwrites flash driver until reloaded");
+                        "Read physical EEPROM via bootmode; overwrites flash driver until reloaded");
                 }
 
                 return _ReadBootmodeEepromCommand;
@@ -158,7 +225,7 @@ namespace ECUFlasher
                 {
                     _SaveEepromCommand = new ReactiveCommand(this.OnSaveEeprom);
                     _SaveEepromCommand.Name = "Save EEPROM File";
-                    _SaveEepromCommand.Description = "Save the 512-byte image on screen. Does not write the chip.";
+                    _SaveEepromCommand.Description = "Save the image on screen. Does not write the chip.";
 
                     if (App != null)
                     {
@@ -190,7 +257,7 @@ namespace ECUFlasher
                     _WriteBootmodeEepromCommand = CreateBootmodeEepromCommand(
                         this.OnWriteBootmodeEeprom,
                         "Write EEPROM",
-                        "Write the image on screen to the physical SPI EEPROM (95040).");
+                        "Write the image on screen to the physical EEPROM.");
                     if (App != null)
                     {
                         _WriteBootmodeEepromCommand.AddWatchedProperty(this, "HasEepromImage");
@@ -279,7 +346,8 @@ namespace ECUFlasher
             {
                 command.WatchConnection(App);
                 command.AddWatchedProperty(App, "OperationInProgress");
-                command.AddWatchedProperty(this, "SelectedEepromPreset");
+                command.AddWatchedProperty(this, "SelectedChipSelect");
+                command.AddWatchedProperty(this, "SelectedDevice");
             }
 
             command.CanExecuteMethod = CanExecuteBootmodeEepromCommand;
@@ -300,6 +368,7 @@ namespace ECUFlasher
             {
                 command.AddWatchedProperty(App, "OperationInProgress");
                 command.AddWatchedProperty(this, "HasEepromImage");
+                command.AddWatchedProperty(this, "SelectedDevice");
             }
 
             command.CanExecuteMethod = canExecute;
@@ -320,9 +389,15 @@ namespace ECUFlasher
                 return false;
             }
 
-            if (mDisplayedImage == null || mDisplayedImage.Length != Me7Eeprom95040Checksum.EepromSize)
+            if (mDisplayedImage == null)
             {
                 reasonsDisabled.Add("No EEPROM image loaded");
+                return false;
+            }
+
+            if (!Is95040Layout(mDisplayedImage))
+            {
+                reasonsDisabled.Add("Immo, lockout, and P0602 apply to a 95040 512-byte image");
                 return false;
             }
 
@@ -331,6 +406,11 @@ namespace ECUFlasher
 
         private bool CanApplyImmo(List<string> reasonsDisabled)
         {
+            if (!CanEditLoadedImage(reasonsDisabled))
+            {
+                return false;
+            }
+
             bool turnOn = Me7Eeprom95040Immo.IsOff(mDisplayedImage);
             if (_ImmoOffCommand != null)
             {
@@ -345,6 +425,11 @@ namespace ECUFlasher
 
         private bool CanApplyP0602(List<string> reasonsDisabled)
         {
+            if (!CanEditLoadedImage(reasonsDisabled))
+            {
+                return false;
+            }
+
             bool set = Me7Eeprom95040Page3031.IsClear(mDisplayedImage);
             if (_ClearP0602Command != null)
             {
@@ -400,7 +485,7 @@ namespace ECUFlasher
 
             if (!HasEepromImage)
             {
-                reasonsDisabled.Add("No 512-byte EEPROM image loaded");
+                reasonsDisabled.Add("No EEPROM image loaded");
                 return false;
             }
 
@@ -429,9 +514,9 @@ namespace ECUFlasher
                 result = false;
             }
 
-            if (SelectedEepromPreset == null)
+            if (SelectedChipSelect == null || SelectedDevice == null)
             {
-                reasonsDisabled.Add("No EEPROM preset selected");
+                reasonsDisabled.Add("No EEPROM device selected");
                 result = false;
             }
 
@@ -447,9 +532,14 @@ namespace ECUFlasher
         private bool CanWriteBootmodeEeprom(List<string> reasonsDisabled)
         {
             bool result = CanExecuteBootmodeEepromCommand(reasonsDisabled);
-            if (!HasEepromImage)
+            if (mDisplayedImage == null)
             {
                 reasonsDisabled.Add("No EEPROM image loaded");
+                result = false;
+            }
+            else if (SelectedDevice == null || mDisplayedImage.Length != SelectedDevice.Size)
+            {
+                reasonsDisabled.Add("EEPROM image size does not match the selected device");
                 result = false;
             }
 
@@ -485,10 +575,17 @@ namespace ECUFlasher
                 return;
             }
 
-            if (image.Length != Me7Eeprom95040Checksum.EepromSize)
+            BootstrapInterface.BootmodeEepromSettings settings = CurrentSettings();
+            if (settings == null)
+            {
+                App.DisplayStatusMessage("No EEPROM device selected.", StatusMessageType.USER);
+                return;
+            }
+
+            if (image.Length != settings.Size)
             {
                 App.DisplayStatusMessage(
-                    "EEPROM file is " + image.Length + " bytes; a 95040 image is 512.",
+                    "EEPROM file is " + image.Length + " bytes; the selected device is " + settings.Size + " bytes.",
                     StatusMessageType.USER);
                 return;
             }
@@ -504,7 +601,8 @@ namespace ECUFlasher
             }
 
             // This button saves the image on screen. Backup before write applies only to Write EEPROM.
-            TrySaveBytes(mDisplayedImage, "Save EEPROM File", "eeprom-95040.bin", "EEPROM", out _);
+            string defaultName = Is95040Layout(mDisplayedImage) ? "eeprom-95040.bin" : "eeprom.bin";
+            TrySaveBytes(mDisplayedImage, "Save EEPROM File", defaultName, "EEPROM", out _);
         }
 
         private void OnReadBootmodeEeprom()
@@ -583,7 +681,8 @@ namespace ECUFlasher
 
         private void StartRead()
         {
-            if (SelectedEepromPreset == null || !ReadBootmodeEepromCommand.IsEnabled)
+            BootstrapInterface.BootmodeEepromSettings settings = CurrentSettings();
+            if (settings == null || !ReadBootmodeEepromCommand.IsEnabled)
             {
                 return;
             }
@@ -594,7 +693,7 @@ namespace ECUFlasher
                 return;
             }
 
-            var operation = new BootmodeReadEepromOperation(bootstrap, SelectedEepromPreset.Settings);
+            var operation = new BootmodeReadEepromOperation(bootstrap, settings);
             StartBootmodeEepromOperation(operation, OnReadBootmodeEepromCompleted);
         }
 
@@ -627,7 +726,7 @@ namespace ECUFlasher
 
         private void OnWriteBootmodeEeprom()
         {
-            if (!WriteBootmodeEepromCommand.IsEnabled || SelectedEepromPreset == null)
+            if (!WriteBootmodeEepromCommand.IsEnabled || CurrentSettings() == null)
             {
                 return;
             }
@@ -647,7 +746,8 @@ namespace ECUFlasher
             if (mPendingOriginal != null && chkBackupBeforeWrite.IsChecked == true)
             {
                 string backupPath;
-                if (!TrySaveBytes(mPendingOriginal, "Save EEPROM backup before write", "eeprom-95040-backup.bin", "EEPROM backup", out backupPath))
+                string backupName = Is95040Layout(mPendingOriginal) ? "eeprom-95040-backup.bin" : "eeprom-backup.bin";
+                if (!TrySaveBytes(mPendingOriginal, "Save EEPROM backup before write", backupName, "EEPROM backup", out backupPath))
                 {
                     App.DisplayStatusMessage("Write cancelled. Backup was not saved. Chip was not modified.", StatusMessageType.USER);
                     return;
@@ -659,8 +759,13 @@ namespace ECUFlasher
                 ? "On-screen image"
                 : "On-screen image (" + mPendingSummary + ")";
 
-            if (SelectedEepromPreset.Settings.EepromType == BootstrapInterface.BootmodeEepromType.Type95040
-                && dataToWrite.Length >= Me7Eeprom95040Checksum.EepromSize)
+            BootstrapInterface.BootmodeEepromSettings settings = CurrentSettings();
+            if (settings == null)
+            {
+                return;
+            }
+
+            if (Is95040Layout(dataToWrite))
             {
                 var checksum = Me7Eeprom95040Checksum.Validate(dataToWrite);
                 if (!checksum.AllChecksumPagesValid)
@@ -698,7 +803,7 @@ namespace ECUFlasher
                 "WRITE physical SPI EEPROM (not KWP mirror).\n\n"
                 + "Source: " + sourceName + "\n"
                 + "Size: " + dataToWrite.Length + " bytes\n"
-                + "Preset: " + SelectedEepromPreset.DisplayName + "\n"
+                + "Preset: " + SelectedChipSelect.DisplayName + ", " + SelectedDevice.DisplayName + "\n"
                 + "Verify after write: " + (verify ? "yes" : "no") + "\n\n"
                 + "This can affect immobilizer / VIN / adaptations.\n"
                 + (chkBackupBeforeWrite.IsChecked == true
@@ -713,11 +818,11 @@ namespace ECUFlasher
                 return;
             }
 
-            mWriteImage = dataToWrite.Length == Me7Eeprom95040Checksum.EepromSize ? dataToWrite : null;
+            mWriteImage = dataToWrite;
             mWriteCaption = verify ? "Written and verified" : "Written (not verified)";
             var operation = new BootmodeWriteEepromOperation(
                 bootstrap,
-                SelectedEepromPreset.Settings,
+                settings,
                 dataToWrite,
                 verify);
             StartBootmodeEepromOperation(operation, OnWriteBootmodeEepromCompleted);
@@ -762,11 +867,13 @@ namespace ECUFlasher
                 App.DisplayStatusMessage(caption, StatusMessageType.USER);
             }
             Pages.Clear();
-            mDisplayedImage = (image != null && image.Length == Me7Eeprom95040Checksum.EepromSize)
-                ? image
-                : null;
+            mDisplayedImage = (image != null && image.Length > 0) ? image : null;
             OnPropertyChanged(new PropertyChangedEventArgs("HasEepromImage"));
+            RefreshGrid();
+        }
 
+        private void RefreshGrid()
+        {
             if (mDisplayedImage == null)
             {
                 ShowEmptyLegend();
@@ -774,13 +881,21 @@ namespace ECUFlasher
                 return;
             }
 
-            var validation = Me7Eeprom95040Checksum.Validate(image);
-            ShowLegend(image, validation.AllChecksumPagesValid);
-
-            for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
+            Pages.Clear();
+            if (Is95040Layout(mDisplayedImage))
             {
-                Pages.Add(BuildRow(image, page, validation.PageChecksumKinds[page]));
+                var validation = Me7Eeprom95040Checksum.Validate(mDisplayedImage);
+                ShowLegend(mDisplayedImage, validation.AllChecksumPagesValid);
+                for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
+                {
+                    Pages.Add(BuildRow(mDisplayedImage, page, validation.PageChecksumKinds[page]));
+                }
+
+                return;
             }
+
+            ShowEmptyLegend();
+            AddPlainRows(mDisplayedImage);
         }
 
         private void ShowEmptyLegend()
@@ -831,17 +946,38 @@ namespace ECUFlasher
         private void ShowPlaceholder()
         {
             Pages.Clear();
-            for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
+            int size = SelectedDevice != null ? (int)SelectedDevice.Size : Me7Eeprom95040Checksum.EepromSize;
+            AddByteRows(size, true, null);
+        }
+
+        private void AddPlainRows(byte[] image)
+        {
+            Pages.Clear();
+            AddByteRows(image.Length, false, image);
+        }
+
+        private void AddByteRows(int size, bool empty, byte[] image)
+        {
+            int pageSize = Me7Eeprom95040Checksum.PageSize;
+            if (size <= 0)
             {
-                Pages.Add(BuildEmptyRow(page));
+                return;
+            }
+
+            int pages = (size + pageSize - 1) / pageSize;
+            for (int page = 0; page < pages; page++)
+            {
+                int count = Math.Min(pageSize, size - (page * pageSize));
+                Pages.Add(empty ? BuildEmptyRow(page, count) : BuildPlainRow(image, page, count));
             }
         }
 
-        private static EepromPageRow BuildEmptyRow(int page)
+        private static EepromPageRow BuildEmptyRow(int page, int count)
         {
             int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
-            var cells = new List<EepromByteCell>(Me7Eeprom95040Checksum.PageSize);
-            for (int index = 0; index < Me7Eeprom95040Checksum.PageSize; index++)
+            var cells = new List<EepromByteCell>(count);
+            var ascii = new List<EepromAsciiChar>(count);
+            for (int index = 0; index < count; index++)
             {
                 cells.Add(new EepromByteCell
                 {
@@ -849,11 +985,6 @@ namespace ECUFlasher
                     Kind = "Empty",
                     ToolTip = "No EEPROM loaded"
                 });
-            }
-
-            var ascii = new List<EepromAsciiChar>(Me7Eeprom95040Checksum.PageSize);
-            for (int index = 0; index < Me7Eeprom95040Checksum.PageSize; index++)
-            {
                 ascii.Add(new EepromAsciiChar
                 {
                     Text = ".",
@@ -867,6 +998,38 @@ namespace ECUFlasher
                 Offset = "0x" + pageOffset.ToString("X3"),
                 Ascii = ascii,
                 Kind = "Empty",
+                Cells = cells
+            };
+        }
+
+        private static EepromPageRow BuildPlainRow(byte[] image, int page, int count)
+        {
+            int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
+            var cells = new List<EepromByteCell>(count);
+            var ascii = new List<EepromAsciiChar>(count);
+            for (int index = 0; index < count; index++)
+            {
+                int offset = pageOffset + index;
+                byte value = image[offset];
+                bool printable = value >= 32 && value <= 126;
+                cells.Add(new EepromByteCell
+                {
+                    Hex = value.ToString("X2"),
+                    Kind = "Plain",
+                    ToolTip = "0x" + offset.ToString("X3")
+                });
+                ascii.Add(new EepromAsciiChar
+                {
+                    Text = (printable ? ((char)value).ToString() : "."),
+                    Kind = "Plain",
+                    ToolTip = "0x" + offset.ToString("X3")
+                });
+            }
+
+            return new EepromPageRow
+            {
+                Offset = "0x" + pageOffset.ToString("X3"),
+                Ascii = ascii,
                 Cells = cells
             };
         }

@@ -1,6 +1,6 @@
 # Bootmode
 
-Bootmode is a different protocol on the same K-line: the C167 bootstrap loader instead of KWP2000. Use it when KWP2000 will not start a session, after a failed entire-flash erase, or to read/write the physical SPI EEPROM (95040) on ME7.1 / ME7.5.
+Bootmode is a different protocol on the same K-line: the C167 bootstrap loader instead of KWP2000. Use it when KWP2000 will not start a session, after a failed entire-flash erase, or to read/write the physical EEPROM.
 
 Connect setup and cables: [Getting started](getting-started.md). NAK / wrong ACK: [Troubleshooting](troubleshooting.md#bootmode-nak-or-wrong-ack).
 
@@ -10,9 +10,9 @@ Flash read/write uses the **Flashing** tab. The protocol combo at the top of the
 
 - KWP connect or programming session is dead
 - Entire-flash erase left the ECU unable to boot
-- Physical 95040 dump or write (not the KWP EEPROM mirror)
+- Physical EEPROM dump or write (not the KWP EEPROM mirror)
 
-Simos 3.x and EDC15: bootmode flash only (layout auto-detect). EEPROM presets on the **Bootmode EEPROM** tab are ME7.1 / ME7.5.
+Simos 3.x and EDC15 flash layout is auto-detected. EEPROM chip select on the **Bootmode EEPROM** tab includes ME7.1, ME7.5, ME7.1.1, Simos 3.2, and EDC15 I2C.
 
 ## Entry and power
 
@@ -61,23 +61,39 @@ After EEPROM access, the EEPROM driver has overwritten the flash driver at `0xF6
 
 On the **Bootmode EEPROM** tab, which is hidden unless the protocol combo is **Boot Mode**. Read and write need a bootmode connection. **Read EEPROM Mirror** stays on **KWP2000 Info**; that is the KWP page at `0x6001E0`, not this chip.
 
-Presets:
+Chip select:
 
-- `ME7.1 - 95040 SSC P4.7 (512 B)`
-- `ME7.5 - 95040 SSC P4.7 (512 B)`
-- XSSC variants of the same (try if SSC fails)
+- `ME7.1 P4.7`
+- `ME7.5 P4.7`
+- `ME7.1.1 P6.3`
+- `Simos 3.2 P6.4`
+- `EDC15 I2C` (no pin)
 
-The grid is read-only: 32 pages of 16 bytes. With no image loaded it stays on screen as grey `00`s, and the legend stays grey. After a read or open, the legend shows the Immo, SKC, `P0602`, and Lockout values, then Checksum **ok** in green or **not ok** in red. The ASCII column highlights the ECU part number at `0x1C2` (11 characters), both tool ID copies at `0x1E2` and `0x1F2` (6 characters), both VIN copies (`0xB5`–`0xB9` plus `0xD0`–`0xDB`, and `0xC5`–`0xC9` plus `0xE0`–`0xEB`), and both immobilizer IDs (`0xDC` plus `0xF0`–`0xFC`, and `0xEC` plus `0x100`–`0x10C`). Hover a highlighted character for the field name. A non-printable byte is `.`.
+Device, for a SPI chip select. The default is `95040 SSC 512 B`.
 
-**Load EEPROM File** displays a file. **Read EEPROM** dumps the chip and shows it. It does not ask for confirmation. **Save EEPROM File** writes the image on screen to a `.bin`. None of those program the chip.
+- `95040` SSC or XSSC, 256 B or 512 B
+- `95080` SSC or XSSC, 1024 B
+- `95160` SSC or XSSC, 2048 B
+- `95320` SSC or XSSC, 4096 B
+- `93S46` SSC, 128 B
+- `93S56` SSC, 256 B
+- `93S66` SSC, 512 B
+- `93S76` SSC, 1024 B
+- `93S86` SSC, 2048 B
 
-**Write EEPROM** programs that image. It stays disabled until an image is loaded. Immobilizer / VIN / adaptations can change. If data-page checksums are invalid:
+EDC15 replaces that list with `24C04 I2C 512 B` (the default) and `24C02 I2C 256 B`.
+
+The grid is read-only, 16 bytes per row. With no image loaded it stays on screen as grey `00`s for the selected device size, and the legend stays grey. A `95040` 512-byte image shows 32 rows. The legend then shows the Immo, SKC, `P0602`, and Lockout values, then Checksum **ok** in green or **not ok** in red. The ASCII column highlights the ECU part number at `0x1C2` (11 characters), both tool ID copies at `0x1E2` and `0x1F2` (6 characters), both VIN copies (`0xB5`–`0xB9` plus `0xD0`–`0xDB`, and `0xC5`–`0xC9` plus `0xE0`–`0xEB`), and both immobilizer IDs (`0xDC` plus `0xF0`–`0xFC`, and `0xEC` plus `0x100`–`0x10C`). Hover a highlighted character for the field name. A non-printable byte is `.`. Any other device size is plain hex, with a grey legend.
+
+**Load EEPROM File** displays a file of the selected device size. **Read EEPROM** dumps the chip and shows it. It does not ask for confirmation. **Save EEPROM File** writes the image on screen to a `.bin`. None of those program the chip.
+
+**Write EEPROM** programs that image. It stays disabled until the image length matches the selected device. Immobilizer / VIN / adaptations can change. If data-page checksums are invalid on a `95040` 512-byte image:
 
 - **Yes** — correct data-page checksums, then continue (pages 28–29 are left unchanged)
 - **No** — write the image as-is
 - **Cancel** — abort
 
-**Immo Off**, **Reset Lockout**, and **Clear P0602** edit the image on screen only. Each stays disabled when no image is loaded. **Reset Lockout** also stays disabled when the lockout bytes are already `00 00`. When immo is already off, that button reads **Immo On**. When bit 7 is already clear, that button reads **Set P0602**. The legend sits under the hex. Read, load, save, and edit results are lines in the status window. A line under the legend says a write is still pending. **Backup before write** starts on and is remembered in `preferences.json`. When it is on, a pending edit asks for a `.bin` of the image from before those edits. **Verify Write** applies.
+**Immo Off**, **Reset Lockout**, and **Clear P0602** edit a `95040` 512-byte image on screen only. On any other device they stay disabled. Each stays disabled when no image is loaded. **Reset Lockout** also stays disabled when the lockout bytes are already `00 00`. When immo is already off, that button reads **Immo On**. When bit 7 is already clear, that button reads **Set P0602**. The legend sits under the hex. Read, load, save, and edit results are lines in the status window. A line under the legend says a write is still pending. **Backup before write** starts on and is remembered in `preferences.json`. When it is on, a pending edit asks for a `.bin` of the image from before those edits. **Verify Write** applies.
 
 - **Immo Off** sets `0x012` and `0x022` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Page 1 and page 2 checksums are corrected.
 - **Reset Lockout** sets `0x1EC`–`0x1ED` and `0x1FC`–`0x1FD` to `00 00`. The `P0602` flag and counters stay. Page 30 and page 31 checksums are corrected when those bytes change. This is the lockout field measured on ME7.5.
