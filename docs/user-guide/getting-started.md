@@ -85,6 +85,8 @@ Slow init is the default. Use it on the bench and in the car unless you already 
 
 On the documented bench units (one ME7.1 and one ME7.5, both 29F800), slow init and fast init both work with FTDI and CH340. Other flash images may differ. There is no automatic fallback from fast to slow.
 
+Every KWP connect logs the ECU part number when the ECU reports it. A KWP1281 exchange logs it as `KWP1281 connect info:`. Otherwise the tool asks for the KWP2000 identification fields right after connect and logs lines such as `ECU Vehicle Manufacturer Spare Part Number: ...`, without changing session or baud. An ECU that refuses that request stays connected.
+
 ### Which connect address
 
 - **`0x01` (default)** works on every ME7. On many ECUs it first runs a short exchange in the older KWP1281 protocol (the log shows `KWP1281 connect info:`), then a second slow init switches to KWP2000. About 10 seconds from Connect on the bench.

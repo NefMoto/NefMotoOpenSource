@@ -80,12 +80,14 @@ namespace ECUFlasher
                 return;
             }
 
-            if (!KWP2000CommInterface.ConsumeSlowInitFellThroughToKwp2000Address())
+            if (KWP2000CommInterface.ConsumeSlowInitFellThroughToKwp2000Address())
             {
-                return;
+                RunOnUi(StartSlowInitFallbackBaud);
             }
-
-            RunOnUi(StartSlowInitFallbackBaud);
+            else if (KWP2000CommInterface.Kwp1281ConnectInfo == null)
+            {
+                RunOnUi(StartConnectIdentRead);
+            }
         }
 
         private static void RunOnUi(Action action)
@@ -133,6 +135,34 @@ namespace ECUFlasher
         private void SlowInitFallbackBaudCompleted(Operation operation, bool success)
         {
             operation.CompletedOperationEvent -= SlowInitFallbackBaudCompleted;
+            FinishConnectOperation(operation, success ? null : "Switching baud did not finish.", StatusMessageType.USER);
+        }
+
+        // No KWP1281 ident on this connect: ask for the part-number ident fields.
+        private void StartConnectIdentRead()
+        {
+            if ((App == null) || !KWP2000CommInterface.IsConnected() || App.OperationInProgress)
+            {
+                return;
+            }
+
+            App.OperationInProgress = true;
+            App.PercentOperationComplete = -1.0f;
+
+            var operation = new ReadConnectIdentOperation(KWP2000CommInterface);
+            App.CurrentOperation = operation;
+            operation.CompletedOperationEvent += ConnectIdentReadCompleted;
+            operation.Start();
+        }
+
+        private void ConnectIdentReadCompleted(Operation operation, bool success)
+        {
+            operation.CompletedOperationEvent -= ConnectIdentReadCompleted;
+            FinishConnectOperation(operation, success ? null : "ECU identification read on connect did not finish.", StatusMessageType.LOG);
+        }
+
+        private void FinishConnectOperation(Operation operation, string failure, StatusMessageType failureType)
+        {
             RunOnUi(() =>
             {
                 if (App == null)
@@ -140,9 +170,9 @@ namespace ECUFlasher
                     return;
                 }
 
-                if (!success)
+                if (failure != null)
                 {
-                    KWP2000CommInterface.DisplayStatusMessage("Switching baud did not finish.", StatusMessageType.USER);
+                    KWP2000CommInterface.DisplayStatusMessage(failure, failureType);
                 }
 
                 if (App.CurrentOperation == operation)

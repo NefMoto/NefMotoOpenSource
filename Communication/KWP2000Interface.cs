@@ -1077,6 +1077,7 @@ namespace Communication
                         //this way we can respect the old settings when we start connecting
                         shouldReset = true;
                         mSlowInitFellThroughToKwp2000Address = false;
+                        Kwp1281ConnectInfo = null;
                     }
                     else if (_ConnectionStatus == ConnectionStatusType.Connected)
                     {
@@ -2514,6 +2515,7 @@ namespace Communication
 
             if ((ASCIIData.Length > 0) && sendOK)
             {
+                Kwp1281ConnectInfo = ASCIIData;
                 DisplayStatusMessage("KWP1281 connect info: " + ASCIIData, StatusMessageType.USER);
                 if (KWP2000RamProgramIdent.ContainsRamProgramIdent(ASCIIData))
                 {
@@ -2580,6 +2582,9 @@ namespace Communication
             return value;
         }
         private bool mSlowInitFellThroughToKwp2000Address;
+
+        // ASCII ident from this attempt's KWP1281 session, or null if none ran.
+        public string Kwp1281ConnectInfo { get; private set; }
 
         protected bool Connect_SlowInit()
         {

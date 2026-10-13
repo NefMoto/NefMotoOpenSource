@@ -3424,6 +3424,46 @@ namespace Communication
         private byte[] mIdentOptionsInScalingTable;
     };
 
+    // Part-number ident in the session and baud connect left. A refused option is skipped.
+    public class ReadConnectIdentOperation : KWP2000SequencialOperation
+    {
+        public ReadConnectIdentOperation(KWP2000Interface commInterface)
+            : base(commInterface)
+        {
+            mActionArray = new KWP2000IdentificationOption[]
+            {
+                KWP2000IdentificationOption.vehicleManufacturerSparePartNumber,
+                KWP2000IdentificationOption.vehicleManufacturerECUSoftwareNumber,
+                KWP2000IdentificationOption.systemSupplierECUSoftwareNumber,
+                KWP2000IdentificationOption.calibrationDate,
+            }.Select(option => (KWP2000Action)new ReadECUIdentificationAction(commInterface, (byte)option)).ToArray();
+        }
+
+        public static string IdentText(byte[] data)
+        {
+            return (data == null) ? "" : new string(data.Select(b => (char)b).Where(c => (c >= ' ') && (c < 0x7F)).ToArray()).Trim();
+        }
+
+        protected override void OnActionCompleted(CommunicationAction action, bool success)
+        {
+            var identAction = action as ReadECUIdentificationAction;
+            string text = success ? IdentText(identAction?.IdentificationData) : "";
+
+            if (text.Length > 0)
+            {
+                var name = DescriptionAttributeConverterLogic.GetDescriptionAttribute((KWP2000IdentificationOption)identAction.IdentificationOption);
+                CommInterface.DisplayStatusMessage("ECU " + name + ": " + text, StatusMessageType.USER);
+
+                if (KWP2000RamProgramIdent.ContainsRamProgramIdent(text))
+                {
+                    CommInterface.DisplayStatusMessage(KWP2000RamProgramIdent.UserStatusMessage, StatusMessageType.USER);
+                }
+            }
+
+            base.OnActionCompleted(action, action.CompletedWithoutCommunicationError);
+        }
+    };
+
     public class ReadDiagnosticTroubleCodesOperation : KWP2000SequencialOperation
     {
         public ReadDiagnosticTroubleCodesOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
