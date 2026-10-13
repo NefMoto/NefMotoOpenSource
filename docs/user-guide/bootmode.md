@@ -22,7 +22,7 @@ Typical ME7 boot pin is **24** (hold at the level your pinout specifies while ap
 
 The app reports **Put ECU in boot mode** if the handshake never starts.
 
-If ident shows the loader core already running (`0xAA`) with no stored flash ID: disconnect, power-cycle to a full boot entry, reconnect so the flash type can be read.
+If the loader core is already running (`0xAA`) and this session has no stored flash ID, the app still uploads the flash driver and reads the flash type with `FC_GETSTATE`. If that query fails, the app shows **Flash Type Not Detected** and flash read and write stay disabled. Disconnect, power-cycle to a full boot entry, and reconnect.
 
 ## Baud
 
@@ -45,7 +45,7 @@ Then **KWP2000 Info** → **Read ECU Info** (device ID, CPU family, SYSCON / BUS
 
 ## Flash
 
-On **Flashing**, the layout combo is **disabled**. Layout comes from the flash device ID (`FC_GETSTATE`). Tooltip shows base address, size, and sector count when detection succeeded.
+On **Flashing**, the layout combo is **disabled**. Layout comes from the flash device ID (`FC_GETSTATE`). Tooltip shows base address, size, and sector count when detection succeeded. A running core gets the same driver upload and `FC_GETSTATE`. If that query fails, the combo shows **Flash type not detected** and **Flash Type Not Detected** appears.
 
 - **Full Read Flash** / **Full Write Flash**
 - **Diff Read Flash** is not supported in bootmode (the loader has no checksum-for-range)

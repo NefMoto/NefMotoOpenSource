@@ -170,7 +170,10 @@ namespace ECUFlasher
                         // Drop the in-memory layout so the next bootmode connect detects again.
                         // Keep the detected file name; disconnect-then-KWP reloads it.
                         // Must run on UI thread - PropertyChanged can fire from SendReceive thread
-                        if (FlashMemoryLayout != null || IsMemoryLayoutOK)
+                        bool prompted = mFlashTypeUndetectedPromptShown;
+                        mFlashTypeUndetectedPromptShown = false;
+                        mFlashDetectPromptGeneration++;
+                        if (FlashMemoryLayout != null || IsMemoryLayoutOK || prompted)
                         {
                             Dispatcher.BeginInvoke(new Action(() =>
                             {
@@ -395,23 +398,60 @@ namespace ECUFlasher
             string errorMessage;
             if (!bootstrapInterface.GetBootmodeFlashLayout(out layout, out errorMessage))
             {
-                Dispatcher.Invoke((Action)(() =>
+                string unavailable = bootstrapInterface.GetBootmodeFlashLayoutUnavailableReason();
+                bool showPrompt = !String.IsNullOrEmpty(unavailable) && !mFlashTypeUndetectedPromptShown;
+                int promptGeneration = mFlashDetectPromptGeneration;
+                if (showPrompt)
                 {
-                    string placeholder = "Auto-detected (requires bootmode)";
-                    if (!AvailableMemoryLayouts.Contains(placeholder))
-                    {
-                        AvailableMemoryLayouts.Insert(0, placeholder);
-                    }
-                    mSelectedMemoryLayout = placeholder;
-                    OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
-                    OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
-                }));
+                    mFlashTypeUndetectedPromptShown = true;
+                    promptGeneration = ++mFlashDetectPromptGeneration;
+                }
+
+                // BeginInvoke so the dialog does not block the bootmode send thread.
+                Dispatcher.BeginInvoke(new Action(() => ShowBootmodeLayoutDetectionFailed(unavailable, showPrompt, promptGeneration)));
                 return;
             }
 
             ushort deviceID = bootstrapInterface.LastKnownFlashDeviceID;
             MemoryLayout layoutForClosure = layout;
             Dispatcher.Invoke((Action)(() => ApplyBootmodeDetection(deviceID, layoutForClosure)));
+        }
+
+        private void ShowBootmodeLayoutDetectionFailed(string unavailableReason, bool showPrompt, int promptGeneration)
+        {
+            if (App == null || App.CommInterface == null || App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
+            {
+                return;
+            }
+
+            if (showPrompt && (promptGeneration != mFlashDetectPromptGeneration || !App.CommInterface.IsConnected()))
+            {
+                return;
+            }
+
+            string placeholder = String.IsNullOrEmpty(unavailableReason)
+                ? "Auto-detected (requires bootmode)"
+                : FlashTypeNotDetectedLayoutName;
+            if (!AvailableMemoryLayouts.Contains(placeholder))
+            {
+                AvailableMemoryLayouts.Insert(0, placeholder);
+            }
+            mSelectedMemoryLayout = placeholder;
+            OnPropertyChanged(new PropertyChangedEventArgs("SelectedMemoryLayout"));
+            OnPropertyChanged(new PropertyChangedEventArgs("MemoryLayoutToolTip"));
+
+            if (!showPrompt)
+            {
+                return;
+            }
+
+            App.DisplayStatusMessage("Flash type could not be detected. " + unavailableReason, StatusMessageType.USER);
+            App.DisplayUserPrompt(
+                "Flash Type Not Detected",
+                "The flash type could not be detected. The bootmode runtime was already running, so flash read and write stay disabled."
+                + Environment.NewLine + Environment.NewLine
+                + unavailableReason,
+                UserPromptType.OK);
         }
 
         private void ApplyBootmodeDetection(ushort deviceID, MemoryLayout generated)
@@ -555,6 +595,9 @@ namespace ECUFlasher
         private string mMemoryLayoutFileName;
         private string mDetectedLayoutBasename;
         private MemoryLayout mDetectedBootmodeLayout;
+        private bool mFlashTypeUndetectedPromptShown;
+        private int mFlashDetectPromptGeneration;
+        private const string FlashTypeNotDetectedLayoutName = "Flash type not detected";
 
         private static string MemoryLayoutBasename(string path)
         {
@@ -612,7 +655,7 @@ namespace ECUFlasher
                         }
 
                         // No stored flash device ID available
-                        string placeholder = "Auto-detected (requires bootmode)";
+                        string placeholder = FlashTypeNotDetectedLayoutName;
                         if (!AvailableMemoryLayouts.Contains(placeholder))
                         {
                             AvailableMemoryLayouts.Insert(0, placeholder);

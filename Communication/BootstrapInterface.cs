@@ -35,10 +35,10 @@ namespace Communication
     /// Logs every failure path; check log line immediately before high-level message for reason. Compare failing run (e.g. CH340) to success (e.g. FTDI) line-by-line.
     /// </summary>
     /// <remarks>
-    /// <para><b>State:</b> DeviceID 0xAA = core already running. LastKnownFlashDeviceID preserved across disconnect; layout available when core running if we have it from same session.</para>
-    /// <para><b>Limitations:</b> Diff read not supported (MiniMon has no checksum-for-range). Core running: cannot load flash driver; layout only if LastKnownFlashDeviceID from prior connect. LastKnownFlashDeviceID not persisted across app restart.</para>
+    /// <para><b>State:</b> DeviceID 0xAA = core already running. LastKnownFlashDeviceID preserved across disconnect. A running core with no stored flash ID still gets LoadFlashDriver plus FC_GETSTATE.</para>
+    /// <para><b>Limitations:</b> Diff read not supported (MiniMon has no checksum-for-range). LastKnownFlashDeviceID is not persisted across app restart. Flash ID query uses the ME7 driver and bus setup.</para>
     /// <para><b>I/O:</b> SendBytes/ReceiveBytes loop until full count or timeout; ReceiveBytes Math.Max(minTimeoutMs, numBytes*3) ms (default min 1000; MiniMon_Call uses 3000 to match C167BootTool ser.timeout=3); Write timeout ~data.Length*5 ms for echo.</para>
-    /// <para><b>Troubleshooting:</b> 0xFD (NAK) vs 0xEA often baud/timing; FTDI more reliable. Connection failed: "Put ECU in boot mode". Core running, no LastKnownFlashDeviceID: "Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type."</para>
+    /// <para><b>Troubleshooting:</b> 0xFD (NAK) vs 0xEA often baud/timing; FTDI more reliable. Connection failed: "Put ECU in boot mode". Core running and FC_GETSTATE failed: flashing UI dialog "Flash Type Not Detected", then "Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type."</para>
     /// <para><b>Constants:</b> CPU IDs 0x55/0xA5/0xB5/0xC5/0xD5, 0xAA core running. Flash IDs 0x22AB/0x2258/0x2223/0x22D6. Driver 0x00F600. ME7 base 0x800000, Simos3/EDC15 0x400000.</para>
     /// <para><b>TODO:</b> Automatic retry on sector/block failure (retry block read or sector erase+program N times before failing). Persist LastKnownFlashDeviceID in ECU RAM (requires safe address).</para>
     /// </remarks>
@@ -394,8 +394,8 @@ namespace Communication
         ///   Core uploaded, no driver yet                Yes (after LoadFlashDriver)   No
         ///   Core uploaded, driver loaded                Yes                           Yes (generated)
         ///   Core uploaded, driver load failed           No                            No
-        ///   Core running, have LastKnownFlashDeviceID   No                            Yes (from cache)
-        ///   Core running, no LastKnownFlashDeviceID     No                            No
+        ///   Core running, have LastKnownFlashDeviceID   Yes (cached ID, no I/O)       Yes (from cache)
+        ///   Core running, no LastKnownFlashDeviceID     Yes (LoadFlashDriver)         If FC_GETSTATE succeeds
         /// </remarks>
         public enum BootmodeFlashLayoutStatus
         {
@@ -1894,8 +1894,8 @@ namespace Communication
 
         /// <summary>
         /// Gets bootmode flash layout. Single entry point for UI, read, and write.
-        /// If DeviceID == 0xAA (core running): uses LastKnownFlashDeviceID; fails if 0.
-        /// Otherwise: loads driver, reads flash device ID, generates layout.
+        /// If DeviceID == 0xAA and LastKnownFlashDeviceID != 0: uses the stored ID.
+        /// Otherwise, including a running core with no stored ID: loads the ME7 driver, reads the flash device ID, generates layout.
         /// Updates mLastBootmodeLayout / mLastBootmodeLayoutError on success/failure. Cache cleared by ResetBootmodeConnectionState.
         /// </summary>
         /// <param name="layout">Output layout, or null on failure</param>
@@ -1919,20 +1919,10 @@ namespace Communication
             ushort deviceID = 0;
             const byte CORE_ALREADY_RUNNING = 0xAA;
 
-            if (DeviceID == CORE_ALREADY_RUNNING)
+            if (DeviceID == CORE_ALREADY_RUNNING && LastKnownFlashDeviceID != 0)
             {
-                if (LastKnownFlashDeviceID != 0)
-                {
-                    deviceID = LastKnownFlashDeviceID;
-                    DisplayStatusMessage($"Using stored flash device ID: 0x{deviceID:X4} (core already running)", StatusMessageType.USER);
-                }
-                else
-                {
-                    errorMessage = "Core is already running and no stored flash device ID available. Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type.";
-                    mLastBootmodeLayout = null;
-                    mLastBootmodeLayoutError = errorMessage;
-                    return false;
-                }
+                deviceID = LastKnownFlashDeviceID;
+                DisplayStatusMessage($"Using stored flash device ID: 0x{deviceID:X4} (core already running)", StatusMessageType.USER);
             }
             else
             {
