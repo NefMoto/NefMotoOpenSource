@@ -142,4 +142,10 @@
   <data name="BootmodeEepromDriverXSSC" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ST10XDriver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="BootmodeEepromDriver93" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\SSC_93_Driver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="BootmodeEepromDriver24C" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\24C0xDriver.bin;System.Byte[], mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
 </root>

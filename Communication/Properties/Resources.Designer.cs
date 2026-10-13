@@ -139,6 +139,26 @@ namespace Communication.Properties {
                 return ((byte[])(obj));
             }
         }
+
+        /// <summary>
+        ///   SPI EEPROM driver for 93S46/56/76. From C167BootTool SSC_93_Driver.bin.
+        /// </summary>
+        internal static byte[] BootmodeEepromDriver93 {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeEepromDriver93", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+
+        /// <summary>
+        ///   I2C EEPROM driver for 24C02/24C04. From C167BootTool 24C0xDriver.bin.
+        /// </summary>
+        internal static byte[] BootmodeEepromDriver24C {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeEepromDriver24C", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }
 

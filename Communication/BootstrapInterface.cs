@@ -129,11 +129,12 @@ namespace Communication
             EDC15       // EDC15 variant - 0x400000 base address (top boot)
         }
 
-        /// <summary>SPI peripheral used by the bootmode EEPROM driver (C167BootTool -SSC / -XSSC).</summary>
+        /// <summary>EEPROM peripheral (C167BootTool -SSC / -XSSC / -I2C).</summary>
         public enum BootmodeEepromPeriph
         {
             SSC,
-            XSSC
+            XSSC,
+            I2C
         }
 
         /// <summary>EEPROM chip type codes from C167BootTool (ME7.1/7.5 use 95040 = 1).</summary>
@@ -2482,10 +2483,10 @@ namespace Communication
         #region Bootmode SPI EEPROM (95040)
 
         /// <summary>
-        /// Uploads the SSC or XSSC EEPROM SPI driver to 0xF600. Overwrites any flash driver —
+        /// Uploads an EEPROM driver to 0xF600. Overwrites any flash driver —
         /// call <see cref="LoadFlashDriver"/> again before flash operations.
         /// </summary>
-        public bool LoadEepromDriver(BootmodeEepromPeriph periph)
+        public bool LoadEepromDriver(BootmodeEepromTransfer.DriverId driver)
         {
             if (!IsConnected())
             {
@@ -2493,23 +2494,10 @@ namespace Communication
                 return false;
             }
 
-            byte[] driverData = null;
-            switch (periph)
-            {
-                case BootmodeEepromPeriph.SSC:
-                    driverData = Properties.Resources.BootmodeEepromDriverSSC;
-                    break;
-                case BootmodeEepromPeriph.XSSC:
-                    driverData = Properties.Resources.BootmodeEepromDriverXSSC;
-                    break;
-                default:
-                    DisplayStatusMessage($"Unknown EEPROM peripheral: {periph}", StatusMessageType.USER);
-                    return false;
-            }
-
+            byte[] driverData = EepromDriverBytes(driver);
             if (driverData == null || driverData.Length == 0)
             {
-                DisplayStatusMessage($"EEPROM driver data is null or empty for {periph}", StatusMessageType.USER);
+                DisplayStatusMessage($"EEPROM driver data is null or empty for {driver}", StatusMessageType.USER);
                 return false;
             }
 
@@ -2521,8 +2509,25 @@ namespace Communication
                 return false;
             }
 
-            DisplayStatusMessage($"EEPROM driver loaded ({periph}, {driverData.Length} bytes). Reload flash driver before flash ops.", StatusMessageType.USER);
+            DisplayStatusMessage($"EEPROM driver loaded ({driver}, {driverData.Length} bytes). Reload flash driver before flash ops.", StatusMessageType.USER);
             return true;
+        }
+
+        private static byte[] EepromDriverBytes(BootmodeEepromTransfer.DriverId driver)
+        {
+            switch (driver)
+            {
+                case BootmodeEepromTransfer.DriverId.Ssc25:
+                    return Properties.Resources.BootmodeEepromDriverSSC;
+                case BootmodeEepromTransfer.DriverId.Xssc25:
+                    return Properties.Resources.BootmodeEepromDriverXSSC;
+                case BootmodeEepromTransfer.DriverId.Ssc93:
+                    return Properties.Resources.BootmodeEepromDriver93;
+                case BootmodeEepromTransfer.DriverId.I2c24:
+                    return Properties.Resources.BootmodeEepromDriver24C;
+                default:
+                    return null;
+            }
         }
 
         /// <summary>Enable XSSC peripheral (XPERCON + SYSCON). Required before XSSC EEPROM driver use.</summary>
@@ -2595,7 +2600,8 @@ namespace Communication
         }
 
         /// <summary>
-        /// Load driver, optional XSSC setup, patch CS, and verify driver state (0xF0 or 0x80).
+        /// Load the driver for this type and peripheral, optional XSSC setup, optional CS patch,
+        /// and for 95040/95080 verify driver state (0xF0 or 0x80).
         /// </summary>
         public bool PrepareEepromDriver(BootmodeEepromSettings settings, out ushort driverState)
         {
@@ -2607,22 +2613,34 @@ namespace Communication
                 return false;
             }
 
-            if (settings.Periph == BootmodeEepromPeriph.XSSC)
+            BootmodeEepromTransfer.Choice choice;
+            if (!BootmodeEepromTransfer.TryChoose(settings.Periph, settings.EepromType, out choice))
             {
-                if (!ConfigureXsscForEeprom())
-                {
-                    return false;
-                }
+                DisplayStatusMessage(
+                    $"EEPROM type {(ushort)settings.EepromType} is not supported on {settings.Periph}.",
+                    StatusMessageType.USER);
+                return false;
             }
 
-            if (!LoadEepromDriver(settings.Periph))
+            if (choice.ConfigureXssc && !ConfigureXsscForEeprom())
             {
                 return false;
             }
 
-            if (!PatchEepromChipSelect(settings.PortNumber, settings.PinNumber))
+            if (!LoadEepromDriver(choice.Driver))
             {
                 return false;
+            }
+
+            if (choice.PatchChipSelect && !PatchEepromChipSelect(settings.PortNumber, settings.PinNumber))
+            {
+                return false;
+            }
+
+            if (!choice.RequireDriverState)
+            {
+                DisplayStatusMessage($"EEPROM driver {choice.Driver} ready. No state check for this chip.", StatusMessageType.LOG);
+                return true;
             }
 
             if (!GetEepromDriverState(out driverState))
@@ -2780,13 +2798,20 @@ namespace Communication
             }
 
             data = new byte[size];
-            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: false, progress))
+            BootmodeEepromTransfer.Choice choice;
+            if (!BootmodeEepromTransfer.TryChoose(settings.Periph, settings.EepromType, out choice))
             {
                 data = null;
                 return false;
             }
 
-            DisplayStatusMessage($"Read EEPROM OK: {size} bytes (state was 0x{state:X4}).", StatusMessageType.USER);
+            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: false, choice.ReadBlockLength, progress))
+            {
+                data = null;
+                return false;
+            }
+
+            DisplayStatusMessage("Read EEPROM OK: " + size + " bytes" + EepromStateNote(choice, state) + ".", StatusMessageType.USER);
             return true;
         }
 
@@ -2814,7 +2839,13 @@ namespace Communication
             }
 
             uint size = (uint)data.Length;
-            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: true, progress))
+            BootmodeEepromTransfer.Choice choice;
+            if (!BootmodeEepromTransfer.TryChoose(settings.Periph, settings.EepromType, out choice))
+            {
+                return false;
+            }
+
+            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: true, choice.WriteBlockLength, progress))
             {
                 return false;
             }
@@ -2824,7 +2855,7 @@ namespace Communication
                 DisplayStatusMessage("Verifying EEPROM write...", StatusMessageType.USER);
                 // Driver already prepared; read blocks directly without re-Prepare
                 byte[] readBack = new byte[size];
-                if (!TransferEepromBlocks(settings.EepromType, readBack, size, writing: false, progress: null))
+                if (!TransferEepromBlocks(settings.EepromType, readBack, size, writing: false, choice.ReadBlockLength, progress: null))
                 {
                     return false;
                 }
@@ -2841,12 +2872,23 @@ namespace Communication
                 DisplayStatusMessage("EEPROM write verified OK.", StatusMessageType.USER);
             }
 
-            DisplayStatusMessage($"Write EEPROM OK: {size} bytes (state was 0x{state:X4}).", StatusMessageType.USER);
+            DisplayStatusMessage("Write EEPROM OK: " + size + " bytes" + EepromStateNote(choice, state) + ".", StatusMessageType.USER);
             return true;
         }
 
+        private static string EepromStateNote(BootmodeEepromTransfer.Choice choice, ushort state)
+        {
+            if (!choice.RequireDriverState)
+            {
+                return "";
+            }
+
+            return " (state was 0x" + state.ToString("X4") + ")";
+        }
+
         /// <summary>
-        /// Read or write EEPROM in DefaultBlockLength chunks. Buffer is destination when reading, source when writing.
+        /// Read or write EEPROM in blockLength chunks. The last block is shorter when size is not a multiple.
+        /// Buffer is destination when reading, source when writing.
         /// Assumes the EEPROM driver is already prepared.
         /// </summary>
         private bool TransferEepromBlocks(
@@ -2854,9 +2896,10 @@ namespace Communication
             byte[] buffer,
             uint size,
             bool writing,
+            ushort blockLength,
             Action<uint, uint> progress)
         {
-            if (buffer == null || buffer.Length < size)
+            if (buffer == null || buffer.Length < size || blockLength == 0)
             {
                 return false;
             }
@@ -2864,7 +2907,7 @@ namespace Communication
             uint offset = 0;
             while (offset < size)
             {
-                ushort blockLen = (ushort)Math.Min(DefaultBlockLength, size - offset);
+                ushort blockLen = (ushort)Math.Min(blockLength, size - offset);
                 if (writing)
                 {
                     byte[] block = new byte[blockLen];
