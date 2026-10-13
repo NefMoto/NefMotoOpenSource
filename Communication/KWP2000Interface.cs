@@ -893,6 +893,7 @@ namespace Communication
         protected bool mReceiveBufferIsDirty = false;
         protected uint mNumPreceedingEchoBytesToIgnore = 0;
         protected byte[] mOutstandingEchoBytes = null;
+        protected bool mCh340EchoMismatch = false;
 
         //data for message pending send
         protected Queue<KWP2000Message> mMessagesPendingSend;
@@ -3866,7 +3867,25 @@ connectEndTime = connectStartTime + connectTime + 3;
                         stream.Write(messageBytes, 0, messageBytes.Length);
                         stream.Close();
 #endif
-                        uint totalBytesWritten = TransmitBytes(currentMessageDataBytes);
+                        long p4MinMs = CurrentTimingParameters.P4TesterInterByteTimeMinMs;
+                        if (!IsConnected())
+                        {
+                            p4MinMs = P4TesterInterByteTimeMinMsWhenConnecting;
+                        }
+
+                        // CH340 drops the echo of a single long Write(). Slice that path and
+                        // consume the echo here so it is not armed again below.
+                        bool echoDrainedDuringSend = false;
+                        uint totalBytesWritten;
+                        if (ShouldUseCh340EchoSlices(currentMessageDataBytes, p4MinMs))
+                        {
+                            totalBytesWritten = TransmitBytesCh340Sliced(currentMessageDataBytes, preceedingBytesToIgnore);
+                            echoDrainedDuringSend = true;
+                        }
+                        else
+                        {
+                            totalBytesWritten = TransmitBytes(currentMessageDataBytes);
+                        }
 
                         mCurrentMessageSentProperly = (totalBytesWritten == currentMessageDataBytes.Length);
 
@@ -3885,7 +3904,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         }
 
                         //we need to consume the echo even if the message is only partially sent
-                        if (mConsumeTransmitEcho && (totalBytesWritten > 0))
+                        if (mConsumeTransmitEcho && (totalBytesWritten > 0) && !echoDrainedDuringSend)
                         {
                             Debug.Assert(mNumPreceedingEchoBytesToIgnore == 0);
                             Debug.Assert(mOutstandingEchoBytes == null);
@@ -3916,6 +3935,155 @@ connectEndTime = connectStartTime + connectTime + 3;
             }
 
             return sentMessage;
+        }
+
+        // CH340 receive FIFO is ~32 bytes and is not drained during one Write().
+        // Read the echo of each 16-byte slice before the next write. That stays
+        // under the FIFO. The pause is the echo of one slice, about 2 ms at
+        // 124800, and under the 20 ms inter-byte cap at slower bauds.
+        const int CH340_ECHO_SLICE_BYTES = 16;
+        const int CH340_ECHO_SLICE_MARGIN_MS = 10;
+
+        uint Ch340EchoSliceBaud()
+        {
+            uint baud = DiagnosticSessionBaudRate;
+            if (baud == (uint)KWP2000BaudRates.BAUD_UNSPECIFIED)
+            {
+                baud = DEFAULT_COMMUNICATION_BAUD_RATE;
+            }
+
+            return baud;
+        }
+
+        bool ShouldUseCh340EchoSlices(byte[] messageBytes, long p4MinMs)
+        {
+            return mConsumeTransmitEcho
+                && (mCommunicationDevice != null)
+                && (mCommunicationDevice.Type == DeviceType.CH340)
+                && (p4MinMs == 0)
+                && (messageBytes != null)
+                && (messageBytes.Length > CH340_ECHO_SLICE_BYTES);
+        }
+
+        uint TransmitBytesCh340Sliced(byte[] messageBytes, uint precedingEchoBytesToIgnore)
+        {
+            mCh340EchoMismatch = false;
+            mNumPreceedingEchoBytesToIgnore = precedingEchoBytesToIgnore;
+            mOutstandingEchoBytes = new byte[messageBytes.Length];
+            messageBytes.CopyTo(mOutstandingEchoBytes, 0);
+
+            Stopwatch sendTimer = Stopwatch.StartNew();
+            long drainMs = 0;
+            int sliceCount = 0;
+            uint echoed = 0;
+            for (int offset = 0; offset < messageBytes.Length; )
+            {
+                int sliceLen = Math.Min(CH340_ECHO_SLICE_BYTES, messageBytes.Length - offset);
+                byte[] slice = new byte[sliceLen];
+                Array.Copy(messageBytes, offset, slice, 0, sliceLen);
+
+                uint numWritten = 0;
+                bool writeOk = mCommunicationDevice.Write(slice, slice.Length, ref numWritten, 4) && (numWritten == (uint)sliceLen);
+                sliceCount++;
+                Stopwatch drainTimer = Stopwatch.StartNew();
+                bool drained = writeOk && DrainCh340EchoSlice((uint)sliceLen);
+                drainMs += drainTimer.ElapsedMilliseconds;
+                if (!drained)
+                {
+                    mOutstandingEchoBytes = null;
+                    mNumPreceedingEchoBytesToIgnore = 0;
+                    LogCh340EchoSliceTiming(messageBytes.Length, sliceCount, sendTimer.ElapsedMilliseconds, drainMs);
+                    DisplayStatusMessage("Did not transmit bytes properly.", StatusMessageType.LOG);
+                    return echoed;
+                }
+
+                offset += sliceLen;
+                echoed = (uint)offset;
+            }
+
+            LogCh340EchoSliceTiming(messageBytes.Length, sliceCount, sendTimer.ElapsedMilliseconds, drainMs);
+            return echoed;
+        }
+
+        void LogCh340EchoSliceTiming(int byteCount, int sliceCount, long totalMs, long drainMs)
+        {
+            uint baud = Ch340EchoSliceBaud();
+
+            DisplayStatusMessage("CH340 echo slices: " + byteCount + " bytes, " + sliceCount
+                + " slices, " + baud + " baud, " + totalMs + " ms total, " + drainMs + " ms waiting for echo.",
+                StatusMessageType.DEV);
+        }
+
+        bool DrainCh340EchoSlice(uint sliceLen)
+        {
+            mCh340EchoMismatch = false;
+
+            uint messageRemaining = (mOutstandingEchoBytes == null) ? 0u : (uint)mOutstandingEchoBytes.Length;
+            if (messageRemaining < sliceLen)
+            {
+                return false;
+            }
+
+            uint targetRemaining = messageRemaining - sliceLen;
+            uint baud = Ch340EchoSliceBaud();
+
+            long deadlineMs = ((sliceLen * 10L * 1000L) / baud) + CH340_ECHO_SLICE_MARGIN_MS;
+            Stopwatch sliceTimer = Stopwatch.StartNew();
+
+            while (true)
+            {
+                if (mCh340EchoMismatch)
+                {
+                    return false;
+                }
+
+                if (Ch340SliceEchoDrained(targetRemaining))
+                {
+                    return true;
+                }
+
+                uint avail = 0;
+                if (!mCommunicationDevice.GetRxBytesAvailable(ref avail, 4))
+                {
+                    return false;
+                }
+
+                // A pending read is what makes the CH340 driver pull the chip FIFO.
+                // BytesToRead stays 0 until that happens, so read one byte when the queue looks empty.
+                uint toRead = (avail > 0) ? avail : 1;
+                ReadAndAppendToReceiveBuffer(toRead);
+
+                if (mCh340EchoMismatch)
+                {
+                    return false;
+                }
+
+                if (Ch340SliceEchoDrained(targetRemaining))
+                {
+                    return true;
+                }
+
+                if (sliceTimer.ElapsedMilliseconds > deadlineMs)
+                {
+                    DisplayStatusMessage("CH340 echo slice timed out.", StatusMessageType.LOG);
+                    return false;
+                }
+            }
+        }
+
+        bool Ch340SliceEchoDrained(uint targetRemaining)
+        {
+            if (mNumPreceedingEchoBytesToIgnore != 0)
+            {
+                return false;
+            }
+
+            if (targetRemaining == 0)
+            {
+                return mOutstandingEchoBytes == null;
+            }
+
+            return (mOutstandingEchoBytes != null) && ((uint)mOutstandingEchoBytes.Length == targetRemaining);
         }
 
         protected uint TransmitBytes(byte[] messageBytes)
@@ -4023,6 +4191,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                 if (!foundEcho)
                 {
+                    mCh340EchoMismatch = true;
                     DisplayStatusMessage("Read incorrect echo from ECU while sending message bytes. Matched first " + numEchoBytesMatched + " of " + numReceivedEchoBytes + " bytes.", StatusMessageType.LOG);
 
                     if (mOutstandingEchoBytes != null)
