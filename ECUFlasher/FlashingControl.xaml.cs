@@ -636,33 +636,6 @@ namespace ECUFlasher
                         return mSelectedMemoryLayout;
                     }
 
-                    var bootstrapInterface = App.CommInterface as BootstrapInterface;
-                    const byte DEVICE_ID_CORE_RUNNING = 0xAA;
-
-                    // Check if core is already running - try to use stored flash device ID
-                    if (bootstrapInterface != null && bootstrapInterface.DeviceID == DEVICE_ID_CORE_RUNNING)
-                    {
-                        // Try to use stored flash device ID if available and layout is already generated
-                        if (bootstrapInterface.LastKnownFlashDeviceID != 0 && FlashMemoryLayout != null && FlashMemoryLayout.Validate() && IsMemoryLayoutOK)
-                        {
-                            // Layout is available from stored device ID
-                            string storedString = $"Auto-detected (stored): {FlashMemoryLayout.Size / 1024}KB, {FlashMemoryLayout.SectorSizes.Count} sectors";
-                            if (!AvailableMemoryLayouts.Contains(storedString))
-                            {
-                                AvailableMemoryLayouts.Insert(0, storedString);
-                            }
-                            return storedString;
-                        }
-
-                        // No stored flash device ID available
-                        string placeholder = FlashTypeNotDetectedLayoutName;
-                        if (!AvailableMemoryLayouts.Contains(placeholder))
-                        {
-                            AvailableMemoryLayouts.Insert(0, placeholder);
-                        }
-                        return placeholder;
-                    }
-
                     if (FlashMemoryLayout != null && FlashMemoryLayout.Validate() && IsMemoryLayoutOK)
                     {
                         // Layout is detected, return the auto-detected string

@@ -35,12 +35,12 @@ namespace Communication
     /// Logs every failure path; check log line immediately before high-level message for reason. Compare failing run (e.g. CH340) to success (e.g. FTDI) line-by-line.
     /// </summary>
     /// <remarks>
-    /// <para><b>State:</b> DeviceID 0xAA = core already running. LastKnownFlashDeviceID preserved across disconnect. A running core with no stored flash ID still gets LoadFlashDriver plus FC_GETSTATE.</para>
-    /// <para><b>Limitations:</b> Diff read not supported (MiniMon has no checksum-for-range). LastKnownFlashDeviceID is not persisted across app restart. Flash ID query uses the ME7 driver and bus setup.</para>
+    /// <para><b>State:</b> DeviceID 0xAA = core already running. LastKnownFlashDeviceID is this connection's FC_GETSTATE result and is cleared on disconnect. A running core always gets LoadFlashDriver plus FC_GETSTATE. A flash id from an earlier connect is not reused.</para>
+    /// <para><b>Limitations:</b> Diff read not supported (MiniMon has no checksum-for-range). Flash ID query uses the ME7 driver and bus setup.</para>
     /// <para><b>I/O:</b> SendBytes/ReceiveBytes loop until full count or timeout; ReceiveBytes Math.Max(minTimeoutMs, numBytes*3) ms (default min 1000; MiniMon_Call uses 3000 to match C167BootTool ser.timeout=3); Write timeout ~data.Length*5 ms for echo.</para>
     /// <para><b>Troubleshooting:</b> 0xFD (NAK) vs 0xEA often baud/timing; FTDI more reliable. Connection failed: "Put ECU in boot mode". Core running and FC_GETSTATE failed: flashing UI dialog "Flash Type Not Detected", then "Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type."</para>
     /// <para><b>Constants:</b> CPU IDs 0x55/0xA5/0xB5/0xC5/0xD5, 0xAA core running. Flash IDs 0x22AB/0x2258/0x2223/0x22D6. Driver 0x00F600. ME7 base 0x800000, Simos3/EDC15 0x400000.</para>
-    /// <para><b>TODO:</b> Automatic retry on sector/block failure (retry block read or sector erase+program N times before failing). Persist LastKnownFlashDeviceID in ECU RAM (requires safe address).</para>
+    /// <para><b>TODO:</b> Automatic retry on sector/block failure (retry block read or sector erase+program N times before failing).</para>
     /// </remarks>
     public class BootstrapInterface : CommunicationInterface
     {
@@ -321,8 +321,7 @@ namespace Communication
         private byte _LastKnownDeviceID = 0;
 
         /// <summary>
-        /// The last known flash device ID (from FC_GETSTATE).
-        /// This is stored when we successfully read the flash device ID and can be used when core is already running.
+        /// Flash device ID from this connection's FC_GETSTATE. Cleared on disconnect.
         /// </summary>
         public ushort LastKnownFlashDeviceID
         {
@@ -356,13 +355,13 @@ namespace Communication
         /// Connection lifecycle:
         ///   State                               DeviceID              LastKnownFlashDeviceID
         ///   --------------------------------    ------------------    ----------------------
-        ///   Not connected                       0 (stale)             0 or stale
-        ///   Connection pending                  -                     -
-        ///   Connection failed                   0                     unchanged
+        ///   Not connected                       0                     0
+        ///   Connection pending                  0                     0
+        ///   Connection failed                   0                     0
         ///   ECU not in boot mode                0                     0
-        ///   Connected, core uploaded            0x55/0xA5/etc         0 or detected
-        ///   Connected, core already running     0xAA                  0 or from same session
-        ///   Disconnected                        stale                 preserved
+        ///   Connected, core uploaded            0x55/0xA5/etc         0 until FC_GETSTATE
+        ///   Connected, core already running     0xAA                  0 until FC_GETSTATE
+        ///   Disconnected                        0                     0
         /// </remarks>
         public struct BootmodeConnectionState
         {
@@ -394,8 +393,7 @@ namespace Communication
         ///   Core uploaded, no driver yet                Yes (after LoadFlashDriver)   No
         ///   Core uploaded, driver loaded                Yes                           Yes (generated)
         ///   Core uploaded, driver load failed           No                            No
-        ///   Core running, have LastKnownFlashDeviceID   Yes (cached ID, no I/O)       Yes (from cache)
-        ///   Core running, no LastKnownFlashDeviceID     Yes (LoadFlashDriver)         If FC_GETSTATE succeeds
+        ///   Core running                                Yes (LoadFlashDriver)         If FC_GETSTATE succeeds
         /// </remarks>
         public enum BootmodeFlashLayoutStatus
         {
@@ -1555,7 +1553,7 @@ namespace Communication
 
                     if (shouldReset)
                     {
-                        // Clears layout cache; FlashingControl.CommInterface_PropertyChanged clears FlashMemoryLayout on disconnect
+                        // Clears layout cache and flash device ID; FlashingControl.CommInterface_PropertyChanged clears FlashMemoryLayout on disconnect
                         ResetBootmodeConnectionState();
                         mCommunicationDevice?.Purge(PurgeType.RX | PurgeType.TX);
                     }
@@ -1894,9 +1892,9 @@ namespace Communication
 
         /// <summary>
         /// Gets bootmode flash layout. Single entry point for UI, read, and write.
-        /// If DeviceID == 0xAA and LastKnownFlashDeviceID != 0: uses the stored ID.
-        /// Otherwise, including a running core with no stored ID: loads the ME7 driver, reads the flash device ID, generates layout.
-        /// Updates mLastBootmodeLayout / mLastBootmodeLayoutError on success/failure. Cache cleared by ResetBootmodeConnectionState.
+        /// Loads the ME7 driver and reads the flash device ID with FC_GETSTATE, including when the core is already running.
+        /// A flash id from an earlier connect is not reused.
+        /// Updates mLastBootmodeLayout / mLastBootmodeLayoutError on success/failure. Cache and LastKnownFlashDeviceID are cleared by ResetBootmodeConnectionState.
         /// </summary>
         /// <param name="layout">Output layout, or null on failure</param>
         /// <param name="errorMessage">Error description on failure</param>
@@ -1916,32 +1914,23 @@ namespace Communication
 
             ECUFlashVariant variant = ECUFlashVariant.ME7;
             uint baseAddress = GetFlashBaseAddress(variant);
-            ushort deviceID = 0;
-            const byte CORE_ALREADY_RUNNING = 0xAA;
+            ushort deviceID;
 
-            if (DeviceID == CORE_ALREADY_RUNNING && LastKnownFlashDeviceID != 0)
+            DisplayStatusMessage("Loading flash driver for device identification...", StatusMessageType.USER);
+            if (!LoadFlashDriver(variant))
             {
-                deviceID = LastKnownFlashDeviceID;
-                DisplayStatusMessage($"Using stored flash device ID: 0x{deviceID:X4} (core already running)", StatusMessageType.USER);
+                errorMessage = "Flash driver load failed. Check ECU variant (ME7/Simos3/EDC15).";
+                mLastBootmodeLayout = null;
+                mLastBootmodeLayoutError = errorMessage;
+                return false;
             }
-            else
-            {
-                DisplayStatusMessage("Loading flash driver for device identification...", StatusMessageType.USER);
-                if (!LoadFlashDriver(variant))
-                {
-                    errorMessage = "Flash driver load failed. Check ECU variant (ME7/Simos3/EDC15).";
-                    mLastBootmodeLayout = null;
-                    mLastBootmodeLayoutError = errorMessage;
-                    return false;
-                }
 
-                if (!GetFlashDeviceID(variant, out deviceID))
-                {
-                    errorMessage = "Failed to read flash device ID. Wrong variant, bad connection, or unsupported flash chip.";
-                    mLastBootmodeLayout = null;
-                    mLastBootmodeLayoutError = errorMessage;
-                    return false;
-                }
+            if (!GetFlashDeviceID(variant, out deviceID))
+            {
+                errorMessage = "Failed to read flash device ID. Wrong variant, bad connection, or unsupported flash chip.";
+                mLastBootmodeLayout = null;
+                mLastBootmodeLayoutError = errorMessage;
+                return false;
             }
 
             if (!GenerateMemoryLayoutFromDeviceID(deviceID, baseAddress, out layout))
@@ -1958,15 +1947,16 @@ namespace Communication
         }
 
         /// <summary>
-        /// Clears connection-specific bootmode state: DeviceID and layout cache.
-        /// LastKnownDeviceID and LastKnownFlashDeviceID are preserved across disconnect so that
-        /// reconnect (same app session) with core already running (0xAA) can still resolve layout.
+        /// Clears connection-specific bootmode state: DeviceID, LastKnownFlashDeviceID, and the layout cache.
+        /// LastKnownDeviceID is preserved across disconnect so a reconnect to a core this process
+        /// uploaded can still name the CPU. A flash id from an earlier connect is not reused.
         /// Called from ConnectionStatus setter when transitioning to ConnectionPending, Disconnected, DisconnectionPending, or CommunicationTerminated.
         /// </summary>
         private void ResetBootmodeConnectionState()
         {
             mLastBootmodeLayout = null;
             mLastBootmodeLayoutError = null;
+            LastKnownFlashDeviceID = 0;
             if (_DeviceID != 0)
             {
                 _DeviceID = 0;
@@ -2306,7 +2296,7 @@ namespace Communication
 
             DisplayStatusMessage($"Flash device ID: 0x{deviceID:X4}", StatusMessageType.USER);
 
-            // Store the flash device ID for reuse when core is already running
+            // Store the flash device ID for this connection. Cleared on disconnect.
             LastKnownFlashDeviceID = deviceID;
 
             return true;
