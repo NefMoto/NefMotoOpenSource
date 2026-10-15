@@ -24,7 +24,7 @@ At startup the app asks GitHub (`api.github.com`) for the list of releases, at m
 The app never downloads or installs anything itself; you run the new MSI yourself.
 
 - **Help → Check for Updates...** checks right away and also reports when you are up to date.
-- **Help → Check for Updates at Startup** turns the startup check off or on.
+- **Help → Check for Updates at Startup** turns the startup check off or on. Turning it on clears the last-check time, so the next startup checks immediately.
 - Pre-releases (`-rc` tags) are only offered when the running build is itself a pre-release.
 - During a read or write, a found update is written to the status text instead of opening the window.
 - Builds from source without a release tag cannot be compared, so the startup check skips them.

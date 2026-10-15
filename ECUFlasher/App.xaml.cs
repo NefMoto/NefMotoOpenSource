@@ -902,6 +902,18 @@ namespace ECUFlasher
                 if (Preferences.CheckForUpdatesAtStartup != value)
                 {
                     Preferences.CheckForUpdatesAtStartup = value;
+                    if (value)
+                    {
+                        Preferences.LastUpdateCheckUtc = null;
+                        try
+                        {
+                            SavePreferences();
+                        }
+                        catch (Exception ex)
+                        {
+                            DisplayStatusMessage("Settings save failed after enabling update check: " + ex.Message, StatusMessageType.LOG);
+                        }
+                    }
                     OnPropertyChanged(new PropertyChangedEventArgs("CheckForUpdatesAtStartup"));
                 }
             }
