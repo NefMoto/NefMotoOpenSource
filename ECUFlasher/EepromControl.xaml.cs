@@ -1166,9 +1166,14 @@ namespace ECUFlasher
                 return "Immo status at 0x" + offset.ToString("X3") + ". 0x01 on, 0x02 off";
             }
 
+            if (role == Me7Eeprom95040Fields.Role.ImmoState)
+            {
+                return "Immobiliser state word, written by the ECU at runtime. Not the SKC";
+            }
+
             if (role == Me7Eeprom95040Fields.Role.Skc)
             {
-                return "SKC";
+                return "SKC, little-endian, shown in the legend as 5 decimal digits. FF FF when none is stored";
             }
 
             if (role == Me7Eeprom95040Fields.Role.P0602Flag)
