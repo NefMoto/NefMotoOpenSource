@@ -829,6 +829,7 @@ namespace ECUFlasher
             App.DisplayStatusMessage("Reading EEPROM through the KWP mirror at 0x600000.", StatusMessageType.USER);
             var operation = new ReadEntireSerialEEPROMOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, true);
             StartBootmodeEepromOperation(operation, OnReadKwpEepromCompleted);
+            App.PercentOperationComplete = -1.0f;   // indeterminate, like the page 30 read
         }
 
         private void OnReadKwpEepromCompleted(Operation operation, bool success)

@@ -591,7 +591,9 @@ namespace Communication
                 mPageActions[page].RefusalIsExpected = true;
             }
 
-            mReadRAMAction = new ReadMemoryAction(commInterface, EXTERNAL_RAM_START_ADDRESS, EXTERNAL_RAM_SIZE, DEFAULT_MAX_BLOCK_SIZE, this.OnRAMBytesRead);
+            // No progress updates: the read takes a few seconds, and each whole percent
+            // prints its own status line.
+            mReadRAMAction = new ReadMemoryAction(commInterface, EXTERNAL_RAM_START_ADDRESS, EXTERNAL_RAM_SIZE, DEFAULT_MAX_BLOCK_SIZE, null);
         }
 
         protected override void ResetOperation()
@@ -665,8 +667,6 @@ namespace Communication
                 {
                     FailureResponseCode = pageAction.FailureResponseCode;
                 }
-
-                OnUpdatePercentComplete(((float)(page + 1) / (float)(mPageActions.Length + (mFillFromShadow ? 1 : 0))) * 100.0f);
             }
             else if (action == mReadRAMAction)
             {
@@ -707,13 +707,6 @@ namespace Communication
             }
 
             return message + (mFillFromShadow ? " The RAM shadow is tried after the chip read." : " It is left FF.");
-        }
-
-        private bool OnRAMBytesRead(uint newAmountRead, uint totalRead, uint totalToRead, ReadMemoryAction runningAction)
-        {
-            float pages = mPageActions.Length;
-            OnUpdatePercentComplete(((pages + ((float)totalRead / (float)totalToRead)) / (pages + 1)) * 100.0f);
-            return true;
         }
 
         /// <summary>512 bytes; pages that could not be read are FF.</summary>
