@@ -217,6 +217,47 @@ namespace ECUFlasher
         }
         private ReactiveCommand _ReadBootmodeEepromCommand;
 
+        public ReactiveCommand ReadKwpEepromCommand
+        {
+            get
+            {
+                if (_ReadKwpEepromCommand == null)
+                {
+                    _ReadKwpEepromCommand = new ReactiveCommand(this.OnReadKwpEeprom);
+                    _ReadKwpEepromCommand.Name = "Read EEPROM (KWP)";
+                    _ReadKwpEepromCommand.Description = "Read the 95040 through the KWP mirror at 0x600000, filling withheld pages from the RAM shadow. Reads only; the chip is not changed.";
+
+                    if (App != null)
+                    {
+                        _ReadKwpEepromCommand.WatchConnection(App);
+                        _ReadKwpEepromCommand.AddWatchedProperty(App, "OperationInProgress");
+                        WatchKwpDiagnosticSession();
+                        App.PropertyChanged += (sender, e) =>
+                        {
+                            if (e.PropertyName == "CommInterface")
+                            {
+                                WatchKwpDiagnosticSession();
+                            }
+                        };
+                    }
+
+                    _ReadKwpEepromCommand.CanExecuteMethod = CanExecuteKwpEepromCommand;
+                }
+
+                return _ReadKwpEepromCommand;
+            }
+        }
+        private ReactiveCommand _ReadKwpEepromCommand;
+
+        private void WatchKwpDiagnosticSession()
+        {
+            var kwp = App.CommInterface as KWP2000Interface;
+            if ((_ReadKwpEepromCommand != null) && (kwp != null))
+            {
+                _ReadKwpEepromCommand.ReplaceWatchedProperty(kwp, "CurrentDiagnosticSessionType");
+            }
+        }
+
         public ReactiveCommand SaveEepromCommand
         {
             get
@@ -247,6 +288,9 @@ namespace ECUFlasher
         }
 
         private byte[] mDisplayedImage;
+
+        // Pages of the on-screen image a KWP read could not get; they are FF, not chip data.
+        private List<int> mMissingPages = new List<int>();
 
         public ReactiveCommand WriteBootmodeEepromCommand
         {
@@ -529,12 +573,56 @@ namespace ECUFlasher
             return result;
         }
 
+        private bool CanExecuteKwpEepromCommand(List<string> reasonsDisabled)
+        {
+            if (App == null)
+            {
+                reasonsDisabled.Add("Internal program error");
+                return false;
+            }
+
+            bool result = true;
+
+            if (!App.CommInterface.IsConnected())
+            {
+                reasonsDisabled.Add("Not connected to ECU");
+                result = false;
+            }
+
+            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+            {
+                reasonsDisabled.Add("Requires KWP2000 protocol (use Read EEPROM in bootmode)");
+                result = false;
+            }
+
+            KWP2000Interface kwp = App.CommInterface as KWP2000Interface;
+            if ((kwp != null) && (kwp.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession))
+            {
+                reasonsDisabled.Add("ECU is in a programming session. Turn the ignition off first.");
+                result = false;
+            }
+
+            if (App.OperationInProgress)
+            {
+                reasonsDisabled.Add("Another operation is in progress");
+                result = false;
+            }
+
+            return result;
+        }
+
         private bool CanWriteBootmodeEeprom(List<string> reasonsDisabled)
         {
             bool result = CanExecuteBootmodeEepromCommand(reasonsDisabled);
             if (mDisplayedImage == null)
             {
                 reasonsDisabled.Add("No EEPROM image loaded");
+                result = false;
+            }
+            else if (mMissingPages.Count > 0)
+            {
+                // Writing FF over the pages the ECU withheld would erase the SKC.
+                reasonsDisabled.Add("Image is missing page(s) " + string.Join(", ", mMissingPages) + " from the KWP read. Read the chip in bootmode to write it");
                 result = false;
             }
             else if (SelectedDevice == null || mDisplayedImage.Length != SelectedDevice.Size)
@@ -724,6 +812,90 @@ namespace ECUFlasher
             }), null);
         }
 
+        private void OnReadKwpEeprom()
+        {
+            if (!ReadKwpEepromCommand.IsEnabled)
+            {
+                return;
+            }
+
+            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if (kwpViewModel == null)
+            {
+                App.DisplayStatusMessage("Reading the EEPROM over KWP needs a KWP2000 connection.", StatusMessageType.USER);
+                return;
+            }
+
+            App.DisplayStatusMessage("Reading EEPROM through the KWP mirror at 0x600000.", StatusMessageType.USER);
+            var operation = new ReadEntireSerialEEPROMOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, true);
+            StartBootmodeEepromOperation(operation, OnReadKwpEepromCompleted);
+        }
+
+        private void OnReadKwpEepromCompleted(Operation operation, bool success)
+        {
+            // BeginInvoke so the completion does not block the KWP send thread.
+            Dispatcher.BeginInvoke((Action)(() =>
+            {
+                operation.CompletedOperationEvent -= OnReadKwpEepromCompleted;
+
+                var readOp = operation as ReadEntireSerialEEPROMOperation;
+                if (!success || readOp == null || readOp.Image == null)
+                {
+                    string failure = "Reading EEPROM over KWP failed.";
+                    if ((readOp != null) && (readOp.FailureResponseCode == (byte)KWP2000ResponseCode.ServiceNotSupported))
+                    {
+                        failure += " The ECU does not serve the EEPROM mirror in this session.";
+                    }
+
+                    FinishBootmodeEepromUi(false, failure);
+                    return;
+                }
+
+                var kwp = App.CommInterface as KWP2000Interface;
+                if (readOp.WithheldPages.Count > 0)
+                {
+                    var refused = new List<string>();
+                    for (int i = 0; i < readOp.WithheldPages.Count; i++)
+                    {
+                        byte code = readOp.WithheldResponseCodes[i];
+                        refused.Add(readOp.WithheldPages[i] + " (" + ((kwp != null) ? kwp.GetResponseCodeString(code) : "0x" + code.ToString("X2")) + ")");
+                    }
+
+                    App.DisplayStatusMessage("ECU withheld mirror page(s): " + string.Join(", ", refused) + ".", StatusMessageType.USER);
+                }
+
+                Me7Eeprom95040Shadow.FillResult fill = readOp.ShadowFill;
+                if (readOp.ShadowReadFailed)
+                {
+                    App.DisplayStatusMessage("The ECU refused the RAM read, so withheld pages were not filled from the shadow.", StatusMessageType.USER);
+                }
+                else if ((fill != null) && !fill.ShadowFound)
+                {
+                    App.DisplayStatusMessage("EEPROM shadow not found in RAM, so withheld pages were not filled.", StatusMessageType.USER);
+                }
+                else if (fill != null)
+                {
+                    App.DisplayStatusMessage(
+                        "EEPROM shadow found at 0x" + fill.ShadowAddress.ToString("X6") + " (" + fill.MatchedPages + " pages agree with the chip)."
+                        + (fill.FilledPages.Count > 0 ? " Filled page(s) " + string.Join(", ", fill.FilledPages) + "; their checksums are valid." : "")
+                        + (fill.RejectedPages.Count > 0 ? " Page(s) " + string.Join(", ", fill.RejectedPages) + " failed the checksum and were not filled." : ""),
+                        StatusMessageType.USER);
+                }
+
+                List<int> missing = readOp.MissingPages;
+                ShowImage((byte[])readOp.Image.Clone(), null, false, missing);
+
+                string statusMessage = "Reading EEPROM over KWP succeeded in: "
+                    + FormatOperationElapsed(operation.OperationElapsedTime) + ".";
+                if (missing.Count > 0)
+                {
+                    statusMessage += " Page(s) " + string.Join(", ", missing) + " are FF (not read). Save keeps them as FF; writing this image is blocked.";
+                }
+
+                FinishBootmodeEepromUi(true, statusMessage);
+            }), null);
+        }
+
         private void OnWriteBootmodeEeprom()
         {
             if (!WriteBootmodeEepromCommand.IsEnabled || CurrentSettings() == null)
@@ -853,13 +1025,14 @@ namespace ECUFlasher
             }), null);
         }
 
-        private void ShowImage(byte[] image, string caption, bool keepPending = false)
+        private void ShowImage(byte[] image, string caption, bool keepPending = false, IList<int> missingPages = null)
         {
             if (!keepPending)
             {
                 mPendingOriginal = null;
                 mPendingSummary = null;
                 WritePendingText = "";
+                mMissingPages = (missingPages != null) ? new List<int>(missingPages) : new List<int>();
             }
 
             if (!string.IsNullOrEmpty(caption))

@@ -209,6 +209,7 @@ Contact by Email: nyet@nyet.org
                 <StackPanel Orientation="Horizontal">
                     <Button Command="{Binding Path=OpenEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
                     <Button Command="{Binding Path=ReadBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                    <Button Command="{Binding Path=ReadKwpEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
                     <Button Command="{Binding Path=ImmoOffCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
                     <Button Command="{Binding Path=ResetLockoutCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
                     <Button Command="{Binding Path=ClearP0602Command}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>

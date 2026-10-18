@@ -128,7 +128,7 @@ Contact by Email: tony@nefariousmotorsports.com
             <TabItem x:Name="KwpLoggingTab" Header="KWP2000 Logging">
                 <ECUFlasher:DataLoggerControl x:Name="DataLogger"/>
             </TabItem>
-            <TabItem x:Name="BootmodeEepromTab" Header="Bootmode EEPROM">
+            <TabItem x:Name="BootmodeEepromTab" Header="EEPROM">
                 <ECUFlasher:EepromControl/>
             </TabItem>
             <TabItem>
