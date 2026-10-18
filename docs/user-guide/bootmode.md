@@ -59,11 +59,11 @@ After EEPROM access, the EEPROM driver has overwritten the flash driver at `0xF6
 
 ## Bootmode EEPROM
 
-On the **EEPROM** tab. **Read EEPROM** and **Write EEPROM** need a bootmode connection. **Read EEPROM Mirror** stays on **KWP2000 Info**; that is the KWP page at `0x6001E0`, not this chip.
+On the **EEPROM** tab. **Read EEPROM** reads the chip in bootmode, or through the KWP mirror over a KWP2000 connection. **Write EEPROM** needs a bootmode connection. **Read EEPROM Mirror** stays on **KWP2000 Info**; that is the KWP page at `0x6001E0`, not this chip.
 
-### Read EEPROM (KWP)
+### Read EEPROM over KWP2000
 
-Without bootmode, **Read EEPROM (KWP)** reads a 95040 over a normal KWP2000 connection. It uses the development session, like **Read EEPROM Mirror**, and reads the mirror at `0x600000` one 16-byte page at a time. No login is needed and nothing is written.
+Connected with KWP2000 instead of bootmode, **Read EEPROM** reads a 95040 through the ECU. It uses the development session, like **Read EEPROM Mirror**, and reads the mirror at `0x600000` one 16-byte page at a time. No login is needed and nothing is written.
 
 ME7.1.1 refuses pages 3 and 4 (SKC and cluster code) with `7F 23 12`. The read logs them as withheld and carries on. Then it reads RAM `0x380000-0x387FFF` and looks for the firmware's EEPROM shadow: one 16-byte slot per record id, in the high byte of the page descriptor. The base is where the most served pages match, and at least 4 must match. A withheld page is taken from its slot only when its own page checksum is valid. On 4Z7907551S `1037367582` the shadow is at `0x383DA8`. There, mirror pages plus shadow pages 3-4 matched a bootmode read except page 17, which changes at every start-up.
 

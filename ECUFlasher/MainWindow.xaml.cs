@@ -61,7 +61,7 @@ namespace ECUFlasher
         private void UpdateProtocolTabs()
         {
             bool boot = App != null && App.DesiredProtocol == CommunicationInterface.Protocol.BootMode;
-            // The EEPROM tab stays up in KWP mode for Read EEPROM (KWP); its bootmode commands disable themselves.
+            // The EEPROM tab stays up in KWP mode: Read EEPROM reads through the KWP mirror; the bootmode commands disable themselves.
             KwpLoggingTab.Visibility = boot ? Visibility.Collapsed : Visibility.Visible;
             if (boot && MainTabs.SelectedItem == KwpLoggingTab)
             {

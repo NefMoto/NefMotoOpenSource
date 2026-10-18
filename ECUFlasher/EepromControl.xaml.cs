@@ -200,46 +200,25 @@ namespace ECUFlasher
         }
         private ReactiveCommand _OpenEepromCommand;
 
-        public ReactiveCommand ReadBootmodeEepromCommand
+        public ReactiveCommand ReadEepromCommand
         {
             get
             {
-                if (_ReadBootmodeEepromCommand == null)
+                if (_ReadEepromCommand == null)
                 {
-                    _ReadBootmodeEepromCommand = CreateBootmodeEepromCommand(
-                        this.OnReadBootmodeEeprom,
+                    _ReadEepromCommand = CreateBootmodeEepromCommand(
+                        this.OnReadEeprom,
                         "Read EEPROM",
-                        "Read physical EEPROM via bootmode; overwrites flash driver until reloaded");
+                        "Bootmode: read the physical EEPROM; overwrites flash driver until reloaded. KWP2000: read the 95040 through the mirror at 0x600000 and fill withheld pages from the RAM shadow");
+                    _ReadEepromCommand.CanExecuteMethod = reasons => (App?.CommInterface?.CurrentProtocol == CommunicationInterface.Protocol.KWP2000)
+                        ? CanExecuteOnProtocol(reasons, CommunicationInterface.Protocol.KWP2000)
+                        : CanExecuteBootmodeEepromCommand(reasons);
                 }
 
-                return _ReadBootmodeEepromCommand;
+                return _ReadEepromCommand;
             }
         }
-        private ReactiveCommand _ReadBootmodeEepromCommand;
-
-        public ReactiveCommand ReadKwpEepromCommand
-        {
-            get
-            {
-                if (_ReadKwpEepromCommand == null)
-                {
-                    _ReadKwpEepromCommand = new ReactiveCommand(this.OnReadKwpEeprom);
-                    _ReadKwpEepromCommand.Name = "Read EEPROM (KWP)";
-                    _ReadKwpEepromCommand.Description = "Read the 95040 through the KWP mirror at 0x600000, filling withheld pages from the RAM shadow. Reads only; the chip is not changed.";
-
-                    if (App != null)
-                    {
-                        _ReadKwpEepromCommand.WatchConnection(App);
-                        _ReadKwpEepromCommand.AddWatchedProperty(App, "OperationInProgress");
-                    }
-
-                    _ReadKwpEepromCommand.CanExecuteMethod = reasons => CanExecuteOnProtocol(reasons, CommunicationInterface.Protocol.KWP2000);
-                }
-
-                return _ReadKwpEepromCommand;
-            }
-        }
-        private ReactiveCommand _ReadKwpEepromCommand;
+        private ReactiveCommand _ReadEepromCommand;
 
         public ReactiveCommand SaveEepromCommand
         {
@@ -651,9 +630,16 @@ namespace ECUFlasher
             TrySaveBytes(mDisplayedImage, "Save EEPROM File", defaultName, "EEPROM", out _);
         }
 
-        private void OnReadBootmodeEeprom()
+        private void OnReadEeprom()
         {
-            StartRead();
+            if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.KWP2000)
+            {
+                StartKwpRead();
+            }
+            else
+            {
+                StartRead();
+            }
         }
 
         private void ApplyLoadedEdit(string title, string caption, Func<byte[], string> edit)
@@ -728,7 +714,7 @@ namespace ECUFlasher
         private void StartRead()
         {
             BootstrapInterface.BootmodeEepromSettings settings = CurrentSettings();
-            if (settings == null || !ReadBootmodeEepromCommand.IsEnabled)
+            if (settings == null || !ReadEepromCommand.IsEnabled)
             {
                 return;
             }
@@ -770,9 +756,9 @@ namespace ECUFlasher
             }), null);
         }
 
-        private void OnReadKwpEeprom()
+        private void StartKwpRead()
         {
-            if (ReadKwpEepromCommand.IsEnabled && (App.CommInterfaceViewModel is KWP2000Interface_ViewModel kwpViewModel))
+            if (ReadEepromCommand.IsEnabled && (App.CommInterfaceViewModel is KWP2000Interface_ViewModel kwpViewModel))
             {
                 App.DisplayStatusMessage("Reading EEPROM through the KWP mirror at 0x600000.", StatusMessageType.USER);
                 StartBootmodeEepromOperation(new ReadEntireSerialEEPROMOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates), OnReadKwpEepromCompleted);
