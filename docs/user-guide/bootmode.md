@@ -80,6 +80,7 @@ Chip select:
 Device, for a SPI chip select. The default is `95040 SSC 512 B`.
 
 - `95040` SSC or XSSC, 256 B or 512 B
+- `95P08` SSC or XSSC, 1024 B. Same driver family as `95040`. Chip select is `ME7.1.1 P6.3`
 - `95080` SSC or XSSC, 1024 B
 - `95160` SSC or XSSC, 2048 B
 - `95320` SSC or XSSC, 4096 B
@@ -91,7 +92,7 @@ Device, for a SPI chip select. The default is `95040 SSC 512 B`.
 
 EDC15 replaces that list with `24C04 I2C 512 B` (the default) and `24C02 I2C 256 B`.
 
-The grid is read-only, 16 bytes per row. With no image loaded it stays on screen as grey `00`s for the selected device size, and the legend stays grey. A `95040` 512-byte image shows 32 rows. The legend then shows the Immo, SKC, `P0602`, and Lockout values, then Checksum **ok** in green or **not ok** in red. The SKC is page 3 bytes 2-3 (`0x032`, copy at `0x042`), little-endian, shown as 5 decimal digits, or **unset** when the bytes are `FF FF`. The word at `0x014`/`0x024` next to the immo flag is an immobiliser state word the ECU writes itself, not the SKC. The ASCII column highlights the ECU part number at `0x1C2` (11 characters), both tool ID copies at `0x1E2` and `0x1F2` (6 characters), both VIN copies (`0xB5`–`0xB9` plus `0xD0`–`0xDB`, and `0xC5`–`0xC9` plus `0xE0`–`0xEB`), and both immobilizer IDs (`0xDC` plus `0xF0`–`0xFC`, and `0xEC` plus `0x100`–`0x10C`). Hover a highlighted character for the field name. A non-printable byte is `.`. Any other device size is plain hex, with a grey legend.
+The grid is read-only, 16 bytes per row. With no image loaded it stays on screen as grey `00`s for the selected device size, and the legend stays grey. A `95040` 512-byte image shows 32 rows. The legend then shows the Immo, SKC, `P0602`, and Lockout values, then Checksum **ok** in green or **not ok** in red. The SKC is page 3 bytes 2-3 (`0x032`, copy at `0x042`), little-endian, shown as 5 decimal digits, or **unset** when the bytes are `FF FF`. The word at `0x014`/`0x024` next to the immo flag is an immobiliser state word the ECU writes itself, not the SKC. The ASCII column highlights the ECU part number at `0x1C2` (11 characters), both tool ID copies at `0x1E2` and `0x1F2` (6 characters), both VIN copies (`0xB5`–`0xB9` plus `0xD0`–`0xDB`, and `0xC5`–`0xC9` plus `0xE0`–`0xEB`), and both immobilizer IDs (`0xDC` plus `0xF0`–`0xFC`, and `0xEC` plus `0x100`–`0x10C`). Hover a highlighted character for the field name. A non-printable byte is `.`. Any other device size, including a `95P08` 1024-byte image, is plain hex, with a grey legend.
 
 **Load EEPROM File** displays a file of the selected device size. **Read EEPROM** dumps the chip and shows it. It does not ask for confirmation. **Save EEPROM File** writes the image on screen to a `.bin`. None of those program the chip.
 
@@ -101,9 +102,10 @@ The grid is read-only, 16 bytes per row. With no image loaded it stays on screen
 - **No** — write the image as-is
 - **Cancel** — abort
 
-**Immo Off**, **Reset Lockout**, and **Clear P0602** edit a `95040` 512-byte image on screen only. On any other device they stay disabled. Each stays disabled when no image is loaded. **Reset Lockout** also stays disabled when the lockout bytes are already `00 00`. When immo is already off, that button reads **Immo On**. When bit 7 is already clear, that button reads **Set P0602**. The legend sits under the hex. Read, load, save, and edit results are lines in the status window. A line under the legend says a write is still pending. **Backup before write** starts on and is remembered in `preferences.json`. When it is on, a pending edit asks for a `.bin` of the image from before those edits. **Verify Write** applies.
+**Immo Off** edits a `95040` 512-byte image or a `95P08` 1024-byte image on screen only. **Reset Lockout** and **Clear P0602** edit a `95040` 512-byte image only. On any other device they stay disabled. Each stays disabled when no image is loaded. **Reset Lockout** also stays disabled when the lockout bytes are already `00 00`. When immo is already off, that button reads **Immo On**. When bit 7 is already clear, that button reads **Set P0602**. The legend sits under the hex. Read, load, save, and edit results are lines in the status window. A line under the legend says a write is still pending. **Backup before write** starts on and is remembered in `preferences.json`. When it is on, a pending edit asks for a `.bin` of the image from before those edits. **Verify Write** applies.
 
-- **Immo Off** sets `0x012` and `0x022` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Page 1 and page 2 checksums are corrected.
+- **Immo Off** on a `95040` sets `0x012` and `0x022` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Page 1 and page 2 checksums are corrected.
+- **Immo Off** on a `95P08` sets `0x032` and `0x042` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Checksums are left unchanged, and the write dialog does not offer the `95040` checksum correction.
 - **Reset Lockout** sets `0x1EC`–`0x1ED` and `0x1FC`–`0x1FD` to `00 00`. The `P0602` flag and counters stay. Page 30 and page 31 checksums are corrected when those bytes change. This is the lockout field measured on ME7.5.
 - **Clear P0602** clears bit 7 at `0x1E8` and `0x1F8`. **Set P0602** sets that bit. Other bits, counters, and lockout bytes stay. Page 30 and page 31 checksums are corrected when those bytes change.
 

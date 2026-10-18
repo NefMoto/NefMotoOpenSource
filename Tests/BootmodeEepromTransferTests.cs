@@ -114,6 +114,18 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal(stock75.PortNumber, me75.PortNumber);
             Assert.Equal(stock75.PinNumber, me75.PinNumber);
             Assert.Equal(stock75.Size, me75.Size);
+            int p08 = 0;
+            foreach (BootmodeEepromCatalog.Device device in BootmodeEepromCatalog.SpiDevices)
+            {
+                if (device.DisplayName.StartsWith("95P08"))
+                {
+                    p08++;
+                    Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95040, device.EepromType);
+                    Assert.Equal(1024u, device.Size);
+                }
+            }
+
+            Assert.Equal(2, p08);
             Assert.Equal(512u, BootmodeEepromCatalog.DefaultSpiDevice.Size);
             Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromCatalog.DefaultSpiDevice.EepromType);
             Assert.Equal(512u, BootmodeEepromCatalog.DefaultI2cDevice.Size);

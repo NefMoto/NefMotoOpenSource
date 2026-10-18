@@ -80,6 +80,8 @@ namespace Communication
             Spi("95040", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, 512),
             Spi("95040", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, 256),
             Spi("95040", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, 256),
+            Spi("95P08", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, 1024),
+            Spi("95P08", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, 1024),
             Spi("95080", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 1024),
             Spi("95080", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 1024),
             Spi("95160", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 2048),
