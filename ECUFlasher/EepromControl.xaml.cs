@@ -177,6 +177,25 @@ namespace ECUFlasher
                 && image.Length == Me7Eeprom95040Checksum.EepromSize;
         }
 
+        private bool Is95P08Layout(byte[] image)
+        {
+            return SelectedDevice != null
+                && SelectedDevice.EepromType == BootstrapInterface.BootmodeEepromType.Type95040
+                && SelectedDevice.Size == Me7Eeprom95P08Immo.EepromSize
+                && image != null
+                && image.Length == Me7Eeprom95P08Immo.EepromSize;
+        }
+
+        private bool ImmoIsOff(byte[] image)
+        {
+            if (Is95P08Layout(image))
+            {
+                return Me7Eeprom95P08Immo.IsOff(image);
+            }
+
+            return Me7Eeprom95040Immo.IsOff(image);
+        }
+
         public ReactiveCommand OpenEepromCommand
         {
             get
@@ -285,11 +304,11 @@ namespace ECUFlasher
                 {
                     _ImmoOffCommand = CreateImageEditCommand(
                         () => ApplyLoadedEdit(
-                            Me7Eeprom95040Immo.IsOff(mDisplayedImage) ? "Immo On" : "Immo Off",
-                            Me7Eeprom95040Immo.IsOff(mDisplayedImage) ? "Immo on (not written)" : "Immo off (not written)",
+                            ImmoIsOff(mDisplayedImage) ? "Immo On" : "Immo Off",
+                            ImmoIsOff(mDisplayedImage) ? "Immo on (not written)" : "Immo off (not written)",
                             EditImmo),
                         "Immo Off",
-                        "Set 0x012 and 0x022 to 0x02 on the loaded image. Does not read or write the chip.",
+                        "Set the immobilizer status bytes on the loaded image. Does not read or write the chip.",
                         CanApplyImmo);
                 }
 
@@ -381,7 +400,7 @@ namespace ECUFlasher
             return command;
         }
 
-        private bool CanEditLoadedImage(List<string> reasonsDisabled)
+        private bool CanUseLoadedImage(List<string> reasonsDisabled)
         {
             if (App == null)
             {
@@ -401,9 +420,19 @@ namespace ECUFlasher
                 return false;
             }
 
+            return true;
+        }
+
+        private bool CanEditLoadedImage(List<string> reasonsDisabled)
+        {
+            if (!CanUseLoadedImage(reasonsDisabled))
+            {
+                return false;
+            }
+
             if (!Is95040Layout(mDisplayedImage))
             {
-                reasonsDisabled.Add("Immo, lockout, and P0602 apply to a 95040 512-byte image");
+                reasonsDisabled.Add("Lockout and P0602 apply to a 95040 512-byte image");
                 return false;
             }
 
@@ -412,21 +441,39 @@ namespace ECUFlasher
 
         private bool CanApplyImmo(List<string> reasonsDisabled)
         {
-            if (!CanEditLoadedImage(reasonsDisabled))
+            if (!CanUseLoadedImage(reasonsDisabled))
             {
                 return false;
             }
 
-            bool turnOn = Me7Eeprom95040Immo.IsOff(mDisplayedImage);
+            bool turnOn = false;
+            string offsetDescription = "";
+
+            if (Is95040Layout(mDisplayedImage))
+            {
+                turnOn = Me7Eeprom95040Immo.IsOff(mDisplayedImage);
+                offsetDescription = "0x012 and 0x022";
+            }
+            else if (Is95P08Layout(mDisplayedImage))
+            {
+                turnOn = Me7Eeprom95P08Immo.IsOff(mDisplayedImage);
+                offsetDescription = "0x032 and 0x042";
+            }
+            else
+            {
+                reasonsDisabled.Add("Immo applies to a 95040 512-byte image or a 95P08 1024-byte image");
+                return false;
+            }
+
             if (_ImmoOffCommand != null)
             {
                 _ImmoOffCommand.Name = turnOn ? "Immo On" : "Immo Off";
                 _ImmoOffCommand.Description = turnOn
-                    ? "Set 0x012 and 0x022 to 0x01 on the loaded image. Does not read or write the chip."
-                    : "Set 0x012 and 0x022 to 0x02 on the loaded image. Does not read or write the chip.";
+                    ? $"Set {offsetDescription} to 0x01 on the loaded image. Does not read or write the chip."
+                    : $"Set {offsetDescription} to 0x02 on the loaded image. Does not read or write the chip.";
             }
 
-            return CanApplyEdit(reasonsDisabled, EditImmo);
+            return CanApplyEdit(reasonsDisabled, EditImmo, false);
         }
 
         private bool CanApplyP0602(List<string> reasonsDisabled)
@@ -448,9 +495,12 @@ namespace ECUFlasher
             return CanApplyEdit(reasonsDisabled, EditP0602);
         }
 
-        private bool CanApplyEdit(List<string> reasonsDisabled, Func<byte[], string> edit)
+        private bool CanApplyEdit(List<string> reasonsDisabled, Func<byte[], string> edit, bool require95040Layout = true)
         {
-            if (!CanEditLoadedImage(reasonsDisabled))
+            bool ready = require95040Layout
+                ? CanEditLoadedImage(reasonsDisabled)
+                : CanUseLoadedImage(reasonsDisabled);
+            if (!ready)
             {
                 return false;
             }
@@ -667,27 +717,39 @@ namespace ECUFlasher
             WritePendingText = "Write pending: " + mPendingSummary + ". Click Write EEPROM to program the chip.";
         }
 
-        private static string EditImmo(byte[] image)
+        private string EditImmo(byte[] image)
         {
-            if (Me7Eeprom95040Immo.IsOff(image))
+            if (Is95P08Layout(image))
             {
-                return Me7Eeprom95040Immo.TryEnable(image) == Me7Eeprom95040Immo.Result.Applied
-                    ? null
-                    : "Immo bytes do not match";
+                return ImmoEdit(
+                    Me7Eeprom95P08Immo.IsOff(image),
+                    () => Me7Eeprom95P08Immo.TryEnable(image),
+                    () => Me7Eeprom95P08Immo.TryDisable(image));
             }
 
-            Me7Eeprom95040Immo.Result result = Me7Eeprom95040Immo.TryDisable(image);
+            return ImmoEdit(
+                Me7Eeprom95040Immo.IsOff(image),
+                () => Me7Eeprom95040Immo.TryEnable(image),
+                () => Me7Eeprom95040Immo.TryDisable(image));
+        }
+
+        private static string ImmoEdit(
+            bool isOff,
+            Func<Me7Eeprom95040Immo.Result> enable,
+            Func<Me7Eeprom95040Immo.Result> disable)
+        {
+            if (isOff)
+            {
+                return enable() == Me7Eeprom95040Immo.Result.Applied ? null : "Immo bytes do not match";
+            }
+
+            Me7Eeprom95040Immo.Result result = disable();
             if (result == Me7Eeprom95040Immo.Result.AlreadyOff)
             {
                 return "Immo is already off";
             }
 
-            if (result != Me7Eeprom95040Immo.Result.Applied)
-            {
-                return "Immo bytes do not match";
-            }
-
-            return null;
+            return result == Me7Eeprom95040Immo.Result.Applied ? null : "Immo bytes do not match";
         }
 
         private static string EditLockout(byte[] image)
