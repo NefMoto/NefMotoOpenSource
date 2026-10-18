@@ -35,12 +35,10 @@ namespace NefMotoOpenSource.Tests
             byte[] ram = RamWithShadow(chip, ShadowOffset);
             byte[] image = Withhold(chip, out bool[] have, 3, 4);
 
-            var result = Me7Eeprom95040Shadow.Fill(image, have, ram, RamAddress);
+            string status = Me7Eeprom95040Shadow.Fill(image, have, ram, RamAddress);
 
-            Assert.True(result.ShadowFound);
-            Assert.Equal(RamAddress + ShadowOffset, result.ShadowAddress);
-            Assert.Equal(new[] { 3, 4 }, result.FilledPages);
-            Assert.Empty(result.RejectedPages);
+            Assert.Contains("found at 0x383DA8", status);
+            Assert.Contains("Filled page(s) 3, 4;", status);
             Assert.True(have[3] && have[4]);
             Assert.Equal(chip, image);
         }
@@ -53,10 +51,10 @@ namespace NefMotoOpenSource.Tests
             ram[ShadowOffset + (Me7Eeprom95040Shadow.GetRecordId(4) * 16) + 5] ^= 0x01;
             byte[] image = Withhold(chip, out bool[] have, 3, 4);
 
-            var result = Me7Eeprom95040Shadow.Fill(image, have, ram, RamAddress);
+            string status = Me7Eeprom95040Shadow.Fill(image, have, ram, RamAddress);
 
-            Assert.Equal(new[] { 3 }, result.FilledPages);
-            Assert.Equal(new[] { 4 }, result.RejectedPages);
+            Assert.Contains("Filled page(s) 3;", status);
+            Assert.Contains("Page(s) 4 failed the checksum", status);
             Assert.False(have[4]);
             for (int i = 4 * 16; i < 5 * 16; i++)
             {
@@ -72,9 +70,7 @@ namespace NefMotoOpenSource.Tests
             byte[] image = Withhold(chip, out bool[] have, 3, 4);
             System.Buffer.BlockCopy(image, 0, ram, 0x100, image.Length);
 
-            var result = Me7Eeprom95040Shadow.Fill(image, have, ram, RamAddress);
-
-            Assert.Equal(RamAddress + ShadowOffset, result.ShadowAddress);
+            Assert.Contains("found at 0x383DA8", Me7Eeprom95040Shadow.Fill(image, have, ram, RamAddress));
             Assert.Equal(chip, image);
         }
 
@@ -85,10 +81,7 @@ namespace NefMotoOpenSource.Tests
             byte[] image = Withhold(chip, out bool[] have, 3, 4);
             byte[] before = (byte[])image.Clone();
 
-            var result = Me7Eeprom95040Shadow.Fill(image, have, new byte[0x8000], RamAddress);
-
-            Assert.False(result.ShadowFound);
-            Assert.Empty(result.FilledPages);
+            Assert.Contains("not found", Me7Eeprom95040Shadow.Fill(image, have, new byte[0x8000], RamAddress));
             Assert.Equal(before, image);
         }
 

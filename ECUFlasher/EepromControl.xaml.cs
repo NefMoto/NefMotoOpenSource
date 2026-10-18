@@ -231,32 +231,15 @@ namespace ECUFlasher
                     {
                         _ReadKwpEepromCommand.WatchConnection(App);
                         _ReadKwpEepromCommand.AddWatchedProperty(App, "OperationInProgress");
-                        WatchKwpDiagnosticSession();
-                        App.PropertyChanged += (sender, e) =>
-                        {
-                            if (e.PropertyName == "CommInterface")
-                            {
-                                WatchKwpDiagnosticSession();
-                            }
-                        };
                     }
 
-                    _ReadKwpEepromCommand.CanExecuteMethod = CanExecuteKwpEepromCommand;
+                    _ReadKwpEepromCommand.CanExecuteMethod = reasons => CanExecuteOnProtocol(reasons, CommunicationInterface.Protocol.KWP2000);
                 }
 
                 return _ReadKwpEepromCommand;
             }
         }
         private ReactiveCommand _ReadKwpEepromCommand;
-
-        private void WatchKwpDiagnosticSession()
-        {
-            var kwp = App.CommInterface as KWP2000Interface;
-            if ((_ReadKwpEepromCommand != null) && (kwp != null))
-            {
-                _ReadKwpEepromCommand.ReplaceWatchedProperty(kwp, "CurrentDiagnosticSessionType");
-            }
-        }
 
         public ReactiveCommand SaveEepromCommand
         {
@@ -538,25 +521,7 @@ namespace ECUFlasher
 
         private bool CanExecuteBootmodeEepromCommand(List<string> reasonsDisabled)
         {
-            if (App == null)
-            {
-                reasonsDisabled.Add("Internal program error");
-                return false;
-            }
-
-            bool result = true;
-
-            if (!App.CommInterface.IsConnected())
-            {
-                reasonsDisabled.Add("Not connected to ECU");
-                result = false;
-            }
-
-            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
-            {
-                reasonsDisabled.Add("Requires BootMode protocol (not KWP)");
-                result = false;
-            }
+            bool result = CanExecuteOnProtocol(reasonsDisabled, CommunicationInterface.Protocol.BootMode);
 
             if (SelectedChipSelect == null || SelectedDevice == null)
             {
@@ -564,16 +529,10 @@ namespace ECUFlasher
                 result = false;
             }
 
-            if (App.OperationInProgress)
-            {
-                reasonsDisabled.Add("Another operation is in progress");
-                result = false;
-            }
-
             return result;
         }
 
-        private bool CanExecuteKwpEepromCommand(List<string> reasonsDisabled)
+        private bool CanExecuteOnProtocol(List<string> reasonsDisabled, CommunicationInterface.Protocol protocol)
         {
             if (App == null)
             {
@@ -589,14 +548,13 @@ namespace ECUFlasher
                 result = false;
             }
 
-            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+            if (App.CommInterface.CurrentProtocol != protocol)
             {
-                reasonsDisabled.Add("Requires KWP2000 protocol (use Read EEPROM in bootmode)");
+                reasonsDisabled.Add("Requires " + protocol + " protocol");
                 result = false;
             }
 
-            KWP2000Interface kwp = App.CommInterface as KWP2000Interface;
-            if ((kwp != null) && (kwp.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession))
+            if ((App.CommInterface as KWP2000Interface)?.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
             {
                 reasonsDisabled.Add("ECU is in a programming session. Turn the ignition off first.");
                 result = false;
@@ -814,22 +772,12 @@ namespace ECUFlasher
 
         private void OnReadKwpEeprom()
         {
-            if (!ReadKwpEepromCommand.IsEnabled)
+            if (ReadKwpEepromCommand.IsEnabled && (App.CommInterfaceViewModel is KWP2000Interface_ViewModel kwpViewModel))
             {
-                return;
+                App.DisplayStatusMessage("Reading EEPROM through the KWP mirror at 0x600000.", StatusMessageType.USER);
+                StartBootmodeEepromOperation(new ReadEntireSerialEEPROMOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates), OnReadKwpEepromCompleted);
+                App.PercentOperationComplete = -1.0f;   // indeterminate, like the page 30 read
             }
-
-            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
-            if (kwpViewModel == null)
-            {
-                App.DisplayStatusMessage("Reading the EEPROM over KWP needs a KWP2000 connection.", StatusMessageType.USER);
-                return;
-            }
-
-            App.DisplayStatusMessage("Reading EEPROM through the KWP mirror at 0x600000.", StatusMessageType.USER);
-            var operation = new ReadEntireSerialEEPROMOperation(kwpViewModel.KWP2000CommInterface, kwpViewModel.DesiredBaudRates, true);
-            StartBootmodeEepromOperation(operation, OnReadKwpEepromCompleted);
-            App.PercentOperationComplete = -1.0f;   // indeterminate, like the page 30 read
         }
 
         private void OnReadKwpEepromCompleted(Operation operation, bool success)
@@ -839,61 +787,16 @@ namespace ECUFlasher
             {
                 operation.CompletedOperationEvent -= OnReadKwpEepromCompleted;
 
-                var readOp = operation as ReadEntireSerialEEPROMOperation;
-                if (!success || readOp == null || readOp.Image == null)
+                if (!success || !(operation is ReadEntireSerialEEPROMOperation readOp))
                 {
-                    string failure = "Reading EEPROM over KWP failed.";
-                    if ((readOp != null) && (readOp.FailureResponseCode == (byte)KWP2000ResponseCode.ServiceNotSupported))
-                    {
-                        failure += " The ECU does not serve the EEPROM mirror in this session.";
-                    }
-
-                    FinishBootmodeEepromUi(false, failure);
+                    FinishBootmodeEepromUi(false, "Reading EEPROM over KWP failed.");
                     return;
                 }
 
-                var kwp = App.CommInterface as KWP2000Interface;
-                if (readOp.WithheldPages.Count > 0)
-                {
-                    var refused = new List<string>();
-                    for (int i = 0; i < readOp.WithheldPages.Count; i++)
-                    {
-                        byte code = readOp.WithheldResponseCodes[i];
-                        refused.Add(readOp.WithheldPages[i] + " (" + ((kwp != null) ? kwp.GetResponseCodeString(code) : "0x" + code.ToString("X2")) + ")");
-                    }
-
-                    App.DisplayStatusMessage("ECU withheld mirror page(s): " + string.Join(", ", refused) + ".", StatusMessageType.USER);
-                }
-
-                Me7Eeprom95040Shadow.FillResult fill = readOp.ShadowFill;
-                if (readOp.ShadowReadFailed)
-                {
-                    App.DisplayStatusMessage("The ECU refused the RAM read, so withheld pages were not filled from the shadow.", StatusMessageType.USER);
-                }
-                else if ((fill != null) && !fill.ShadowFound)
-                {
-                    App.DisplayStatusMessage("EEPROM shadow not found in RAM, so withheld pages were not filled.", StatusMessageType.USER);
-                }
-                else if (fill != null)
-                {
-                    App.DisplayStatusMessage(
-                        "EEPROM shadow found at 0x" + fill.ShadowAddress.ToString("X6") + " (" + fill.MatchedPages + " pages agree with the chip)."
-                        + (fill.FilledPages.Count > 0 ? " Filled page(s) " + string.Join(", ", fill.FilledPages) + "; their checksums are valid." : "")
-                        + (fill.RejectedPages.Count > 0 ? " Page(s) " + string.Join(", ", fill.RejectedPages) + " failed the checksum and were not filled." : ""),
-                        StatusMessageType.USER);
-                }
-
                 List<int> missing = readOp.MissingPages;
-                ShowImage((byte[])readOp.Image.Clone(), null, false, missing);
-
-                string statusMessage = "Reading EEPROM over KWP succeeded in: "
-                    + FormatOperationElapsed(operation.OperationElapsedTime) + ".";
-                if (missing.Count > 0)
-                {
-                    statusMessage += " Page(s) " + string.Join(", ", missing) + " are FF (not read). Save keeps them as FF; writing this image is blocked.";
-                }
-
-                FinishBootmodeEepromUi(true, statusMessage, logPercent: false);
+                ShowImage(readOp.Image, null, false, missing);
+                FinishBootmodeEepromUi(true, "Reading EEPROM over KWP succeeded in: " + FormatOperationElapsed(operation.OperationElapsedTime) + "."
+                    + ((missing.Count > 0) ? " Page(s) " + string.Join(", ", missing) + " are FF (not read). Save keeps them as FF; writing this image is blocked." : ""));
             }), null);
         }
 
@@ -1026,14 +929,14 @@ namespace ECUFlasher
             }), null);
         }
 
-        private void ShowImage(byte[] image, string caption, bool keepPending = false, IList<int> missingPages = null)
+        private void ShowImage(byte[] image, string caption, bool keepPending = false, List<int> missingPages = null)
         {
             if (!keepPending)
             {
                 mPendingOriginal = null;
                 mPendingSummary = null;
                 WritePendingText = "";
-                mMissingPages = (missingPages != null) ? new List<int>(missingPages) : new List<int>();
+                mMissingPages = missingPages ?? new List<int>();
             }
 
             if (!string.IsNullOrEmpty(caption))
@@ -1392,7 +1295,7 @@ namespace ECUFlasher
             App.OperationInProgress = false;
         }
 
-        private void FinishBootmodeEepromUi(bool success, string statusMessage, string failureTitle = null, bool logPercent = true)
+        private void FinishBootmodeEepromUi(bool success, string statusMessage, string failureTitle = null)
         {
             App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
             if (!success && failureTitle != null)
@@ -1400,17 +1303,12 @@ namespace ECUFlasher
                 App.DisplayUserPrompt(failureTitle, statusMessage, UserPromptType.OK);
             }
 
-            if (success && logPercent)
-            {
-                App.PercentOperationComplete = 100.0f;
-            }
-
             App.CurrentOperation = null;
             App.OperationInProgress = false;
 
-            if (success && !logPercent)
+            if (success)
             {
-                // Set after the operation ends, so App does not log "100% complete."
+                // Set after the operation ends, so App does not log a "100% complete." line.
                 App.PercentOperationComplete = 100.0f;
             }
         }

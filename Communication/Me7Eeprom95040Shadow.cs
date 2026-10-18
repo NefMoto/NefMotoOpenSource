@@ -18,16 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: nyet@nyet.org
 */
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Communication
 {
     /// <summary>
-    /// Fills 95040 pages the KWP mirror at 0x600000 withholds (pages 3-4, SKC and cluster
-    /// code, answer 7F 23 12) from the firmware's RAM shadow. The shadow holds one 16-byte
-    /// slot per record id (descriptor high byte), at a build-specific base. The base is
-    /// found by matching the pages the mirror did serve, and a filled page is kept only
-    /// when its own checksum is valid.
+    /// Fills 95040 pages the KWP mirror withholds from the firmware's RAM shadow: one 16-byte slot
+    /// per record id (descriptor high byte) at a build-specific base. The base is where the most
+    /// served pages match, and a filled page is kept only when its own checksum is valid.
     /// </summary>
     public static class Me7Eeprom95040Shadow
     {
@@ -36,16 +36,7 @@ namespace Communication
         /// <summary>Pages that must agree with the shadow before its base is trusted.</summary>
         public const int MinMatchedPages = 4;
 
-        public sealed class FillResult
-        {
-            public bool ShadowFound { get; set; }
-            public uint ShadowAddress { get; set; }
-            public int MatchedPages { get; set; }
-            public List<int> FilledPages { get; } = new List<int>();
-
-            /// <summary>Missing pages whose shadow slot failed the page checksum.</summary>
-            public List<int> RejectedPages { get; } = new List<int>();
-        }
+        private const int PageSize = Me7Eeprom95040Checksum.PageSize;
 
         public static byte GetRecordId(int page)
         {
@@ -53,137 +44,73 @@ namespace Communication
         }
 
         /// <summary>
-        /// Fills the pages with havePage[page] == false in image from ram (read at ramAddress).
-        /// Filled pages are marked in havePage.
+        /// Fills the pages with havePage[page] == false in image from ram (read at ramAddress) and
+        /// marks them in havePage. Returns a status line for the log.
         /// </summary>
-        public static FillResult Fill(byte[] image, bool[] havePage, byte[] ram, uint ramAddress)
+        public static string Fill(byte[] image, bool[] havePage, byte[] ram, uint ramAddress)
         {
-            var result = new FillResult();
-            if (image == null || image.Length < Me7Eeprom95040Checksum.EepromSize || havePage == null
-                || havePage.Length < Me7Eeprom95040Checksum.PageCount || ram == null)
+            // A page of zeros or FF matches anywhere, so it neither locates nor confirms the shadow.
+            var known = Enumerable.Range(0, Me7Eeprom95040Checksum.PageCount)
+                .Where(page => havePage[page] && (GetRecordId(page) != NoRecord) && (image.Skip(page * PageSize).Take(PageSize).Distinct().Count() >= 4))
+                .ToList();
+
+            int Score(int shadowBase) => known.Count(page => SlotMatches(image, page, ram, shadowBase + (GetRecordId(page) * PageSize)));
+
+            var ranked = known
+                .SelectMany(page => Enumerable.Range(0, (ram.Length - PageSize) / 2 + 1)
+                    .Where(half => SlotMatches(image, page, ram, half * 2))
+                    .Select(half => (half * 2) - (GetRecordId(page) * PageSize)))
+                .Where(shadowBase => shadowBase >= 0)
+                .Distinct()
+                .Select(shadowBase => (shadowBase, score: Score(shadowBase)))
+                .OrderByDescending(candidate => candidate.score)
+                .Take(2)
+                .ToList();
+
+            if ((ranked.Count == 0) || (ranked[0].score < MinMatchedPages) || ((ranked.Count > 1) && (ranked[1].score == ranked[0].score)))
             {
-                return result;
+                return "EEPROM shadow not found in RAM, so withheld pages stay FF.";
             }
 
-            int bestBase = -1;
-            int bestScore = 0;
-            bool tied = false;
-            var scored = new HashSet<int>();
-
-            for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
+            int bestBase = ranked[0].shadowBase;
+            var filled = new List<int>();
+            var rejected = new List<int>();
+            for (int page = 0; page < havePage.Length; page++)
             {
-                if (!havePage[page] || GetRecordId(page) == NoRecord || !IsDistinctive(image, page))
+                int slot = bestBase + (GetRecordId(page) * PageSize);
+                if (havePage[page] || (GetRecordId(page) == NoRecord) || (slot + PageSize > ram.Length))
                 {
                     continue;
                 }
 
-                for (int offset = 0; offset + Me7Eeprom95040Checksum.PageSize <= ram.Length; offset += 2)
+                if (!SlotChecksumValid(ram, slot, page))
                 {
-                    int shadowBase = offset - (GetRecordId(page) * Me7Eeprom95040Checksum.PageSize);
-                    if (shadowBase < 0 || !SlotMatches(image, page, ram, offset) || !scored.Add(shadowBase))
-                    {
-                        continue;
-                    }
-
-                    int score = Score(image, havePage, ram, shadowBase);
-                    if (score > bestScore)
-                    {
-                        bestScore = score;
-                        bestBase = shadowBase;
-                        tied = false;
-                    }
-                    else if (score == bestScore)
-                    {
-                        tied = true;
-                    }
-                }
-            }
-
-            if (bestBase < 0 || tied || bestScore < MinMatchedPages)
-            {
-                return result;
-            }
-
-            result.ShadowFound = true;
-            result.ShadowAddress = ramAddress + (uint)bestBase;
-            result.MatchedPages = bestScore;
-
-            for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
-            {
-                byte record = GetRecordId(page);
-                if (havePage[page] || record == NoRecord)
-                {
+                    rejected.Add(page);
                     continue;
                 }
 
-                int slot = bestBase + (record * Me7Eeprom95040Checksum.PageSize);
-                if (slot + Me7Eeprom95040Checksum.PageSize > ram.Length)
-                {
-                    continue;
-                }
-
-                var candidate = (byte[])image.Clone();
-                System.Buffer.BlockCopy(ram, slot, candidate, page * Me7Eeprom95040Checksum.PageSize, Me7Eeprom95040Checksum.PageSize);
-                if (Me7Eeprom95040Checksum.Validate(candidate).PageChecksumKinds[page] != Me7Eeprom95040Checksum.PageChecksumKind.Ok)
-                {
-                    result.RejectedPages.Add(page);
-                    continue;
-                }
-
-                System.Buffer.BlockCopy(ram, slot, image, page * Me7Eeprom95040Checksum.PageSize, Me7Eeprom95040Checksum.PageSize);
+                Buffer.BlockCopy(ram, slot, image, page * PageSize, PageSize);
                 havePage[page] = true;
-                result.FilledPages.Add(page);
+                filled.Add(page);
             }
 
-            return result;
-        }
-
-        private static int Score(byte[] image, bool[] havePage, byte[] ram, int shadowBase)
-        {
-            int score = 0;
-            for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
-            {
-                byte record = GetRecordId(page);
-                if (!havePage[page] || record == NoRecord || !IsDistinctive(image, page))
-                {
-                    continue;
-                }
-
-                int slot = shadowBase + (record * Me7Eeprom95040Checksum.PageSize);
-                if (slot + Me7Eeprom95040Checksum.PageSize <= ram.Length && SlotMatches(image, page, ram, slot))
-                {
-                    score++;
-                }
-            }
-
-            return score;
+            return "EEPROM shadow found at 0x" + (ramAddress + (uint)bestBase).ToString("X6") + " (" + ranked[0].score + " pages agree with the chip)."
+                + ((filled.Count > 0) ? " Filled page(s) " + string.Join(", ", filled) + "; their checksums are valid." : "")
+                + ((rejected.Count > 0) ? " Page(s) " + string.Join(", ", rejected) + " failed the checksum and stay FF." : "");
         }
 
         private static bool SlotMatches(byte[] image, int page, byte[] ram, int offset)
         {
-            int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
-            for (int i = 0; i < Me7Eeprom95040Checksum.PageSize; i++)
-            {
-                if (image[pageOffset + i] != ram[offset + i])
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return (offset >= 0) && (offset + PageSize <= ram.Length)
+                && image.AsSpan(page * PageSize, PageSize).SequenceEqual(ram.AsSpan(offset, PageSize));
         }
 
-        // A page of zeros or FF matches anywhere, so it neither locates nor confirms the shadow.
-        private static bool IsDistinctive(byte[] image, int page)
+        // Pages without a checksum can't be verified, so they are never filled.
+        private static bool SlotChecksumValid(byte[] ram, int slot, int page)
         {
-            var values = new HashSet<byte>();
-            int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
-            for (int i = 0; i < Me7Eeprom95040Checksum.PageSize; i++)
-            {
-                values.Add(image[pageOffset + i]);
-            }
-
-            return values.Count >= 4;
+            ushort descriptor = Me7Eeprom95040Checksum.GetPageDescriptor(page);
+            return ((descriptor & 1) != 0) && !Me7Eeprom95040Checksum.IsChecksumExemptPage(page)
+                && (Me7Eeprom95040Checksum.CalculatePageChecksum(ram, slot, (ushort)page, descriptor) == (ram[slot + 14] | (ram[slot + 15] << 8)));
         }
     }
 }
