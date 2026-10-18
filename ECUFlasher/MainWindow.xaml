@@ -125,11 +125,11 @@ Contact by Email: tony@nefariousmotorsports.com
             <TabItem Header="Flashing">
                 <ECUFlasher:FlashingControl x:Name="Flashing"/>
             </TabItem>
-            <TabItem x:Name="KwpLoggingTab" Header="KWP2000 Logging">
-                <ECUFlasher:DataLoggerControl x:Name="DataLogger"/>
-            </TabItem>
             <TabItem Header="EEPROM">
                 <ECUFlasher:EepromControl/>
+            </TabItem>
+            <TabItem x:Name="KwpLoggingTab" Header="KWP2000 Logging">
+                <ECUFlasher:DataLoggerControl x:Name="DataLogger"/>
             </TabItem>
             <TabItem>
                 <TabItem.Header>
