@@ -28,8 +28,11 @@ namespace NefMotoOpenSource.Tests
         [Theory]
         [InlineData(0x012, Me7Eeprom95040Fields.Role.ImmoStatus)]
         [InlineData(0x022, Me7Eeprom95040Fields.Role.ImmoStatus)]
-        [InlineData(0x014, Me7Eeprom95040Fields.Role.Skc)]
-        [InlineData(0x025, Me7Eeprom95040Fields.Role.Skc)]
+        [InlineData(0x014, Me7Eeprom95040Fields.Role.ImmoState)]
+        [InlineData(0x025, Me7Eeprom95040Fields.Role.ImmoState)]
+        [InlineData(0x032, Me7Eeprom95040Fields.Role.Skc)]
+        [InlineData(0x043, Me7Eeprom95040Fields.Role.Skc)]
+        [InlineData(0x034, Me7Eeprom95040Fields.Role.None)]
         [InlineData(0x1C0, Me7Eeprom95040Fields.Role.None)]
         [InlineData(0x1E8, Me7Eeprom95040Fields.Role.P0602Flag)]
         [InlineData(0x1F8, Me7Eeprom95040Fields.Role.P0602Flag)]
@@ -51,13 +54,17 @@ namespace NefMotoOpenSource.Tests
             image[0x015] = 0x94;
             image[0x024] = 0xEC;
             image[0x025] = 0x94;
+            image[0x032] = 0x39;
+            image[0x033] = 0x30;
+            image[0x042] = 0x39;
+            image[0x043] = 0x30;
             image[0x1E8] = 0x80;
             image[0x1F8] = 0x00;
             image[0x1EC] = 0x42;
             image[0x1ED] = 0x22;
 
             Assert.Equal("on", Me7Eeprom95040Fields.FormatImmoValue(image));
-            Assert.Equal("94EC", Me7Eeprom95040Fields.FormatSkcValue(image));
+            Assert.Equal("12345", Me7Eeprom95040Fields.FormatSkcValue(image));
             Assert.Equal("set / clear", Me7Eeprom95040Fields.FormatP0602Value(image));
             Assert.Equal("42 22 / 00 00", Me7Eeprom95040Fields.FormatLockoutValue(image));
             Assert.True(Me7Eeprom95040Fields.IsEcuPartNumber(0x1C2));
@@ -90,6 +97,25 @@ namespace NefMotoOpenSource.Tests
             Assert.True(Me7Eeprom95040Fields.IsImmoId(0x100));
             Assert.True(Me7Eeprom95040Fields.IsImmoId(0x10C));
             Assert.False(Me7Eeprom95040Fields.IsImmoId(0x10D));
+        }
+
+        [Fact]
+        public void FormatSkcValue_reports_an_erased_slot_and_a_mismatch()
+        {
+            var image = new byte[Me7Eeprom95040Checksum.EepromSize];
+            image[0x032] = 0xFF;
+            image[0x033] = 0xFF;
+            image[0x042] = 0xFF;
+            image[0x043] = 0xFF;
+
+            // Virgin and AWU ME7.5 images keep FF FF here and a value in the 0x014 word.
+            image[0x014] = 0x1E;
+            image[0x015] = 0xCF;
+            Assert.Equal("unset", Me7Eeprom95040Fields.FormatSkcValue(image));
+
+            image[0x042] = 0x07;
+            image[0x043] = 0x00;
+            Assert.Equal("unset / 00007", Me7Eeprom95040Fields.FormatSkcValue(image));
         }
     }
 }

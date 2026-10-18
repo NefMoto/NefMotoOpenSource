@@ -78,8 +78,13 @@ namespace Communication
         {
             [FieldOffset(0x012)] public byte Immo1;
             [FieldOffset(0x022)] public byte Immo2;
-            [FieldOffset(0x014)] public ushort Skc1;
-            [FieldOffset(0x024)] public ushort Skc2;
+            // Runtime immobiliser word, not the SKC: the ECU loads it with the immo flag at start-up
+            // and writes it back itself. Populated on virgin ECUs too.
+            [FieldOffset(0x014)] public ushort ImmoState1;
+            [FieldOffset(0x024)] public ushort ImmoState2;
+            // SKC, little-endian, shown as 5 decimal digits. FFFF when no SKC is stored.
+            [FieldOffset(0x032)] public ushort Skc1;
+            [FieldOffset(0x042)] public ushort Skc2;
             [FieldOffset(0x1C2)] public EcuPartNumberBytes EcuPartNumber;
             [FieldOffset(0x1E2)] public ToolIdBytes ToolId1;
             [FieldOffset(0x1F2)] public ToolIdBytes ToolId2;
@@ -101,6 +106,7 @@ namespace Communication
         {
             None,
             ImmoStatus,
+            ImmoState,
             Skc,
             P0602Flag,
             Lockout
@@ -116,6 +122,11 @@ namespace Communication
             if (IsField(offset, nameof(Image.Immo1)) || IsField(offset, nameof(Image.Immo2)))
             {
                 return Role.ImmoStatus;
+            }
+
+            if (Covers<ushort>(offset, nameof(Image.ImmoState1)) || Covers<ushort>(offset, nameof(Image.ImmoState2)))
+            {
+                return Role.ImmoState;
             }
 
             if (Covers<ushort>(offset, nameof(Image.Skc1)) || Covers<ushort>(offset, nameof(Image.Skc2)))
@@ -189,7 +200,12 @@ namespace Communication
 
         public static string FormatSkcValue(Image ee)
         {
-            return Pair(ee.Skc1.ToString("X4"), ee.Skc2.ToString("X4"));
+            return Pair(Skc(ee.Skc1), Skc(ee.Skc2));
+        }
+
+        private static string Skc(ushort value)
+        {
+            return (value == 0xFFFF) ? "unset" : value.ToString("D5");
         }
 
         public static string FormatP0602Value(byte[] image)
