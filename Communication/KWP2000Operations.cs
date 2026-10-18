@@ -558,88 +558,121 @@ namespace Communication
         }
     };
 
-    public class ReadEntireSerialEEPROMOperation : ReadMemoryOperation
+    /// <summary>
+    /// Reads the 95040 through the KWP mirror at 0x600000, one page per request. ME7.1.1 refuses
+    /// pages 3-4 (SKC, cluster code) with 7F 23 12 and keeps the session; the read goes on and then
+    /// fills refused pages from the RAM shadow. Pages still missing stay FF.
+    /// </summary>
+    public class ReadEntireSerialEEPROMOperation : KWP2000Operation
     {
-        public static readonly UInt32 SERIAL_EEPROM_SIZE = 512;
-        public static readonly UInt32 SERIAL_EEPROM_START_ADDR = 0x600000;
+        public const uint SERIAL_EEPROM_START_ADDRESS = 0x600000;
+        public const uint EXTERNAL_RAM_START_ADDRESS = 0x380000;
+        public const uint EXTERNAL_RAM_SIZE = 0x8000;
+        private const int PageSize = Me7Eeprom95040Checksum.PageSize;
 
         public ReadEntireSerialEEPROMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates)
-            : base(commInterface, baudRates, SERIAL_EEPROM_START_ADDR, SERIAL_EEPROM_SIZE, 16)
-        {
-        }
-    };
-
-    //todo - need to match and replace the 16 byte pages individually
-    public class WriteEntireSerialEEPROMOperation : KWP2000SequencialOperation
-    {
-        public static readonly UInt32 EXTERNAL_RAM_SIZE = 0x8000;
-        public static readonly UInt32 EXTERNAL_RAM_START_ADDRESS = 0x380000;
-        public static readonly UInt32 SERIAL_EEPROM_SIZE = 512;
-        public static readonly UInt32 SERIAL_EEPROM_START_ADDRESS = 0x600000;
-
-        public WriteEntireSerialEEPROMOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, byte[] dataToWrite)
             : base(commInterface)
         {
+            // Same session as the page 30 read: NL serves ReadMemoryByAddress only in a
+            // development session, and CH rejects the login but still serves the read.
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
 
+            // Max block size counts the 4 address/size bytes. No progress updates: each whole
+            // percent prints a status line, and the read takes seconds.
+            mPageActions = Enumerable.Range(0, Me7Eeprom95040Checksum.PageCount)
+                .Select(page => new ReadMemoryAction(commInterface, SERIAL_EEPROM_START_ADDRESS + (uint)(page * PageSize), PageSize, PageSize + 4, null) { RefusalIsExpected = true })
+                .ToArray();
             mReadRAMAction = new ReadMemoryAction(commInterface, EXTERNAL_RAM_START_ADDRESS, EXTERNAL_RAM_SIZE, DEFAULT_MAX_BLOCK_SIZE, null);
-            mReadSerialEEPROMAction = new ReadMemoryAction(commInterface, SERIAL_EEPROM_START_ADDRESS, SERIAL_EEPROM_SIZE, 16, null);
-            mWriteRAMAction = new WriteMemoryAction(commInterface, 0, 0, dataToWrite, null);
+        }
 
-            mActionArray = new KWP2000Action[3];
-            mActionArray[0] = mReadRAMAction;
-            mActionArray[1] = mReadSerialEEPROMAction;
-            mActionArray[2] = mWriteRAMAction;
+        /// <summary>512 bytes; pages that could not be read are FF.</summary>
+        public byte[] Image { get; private set; }
+
+        public List<int> MissingPages
+        {
+            get { return Enumerable.Range(0, mHavePage.Length).Where(page => !mHavePage[page]).ToList(); }
+        }
+
+        protected override void ResetOperation()
+        {
+            mCurrentActionIndex = -1;
+            Image = Enumerable.Repeat((byte)0xFF, Me7Eeprom95040Checksum.EepromSize).ToArray();
+            mHavePage = new bool[mPageActions.Length];
+
+            base.ResetOperation();
+        }
+
+        protected override CommunicationAction NextAction()
+        {
+            var nextAction = base.NextAction();
+
+            if ((nextAction == null) && (++mCurrentActionIndex <= mPageActions.Length))
+            {
+                if (mCurrentActionIndex < mPageActions.Length)
+                {
+                    nextAction = mPageActions[mCurrentActionIndex];
+                }
+                else if (MissingPages.Count > 0)
+                {
+                    CommInterface.DisplayStatusMessage("Reading RAM " + RangeText(EXTERNAL_RAM_START_ADDRESS, EXTERNAL_RAM_SIZE) + " to fill withheld pages from the EEPROM shadow.", StatusMessageType.USER);
+                    nextAction = mReadRAMAction;
+                }
+            }
+
+            return nextAction;
         }
 
         protected override void OnActionCompleted(CommunicationAction action, bool success)
         {
-            if (success)
+            var read = action as ReadMemoryAction;
+            int page = Array.IndexOf(mPageActions, read);
+
+            if (success && (page >= 0))
             {
-                if (action == mReadSerialEEPROMAction)
+                Buffer.BlockCopy(read.ReadData, 0, Image, page * PageSize, PageSize);
+                mHavePage[page] = true;
+            }
+            else if (success && (read == mReadRAMAction))
+            {
+                CommInterface.DisplayStatusMessage(Me7Eeprom95040Shadow.Fill(Image, mHavePage, read.ReadData, EXTERNAL_RAM_START_ADDRESS), StatusMessageType.USER);
+            }
+            else if (!success && action.CompletedWithoutCommunicationError && ((read != null) || (action is SecurityAccessAction)))
+            {
+                byte code = (read != null) ? read.FailureResponseCode : (byte)0;
+                if (code == (byte)KWP2000ResponseCode.ServiceNotSupported)
                 {
-                    bool matched = true;
-                    UInt32 x = 0;
-
-                    for (x = (EXTERNAL_RAM_SIZE - SERIAL_EEPROM_SIZE); x >= 0;  x--)
-                    {
-                        matched = true;
-
-                        for (UInt32 y = 0; y < SERIAL_EEPROM_SIZE; y++)
-                        {
-                            if (mReadRAMAction.ReadData[x + y] != mReadSerialEEPROMAction.ReadData[y])
-                            {
-                                matched = false;
-                                break;
-                            }
-                        }
-
-                        if (matched)
-                        {
-                            break;
-                        }
-                    }
-
-                    if (matched)
-                    {
-                        mWriteRAMAction.SetStartAddressAndNumBytes(x + EXTERNAL_RAM_START_ADDRESS, SERIAL_EEPROM_SIZE);
-                    }
-                    else
-                    {
-                        CommInterface.DisplayStatusMessage("Could not locate serial eeprom data in RAM", StatusMessageType.USER);
-                        success = false;
-                    }
+                    CommInterface.DisplayStatusMessage("The ECU does not serve the EEPROM mirror in this session.", StatusMessageType.USER);
                 }
+                else if (page >= 0)
+                {
+                    // A refused page leaves the session up. Keep reading the others.
+                    CommInterface.DisplayStatusMessage("ECU withheld EEPROM page " + page + " (0x" + (page * PageSize).ToString("X3") + "), "
+                        + KWP2000CommInterface.GetResponseCodeString(code) + "."
+                        + (((page == 3) || (page == 4)) ? " Expected: ME7 does not serve the " + ((page == 3) ? "SKC" : "cluster code") + " page through the mirror." : ""),
+                        StatusMessageType.USER);
+                }
+                else if (read == mReadRAMAction)
+                {
+                    CommInterface.DisplayStatusMessage("The ECU refused the RAM read, so withheld pages stay FF.", StatusMessageType.USER);
+                }
+
+                // CH rejects the login before a session; the read still has to run.
+                success = code != (byte)KWP2000ResponseCode.ServiceNotSupported;
             }
 
             base.OnActionCompleted(action, success);
         }
 
-        protected ReadMemoryAction mReadRAMAction;
-        protected ReadMemoryAction mReadSerialEEPROMAction;
-        protected WriteMemoryAction mWriteRAMAction;
-        protected UInt32 mSerialEEPROMBackupAddress;
+        protected override bool OnOperationCompleted(bool success)
+        {
+            return base.OnOperationCompleted(success && mHavePage.Contains(true));
+        }
+
+        private readonly ReadMemoryAction[] mPageActions;
+        private readonly ReadMemoryAction mReadRAMAction;
+        private bool[] mHavePage;
+        private int mCurrentActionIndex;
     };
 
     /// <summary>

@@ -2298,6 +2298,9 @@ namespace Communication
             private set;
         }
 
+        /// <summary>The caller reports a refusal itself, so the generic failure goes to the log only.</summary>
+        public bool RefusalIsExpected { get; set; }
+
         protected override bool MessageHandler(KWP2000Interface commInterface, KWP2000Message message)
         {
             bool handled = base.MessageHandler(commInterface, message);
@@ -2336,7 +2339,7 @@ namespace Communication
                         FailureResponseCode = responseCode;
                         if (responseCode != (byte)KWP2000ResponseCode.ServiceNotSupported)
                         {
-                            DisplayStatusMessage("Read memory by address failed, ECU reports " + KWP2000CommInterface.GetResponseCodeString(responseCode) + ".", StatusMessageType.USER);
+                            DisplayStatusMessage("Read memory by address failed, ECU reports " + KWP2000CommInterface.GetResponseCodeString(responseCode) + ".", RefusalIsExpected ? StatusMessageType.LOG : StatusMessageType.USER);
                         }
 
                         handled = true;

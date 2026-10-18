@@ -12,7 +12,7 @@ Flash read/write uses the **Flashing** tab. The protocol combo at the top of the
 - Entire-flash erase left the ECU unable to boot
 - Physical EEPROM dump or write (not the KWP EEPROM mirror)
 
-Simos 3.x and EDC15 flash layout is auto-detected. EEPROM chip select on the **Bootmode EEPROM** tab includes ME7.1, ME7.5, ME7.1.1, Simos 3.2, and EDC15 I2C.
+Simos 3.x and EDC15 flash layout is auto-detected. EEPROM chip select on the **EEPROM** tab includes ME7.1, ME7.5, ME7.1.1, Simos 3.2, and EDC15 I2C.
 
 ## Entry and power
 
@@ -59,7 +59,15 @@ After EEPROM access, the EEPROM driver has overwritten the flash driver at `0xF6
 
 ## Bootmode EEPROM
 
-On the **Bootmode EEPROM** tab, which is hidden unless the protocol combo is **Boot Mode**. Read and write need a bootmode connection. **Read EEPROM Mirror** stays on **KWP2000 Info**; that is the KWP page at `0x6001E0`, not this chip.
+On the **EEPROM** tab. **Read EEPROM** reads the chip in bootmode, or through the KWP mirror over a KWP2000 connection. **Write EEPROM** needs a bootmode connection. **Read EEPROM Mirror** stays on **KWP2000 Info**; that is the KWP page at `0x6001E0`, not this chip.
+
+### Read EEPROM over KWP2000
+
+Connected with KWP2000 instead of bootmode, **Read EEPROM** reads a 95040 through the ECU. It uses the development session, like **Read EEPROM Mirror**, and reads the mirror at `0x600000` one 16-byte page at a time. No login is needed and nothing is written.
+
+ME7.1.1 refuses pages 3 and 4 (SKC and cluster code) with `7F 23 12`. The read logs them as withheld and carries on. Then it reads RAM `0x380000-0x387FFF` and looks for the firmware's EEPROM shadow: one 16-byte slot per record id, in the high byte of the page descriptor. The base is where the most served pages match, and at least 4 must match. A withheld page is taken from its slot only when its own page checksum is valid. On 4Z7907551S `1037367582` the shadow is at `0x383DA8`. There, mirror pages plus shadow pages 3-4 matched a bootmode read except page 17, which changes at every start-up.
+
+Pages that still can't be read stay `FF` and the status log names them. **Save EEPROM File** keeps them as `FF`. **Write EEPROM** is disabled for an image with missing pages, because writing it would erase them on the chip.
 
 Chip select:
 
