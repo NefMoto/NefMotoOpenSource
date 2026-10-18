@@ -893,7 +893,7 @@ namespace ECUFlasher
                     statusMessage += " Page(s) " + string.Join(", ", missing) + " are FF (not read). Save keeps them as FF; writing this image is blocked.";
                 }
 
-                FinishBootmodeEepromUi(true, statusMessage);
+                FinishBootmodeEepromUi(true, statusMessage, logPercent: false);
             }), null);
         }
 
@@ -1392,7 +1392,7 @@ namespace ECUFlasher
             App.OperationInProgress = false;
         }
 
-        private void FinishBootmodeEepromUi(bool success, string statusMessage, string failureTitle = null)
+        private void FinishBootmodeEepromUi(bool success, string statusMessage, string failureTitle = null, bool logPercent = true)
         {
             App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
             if (!success && failureTitle != null)
@@ -1400,13 +1400,19 @@ namespace ECUFlasher
                 App.DisplayUserPrompt(failureTitle, statusMessage, UserPromptType.OK);
             }
 
-            if (success)
+            if (success && logPercent)
             {
                 App.PercentOperationComplete = 100.0f;
             }
 
             App.CurrentOperation = null;
             App.OperationInProgress = false;
+
+            if (success && !logPercent)
+            {
+                // Set after the operation ends, so App does not log "100% complete."
+                App.PercentOperationComplete = 100.0f;
+            }
         }
 
         private bool TrySaveBytes(byte[] data, string title, string defaultName, string savedKind, out string path)
