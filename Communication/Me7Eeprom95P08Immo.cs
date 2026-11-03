@@ -22,7 +22,7 @@ namespace Communication
 {
     /// <summary>
     /// Immobilizer status patch for a 95P08 image (1024 bytes, C167BootTool type 1).
-    /// Off sets the mirrored bytes at 0x032 and 0x042 to 0x02 when they match.
+    /// Off sets the mirrored bytes at 0x012 and 0x022 to 0x02 when they match.
     /// On sets that pair back to 0x01 when both are 0x02.
     /// The page checksum for this image is not known, so those bytes stay as they are.
     /// </summary>
@@ -31,8 +31,8 @@ namespace Communication
         public const int EepromSize = 1024;
         public const byte ImmoOn = 0x01;
         public const byte ImmoOff = 0x02;
-        public const int ImmoOffset1 = 0x032;
-        public const int ImmoOffset2 = 0x042;
+        public const int ImmoOffset1 = 0x012;
+        public const int ImmoOffset2 = 0x022;
 
         public static bool IsOff(byte[] image)
         {

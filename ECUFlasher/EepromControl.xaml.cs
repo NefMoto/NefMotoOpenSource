@@ -457,7 +457,7 @@ namespace ECUFlasher
             else if (Is95P08Layout(mDisplayedImage))
             {
                 turnOn = Me7Eeprom95P08Immo.IsOff(mDisplayedImage);
-                offsetDescription = "0x032 and 0x042";
+                offsetDescription = "0x012 and 0x022";
             }
             else
             {

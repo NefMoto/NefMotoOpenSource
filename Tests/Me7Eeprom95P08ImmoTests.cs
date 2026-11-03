@@ -30,8 +30,9 @@ namespace NefMotoOpenSource.Tests
             byte[] image = new byte[Me7Eeprom95P08Immo.EepromSize];
             image[Me7Eeprom95P08Immo.ImmoOffset1] = first;
             image[Me7Eeprom95P08Immo.ImmoOffset2] = second;
-            image[0x012] = 0x11;
-            image[0x022] = 0x11;
+            image[0x021] = 0x11;
+            image[0x032] = 0x11;
+            image[0x042] = 0x11;
             return image;
         }
 
@@ -44,11 +45,11 @@ namespace NefMotoOpenSource.Tests
             Me7Eeprom95040Immo.Result result = Me7Eeprom95P08Immo.TryDisable(image);
 
             Assert.Equal(Me7Eeprom95040Immo.Result.Applied, result);
-            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[0x032]);
-            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[0x042]);
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[Me7Eeprom95P08Immo.ImmoOffset1]);
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[Me7Eeprom95P08Immo.ImmoOffset2]);
             for (int i = 0; i < image.Length; i++)
             {
-                if (i == 0x032 || i == 0x042)
+                if (i == Me7Eeprom95P08Immo.ImmoOffset1 || i == Me7Eeprom95P08Immo.ImmoOffset2)
                 {
                     continue;
                 }
@@ -63,8 +64,8 @@ namespace NefMotoOpenSource.Tests
             byte[] image = Image(0x02, 0x02);
 
             Assert.Equal(Me7Eeprom95040Immo.Result.Applied, Me7Eeprom95P08Immo.TryEnable(image));
-            Assert.Equal(Me7Eeprom95P08Immo.ImmoOn, image[0x032]);
-            Assert.Equal(Me7Eeprom95P08Immo.ImmoOn, image[0x042]);
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOn, image[Me7Eeprom95P08Immo.ImmoOffset1]);
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOn, image[Me7Eeprom95P08Immo.ImmoOffset2]);
             Assert.False(Me7Eeprom95P08Immo.IsOff(image));
         }
 
@@ -73,8 +74,8 @@ namespace NefMotoOpenSource.Tests
         {
             byte[] image = Image(0x01, 0x02);
             Assert.Equal(Me7Eeprom95040Immo.Result.Refused, Me7Eeprom95P08Immo.TryDisable(image));
-            Assert.Equal(0x01, image[0x032]);
-            Assert.Equal(0x02, image[0x042]);
+            Assert.Equal(0x01, image[Me7Eeprom95P08Immo.ImmoOffset1]);
+            Assert.Equal(0x02, image[Me7Eeprom95P08Immo.ImmoOffset2]);
 
             Assert.Equal(Me7Eeprom95040Immo.Result.Refused, Me7Eeprom95P08Immo.TryDisable(new byte[512]));
             Assert.Equal(Me7Eeprom95040Immo.Result.AlreadyOff, Me7Eeprom95P08Immo.TryDisable(Image(0x02, 0x02)));
