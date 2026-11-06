@@ -196,7 +196,7 @@ namespace ECUFlasher
                         WatchDiagnosticSession(_ReadDTCsCommand);
                     }
 
-                    _ReadDTCsCommand.CanExecuteMethod = CanExecuteApplicationSessionCommand;
+                    _ReadDTCsCommand.CanExecuteMethod = CanExecuteDtcCommand;
                 }
 
                 return _ReadDTCsCommand;
@@ -221,7 +221,7 @@ namespace ECUFlasher
                         WatchDiagnosticSession(_ClearDTCsCommand);
                     }
 
-                    _ClearDTCsCommand.CanExecuteMethod = CanExecuteApplicationSessionCommand;
+                    _ClearDTCsCommand.CanExecuteMethod = CanExecuteDtcCommand;
                 }
 
                 return _ClearDTCsCommand;
@@ -294,6 +294,30 @@ namespace ECUFlasher
             command.ReplaceWatchedProperty(kwp, "CurrentDiagnosticSessionType");
         }
 
+        private bool CanExecuteDtcCommand(List<string> reasonsDisabled)
+        {
+            var held = App?.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if ((held != null) && held.IsHeldKWP1281Session())
+            {
+                bool ok = true;
+                if ((App.CommInterface == null) || !App.CommInterface.IsConnected())
+                {
+                    reasonsDisabled.Add("Not connected to ECU");
+                    ok = false;
+                }
+
+                if (App.OperationInProgress)
+                {
+                    reasonsDisabled.Add("Another operation is in progress");
+                    ok = false;
+                }
+
+                return ok;
+            }
+
+            return CanExecuteApplicationSessionCommand(reasonsDisabled);
+        }
+
         private bool CanExecuteApplicationSessionCommand(List<string> reasonsDisabled)
         {
             if (App == null)
@@ -323,6 +347,13 @@ namespace ECUFlasher
                 result = false;
             }
 
+            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
+            {
+                reasonsDisabled.Add("This command is for ME7.");
+                result = false;
+            }
+
             if (App.OperationInProgress)
             {
                 reasonsDisabled.Add("Another operation is in progress");
@@ -339,6 +370,26 @@ namespace ECUFlasher
 
         private void OnClearDTCs()
         {
+            var held = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if ((held != null) && held.IsHeldKWP1281Session())
+            {
+                string heldMessage = "Click OK to confirm, otherwise Cancel.";
+                heldMessage += "\n\nAre you sure you want to clear diagnostic information?";
+                if (App.DisplayUserPrompt("Confirm Clear Diagnostic Information", heldMessage, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
+                {
+                    return;
+                }
+
+                App.OperationInProgress = true;
+                App.PercentOperationComplete = -1.0f;
+                App.DisplayStatusMessage("Clearing ECU DTCs.", StatusMessageType.USER);
+                held.KWP2000CommInterface.RequestHeldKWP1281Dtcs(true, (success, text) =>
+                {
+                    Dispatcher.Invoke((Action)(() => FinishHeldDtcRead(success, text)));
+                });
+                return;
+            }
+
             string confirmationMessage = "Click OK to confirm, otherwise Cancel.";
             confirmationMessage += "\n\nAre you sure you want to clear diagnostic information?";
 
@@ -508,6 +559,13 @@ namespace ECUFlasher
                         if (!App.CommInterface.IsConnected())
                         {
                             reasonsDisabled.Add("Not connected to ECU");
+                            result = false;
+                        }
+
+                        var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                        if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
+                        {
+                            reasonsDisabled.Add("ECU info read is for ME7.");
                             result = false;
                         }
 
@@ -940,6 +998,18 @@ namespace ECUFlasher
             App.OperationInProgress = true;
             App.PercentOperationComplete = -1.0f;
 
+            var held = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if ((held != null) && held.IsHeldKWP1281Session())
+            {
+                App.DisplayStatusMessage("Reading ECU DTCs.", StatusMessageType.USER);
+                ECUDTCs.Clear();
+                held.KWP2000CommInterface.RequestHeldKWP1281Dtcs(false, (success, text) =>
+                {
+                    Dispatcher.Invoke((Action)(() => FinishHeldDtcRead(success, text)));
+                });
+                return;
+            }
+
             App.DisplayStatusMessage("Reading all ECU DTCs.", StatusMessageType.USER);
 
             ECUDTCs.Clear();
@@ -984,6 +1054,66 @@ namespace ECUFlasher
                 App.PercentOperationComplete = 100.0f;
                 App.OperationInProgress = false;
             }), null);
+        }
+
+        private void FinishHeldDtcRead(bool success, string text)
+        {
+            App.DisplayStatusMessage(success ? text : ("DTC request failed. " + text), StatusMessageType.USER);
+            if (success)
+            {
+                string body = text ?? "";
+                int after = body.IndexOf("; after ", StringComparison.Ordinal);
+                if (after >= 0)
+                {
+                    body = body.Substring(after + 8);
+                }
+
+                ECUDTCs = ParseHeldFaults(body);
+                DisplayDTCsRead(ECUDTCs);
+            }
+
+            App.PercentOperationComplete = 100.0f;
+            App.OperationInProgress = false;
+        }
+
+        private static ObservableCollection<KWP2000DTCInfo> ParseHeldFaults(string text)
+        {
+            var list = new ObservableCollection<KWP2000DTCInfo>();
+            if (string.IsNullOrEmpty(text))
+            {
+                return list;
+            }
+
+            string[] parts = text.Split(new char[] { ',', ';' });
+            foreach (string part in parts)
+            {
+                string piece = part.Trim();
+                int slash = piece.LastIndexOf('/');
+                if (slash < 4)
+                {
+                    continue;
+                }
+
+                int statusAt = piece.IndexOf(" status ", slash, StringComparison.Ordinal);
+                if ((statusAt < 0) || ((statusAt + 10) > piece.Length))
+                {
+                    continue;
+                }
+
+                string hexCode = piece.Substring(slash - 4, 4);
+                string statusHex = piece.Substring(statusAt + 8, 2);
+                ushort code;
+                byte status;
+                if (!ushort.TryParse(hexCode, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out code)
+                    || !byte.TryParse(statusHex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out status))
+                {
+                    continue;
+                }
+
+                list.Add(new KWP2000DTCInfo { DTC = code, Status = status });
+            }
+
+            return list;
         }
 
         private const uint EepromMirrorPage30Address = 0x6001E0;

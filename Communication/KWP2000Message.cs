@@ -60,7 +60,7 @@ namespace Communication
             UInt32 numHeaderBytes = 3;
             var actualAddressMode = mAddressMode;
 
-            if (commInterface.IsOneByteHeaderSupported())
+            if (commInterface.IsOneByteHeaderSupported() && !commInterface.FirstWakeFlashUseThreeByteHeader)
             {
                 useOneByteHeader = true;
                 numHeaderBytes = 1;

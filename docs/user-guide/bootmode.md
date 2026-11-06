@@ -14,6 +14,31 @@ Flash read/write uses the **Flashing** tab. The protocol combo at the top of the
 
 Simos 3.x and EDC15 flash layout is auto-detected. EEPROM chip select on the **EEPROM** tab includes ME7.1, ME7.5, ME7.1.1, Simos 3.2, and EDC15 I2C.
 
+## M5.9.2
+
+M5.9.2 does not use Boot Mode. This screen is the C167 bootstrap loader. M5.9.2 is an 80C196 ECU, so it does not answer. The hello (`0x00` in, device ID back) is only a cable echo. No ID follows, at 9600 or at 38400.
+
+Use **KWP2000**. Pin 43 selects which session the ECU answers.
+
+- **Full Write** needs pin 43 at +12 V. It sends the loaded file on the first KWP2000 wake.
+- **Full Read** needs pin 43 off +12 V. The held KWP1281 session copies `0x0000`-`0xBFFF` (49152 bytes). That is the calibration, not the whole flash.
+- **Read EEPROM** uses that same read session and copies the 24C02. Pin 43 stays off +12 V.
+
+### Write
+
+Pin 43 stays at +12 V for the whole attempt. Set it before you apply power.
+
+- Protocol **KWP2000**, connection method **Fast Init**. The connect-bar baud selects the speed byte. The write requests one byte: the fastest rate this ECU has accepted that is at or below that baud. 10400 is `0x14` and 38400 is `0x50`. A higher dropdown still requests `0x50`. The key is sent when the session answers `7F 10 33`, or when erase answers security-required `0x33`. After that key the same speed byte is sent again, then timing, then erase.
+- Connect. A good connect says `OK. Connect succeeded. First wake stayed KWP2000. Tester present is not sent.` The scan of `0x10` is silent. `0x01` answers, key bytes `0x6F` / `0x0F`.
+- **Full Write** wakes `0x11` and sends the loaded file. Let it run. Tester present is not sent, and the app does not close this session on its own.
+- **Read DTCs** and **Clear DTCs** need the read session, pin 43 off +12 V. They are blocked on the programming wake.
+
+### If the write fails
+
+Switch the ECU supply off, then back on. Set pin 43 to +12 V before the supply comes back, and run **Full Write** again. Leaving the ECU powered does not clear a failed write. [Troubleshooting](troubleshooting.md#m592-write-fails).
+
+Measurements from the bench are in [M5.9.2](../M5.9.2.md).
+
 ## Entry and power
 
 Same ground and +12 V as a KWP bench. Bootmode needs the ECU in bootstrap, not a normal KWP session.
@@ -27,6 +52,8 @@ If the loader core is already running (`0xAA`), the app uploads the flash driver
 ## Baud
 
 Default **57600**. Try **38400** if 57600 fails (especially CH340).
+
+M5.9.2 does not use this loader. Write needs pin 43 at +12 V. Read needs pin 43 off +12 V ([M5.9.2](#m592)).
 
 9600 and 19200 can fail non-deterministically on CH340 (wrong ACKs, NAK, readback errors). Likely USB latency, buffering, jitter, or voltage — not baud error. Prefer FTDI at those lower rates. [Issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44)
 

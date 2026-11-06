@@ -1563,6 +1563,13 @@ namespace ECUFlasher
                             result = false;
                         }
 
+                        var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                        if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
+                        {
+                            reasonsDisabled.Add("Logging is for ME7.");
+                            result = false;
+                        }
+
                         if (App.OperationInProgress)
                         {
                             reasonsDisabled.Add("Another operation is in progress");

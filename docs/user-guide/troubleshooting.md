@@ -32,6 +32,12 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 - Check the log for one `Connecting to address 0x..` line per attempt. If you see only one, set **Attempts** on the Settings tab back to 3; fast init needs several attempts to try each address. [Getting started](getting-started.md#fast-init), [KWP2000.md](../KWP2000.md)
 - After a flash write or abort, the ECU may still be on the RAM programming kernel. Prefer slow init. Do not change fast-init address mode to hunt for it. [issue #106](https://github.com/NefMoto/NefMotoOpenSource/issues/106)
 
+## M5.9.2 write fails
+
+Switch the ECU supply off, then back on. Set pin 43 to +12 V before the supply comes back, leave the connection method on **Fast Init**, and run **Full Write** again. [M5.9.2](bootmode.md#m592)
+
+Leaving the ECU powered does not clear a failed write.
+
 ## Connect works, programming or flash fails
 
 - ME7.5 bench: pin 121 at +12 V (same switched rail as pins 3, 21, 62). Ident can succeed while a programming session fails if 121 is floating.
