@@ -841,7 +841,7 @@ namespace ECUFlasher
             {
                 if (_ChooseFlashFileCommand == null)
                 {
-                    _ChooseFlashFileCommand = new ReactiveCommand(this.OnChooseFlashFile);
+                    _ChooseFlashFileCommand = new ReactiveCommand(() => TryChooseFlashFile());
                     _ChooseFlashFileCommand.Name = "Choose Flash File";
                     _ChooseFlashFileCommand.Description = "Choose the flash file";
                     _ChooseFlashFileCommand.AddWatchedProperty(App, "OperationInProgress");
@@ -874,7 +874,8 @@ namespace ECUFlasher
         private readonly string FLASH_FILE_EXT = ".bin";
         private readonly string FLASH_FILE_FILTER = "Binary Files (*.bin)|*.bin|All Files (*.*)|*.*";
 
-        private void OnChooseFlashFile()
+        // True if a file was picked; validation may still fail.
+        private bool TryChooseFlashFile()
         {
             OpenFileDialog dialog = new OpenFileDialog();
             dialog.Filter = FLASH_FILE_FILTER;
@@ -882,10 +883,11 @@ namespace ECUFlasher
             dialog.CheckPathExists = true;
             dialog.Title = "Select File to Flash";
 
-            if (App.ShowFileDialog(dialog, FileNameToFlash) == true)
-            {
-                FileNameToFlash = dialog.FileName;
-            }
+            if (App.ShowFileDialog(dialog, FileNameToFlash) != true)
+                return false;
+
+            FileNameToFlash = dialog.FileName;
+            return true;
         }
 
         private void OnFlashFilePathOpen(object sender, MouseButtonEventArgs e)
@@ -1091,14 +1093,10 @@ namespace ECUFlasher
                     {
                         _WriteEntireFlashCommand.WatchConnection(App);
                         _WriteEntireFlashCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _WriteEntireFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
                         _WriteEntireFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
 
-                    _WriteEntireFlashCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
-                    {
-                        return CanExecuteWriteEntireFlashCommand(reasonsDisabled);
-                    };
+                    _WriteEntireFlashCommand.CanExecuteMethod = CanExecuteEntireFlashCommand;
                 }
 
                 return _WriteEntireFlashCommand;
@@ -1106,105 +1104,44 @@ namespace ECUFlasher
         }
         private ReactiveCommand _WriteEntireFlashCommand;
 
-
-        private bool CanExecuteWriteEntireFlashCommand(List<string> reasonsDisabled)
+        // Missing/invalid bin must not grey out write: click opens the picker (#143).
+        private bool EnsureFlashFileReadyForWrite()
         {
-            if (App == null)
-            {
-                reasonsDisabled.Add("Internal program error");
-                return false;
-            }
-
-            bool result = true;
-
-            // For bootmode, layout is auto-detected via GetBootmodeFlashLayout
-            if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
-            {
-                if (!App.CommInterface.IsConnected())
-                {
-                    reasonsDisabled.Add("Not connected to ECU");
-                    result = false;
-                }
-                else
-                {
-                    var bootstrapInterface = App.CommInterface as BootstrapInterface;
-                    if (bootstrapInterface != null && !bootstrapInterface.CanGetBootmodeFlashLayout())
-                    {
-                        reasonsDisabled.Add(bootstrapInterface.GetBootmodeFlashLayoutUnavailableReason()
-                            ?? "Flash layout not available (BootMode).");
-                        result = false;
-                    }
-                }
-
-                if (App.OperationInProgress)
-                {
-                    reasonsDisabled.Add("Another operation is in progress");
-                    result = false;
-                }
-
-                if (!IsFlashFileOK)
-                {
-                    reasonsDisabled.Add("Specified flash file is not correct");
-                    result = false;
-                }
-
-                return result;
-            }
-
-            // For KWP2000, require memory layout
-            if (!IsMemoryLayoutOK)
-            {
-                reasonsDisabled.Add("Specified memory layout is not correct");
-                result = false;
-            }
-
-            if (!IsFlashFileOK)
-            {
-                reasonsDisabled.Add("Specified flash file is not correct");
-                result = false;
-            }
-
-            if (!App.CommInterface.IsConnected())
-            {
-                reasonsDisabled.Add("Not connected to ECU");
-                result = false;
-            }
-
-            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 &&
-                App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
-            {
-                reasonsDisabled.Add("Not connected with KWP2000 or BootMode protocol");
-                result = false;
-            }
-
-            if (App.OperationInProgress)
-            {
-                reasonsDisabled.Add("Another operation is in progress");
-                result = false;
-            }
-
-            return result;
-        }
-        private void OnWriteEntireFlash()
-        {
-            //done to trigger a reload of the memory layout and flash files and cause them to revalidate
             FileNameToFlash = FileNameToFlash;
             MemoryLayoutFileName = MemoryLayoutFileName;
 
-            if (WriteEntireFlashCommand.IsEnabled)
-            {
-                if (ConfirmFlashOperation("Confirm Full Write ECU Flash Memory", FlashConfirmationKind.WriteEntire))
-                {
-                    LogLoadedFlashFile("Full write");
-                    // Force verify to false for bootmode
-                    bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
-                        ? false
-                        : chkVerifyWrite.IsChecked.Value;
-                    OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, false, verify);
-                }
-            }
+            if (IsFlashFileOK)
+                return true;
+            if (!ChooseFlashFileCommand.CanExecute(null) || !TryChooseFlashFile())
+                return false;
+            if (IsFlashFileOK)
+                return true;
+
+            App.DisplayUserPrompt("Flash File Not Valid",
+                this["FileNameToFlash"] ?? "Specified flash file is not correct", UserPromptType.OK);
+            return false;
         }
 
+        private void StartWriteFlash(ReactiveCommand command, bool diff, string confirmTitle,
+            FlashConfirmationKind kind, string logLabel)
+        {
+            if (!EnsureFlashFileReadyForWrite() || !command.CanExecute(null))
+                return;
+            if (!ConfirmFlashOperation(confirmTitle, kind))
+                return;
+
+            LogLoadedFlashFile(logLabel);
+            bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+                ? false
+                : chkVerifyWrite.IsChecked.Value;
+            OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, OnWriteFlashCompleted, diff, verify);
+        }
+
+        private void OnWriteEntireFlash()
+        {
+            StartWriteFlash(WriteEntireFlashCommand, false, "Confirm Full Write ECU Flash Memory",
+                FlashConfirmationKind.WriteEntire, "Full write");
+        }
 
         public ReactiveCommand WriteDiffFlashCommand
         {
@@ -1220,14 +1157,10 @@ namespace ECUFlasher
                     {
                         _WriteDiffFlashCommand.WatchConnection(App);
                         _WriteDiffFlashCommand.AddWatchedProperty(App, "OperationInProgress");
-                        _WriteDiffFlashCommand.AddWatchedProperty(this, "IsFlashFileOK");
                         _WriteDiffFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
 
-                    _WriteDiffFlashCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
-                    {
-                        return CanExecuteWriteDiffFlashCommand(reasonsDisabled);
-                    };
+                    _WriteDiffFlashCommand.CanExecuteMethod = CanExecuteWriteDiffFlashCommand;
                 }
 
                 return _WriteDiffFlashCommand;
@@ -1235,75 +1168,21 @@ namespace ECUFlasher
         }
         private ReactiveCommand _WriteDiffFlashCommand;
 
-
         private bool CanExecuteWriteDiffFlashCommand(List<string> reasonsDisabled)
         {
-            if (App == null)
-            {
-                reasonsDisabled.Add("Internal program error");
-                return false;
-            }
-
-            // Diff write is not supported for BootMode (same reason as diff read)
-            if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+            if (App?.CommInterface?.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
             {
                 reasonsDisabled.Add("Diff write is not supported for BootMode protocol");
                 return false;
             }
 
-            bool result = true;
-
-            if (!IsMemoryLayoutOK)
-            {
-                reasonsDisabled.Add("Specified memory layout is not correct");
-                result = false;
-            }
-
-            if (!IsFlashFileOK)
-            {
-                reasonsDisabled.Add("Specified flash file is not correct");
-                result = false;
-            }
-
-            if (!App.CommInterface.IsConnected())
-            {
-                reasonsDisabled.Add("Not connected to ECU");
-                result = false;
-            }
-
-            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 &&
-                App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
-            {
-                reasonsDisabled.Add("Not connected with KWP2000 or BootMode protocol");
-                result = false;
-            }
-
-            if (App.OperationInProgress)
-            {
-                reasonsDisabled.Add("Another operation is in progress");
-                result = false;
-            }
-
-            return result;
+            return CanExecuteEntireFlashCommand(reasonsDisabled);
         }
+
         private void OnWriteDiffFlash()
         {
-            //done to trigger a reload of the memory layout and flash files and cause them to revalidate
-            FileNameToFlash = FileNameToFlash;
-            MemoryLayoutFileName = MemoryLayoutFileName;
-
-            if (WriteDiffFlashCommand.IsEnabled)
-            {
-                if (ConfirmFlashOperation("Confirm Diff Write ECU Flash Memory", FlashConfirmationKind.WriteDiff))
-                {
-                    LogLoadedFlashFile("Diff write");
-                    // Force verify to false for bootmode
-                    bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
-                        ? false
-                        : chkVerifyWrite.IsChecked.Value;
-                    OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, this.OnWriteFlashCompleted, true, verify);
-                }
-            }
+            StartWriteFlash(WriteDiffFlashCommand, true, "Confirm Diff Write ECU Flash Memory",
+                FlashConfirmationKind.WriteDiff, "Diff write");
         }
 
         private void OnWriteFlashCompleted(Operation operation, bool success)
@@ -1346,11 +1225,7 @@ namespace ECUFlasher
                         _ReadEntireFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
 
-                    _ReadEntireFlashCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
-                    {
-                        return CanExecuteReadEntireFlashCommand(reasonsDisabled);
-                    };
-
+                    _ReadEntireFlashCommand.CanExecuteMethod = CanExecuteEntireFlashCommand;
                 }
 
                 return _ReadEntireFlashCommand;
@@ -1358,7 +1233,8 @@ namespace ECUFlasher
         }
         private ReactiveCommand _ReadEntireFlashCommand;
 
-        private bool CanExecuteReadEntireFlashCommand(List<string> reasonsDisabled)
+        // Shared by full read and full write (write prompts for bin on click if needed).
+        private bool CanExecuteEntireFlashCommand(List<string> reasonsDisabled)
         {
             if (App == null)
             {
