@@ -323,6 +323,13 @@ namespace ECUFlasher
                 result = false;
             }
 
+            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
+            {
+                reasonsDisabled.Add("This command is for ME7.");
+                result = false;
+            }
+
             if (App.OperationInProgress)
             {
                 reasonsDisabled.Add("Another operation is in progress");
@@ -508,6 +515,13 @@ namespace ECUFlasher
                         if (!App.CommInterface.IsConnected())
                         {
                             reasonsDisabled.Add("Not connected to ECU");
+                            result = false;
+                        }
+
+                        var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                        if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
+                        {
+                            reasonsDisabled.Add("ECU info read is for ME7.");
                             result = false;
                         }
 

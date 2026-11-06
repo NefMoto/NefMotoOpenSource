@@ -103,8 +103,8 @@ namespace ECUFlasher
             }
         }
 
-        // Second 0x01 was still KWP1281, so 0x11 opened the session. Request the
-        // connect-bar baud now. At 10400 there is no faster rate to ask for.
+        // A session opened at 0x11 asks for the connect-bar baud. At 10400 there
+        // is no faster rate to ask for.
         private void StartSlowInitFallbackBaud()
         {
             if ((App == null) || !KWP2000CommInterface.IsConnected() || App.OperationInProgress)
@@ -158,7 +158,30 @@ namespace ECUFlasher
         private void ConnectIdentReadCompleted(Operation operation, bool success)
         {
             operation.CompletedOperationEvent -= ConnectIdentReadCompleted;
+
+            if (IsFirstWakeKWP2000())
+            {
+                KWP2000CommInterface.DisplayStatusMessage("OK. Connect succeeded. First wake stayed KWP2000. Tester present is not sent.", StatusMessageType.USER);
+            }
+
             FinishConnectOperation(operation, success ? null : "ECU identification read on connect did not finish.", StatusMessageType.LOG);
+        }
+
+        // First wake was already KWP2000. Full Write is the operation this session allows.
+        public bool IsFirstWakeKWP2000()
+        {
+            return KWP2000CommInterface.IsConnected() && KWP2000CommInterface.IsFirstWakeKWP2000();
+        }
+
+        // Second wake stayed KWP1281. Full Read is the operation this session allows.
+        public bool IsHeldKWP1281Session()
+        {
+            return KWP2000CommInterface.IsConnected() && KWP2000CommInterface.IsHeldKWP1281Session;
+        }
+
+        public bool BlocksMe7Commands()
+        {
+            return IsFirstWakeKWP2000() || IsHeldKWP1281Session();
         }
 
         private void FinishConnectOperation(Operation operation, string failure, StatusMessageType failureType)
