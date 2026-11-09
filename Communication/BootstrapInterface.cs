@@ -2780,12 +2780,12 @@ namespace Communication
         /// <summary>
         /// Prepare driver and read the full EEPROM image (default 512 B in 0x200 chunks).
         /// </summary>
-        public bool ReadEeprom(BootmodeEepromSettings settings, out byte[] data, Action<uint, uint> progress = null)
+        public bool ReadEeprom(BootmodeEepromSettings settings, out byte[] data, out ushort driverState, Action<uint, uint> progress = null)
         {
             data = null;
+            driverState = 0;
 
-            ushort state;
-            if (!PrepareEepromDriver(settings, out state))
+            if (!PrepareEepromDriver(settings, out driverState))
             {
                 return false;
             }
@@ -2811,7 +2811,6 @@ namespace Communication
                 return false;
             }
 
-            DisplayStatusMessage("Read EEPROM OK: " + size + " bytes" + EepromStateNote(choice, state) + ".", StatusMessageType.USER);
             return true;
         }
 
@@ -2876,7 +2875,7 @@ namespace Communication
             return true;
         }
 
-        private static string EepromStateNote(BootmodeEepromTransfer.Choice choice, ushort state)
+        internal static string EepromStateNote(BootmodeEepromTransfer.Choice choice, ushort state)
         {
             if (!choice.RequireDriverState)
             {

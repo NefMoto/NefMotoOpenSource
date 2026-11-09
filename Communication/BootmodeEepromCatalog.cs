@@ -131,6 +131,36 @@ namespace Communication
             };
         }
 
+        public static string DisplayNameFor(BootstrapInterface.BootmodeEepromSettings settings)
+        {
+            if (settings == null)
+            {
+                return "";
+            }
+
+            foreach (Device device in SpiDevices)
+            {
+                if (device.Periph == settings.Periph
+                    && device.EepromType == settings.EepromType
+                    && device.Size == settings.Size)
+                {
+                    return device.DisplayName;
+                }
+            }
+
+            foreach (Device device in I2cDevices)
+            {
+                if (device.Periph == settings.Periph
+                    && device.EepromType == settings.EepromType
+                    && device.Size == settings.Size)
+                {
+                    return device.DisplayName;
+                }
+            }
+
+            return settings.Periph + " " + settings.Size + " B";
+        }
+
         private static Device Spi(
             string name,
             BootstrapInterface.BootmodeEepromPeriph periph,

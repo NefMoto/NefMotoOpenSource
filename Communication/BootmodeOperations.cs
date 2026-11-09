@@ -599,11 +599,13 @@ namespace Communication
     {
         public BootmodeReadEepromOperation(
             BootstrapInterface commInterface,
-            BootstrapInterface.BootmodeEepromSettings settings)
+            BootstrapInterface.BootmodeEepromSettings settings,
+            ushort[] imageTable = null)
             : base(commInterface, "Bootmode EEPROM read")
         {
             mBootstrapInterface = commInterface;
             mSettings = settings ?? BootstrapInterface.BootmodeEepromSettings.ForMe75();
+            mImageTable = imageTable;
         }
 
         public MemoryImage ReadMemory { get; private set; }
@@ -620,9 +622,11 @@ namespace Communication
                 StatusMessageType.USER);
 
             byte[] data;
+            ushort driverState;
             bool success = mBootstrapInterface.ReadEeprom(
                 mSettings,
                 out data,
+                out driverState,
                 ReportProgress);
 
             if (!success || data == null)
@@ -632,11 +636,41 @@ namespace Communication
 
             ReadMemory = new MemoryImage(data, 0);
             LogEepromBytes(data);
-            BootmodeEepromChecksumMessages.ReportMe7Eeprom95040Checksums(CommInterface, mSettings, data, warnOnly: false);
+            if (data.Length > Me7Eeprom95040Checksum.EepromSize)
+            {
+                string verdict = Me7Eeprom95040Checksum.OversizedReadStatus(
+                    data,
+                    BootmodeEepromCatalog.DisplayNameFor(mSettings));
+                CommInterface.DisplayStatusMessage(
+                    verdict ?? ReadOkMessage(data.Length, driverState),
+                    StatusMessageType.USER);
+            }
+            else
+            {
+                CommInterface.DisplayStatusMessage(ReadOkMessage(data.Length, driverState), StatusMessageType.USER);
+                BootmodeEepromChecksumMessages.ReportMe7Eeprom95040Checksums(
+                    CommInterface,
+                    mSettings,
+                    data,
+                    warnOnly: false,
+                    imageTable: mImageTable);
+            }
             CommInterface.DisplayStatusMessage(
                 "Bootmode EEPROM read complete. Reload flash driver before any flash operation.",
                 StatusMessageType.USER);
             return true;
+        }
+
+        private string ReadOkMessage(int size, ushort driverState)
+        {
+            string note = "";
+            BootmodeEepromTransfer.Choice choice;
+            if (BootmodeEepromTransfer.TryChoose(mSettings.Periph, mSettings.EepromType, out choice))
+            {
+                note = BootstrapInterface.EepromStateNote(choice, driverState);
+            }
+
+            return "Read EEPROM OK: " + size + " bytes" + note + ".";
         }
 
         private void LogEepromBytes(byte[] data)
@@ -653,6 +687,7 @@ namespace Communication
 
         private readonly BootstrapInterface mBootstrapInterface;
         private readonly BootstrapInterface.BootmodeEepromSettings mSettings;
+        private readonly ushort[] mImageTable;
     }
 
     /// <summary>
@@ -665,7 +700,8 @@ namespace Communication
             BootstrapInterface commInterface,
             BootstrapInterface.BootmodeEepromSettings settings,
             byte[] dataToWrite,
-            bool verify)
+            bool verify,
+            ushort[] imageTable = null)
             : base(commInterface, "Bootmode EEPROM write")
         {
             if (dataToWrite == null || dataToWrite.Length == 0)
@@ -677,6 +713,7 @@ namespace Communication
             mSettings = settings ?? BootstrapInterface.BootmodeEepromSettings.ForMe75();
             mDataToWrite = dataToWrite;
             mVerify = verify;
+            mImageTable = imageTable;
         }
 
         protected override bool RunWorker()
@@ -697,7 +734,8 @@ namespace Communication
                 CommInterface,
                 mSettings,
                 mDataToWrite,
-                warnOnly: true);
+                warnOnly: true,
+                imageTable: mImageTable);
 
             bool success = mBootstrapInterface.WriteEeprom(
                 mSettings,
@@ -720,6 +758,7 @@ namespace Communication
         private readonly BootstrapInterface.BootmodeEepromSettings mSettings;
         private readonly byte[] mDataToWrite;
         private readonly bool mVerify;
+        private readonly ushort[] mImageTable;
     }
 
     internal static class BootmodeEepromChecksumMessages
@@ -728,17 +767,18 @@ namespace Communication
             CommunicationInterface commInterface,
             BootstrapInterface.BootmodeEepromSettings settings,
             byte[] data,
-            bool warnOnly)
+            bool warnOnly,
+            ushort[] imageTable = null)
         {
             if (settings == null
                 || data == null
                 || settings.EepromType != BootstrapInterface.BootmodeEepromType.Type95040
-                || data.Length < Me7Eeprom95040Checksum.EepromSize)
+                || data.Length != Me7Eeprom95040Checksum.EepromSize)
             {
                 return;
             }
 
-            var checksum = Me7Eeprom95040Checksum.Validate(data);
+            var checksum = Me7Eeprom95040Checksum.Validate(data, 0, imageTable);
             if (checksum.AllChecksumPagesValid)
             {
                 if (!warnOnly)

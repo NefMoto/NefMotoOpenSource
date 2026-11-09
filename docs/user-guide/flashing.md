@@ -18,7 +18,7 @@ KWP has no flash chip ID. You pick the XML in the layout combo:
 
 BT vs BB is the same density with the small sectors at opposite ends. A write with the wrong orientation can program most of the chip, then fail on the boot cluster. That is **Wrong Flash Layout**, not “persistent data.” Recovery: [Wrong Flash Layout](troubleshooting.md#wrong-flash-layout).
 
-Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB). 
+Most ME7.x ECUs are **29F800BB** (1MB) or **29F400BB** (512KB).
 
 M5.9.2 is typically **29F200** (256KB).
 

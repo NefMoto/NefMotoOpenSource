@@ -41,11 +41,22 @@ namespace Communication
 
         private const ushort ChecksumPresentMask = 0x0001;
         private const ushort ChecksumBitMask = 0x0040;
+        private const int ImageTablePrefixPages = 20;
+        private const int Page20 = 20;
 
         /// <summary>
-        /// Pages whose firmware descriptor has the CS bit but real ME7 dumps use for
-        /// VAG HW/SW ASCII (e.g. 8D0907551M / 0002) and do not store the Bosch page checksum.
-        /// Formula math is unchanged; these are excluded from pass/fail policy only.
+        /// Flags for a page-20 check when no flash table was found. Bit 6 is clear, so the
+        /// formula does not subtract one. A stored word that matches counts as ok.
+        /// </summary>
+        private const ushort Page20MatchFlags = 0x0037;
+
+        /// <summary>Page 0 byte 15 on the 95040 images in issue #138.</summary>
+        public const byte Page0Signature = 0x5A;
+
+        /// <summary>
+        /// Pages 28 and 29 are scored by <see cref="Validate"/> when their descriptor has the
+        /// checksum bit. <see cref="CorrectChecksums"/> never rewrites them, and the KWP shadow
+        /// fill never copies them.
         /// </summary>
         public static readonly int[] ChecksumExemptPages = { 28, 29 };
 
@@ -60,41 +71,31 @@ namespace Communication
 
         public sealed class ValidationResult
         {
-            /// <summary>CS pages that are enforced (descriptor CS bit, not exempt).</summary>
+            /// <summary>Pages whose descriptor has the checksum bit.</summary>
             public int PagesChecked { get; set; }
 
-            /// <summary>Enforced pages whose stored checksum does not match the formula.</summary>
+            /// <summary>Checked pages whose stored checksum does not match the formula.</summary>
             public int PagesInvalid { get; set; }
 
-            /// <summary>Exempt CS pages (HW/SW ID); not counted toward pass/fail.</summary>
-            public int PagesExempt { get; set; }
-
-            /// <summary>Exempt pages that also do not match the formula (expected on real chips).</summary>
-            public int PagesExemptMismatch { get; set; }
-
-            /// <summary>True when every enforced checksum page is valid (and at least one was checked).</summary>
+            /// <summary>True when every checked page is valid (and at least one was checked).</summary>
             public bool AllChecksumPagesValid
             {
                 get { return PagesInvalid == 0 && PagesChecked > 0; }
             }
 
-            /// <summary>One entry per page. Exempt pages are Exempt even when the formula happens to match.</summary>
+            /// <summary>One entry per page. Unchecked pages stay <see cref="PageChecksumKind.None"/>.</summary>
             public PageChecksumKind[] PageChecksumKinds { get; set; }
 
             /// <summary>User-facing summary for status log / prompts.</summary>
             public string FormatStatusMessage(bool warnOnly = false)
             {
-                string exemptNote = PagesExempt > 0
-                    ? $"; pages 28-29 (HW/SW ID) not checksummed"
-                    : string.Empty;
-
                 if (AllChecksumPagesValid)
                 {
-                    return $"ME7 95040 page checksums OK ({PagesChecked} data pages){exemptNote}.";
+                    return $"ME7 95040 page checksums OK ({PagesChecked} data pages).";
                 }
 
                 string suffix = warnOnly ? "; writing anyway." : ".";
-                return $"Warning: ME7 95040 page checksums failed ({PagesInvalid} bad / {PagesChecked} data pages checked){exemptNote}{suffix}";
+                return $"Warning: ME7 95040 page checksums failed ({PagesInvalid} bad / {PagesChecked} data pages checked){suffix}";
             }
         }
 
@@ -116,7 +117,94 @@ namespace Communication
             return PageDescriptors[pageNumber];
         }
 
-        public static ValidationResult Validate(byte[] data, int dataOffset = 0)
+        /// <summary>
+        /// Descriptor used to score <paramref name="page"/>. An image table replaces the shipped
+        /// list. With no table, page 20 uses <see cref="Page20MatchFlags"/> only when the stored
+        /// word already matches that formula; a mismatch stays unchecked.
+        /// </summary>
+        public static ushort ActiveDescriptor(int page, byte[] data, int pageOffset, ushort[] imageTable)
+        {
+            if (imageTable != null && imageTable.Length == PageCount)
+            {
+                return imageTable[page];
+            }
+
+            if (page == Page20
+                && data != null
+                && pageOffset >= 0
+                && data.Length >= pageOffset + PageSize)
+            {
+                ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, Page20MatchFlags);
+                ushort stored = (ushort)(data[pageOffset + 14] | (data[pageOffset + 15] << 8));
+                if (stored == expected)
+                {
+                    return Page20MatchFlags;
+                }
+
+                return 0;
+            }
+
+            return PageDescriptors[page];
+        }
+
+        /// <summary>
+        /// First 20 shipped descriptors, as little-endian words, locate the table. The 32 words
+        /// at the first even hit are this image's table. Returns null when the prefix is absent
+        /// or the 32 words do not fit.
+        /// </summary>
+        public static ushort[] TryCopyImageTable(byte[] flash)
+        {
+            int tableBytes = PageCount * 2;
+            if (flash == null || flash.Length < tableBytes)
+            {
+                return null;
+            }
+
+            for (int at = 0; at + tableBytes <= flash.Length; at += 2)
+            {
+                if (!PrefixMatches(flash, at))
+                {
+                    continue;
+                }
+
+                var table = new ushort[PageCount];
+                for (int page = 0; page < PageCount; page++)
+                {
+                    int offset = at + (page * 2);
+                    table[page] = (ushort)(flash[offset] | (flash[offset + 1] << 8));
+                }
+
+                return table;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Status for a bootmode read whose selected size is over 512 bytes, using the shipped
+        /// list on the first 512. Null means the plain OK line still applies.
+        /// </summary>
+        public static string OversizedReadStatus(byte[] data, string deviceName)
+        {
+            if (data == null || deviceName == null)
+            {
+                return null;
+            }
+
+            if (Validate(data).AllChecksumPagesValid)
+            {
+                return "EEPROM looks like a 95040; selected device is " + deviceName + ".";
+            }
+
+            if (data.Length > 15 && data[15] != Page0Signature)
+            {
+                return "EEPROM size is unverified; selected device is " + deviceName + ".";
+            }
+
+            return null;
+        }
+
+        public static ValidationResult Validate(byte[] data, int dataOffset = 0, ushort[] imageTable = null)
         {
             var result = new ValidationResult();
             result.PageChecksumKinds = new PageChecksumKind[PageCount];
@@ -129,8 +217,7 @@ namespace Communication
             for (int page = 0; page < PageCount; page++)
             {
                 int pageOffset = dataOffset + (page * PageSize);
-                ushort descriptor = PageDescriptors[page];
-
+                ushort descriptor = ActiveDescriptor(page, data, pageOffset, imageTable);
                 if ((descriptor & ChecksumPresentMask) == 0)
                 {
                     continue;
@@ -138,21 +225,8 @@ namespace Communication
 
                 ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, descriptor);
                 ushort stored = (ushort)(data[pageOffset + 14] | (data[pageOffset + 15] << 8));
-                bool match = stored == expected;
-
-                if (IsChecksumExemptPage(page))
-                {
-                    result.PagesExempt++;
-                    result.PageChecksumKinds[page] = PageChecksumKind.Exempt;
-                    if (!match)
-                    {
-                        result.PagesExemptMismatch++;
-                    }
-                    continue;
-                }
-
                 result.PagesChecked++;
-                if (!match)
+                if (stored != expected)
                 {
                     result.PagesInvalid++;
                     result.PageChecksumKinds[page] = PageChecksumKind.Bad;
@@ -185,7 +259,7 @@ namespace Communication
         }
 
         /// <summary>
-        /// Writes the Bosch checksum for one page. Exempt pages and pages with no checksum are left unchanged.
+        /// Writes the Bosch checksum for one page. Pages 28-29 and pages with no checksum bit are left unchanged.
         /// </summary>
         public static void WritePageChecksum(byte[] data, int page, int dataOffset = 0)
         {
@@ -212,10 +286,11 @@ namespace Communication
         }
 
         /// <summary>
-        /// Writes Bosch page checksums for all non-exempt CS pages in place.
-        /// Pages 28-29 (HW/SW ID) are never modified. Returns how many pages were updated.
+        /// Writes Bosch page checksums for checksummed pages in place.
+        /// Pages 28-29 are never modified. With no image table, page 20 is not written.
+        /// Returns how many pages were updated.
         /// </summary>
-        public static int CorrectChecksums(byte[] data, int dataOffset = 0)
+        public static int CorrectChecksums(byte[] data, int dataOffset = 0, ushort[] imageTable = null)
         {
             int pagesUpdated = 0;
 
@@ -231,13 +306,13 @@ namespace Communication
                     continue;
                 }
 
-                ushort descriptor = PageDescriptors[page];
+                int pageOffset = dataOffset + (page * PageSize);
+                ushort descriptor = ActiveDescriptor(page, data, pageOffset, imageTable);
                 if ((descriptor & ChecksumPresentMask) == 0)
                 {
                     continue;
                 }
 
-                int pageOffset = dataOffset + (page * PageSize);
                 ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, descriptor);
                 ushort stored = (ushort)(data[pageOffset + 14] | (data[pageOffset + 15] << 8));
                 if (stored == expected)
@@ -251,6 +326,21 @@ namespace Communication
             }
 
             return pagesUpdated;
+        }
+
+        private static bool PrefixMatches(byte[] flash, int at)
+        {
+            for (int page = 0; page < ImageTablePrefixPages; page++)
+            {
+                int offset = at + (page * 2);
+                ushort word = (ushort)(flash[offset] | (flash[offset + 1] << 8));
+                if (word != PageDescriptors[page])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }
