@@ -69,6 +69,8 @@ Ident may show `THIS-IS-THE-RAM-PROGRAM` (hyphens vary) until a **complete** pow
 
 **Wrong Flash Layout**, a sector fail you can resume, or a comm drop: **do not** power cycle. Stay on the same power-on and retry KWP with slow init. [issue #106](https://github.com/NefMoto/NefMotoOpenSource/issues/106)
 
+M5.9.2 does not use that retry. Power-cycle the ECU supply. Set pin 43 to +12 V before power comes back, and leave the connection method on **Fast Init**. [M5.9.2](bootmode.md#m592).
+
 **Wrong Flash Layout** (OK only): pick the opposite layout named in the dialog, then write again. **Diff Write Flash** skips sectors that already match (ECU checksum), so the boot cluster is what still needs programming. Entire-flash erase does not fix BT vs BB. Switching layout in the same programming session is not implemented. [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103)
 
 ## Erase

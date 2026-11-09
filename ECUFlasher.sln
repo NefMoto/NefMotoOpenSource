@@ -18,6 +18,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ApplicationShared", "Applic
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NefMotoOpenSource.Tests", "Tests\NefMotoOpenSource.Tests.csproj", "{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FirstWakeProbe", "FirstWakeProbe\FirstWakeProbe.csproj", "{C4E8A1B2-7D3F-4A91-8E6C-2B5F0D9A1E47}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,10 @@ Global
 		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4E8A1B2-7D3F-4A91-8E6C-2B5F0D9A1E47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4E8A1B2-7D3F-4A91-8E6C-2B5F0D9A1E47}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4E8A1B2-7D3F-4A91-8E6C-2B5F0D9A1E47}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4E8A1B2-7D3F-4A91-8E6C-2B5F0D9A1E47}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

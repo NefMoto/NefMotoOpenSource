@@ -166,8 +166,8 @@ namespace Communication
         public const byte DEFUALT_ECU_FASTINIT_KWP2000_FUNCTIONAL_ADDRESS_INTERNAL_ROM = 0x10;
 
         //KWP_1281_KB2_0x0A * 128 + KWP_1281_KB1_0x01 = 1281
-        protected const byte KWP_1281_PROTOCOL_KEY_BYTE_1 = 0x01;//seven data bits, odd parity
-        protected const byte KWP_1281_PROTOCOL_KEY_BYTE_2 = 0x0A;//seven data bits, odd parity
+        protected internal const byte KWP_1281_PROTOCOL_KEY_BYTE_1 = 0x01;//seven data bits, odd parity
+        protected internal const byte KWP_1281_PROTOCOL_KEY_BYTE_2 = 0x0A;//seven data bits, odd parity
 
         public const byte KWP_2000_PROTOCOL_KEY_BYTE_2 = 0x0F;//seven data bits, odd parity
 
@@ -211,9 +211,12 @@ namespace Communication
         //PUBLIC METHODS
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+        internal readonly KWP1281Read HeldKWP1281Read;
+
         public KWP2000Interface(DisplayStatusMessageDelegate displayStatusMessage)
             : base(displayStatusMessage)
         {
+            HeldKWP1281Read = new KWP1281Read(this);
             mReceiveBuffer = new byte[RECEIVE_BUFFER_SIZE];
             mMessagesPendingSend = new Queue<KWP2000Message>();
 
@@ -344,6 +347,9 @@ namespace Communication
         //physical 0x11 is in FASTINIT_KWP2000_PHYSICAL_TARGETS; bench units gave no reply. Some images set the physical RAM byte to 0x11 when the low word of RAM 0xE048 matches an image constant
         //physical 0x01 YES on images whose address filter compares against 0x01; 8E0909518, 06A906032NL, and the 4B0906018CH family want 0x10 (issue #123)
 
+        // Fast init uses this address only. The physical scan that starts at 0x10 is skipped.
+        public bool FastInitUseConnectAddressOnly { get; set; }
+
         public bool ConnectToECUSlowInit(byte connectAddress)
         {
             return ConnectToECU(KWP2000AddressMode.None, connectAddress, KWP2000ConnectionMethod.SlowInit);
@@ -462,6 +468,12 @@ namespace Communication
         {
             if (ConnectionStatus == ConnectionStatusType.Connected)
             {
+                if (IsHeldKWP1281Session)
+                {
+                    ConnectionStatus = ConnectionStatusType.Disconnected;
+                    return;
+                }
+
                 ConnectionStatus = ConnectionStatusType.DisconnectionPending;
                 SendMessage((byte)KWP2000ServiceID.StopCommunication);
 
@@ -489,7 +501,10 @@ namespace Communication
                 {
                     if (IsCommunicationDeviceOpen())
                     {
-                        mCommunicationDevice.SetBaudRate(value);
+                        if (!mCommunicationDevice.SetBaudRate(value))
+                        {
+                            DisplayStatusMessage("SetBaudRate(" + value + ") was rejected.", StatusMessageType.USER);
+                        }
                     }
                 }
                 mDiagnosticSessionBaudRate = value;
@@ -840,6 +855,9 @@ namespace Communication
             return (CommunicationKeyByte1 & (byte)KeyByte1.OneByteHeaderSupported) != 0;
         }
 
+        // First-wake flash frames are physical 3-byte headers even when the key byte allows a 1-byte header.
+        internal bool FirstWakeFlashUseThreeByteHeader { get; set; }
+
         public bool IsTargetSourceAddressInHeaderSupported()
         {
             return (CommunicationKeyByte1 & (byte)KeyByte1.TargetSourceAddressInHeaderSupported) != 0;
@@ -886,6 +904,169 @@ namespace Communication
 
         protected KWP2000AddressMode        mConnectAddressMode = KWP2000AddressMode.Physical;
         protected KWP2000ConnectionMethod    mConnectionType = KWP2000ConnectionMethod.SlowInit;
+
+        public bool IsSlowInitConnection
+        {
+            get { return mConnectionType == KWP2000ConnectionMethod.SlowInit; }
+        }
+
+        private bool KeepsTesterPresent()
+        {
+            return !IsFirstWakeKWP2000() && !IsHeldKWP1281Session;
+        }
+
+        // First wake was already KWP2000. There was no KWP1281 session.
+        // Slow init and fast init both count when the key bytes are the programming pair.
+        public bool IsFirstWakeKWP2000()
+        {
+            return (Kwp1281ConnectInfo == null)
+                && (CommunicationKeyByte1 == 0x6F)
+                && (CommunicationKeyByte2 == KWP_2000_PROTOCOL_KEY_BYTE_2)
+                && ((CommunicationAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS)
+                    || (CommunicationAddress == DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS));
+        }
+
+
+        // The transfer wakes at 0x11, then 0x81, before any transfer request.
+        // The wake uses the same init the first-wake KWP2000 connection was opened with.
+        internal void RequestFirstWakeFlashWake(Action<bool> finished)
+        {
+            mFirstWakeFlashWakeFinished = finished;
+            mFirstWakeFlashWakeRequested = true;
+        }
+
+        internal KWP2000Message TakeFirstWakeFlashFastStartMessage()
+        {
+            KWP2000Message message = mFirstWakeFlashFastStartMessage;
+            mFirstWakeFlashFastStartMessage = null;
+            return message;
+        }
+
+        private bool mFirstWakeFlashWakeRequested;
+        private Action<bool> mFirstWakeFlashWakeFinished;
+        private KWP2000Message mFirstWakeFlashFastStartMessage;
+
+        private bool WakeForFirstWakeFlash()
+        {
+            if (mConnectionType == KWP2000ConnectionMethod.FastInit)
+            {
+                return WakeForFirstWakeFlashFastInit();
+            }
+
+            return WakeForFirstWakeFlashSlowInit();
+        }
+
+        // 25 ms low, 25 ms high, then Start Communication at 0x11. The 0x81 is the wake.
+        private bool WakeForFirstWakeFlashFastInit()
+        {
+            long lowTimeTicks = (long)(Stopwatch.Frequency * (25.0 + FastInitLowHighTimeOffsetMS) / 1000.0);
+            long highTimeTicks = (long)(Stopwatch.Frequency * (25.0 + FastInitLowHighTimeOffsetMS) / 1000.0);
+            byte target = DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS;
+
+            DisplayStatusMessage("First wake flash: fast init to 0x11.", StatusMessageType.USER);
+            ClearMessageBuffers();
+            mP1ECUResponseInterByteTimeOut.Reset();
+            mP2ECUResponseTimeOut.Reset();
+            mP3TesterRequestTimeOut.Reset();
+            mFirstWakeFlashFastStartMessage = null;
+            mNumSendAttemptsForCurrentMessage = 0;
+            Thread.Sleep(1000);
+
+            bool sent = false;
+            lock (mCommunicationDevice)
+            {
+                if (mCommunicationDevice.SetBaudRate((uint)KWP2000BaudRates.BAUD_DEFAULT))
+                {
+                    DiagnosticSessionBaudRate = (uint)KWP2000BaudRates.BAUD_DEFAULT;
+
+                    var start = new KWP2000Message(KWP2000AddressMode.Physical, TESTER_ADDRESS, target, (byte)KWP2000ServiceID.StartCommunication, 0, null);
+                    SendMessage(start);
+                    byte[] startBytes = start.GetMessageDataBytes(this);
+                    Stopwatch watch = new Stopwatch();
+
+                    if (mCommunicationDevice.SetBreak(false))
+                    {
+                        watch.Start();
+                        long lowEndTime = watch.ElapsedTicks + lowTimeTicks;
+                        if (mCommunicationDevice.SetBreak(true))
+                        {
+                            while (watch.ElapsedTicks < lowEndTime) ;
+
+                            long highEndTime = lowEndTime + highTimeTicks;
+                            if (mCommunicationDevice.SetBreak(false))
+                            {
+                                while (watch.ElapsedTicks < highEndTime) ;
+
+                                if (TransmitMessage(startBytes, false, 1))
+                                {
+                                    mFirstWakeFlashFastStartMessage = start;
+                                    mConnectAddress = target;
+                                    sent = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!sent)
+                    {
+                        ClearMessageBuffers();
+                        mFirstWakeFlashFastStartMessage = null;
+                    }
+                }
+            }
+
+            if (sent)
+            {
+                DisplayStatusMessage("OK. Fast init sent start communication to 0x11. The speed byte has not been sent.", StatusMessageType.USER);
+            }
+            else
+            {
+                DisplayStatusMessage("FAILURE: fast init at 0x11 was not sent. The speed byte was not sent.", StatusMessageType.USER);
+            }
+
+            return sent;
+        }
+
+        private bool WakeForFirstWakeFlashSlowInit()
+        {
+            DisplayStatusMessage("First wake flash: slow init to 0x11.", StatusMessageType.USER);
+            ClearMessageBuffers();
+            mP1ECUResponseInterByteTimeOut.Reset();
+            mP2ECUResponseTimeOut.Reset();
+            mP3TesterRequestTimeOut.Reset();
+
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                DisplayStatusMessage("First wake flash: slow init to 0x11, try " + attempt + ".", StatusMessageType.USER);
+                Thread.Sleep(1000);
+
+                byte keyByte1;
+                byte keyByte2;
+                bool woke = SendSlowInit(DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS, SlowInitDataBits.Eight, SlowInitParity.None, out keyByte1, out keyByte2);
+                if (!woke)
+                {
+                    continue;
+                }
+
+                if (!IsKeyByte1ValidKWP2000(keyByte1, false) || !IsKeyByte2ValidKWP2000(keyByte2, false) || (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
+                {
+                    DisplayStatusMessage("First wake flash wake key bytes were not KWP2000: 0x" + keyByte1.ToString("X2") + " 0x" + keyByte2.ToString("X2") + ".", StatusMessageType.USER);
+                    continue;
+                }
+
+                mConnectAddress = DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS;
+                SetCommunicationPhysicalAddressAndKeyBytes(mConnectAddress, keyByte1, keyByte2);
+                DisplayStatusMessage("OK. Slow init at 0x11 succeeded. KB1=0x" + keyByte1.ToString("X2") + " KB2=0x" + keyByte2.ToString("X2") + ". The speed byte has not been sent.", StatusMessageType.USER);
+                mP2ECUResponseTimeOut.Start();
+                mP3TesterRequestTimeOut.Start();
+                return true;
+            }
+
+            DisplayStatusMessage("FAILURE: slow init at 0x11 did not return KWP2000 key bytes. The speed byte was not sent.", StatusMessageType.USER);
+            return false;
+        }
+
+
         protected byte                      mConnectAddress;
 
         protected byte[] mReceiveBuffer = null;
@@ -908,9 +1089,9 @@ namespace Communication
 
 
 
-        protected Stopwatch mP1ECUResponseInterByteTimeOut;
-        protected Stopwatch mP2ECUResponseTimeOut;
-        protected Stopwatch mP3TesterRequestTimeOut;
+        protected internal Stopwatch mP1ECUResponseInterByteTimeOut;
+        protected internal Stopwatch mP2ECUResponseTimeOut;
+        protected internal Stopwatch mP3TesterRequestTimeOut;
         protected Stopwatch mDisconnectTimeOut;
         protected uint mNumConnectionAttemptsRemaining = 0;
         private readonly Stopwatch mFastInitRequestSentWatch = new Stopwatch();
@@ -1067,6 +1248,11 @@ namespace Communication
             {
                 if (_ConnectionStatus != value)
                 {
+                    if (value != ConnectionStatusType.Connected)
+                    {
+                        IsHeldKWP1281Session = false;
+                    }
+
                     bool wasConnected = IsConnectionOpen() && (_ConnectionStatus != ConnectionStatusType.ConnectionPending);
                     bool shouldReset = false;
 
@@ -1138,7 +1324,7 @@ namespace Communication
             return mNumConnectionAttemptsRemaining;
         }
 
-        protected void ClearMessageBuffers()
+        protected internal void ClearMessageBuffers()
         {
             lock (mMessagesPendingSend)
             {
@@ -1171,14 +1357,14 @@ namespace Communication
         private const uint SLOW_INIT_TX_DRAIN_TIMEOUT_MS = 500;
         private const int SleepOverheadMs = 16;//Windows timer tick ~15.6 ms; Sleep this much short of target, then spin
 
-        protected enum SlowInitParity
+        protected internal enum SlowInitParity
         {
             None = -1,
             Even= 0,
             Odd = 1
         };
 
-        protected enum SlowInitDataBits
+        protected internal enum SlowInitDataBits
         {
             Seven = 7,
             Eight = 8
@@ -1575,7 +1761,7 @@ namespace Communication
             return false;
         }
 
-        protected bool SendSlowInit(byte connectAddress, SlowInitDataBits numDataBits, SlowInitParity parity, out byte keyByte1, out byte keyByte2)
+        protected internal bool SendSlowInit(byte connectAddress, SlowInitDataBits numDataBits, SlowInitParity parity, out byte keyByte1, out byte keyByte2)
         {
             uint PRIMARY_SLOW_INIT_BAUD_RATE = 10400;
             uint SECONDARY_SLOW_INIT_BAUD_RATE = 9600;
@@ -1940,7 +2126,7 @@ namespace Communication
             return result;
         }
 
-        private enum KWP1281BlockTitle : byte
+        internal enum KWP1281BlockTitle : byte
         {
             RequestClearDTCs = 0x05,
             RequestEndCommunication = 0x06,
@@ -2152,7 +2338,7 @@ namespace Communication
             return result;
         }
 
-        private class KWP1281Block
+        internal class KWP1281Block
         {
             public byte mBlockCounter;
             public byte mBlockTitle;
@@ -2194,7 +2380,7 @@ namespace Communication
             return text;
         }
 
-        private bool KWP1281ReadBlock(out KWP1281Block messageBlock)
+        internal bool KWP1281ReadBlock(out KWP1281Block messageBlock)
         {
             bool result = false;
             messageBlock = null;
@@ -2266,7 +2452,7 @@ namespace Communication
                 DisplayStatusMessage("Failed to read KWP1281 block length byte.", StatusMessageType.LOG);
             }
 
-            if (result)
+            if (result && !mKWP1281QuietBlocks)
             {
                 DisplayStatusMessage("KWP1281 read block", StatusMessageType.LOG);
 #if DEBUG
@@ -2316,7 +2502,7 @@ namespace Communication
                 }
 #endif
             }
-            else
+            else if (!result)
             {
                 DisplayStatusMessage("KWP1281 read block failed.", StatusMessageType.LOG);
             }
@@ -2324,7 +2510,7 @@ namespace Communication
             return result;
         }
 
-        private bool KWP1281SendBlock(KWP1281Block messageBlock)
+        internal bool KWP1281SendBlock(KWP1281Block messageBlock)
         {
             bool result = false;
 
@@ -2384,6 +2570,8 @@ namespace Communication
             }
 
 #if DEBUG
+            if (!mKWP1281QuietBlocks)
+            {
             string statusMessage = "KWP1281 sending block data: 0x" + blockLength.ToString("X2") + ", 0x" + messageBlock.mBlockCounter.ToString("X2") + ", 0x" + messageBlock.mBlockTitle.ToString("X2") + ", 0x";
 
             if(messageBlock.mBlockData != null)
@@ -2396,13 +2584,14 @@ namespace Communication
 
             statusMessage += "03";
             DisplayStatusMessage(statusMessage, StatusMessageType.DEV);
+            }
 #endif
 
-            if (result)
+            if (result && !mKWP1281QuietBlocks)
             {
                 DisplayStatusMessage("KWP1281 sent block", StatusMessageType.LOG);
             }
-            else
+            else if (!result)
             {
                 DisplayStatusMessage("KWP1281 send block FAILED", StatusMessageType.LOG);
             }
@@ -2575,7 +2764,7 @@ namespace Communication
         }
 
         // Second 0x01 was still KWP1281 and 0x11 opened KWP2000. The connect bar baud
-        // is requested once this is consumed. Cleared when a new attempt starts.
+        // requested once this is consumed. Cleared when a new attempt starts.
         public bool ConsumeSlowInitFellThroughToKwp2000Address()
         {
             bool value = mSlowInitFellThroughToKwp2000Address;
@@ -2584,8 +2773,33 @@ namespace Communication
         }
         private bool mSlowInitFellThroughToKwp2000Address;
 
+        // Second wake at 0x01 stayed KWP1281. Full Read uses that session.
+        public bool IsHeldKWP1281Session { get; private set; }
+
+        // Read faults on the held session, then clear them when asked. No programming speed byte.
+        public void RequestHeldKWP1281Dtcs(bool clearAfterRead, Action<bool, string> finished)
+        {
+            HeldKWP1281Read.RequestDtcs(clearAfterRead, finished);
+        }
+
+        // Copy the 24C02 from the 0xC000 window. Read only.
+        public void RequestHeldKWP1281Eeprom(Action<bool, byte[]> finished)
+        {
+            HeldKWP1281Read.RequestKWP1281EepromRead((ok, calibration, eeprom) =>
+            {
+                if (finished != null)
+                {
+                    finished(ok, eeprom);
+                }
+            }, null);
+        }
+
+        internal bool mKWP1281QuietBlocks;
+        internal byte mKWP1281BlockCounter;
+
         // ASCII ident from this attempt's KWP1281 session, or null if none ran.
         public string Kwp1281ConnectInfo { get; private set; }
+
 
         protected bool Connect_SlowInit()
         {
@@ -2622,9 +2836,11 @@ namespace Communication
                     DisplayStatusMessage("Slow init: user address 0x11 - direct KWP2000 slow init (no KWP1281 first). Images that start KWP2000 at 0x01 have no 0x11 entry.", StatusMessageType.LOG);
                 }
 
-                //wait for the required idle time
+                // Cold-connect trial: W0Min + W5Min (302 ms). The 1500 ms gap after a
+                // KWP1281 session is unchanged. Restore 2600 if a cold programming-session
+                // connect or a cold ME7 connect does not answer.
                 Stopwatch watch = new Stopwatch(); watch.Start();
-                const uint idleTime = 2600;//VW says they need a min of 2.6 seconds between slow inits//(uint)SlowInitConnectionTiming.W0Min + (uint)SlowInitConnectionTiming.W5Min;
+                const uint idleTime = (uint)SlowInitConnectionTiming.W0Min + (uint)SlowInitConnectionTiming.W5Min;
                 long overshootMs = WaitUntilElapsedMs(watch, idleTime);
 
                 DisplayStatusMessage("Connecting to address 0x" + mConnectAddress.ToString("X2") + ".", StatusMessageType.USER);
@@ -2675,28 +2891,34 @@ namespace Communication
                     //did the second slow init result in another KWP1281 session?
                     if((mConnectAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS) && (keyByte1 == KWP_1281_PROTOCOL_KEY_BYTE_1) && (keyByte2 == KWP_1281_PROTOCOL_KEY_BYTE_2))
                     {
-                        DisplayStatusMessage("Slow init: KWP1281 at 0x01 again - third attempt at 0x"
-                            + DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS.ToString("X2") + ".", StatusMessageType.LOG);
-                        KWP1281RunShortSession();
-
-                        //wait additional time to give the ECU time to switch to KWP2000
-                        watch.Reset(); watch.Start();
-                        overshootMs = WaitUntilElapsedMs(watch, TimeBetweenSlowInitForKWP2000MS);
-
-                        //we don't set the mConnectAddress here because we are overriding it and don't want to set it
-                        connectAddressOverride = DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS;
-                        DisplayStatusMessage("Connecting to address 0x" + connectAddressOverride.ToString("X2") + ".", StatusMessageType.USER);
-                        slowInitSuccess = SendSlowInit(connectAddressOverride, SlowInitDataBits.Eight, SlowInitParity.None, out keyByte1, out keyByte2);
-                        LogWaitUntilOvershoot("kwp1281-gap-0x11", TimeBetweenSlowInitForKWP2000MS, overshootMs);
-
-                        if (slowInitSuccess)
+                        // The second wake did not become KWP2000. Hold this session for the calibration and 24C02 reads.
+                        // Do not end it, and do not try 0x11.
+                        DisplayStatusMessage("Slow init stayed KWP1281. Holding the session for a calibration read.", StatusMessageType.USER);
+                        KWP1281Block greeting;
+                        if (!KWP1281ReadBlock(out greeting))
                         {
-                            fellThroughToKwp2000Address = true;
-                            DisplayStatusMessage("Slow init succeeded.", StatusMessageType.USER);
+                            DisplayStatusMessage("KWP1281 greeting block was not received.", StatusMessageType.USER);
+                            slowInitSuccess = false;
                         }
                         else
                         {
-                            DisplayStatusMessage("Slow init failed.", StatusMessageType.USER);
+                            mKWP1281BlockCounter = greeting.mBlockCounter;
+                            string ident = "";
+                            if (greeting.mBlockTitle == (byte)KWP1281BlockTitle.ASCIIData)
+                            {
+                                ident = Kwp1281IdentBlockToAscii(greeting.mBlockData);
+                            }
+
+                            if (string.IsNullOrEmpty(ident))
+                            {
+                                ident = "KWP1281";
+                            }
+
+                            Kwp1281ConnectInfo = ident;
+                            IsHeldKWP1281Session = true;
+                            DisplayStatusMessage("KWP1281 session held. Read Calibration reads 0x0000-0xBFFF, not the full flash.", StatusMessageType.USER);
+                            ConnectionStatus = ConnectionStatusType.Connected;
+                            return true;
                         }
                     }
                 }
@@ -3120,7 +3342,7 @@ connectEndTime = connectStartTime + connectTime + 3;
 
             int attempt = (int)(NumConnectionAttempts - mNumConnectionAttemptsRemaining - 1);
             byte target = mConnectAddress;
-            if (mConnectAddressMode == KWP2000AddressMode.Physical)
+            if (!FastInitUseConnectAddressOnly && (mConnectAddressMode == KWP2000AddressMode.Physical))
             {
                 byte[] targets = new[] { FASTINIT_KWP2000_PHYSICAL_TARGETS[0], mConnectAddress }.Concat(FASTINIT_KWP2000_PHYSICAL_TARGETS).Distinct().ToArray();
                 target = targets[attempt % targets.Length];
@@ -3328,6 +3550,29 @@ connectEndTime = connectStartTime + connectTime + 3;
             {
                 lock (mCommunicationDevice)
                 {
+                    if (mFirstWakeFlashWakeRequested)
+                    {
+                        mFirstWakeFlashWakeRequested = false;
+                        Action<bool> wakeFinished = mFirstWakeFlashWakeFinished;
+                        mFirstWakeFlashWakeFinished = null;
+                        bool woke = (ConnectionStatus == ConnectionStatusType.Connected) && WakeForFirstWakeFlash();
+                        if (wakeFinished != null)
+                        {
+                            wakeFinished(woke);
+                        }
+
+                        if (!woke)
+                        {
+                            ConnectionStatus = ConnectionStatusType.Disconnected;
+                            continue;
+                        }
+                    }
+
+                    if (HeldKWP1281Read.Execute())
+                    {
+                        continue;
+                    }
+
                     #region HandleConnecting
                     while ((ConnectionStatus == ConnectionStatusType.Disconnected) && (mNumConnectionAttemptsRemaining > 0))
                     {
@@ -3548,7 +3793,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         }
 
                         //if we are approaching the max time between responses, and no messages are pending, insert a tester present, but only if fully connected
-                        if ((p3TimeAtLastRead > (CurrentTimingParameters.P3TesterResponseTimeMaxMs * 0.5)) && !AnyMessagesPendingSend() && (ConnectionStatus == ConnectionStatusType.Connected))
+                        if ((p3TimeAtLastRead > (CurrentTimingParameters.P3TesterResponseTimeMaxMs * 0.5)) && !AnyMessagesPendingSend() && (ConnectionStatus == ConnectionStatusType.Connected) && KeepsTesterPresent())
                         {
                             //01 response required, 02 response not required
                             byte[] testerPresentData = { 0x01 };
@@ -3595,8 +3840,10 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                     #region HandleP3TimeOut
                     //are we connected and have not successfully sent a message within the max time?
+                    // The first-wake KWP2000 connection and the held KWP1281 session do not use tester present.
                     if (!mP1ECUResponseInterByteTimeOut.IsRunning && (p3TimeAtLastRead > CurrentTimingParameters.P3TesterResponseTimeMaxMs) && !IsExpectingResponses()
-                        && ((ConnectionStatus != ConnectionStatusType.Disconnected) && (ConnectionStatus != ConnectionStatusType.DisconnectionPending)))
+                        && ((ConnectionStatus != ConnectionStatusType.Disconnected) && (ConnectionStatus != ConnectionStatusType.DisconnectionPending))
+                        && KeepsTesterPresent())
                     {
                         Debug.Assert(mP3TesterRequestTimeOut.IsRunning);
 
@@ -3670,8 +3917,21 @@ connectEndTime = connectStartTime + connectTime + 3;
                         {
                             if (!mCurrentMessageReceivedAnyResponses)
                             {
-                                //this is here so that fast init displays something when it fails to connect
-                                DisplayStatusMessage("Start communication request did not receive any response.", StatusMessageType.USER);
+                                // A miss while attempts remain is the connect scan moving to the next address.
+                                // The first-wake 0x11 wake is the only start-communication miss after connect.
+                                string address = finishedMessage.mDestination.ToString("X2");
+                                if (mFirstWakeFlashFastStartMessage != null)
+                                {
+                                    DisplayStatusMessage("No reply to first-wake start communication at 0x" + address + ". The speed byte was not sent.", StatusMessageType.USER);
+                                }
+                                else if (mNumConnectionAttemptsRemaining > 0)
+                                {
+                                    DisplayStatusMessage("No reply from 0x" + address + ". Connect scan continues. Not a failure.", StatusMessageType.USER);
+                                }
+                                else
+                                {
+                                    DisplayStatusMessage("FAILURE: no reply from 0x" + address + ". No connect attempts remain.", StatusMessageType.USER);
+                                }
 
                                 //we didn't receive a response to the start communication message, after sending with no retries
                                 ConnectionStatus = ConnectionStatusType.Disconnected;
@@ -3693,7 +3953,7 @@ connectEndTime = connectStartTime + connectTime + 3;
                         }
                         case (byte)KWP2000ServiceID.TesterPresent:
                         {
-                            if (!mCurrentMessageReceivedAnyResponses)
+                            if (!mCurrentMessageReceivedAnyResponses && KeepsTesterPresent())
                             {
                                 DisplayStatusMessage("Disconnecting because no response was received for the Tester Present message.", StatusMessageType.USER);
                                 LogMe75Pin121HintIfProgrammingSessionStartPending();

@@ -917,6 +917,7 @@ namespace ECUFlasher
 
                     if (App != null)
                     {
+                        _VerifyChecksumsCommand.WatchConnection(App);
                         _VerifyChecksumsCommand.AddWatchedProperty(App, "OperationInProgress");
                         _VerifyChecksumsCommand.AddWatchedProperty(this, "IsFlashFileOK");
                     }
@@ -928,6 +929,8 @@ namespace ECUFlasher
                             reasonsDisabled.Add("Internal program error");
                             return false;
                         }
+
+                        if (RejectMe7Only(reasonsDisabled)) return false;
 
                         bool result = true;
 
@@ -1023,6 +1026,8 @@ namespace ECUFlasher
                             return false;
                         }
 
+                        if (RejectMe7Only(reasonsDisabled)) return false;
+
                         bool result = true;
 
                         if (!IsMemoryLayoutOK)
@@ -1096,7 +1101,7 @@ namespace ECUFlasher
                         _WriteEntireFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
 
-                    _WriteEntireFlashCommand.CanExecuteMethod = CanExecuteEntireFlashCommand;
+                    _WriteEntireFlashCommand.CanExecuteMethod = CanExecuteWriteEntireFlashCommand;
                 }
 
                 return _WriteEntireFlashCommand;
@@ -1176,7 +1181,9 @@ namespace ECUFlasher
                 return false;
             }
 
-            return CanExecuteEntireFlashCommand(reasonsDisabled);
+            if (RejectMe7Only(reasonsDisabled)) return false;
+
+            return CanExecuteFlashConnection(reasonsDisabled, true);
         }
 
         private void OnWriteDiffFlash()
@@ -1191,15 +1198,17 @@ namespace ECUFlasher
             Dispatcher.BeginInvoke((Action)(() =>
             {
                 string statusMessage = OnWriteExternalFlashCompleted(operation, success);
+                var firstWakeWrite = operation as FirstWakeFlashOperation;
+                bool probe = (firstWakeWrite != null) && firstWakeWrite.ProbeStopped;
 
-                if (success)
+                if (success && !probe)
                 {
                     var flashingTime = operation.OperationElapsedTime;
                     statusMessage += "\nFlashing time was " + flashingTime.Hours.ToString("D2") + ":" + flashingTime.Minutes.ToString("D2") + ":" + flashingTime.Seconds.ToString("D2") + ".";
                 }
 
                 App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
-                App.DisplayUserPrompt("Writing ECU Flash Memory Complete", statusMessage, UserPromptType.OK);
+                App.DisplayUserPrompt(probe ? "Baud probe" : "Writing ECU Flash Memory Complete", statusMessage, UserPromptType.OK);
 
                 if (success)
                     App.PercentOperationComplete = 100.0f;
@@ -1225,7 +1234,7 @@ namespace ECUFlasher
                         _ReadEntireFlashCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
 
-                    _ReadEntireFlashCommand.CanExecuteMethod = CanExecuteEntireFlashCommand;
+                    _ReadEntireFlashCommand.CanExecuteMethod = CanExecuteReadEntireFlashCommand;
                 }
 
                 return _ReadEntireFlashCommand;
@@ -1233,8 +1242,43 @@ namespace ECUFlasher
         }
         private ReactiveCommand _ReadEntireFlashCommand;
 
-        // Shared by full read and full write (write prompts for bin on click if needed).
-        private bool CanExecuteEntireFlashCommand(List<string> reasonsDisabled)
+        // Full write stays enabled without a bin so the click can open the picker (#143).
+        // A held KWP1281 session cannot write. First-wake KWP2000 does not need an ME7 layout.
+        private bool CanExecuteWriteEntireFlashCommand(List<string> reasonsDisabled)
+        {
+            if (IsHeldKWP1281Session())
+            {
+                reasonsDisabled.Add("Full Write needs the first-wake KWP2000 connection.");
+                return false;
+            }
+
+            return CanExecuteFlashConnection(reasonsDisabled, !IsFirstWakeKWP2000());
+        }
+
+        private bool CanExecuteReadEntireFlashCommand(List<string> reasonsDisabled)
+        {
+            if (IsFirstWakeKWP2000())
+            {
+                reasonsDisabled.Add("Read Calibration needs the KWP1281 session.");
+                return false;
+            }
+
+            if (IsHeldKWP1281Session())
+            {
+                ReadEntireFlashCommand.Name = "Read Calibration";
+                ReadEntireFlashCommand.Description = "Read 0x0000-0xBFFF (49152 bytes). Not a full flash read.";
+            }
+            else
+            {
+                ReadEntireFlashCommand.Name = "Full Read Flash";
+                ReadEntireFlashCommand.Description = "Read every sector of ECU flash memory";
+            }
+
+            return CanExecuteFlashConnection(reasonsDisabled, !IsHeldKWP1281Session());
+        }
+
+        // Bootmode ignores requireMemoryLayout and uses the detected flash layout.
+        private bool CanExecuteFlashConnection(List<string> reasonsDisabled, bool requireMemoryLayout)
         {
             if (App == null)
             {
@@ -1244,7 +1288,6 @@ namespace ECUFlasher
 
             bool result = true;
 
-            // For bootmode, layout is auto-detected via GetBootmodeFlashLayout
             if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
             {
                 if (!App.CommInterface.IsConnected())
@@ -1272,8 +1315,7 @@ namespace ECUFlasher
                 return result;
             }
 
-            // For KWP2000, require memory layout
-            if (!IsMemoryLayoutOK)
+            if (requireMemoryLayout && !IsMemoryLayoutOK)
             {
                 reasonsDisabled.Add("Specified memory layout is not correct");
                 result = false;
@@ -1308,7 +1350,21 @@ namespace ECUFlasher
 
             if (ReadEntireFlashCommand.IsEnabled)
             {
-                if (ConfirmFlashOperation("Confirm Full Read ECU Flash Memory", FlashConfirmationKind.ReadEntire))
+                if (IsHeldKWP1281Session())
+                {
+                    if (App.DisplayUserPrompt(
+                        "Confirm Calibration Read",
+                        "This reads 0x0000-0xBFFF (49152 bytes).\nIt is not a full flash read.",
+                        UserPromptType.OK_CANCEL) != UserPromptResult.OK)
+                    {
+                        return;
+                    }
+
+                    App.OperationInProgress = true;
+                    App.PercentOperationComplete = 0.0f;
+                    OnReadExternalFlashStarted(false, false, false, null, null, this.OnReadFlashCompleted, null);
+                }
+                else if (ConfirmFlashOperation("Confirm Full Read ECU Flash Memory", FlashConfirmationKind.ReadEntire))
                 {
                     App.OperationInProgress = true;
                     App.PercentOperationComplete = 0.0f;
@@ -1389,6 +1445,8 @@ namespace ECUFlasher
                 return false;
             }
 
+            if (RejectMe7Only(reasonsDisabled)) return false;
+
             bool result = true;
 
             if (!IsMemoryLayoutOK)
@@ -1462,9 +1520,11 @@ namespace ECUFlasher
                 MemoryImage readMemory = null;
                 success = OnReadExternalFlashCompleted(operation, success, out readMemory);
 
+                bool calibrationRead = operation is KWP1281CalibrationReadOperation;
+
                 if (success)
                 {
-                    success = SaveECUFlashFile(readMemory);
+                    success = SaveECUFlashFile(readMemory, calibrationRead);
                 }
 
                 string statusMessage = "";
@@ -1472,8 +1532,14 @@ namespace ECUFlasher
                 if (success)
                 {
                     var readingTime = operation.OperationElapsedTime;
-
-                    statusMessage = "Reading ECU flash memory succeeded in: " + readingTime.Hours.ToString("D2") + ":" + readingTime.Minutes.ToString("D2") + ":" + readingTime.Seconds.ToString("D2") + ".";
+                    string elapsed = readingTime.Hours.ToString("D2") + ":" + readingTime.Minutes.ToString("D2") + ":" + readingTime.Seconds.ToString("D2");
+                    statusMessage = calibrationRead
+                        ? "Calibration read succeeded in: " + elapsed + ". 49152 bytes, 0x0000-0xBFFF. Not a full flash image."
+                        : "Reading ECU flash memory succeeded in: " + elapsed + ".";
+                }
+                else if (calibrationRead)
+                {
+                    statusMessage = "Calibration read failed.";
                 }
                 else
                 {
@@ -1481,7 +1547,7 @@ namespace ECUFlasher
                 }
 
                 App.DisplayStatusMessage(statusMessage, StatusMessageType.USER);
-                App.DisplayUserPrompt("Reading ECU Flash Memory Finished", statusMessage, UserPromptType.OK);
+                App.DisplayUserPrompt(calibrationRead ? "Calibration Read Finished" : "Reading ECU Flash Memory Finished", statusMessage, UserPromptType.OK);
 
                 // Clear operation state before showing the modal so user can cancel/close/disconnect
                 // while the completion dialog is open (e.g. after a write failure).
@@ -1492,7 +1558,7 @@ namespace ECUFlasher
             }), null);
         }
 
-        private bool SaveECUFlashFile(MemoryImage readMemory)
+        private bool SaveECUFlashFile(MemoryImage readMemory, bool calibration = false)
         {
             //save the read data
             var dialog = new SaveFileDialog();
@@ -1500,22 +1566,22 @@ namespace ECUFlasher
             dialog.Filter = FLASH_FILE_FILTER;
             dialog.AddExtension = true;
             dialog.OverwritePrompt = true;
-            dialog.Title = "Select Where to Save Read Flash File";
+            dialog.Title = calibration ? "Save Calibration Read" : "Select Where to Save Read Flash File";
 
             if (App.ShowFileDialog(dialog, FileNameToFlash) == true)
             {
                 if (readMemory.SaveToFile(dialog.FileName))
                 {
-                    App.DisplayStatusMessage("Saved ECU flash memory to: " + dialog.FileName, StatusMessageType.USER);
+                    App.DisplayStatusMessage((calibration ? "Saved calibration to: " : "Saved ECU flash memory to: ") + dialog.FileName, StatusMessageType.USER);
                 }
                 else
                 {
-                    App.DisplayStatusMessage("Failed to save ECU flash memory to file", StatusMessageType.USER);
+                    App.DisplayStatusMessage((calibration ? "Failed to save calibration to file" : "Failed to save ECU flash memory to file"), StatusMessageType.USER);
                 }
             }
             else
             {
-                App.DisplayStatusMessage("Not saving ECU flash memory because user cancelled", StatusMessageType.USER);
+                App.DisplayStatusMessage(calibration ? "Not saving the calibration because the save was cancelled." : "Not saving ECU flash memory because user cancelled", StatusMessageType.USER);
             }
 
             return true;
@@ -1841,7 +1907,14 @@ namespace ECUFlasher
 
         private void OnWriteExternalFlashStarted_KWP2000(byte[] flashMemoryImage, MemoryLayout flashMemoryLayout, Operation.CompletedOperationDelegate onOperationComplete, bool diffWrite, bool verify)
         {
-            var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            var kwp = KwpViewModel();
+
+            if (IsFirstWakeKWP2000())
+            {
+                var firstWakeWrite = new FirstWakeFlashOperation(kwp.KWP2000CommInterface, flashMemoryImage, kwp.DesiredBaudRate);
+                StartFlashOperation(firstWakeWrite, onOperationComplete, "Writing ECU flash memory.");
+                return;
+            }
 
             var settings = new WriteExternalFlashOperation.WriteExternalFlashSettings();
             settings.CheckIfWriteRequired = diffWrite;
@@ -1849,17 +1922,28 @@ namespace ECUFlasher
             settings.VerifyWrittenData = verify;
             settings.EraseEntireFlashAtOnce = false;
             settings.FlashMemoryLayout = flashMemoryLayout;
-            settings.SecuritySettings = GetSecuritySettings(KWP2000CommViewModel);
+            settings.SecuritySettings = GetSecuritySettings(kwp);
 
             var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(flashMemoryImage, flashMemoryLayout);
 
-            var operation = new WriteExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
+            var operation = new WriteExternalFlashOperation(kwp.KWP2000CommInterface, kwp.DesiredBaudRates, settings, sectorImages);
             StartFlashOperation(operation, onOperationComplete, "Writing ECU flash memory.");
         }
 
         private string OnWriteExternalFlashCompleted(Operation operation, bool success)
         {
             string statusMesage = "";
+
+            var firstWakeWrite = operation as FirstWakeFlashOperation;
+            if (firstWakeWrite != null)
+            {
+                if (!string.IsNullOrEmpty(firstWakeWrite.ResultText))
+                {
+                    return firstWakeWrite.ResultText;
+                }
+
+                return success ? "Writing ECU flash memory succeeded." : "Writing ECU flash memory failed.";
+            }
 
             var bootmodeWrite = operation as BootmodeWriteExternalFlashOperation;
             if (bootmodeWrite != null)
@@ -2001,6 +2085,14 @@ namespace ECUFlasher
 
         private void OnReadExternalFlashStarted_KWP2000(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel, ReadExternalFlashOperation.UploadRange[] checksumRanges = null)
         {
+            var kwp = KwpViewModel();
+            if (IsHeldKWP1281Session())
+            {
+                var calibrationRead = new KWP1281CalibrationReadOperation(kwp.KWP2000CommInterface);
+                StartFlashOperation(calibrationRead, operationCompletedDel, "Reading calibration 0x0000-0xBFFF. This is not a full flash read.");
+                return;
+            }
+
             if (flashLayout == null)
             {
                 App.DisplayStatusMessage("Memory layout is required for read. Select a layout file (KWP2000) or use BootMode for auto-detect.", StatusMessageType.USER);
@@ -2011,16 +2103,14 @@ namespace ECUFlasher
             var readImage = PrepareReadImage(baseImage, flashLayout);
             var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(readImage, flashLayout);
 
-            var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
-
             var settings = new ReadExternalFlashOperation.ReadExternalFlashSettings();
             settings.CheckIfSectorReadRequired = checkIfReadRequired;
             settings.OnlyReadNonMatchingSectors = onlyReadRequiredSectors;
             settings.VerifyReadData = shouldVerifyReadData;
             settings.ChecksumRanges = checksumRanges;
-            settings.SecuritySettings = GetSecuritySettings(KWP2000CommViewModel);
+            settings.SecuritySettings = GetSecuritySettings(kwp);
 
-            var operation = new ReadExternalFlashOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, settings, sectorImages);
+            var operation = new ReadExternalFlashOperation(kwp.KWP2000CommInterface, kwp.DesiredBaudRates, settings, sectorImages);
             StartFlashOperation(operation, operationCompletedDel, "Reading ECU flash memory.");
         }
 
@@ -2036,6 +2126,18 @@ namespace ECUFlasher
                 {
                     readMemory = bootmodeOperation.mReadFlashMemory;
                     return readMemory != null;
+                }
+
+                var calibrationRead = operation as KWP1281CalibrationReadOperation;
+                if (calibrationRead != null)
+                {
+                    if (success && (calibrationRead.Calibration != null))
+                    {
+                        readMemory = new MemoryImage(calibrationRead.Calibration, 0);
+                        return true;
+                    }
+
+                    return false;
                 }
 
                 // Handle KWP2000 operation
@@ -2194,8 +2296,38 @@ namespace ECUFlasher
             }
         }
 
+        private KWP2000Interface_ViewModel KwpViewModel()
+        {
+            return App?.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+        }
+
+        private bool IsFirstWakeKWP2000()
+        {
+            return KwpViewModel()?.IsFirstWakeKWP2000() == true;
+        }
+
+        private bool IsHeldKWP1281Session()
+        {
+            return KwpViewModel()?.IsHeldKWP1281Session() == true;
+        }
+
+        private bool RejectMe7Only(List<string> reasonsDisabled)
+        {
+            if (!IsFirstWakeKWP2000() && !IsHeldKWP1281Session())
+                return false;
+
+            reasonsDisabled.Add("This command is for ME7.");
+            return true;
+        }
+
         private static void AddMe75BenchPin121NoteIfKwp(List<string> lines, CommunicationInterface commInterface)
         {
+            var kwp = commInterface as KWP2000Interface;
+            if ((kwp != null) && (kwp.IsFirstWakeKWP2000() || kwp.IsHeldKWP1281Session))
+            {
+                return;
+            }
+
             if (commInterface != null && commInterface.CurrentProtocol == CommunicationInterface.Protocol.KWP2000)
             {
                 lines.Add(string.Empty);

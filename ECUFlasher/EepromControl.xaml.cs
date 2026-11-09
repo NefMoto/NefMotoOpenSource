@@ -228,7 +228,7 @@ namespace ECUFlasher
                     _ReadEepromCommand = CreateBootmodeEepromCommand(
                         this.OnReadEeprom,
                         "Read EEPROM",
-                        "Bootmode: read the physical EEPROM; overwrites flash driver until reloaded. KWP2000: read the 95040 through the mirror at 0x600000 and fill withheld pages from the RAM shadow");
+                        "Bootmode: read the physical EEPROM; overwrites flash driver until reloaded. KWP2000: read the 95040 through the mirror at 0x600000 and fill withheld pages from the RAM shadow. Held KWP1281: read the 24C02.");
                     _ReadEepromCommand.CanExecuteMethod = reasons => (App?.CommInterface?.CurrentProtocol == CommunicationInterface.Protocol.KWP2000)
                         ? CanExecuteOnProtocol(reasons, CommunicationInterface.Protocol.KWP2000)
                         : CanExecuteBootmodeEepromCommand(reasons);
@@ -391,6 +391,7 @@ namespace ECUFlasher
 
             if (App != null)
             {
+                command.WatchConnection(App);
                 command.AddWatchedProperty(App, "OperationInProgress");
                 command.AddWatchedProperty(this, "HasEepromImage");
                 command.AddWatchedProperty(this, "SelectedDevice");
@@ -430,6 +431,13 @@ namespace ECUFlasher
                 return false;
             }
 
+            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
+            {
+                reasonsDisabled.Add("Lockout and P0602 apply to an ME7 EEPROM.");
+                return false;
+            }
+
             if (!Is95040Layout(mDisplayedImage))
             {
                 reasonsDisabled.Add("Lockout and P0602 apply to a 95040 512-byte image");
@@ -443,6 +451,13 @@ namespace ECUFlasher
         {
             if (!CanUseLoadedImage(reasonsDisabled))
             {
+                return false;
+            }
+
+            var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+            if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
+            {
+                reasonsDisabled.Add("Immo applies to an ME7 EEPROM.");
                 return false;
             }
 
@@ -589,6 +604,16 @@ namespace ECUFlasher
                 result = false;
             }
 
+            if (protocol == CommunicationInterface.Protocol.KWP2000)
+            {
+                var kwpViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
+                if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands() && !kwpViewModel.IsHeldKWP1281Session())
+                {
+                    reasonsDisabled.Add("EEPROM mirror read is for ME7.");
+                    result = false;
+                }
+            }
+
             if (App.OperationInProgress)
             {
                 reasonsDisabled.Add("Another operation is in progress");
@@ -684,7 +709,14 @@ namespace ECUFlasher
         {
             if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.KWP2000)
             {
-                StartKwpRead();
+                if ((App.CommInterfaceViewModel is KWP2000Interface_ViewModel kwpViewModel) && kwpViewModel.IsHeldKWP1281Session())
+                {
+                    StartKWP1281EepromRead();
+                }
+                else
+                {
+                    StartKwpRead();
+                }
             }
             else
             {
@@ -815,6 +847,35 @@ namespace ECUFlasher
                 string statusMessage = "Reading EEPROM succeeded in: "
                     + FormatOperationElapsed(operation.OperationElapsedTime) + ".";
                 FinishBootmodeEepromUi(true, statusMessage);
+            }), null);
+        }
+
+        private void StartKWP1281EepromRead()
+        {
+            if (!ReadEepromCommand.IsEnabled || !(App.CommInterfaceViewModel is KWP2000Interface_ViewModel kwpViewModel))
+            {
+                return;
+            }
+
+            App.DisplayStatusMessage("Reading 24C02.", StatusMessageType.USER);
+            StartBootmodeEepromOperation(new KWP1281CalibrationReadOperation(kwpViewModel.KWP2000CommInterface, true), OnReadKWP1281EepromCompleted);
+        }
+
+        private void OnReadKWP1281EepromCompleted(Operation operation, bool success)
+        {
+            Dispatcher.BeginInvoke((Action)(() =>
+            {
+                operation.CompletedOperationEvent -= OnReadKWP1281EepromCompleted;
+
+                var readOp = operation as KWP1281CalibrationReadOperation;
+                if (!success || (readOp == null) || (readOp.Eeprom == null))
+                {
+                    FinishBootmodeEepromUi(false, "Reading 24C02 failed.");
+                    return;
+                }
+
+                ShowImage(readOp.Eeprom, null);
+                FinishBootmodeEepromUi(true, "Reading 24C02 succeeded in: " + FormatOperationElapsed(operation.OperationElapsedTime) + ".");
             }), null);
         }
 

@@ -9,6 +9,7 @@
     <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'Checksum'">true</IsNonWindowsTfm>
     <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'ApplicationShared'">true</IsNonWindowsTfm>
     <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'NefMotoOpenSource.Tests'">true</IsNonWindowsTfm>
+    <IsNonWindowsTfm Condition="'$(MSBuildProjectName)' == 'FirstWakeProbe'">true</IsNonWindowsTfm>
     <TargetFramework Condition="'$(IsNonWindowsTfm)' == 'true'">$(NetTfm)</TargetFramework>
     <TargetFramework Condition="'$(IsNonWindowsTfm)' != 'true'">$(NetTfm)-windows</TargetFramework>
     <!-- Keep bin paths stable across TFM bumps (Makefile, WiX, launch.json). -->

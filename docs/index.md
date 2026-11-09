@@ -9,12 +9,13 @@ Project overview, features, and requirements: [README.md](../README.md).
 - [Getting started](user-guide/getting-started.md) — install, cable, first connect, bench vs in-car, DTCs, logs
 - [Flashing](user-guide/flashing.md) — KWP read/write, layouts, checksums
 - [P0602](user-guide/clearing-P0602.md) — same fault as `P1681`: the stored flag, and what clears it
-- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM (95040 immo, lockout, `P0602` flag; 95P08 immo)
+- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM (95040 immo, lockout, `P0602` flag; 95P08 immo). M5.9.2 write: pin 43 at +12 V; power-cycle the ECU if a write fails
 - [Troubleshooting](user-guide/troubleshooting.md) — symptom index, FAQ, what to attach on a bug report
 
 ## Developer / maintainer
 
 - [KWP2000.md](KWP2000.md) — bench results, connect timing, RAM kernel after write, settings persistence
+- [M5.9.2.md](M5.9.2.md) — M5.9.2 first-wake KWP: pin 43, speed byte, security, erase, and download
 - [ME7-K-line-addresses.md](ME7-K-line-addresses.md) — slow-init and fast-init addresses per ME7 image, from firmware analysis
 - [P1681-P0602.md](P1681-P0602.md) — regression guide for `P0602` on a `4B0906018CH`: measurements, the `NL` kernel logic, the ASM listing, and the diagrams
 - [BUILDING.md](BUILDING.md) — build from source
