@@ -59,32 +59,41 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
-        public void Validate_exempts_hw_sw_id_pages_28_and_29()
+        public void Validate_counts_matching_pages_28_and_29_as_ok()
         {
-            var data = BuildImageWithValidEnforcedChecksums();
-
-            // Real ME7 chips store VAG HW/SW ASCII here, not the Bosch page checksum.
-            data[28 * 16 + 2] = (byte)'8';
-            data[28 * 16 + 14] = 0x7F;
-            data[28 * 16 + 15] = 0x09;
-            data[29 * 16 + 0] = (byte)'0';
-            data[29 * 16 + 14] = 0x39;
-            data[29 * 16 + 15] = 0x03;
+            var data = BuildImageWithValidChecksums();
 
             var result = Me7Eeprom95040Checksum.Validate(data);
 
-            Assert.Equal(2, result.PagesExempt);
-            Assert.Equal(2, result.PagesExemptMismatch);
             Assert.Equal(0, result.PagesInvalid);
             Assert.True(result.AllChecksumPagesValid);
-            Assert.Contains("HW/SW ID", result.FormatStatusMessage());
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, result.PageChecksumKinds[28]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, result.PageChecksumKinds[29]);
             Assert.DoesNotContain("failed", result.FormatStatusMessage());
+        }
+
+        [Fact]
+        public void Validate_rejects_mismatched_pages_28_and_29()
+        {
+            var data = BuildImageWithValidChecksums();
+            data[28 * 16 + 14] ^= 0xFF;
+            data[28 * 16 + 15] ^= 0xFF;
+            data[29 * 16 + 14] ^= 0xFF;
+            data[29 * 16 + 15] ^= 0xFF;
+
+            var result = Me7Eeprom95040Checksum.Validate(data);
+
+            Assert.Equal(2, result.PagesInvalid);
+            Assert.False(result.AllChecksumPagesValid);
+            Assert.Contains("failed", result.FormatStatusMessage());
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, result.PageChecksumKinds[28]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, result.PageChecksumKinds[29]);
         }
 
         [Fact]
         public void Validate_still_fails_when_non_exempt_page_is_corrupt()
         {
-            var data = BuildImageWithValidEnforcedChecksums();
+            var data = BuildImageWithValidChecksums();
             data[1 * 16 + 14] ^= 0xFF;
             data[1 * 16 + 15] ^= 0xFF;
 
@@ -95,16 +104,15 @@ namespace NefMotoOpenSource.Tests
             Assert.Contains("failed", result.FormatStatusMessage());
             Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, result.PageChecksumKinds[1]);
             Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, result.PageChecksumKinds[2]);
-            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Exempt, result.PageChecksumKinds[28]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, result.PageChecksumKinds[28]);
             Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.None, result.PageChecksumKinds[0]);
         }
 
         [Fact]
         public void CorrectChecksums_fixes_non_exempt_pages_only()
         {
-            var data = BuildImageWithValidEnforcedChecksums();
+            var data = BuildImageWithValidChecksums();
 
-            // Corrupt an enforced page and leave exempt pages with non-formula trailers.
             data[1 * 16 + 14] ^= 0xFF;
             data[1 * 16 + 15] ^= 0xFF;
             byte p28_14 = data[28 * 16 + 14] = 0x7F;
@@ -117,41 +125,172 @@ namespace NefMotoOpenSource.Tests
             int updated = Me7Eeprom95040Checksum.CorrectChecksums(data);
 
             Assert.Equal(1, updated);
-            Assert.True(Me7Eeprom95040Checksum.Validate(data).AllChecksumPagesValid);
+            Assert.False(Me7Eeprom95040Checksum.Validate(data).AllChecksumPagesValid);
             Assert.Equal(p28_14, data[28 * 16 + 14]);
             Assert.Equal(p28_15, data[28 * 16 + 15]);
             Assert.Equal(p29_14, data[29 * 16 + 14]);
             Assert.Equal(p29_15, data[29 * 16 + 15]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, Me7Eeprom95040Checksum.Validate(data).PageChecksumKinds[1]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, Me7Eeprom95040Checksum.Validate(data).PageChecksumKinds[28]);
         }
 
-        private static byte[] BuildImageWithValidEnforcedChecksums()
+        [Fact]
+        public void Validate_without_table_counts_matching_page_20_only()
+        {
+            var data = BuildImageWithValidChecksums();
+            WriteStoredChecksum(data, 20, 0x0037);
+
+            var matched = Me7Eeprom95040Checksum.Validate(data);
+
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, matched.PageChecksumKinds[20]);
+            Assert.True(matched.AllChecksumPagesValid);
+
+            byte stored14 = data[20 * 16 + 14];
+            byte stored15 = data[20 * 16 + 15];
+            data[20 * 16 + 14] ^= 0xFF;
+            data[20 * 16 + 15] ^= 0xFF;
+
+            var mismatched = Me7Eeprom95040Checksum.Validate(data);
+
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.None, mismatched.PageChecksumKinds[20]);
+            Assert.True(mismatched.AllChecksumPagesValid);
+
+            int updated = Me7Eeprom95040Checksum.CorrectChecksums(data);
+
+            Assert.Equal(0, updated);
+            Assert.Equal((byte)(stored14 ^ 0xFF), data[20 * 16 + 14]);
+            Assert.Equal((byte)(stored15 ^ 0xFF), data[20 * 16 + 15]);
+        }
+
+        [Fact]
+        public void Image_table_rewrites_page_20_and_leaves_pages_28_and_29()
+        {
+            ushort[] table = ShippedTable();
+            table[20] = 0x0C37;
+            var data = BuildImageWithValidChecksums(table);
+            data[20 * 16 + 14] ^= 0xFF;
+            data[20 * 16 + 15] ^= 0xFF;
+            byte p28_14 = data[28 * 16 + 14] = 0x11;
+            byte p28_15 = data[28 * 16 + 15] = 0x22;
+
+            var before = Me7Eeprom95040Checksum.Validate(data, 0, table);
+
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, before.PageChecksumKinds[20]);
+            Assert.False(before.AllChecksumPagesValid);
+
+            int updated = Me7Eeprom95040Checksum.CorrectChecksums(data, 0, table);
+
+            Assert.Equal(1, updated);
+            Assert.Equal(p28_14, data[28 * 16 + 14]);
+            Assert.Equal(p28_15, data[28 * 16 + 15]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, Me7Eeprom95040Checksum.Validate(data, 0, table).PageChecksumKinds[20]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, Me7Eeprom95040Checksum.Validate(data, 0, table).PageChecksumKinds[28]);
+        }
+
+        [Fact]
+        public void TryCopyImageTable_reads_32_words_at_the_prefix()
+        {
+            ushort[] table = ShippedTable();
+            table[20] = 0x0C37;
+            table[28] = 0x1335;
+            var flash = new byte[80 + (Me7Eeprom95040Checksum.PageCount * 2)];
+            WriteWords(flash, 40, table);
+
+            ushort[] found = Me7Eeprom95040Checksum.TryCopyImageTable(flash);
+
+            Assert.NotNull(found);
+            Assert.Equal(0x0C37, found[20]);
+            Assert.Equal(0x1335, found[28]);
+            Assert.Equal(Me7Eeprom95040Checksum.GetPageDescriptor(0), found[0]);
+            Assert.Equal(Me7Eeprom95040Checksum.GetPageDescriptor(19), found[19]);
+        }
+
+        [Fact]
+        public void TryCopyImageTable_misses_a_short_prefix()
+        {
+            ushort[] prefix = ShippedTable();
+            var flash = new byte[40];
+            WriteWords(flash, 0, prefix, 20);
+
+            Assert.Null(Me7Eeprom95040Checksum.TryCopyImageTable(flash));
+            Assert.Null(Me7Eeprom95040Checksum.TryCopyImageTable(new byte[64]));
+        }
+
+        [Fact]
+        public void OversizedReadStatus_names_a_95040_and_an_unverified_size()
+        {
+            const string device = "95080 SSC 1024 B";
+            var image = new byte[1024];
+            BuildImageWithValidChecksums().CopyTo(image, 0);
+
+            Assert.Equal(
+                "EEPROM looks like a 95040; selected device is " + device + ".",
+                Me7Eeprom95040Checksum.OversizedReadStatus(image, device));
+
+            image[1 * 16 + 14] ^= 0xFF;
+            image[15] = 0x00;
+
+            Assert.Equal(
+                "EEPROM size is unverified; selected device is " + device + ".",
+                Me7Eeprom95040Checksum.OversizedReadStatus(image, device));
+
+            image[15] = Me7Eeprom95040Checksum.Page0Signature;
+
+            Assert.Null(Me7Eeprom95040Checksum.OversizedReadStatus(image, device));
+        }
+
+        private static byte[] BuildImageWithValidChecksums(ushort[]? table = null)
         {
             var data = new byte[Me7Eeprom95040Checksum.EepromSize];
-
             for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
             {
-                ushort descriptor = Me7Eeprom95040Checksum.GetPageDescriptor(page);
+                ushort descriptor = table != null ? table[page] : Me7Eeprom95040Checksum.GetPageDescriptor(page);
                 if ((descriptor & ChecksumPresentMask) == 0)
                 {
                     continue;
                 }
 
-                if (Me7Eeprom95040Checksum.IsChecksumExemptPage(page))
-                {
-                    continue;
-                }
-
-                int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
-                ushort cs = Me7Eeprom95040Checksum.CalculatePageChecksum(
-                    data,
-                    pageOffset,
-                    (ushort)page,
-                    descriptor);
-                data[pageOffset + 14] = (byte)(cs & 0xFF);
-                data[pageOffset + 15] = (byte)(cs >> 8);
+                WriteStoredChecksum(data, page, descriptor);
             }
 
             return data;
+        }
+
+        private static void WriteStoredChecksum(byte[] data, int page, ushort descriptor)
+        {
+            int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
+            ushort cs = Me7Eeprom95040Checksum.CalculatePageChecksum(
+                data,
+                pageOffset,
+                (ushort)page,
+                descriptor);
+            data[pageOffset + 14] = (byte)(cs & 0xFF);
+            data[pageOffset + 15] = (byte)(cs >> 8);
+        }
+
+        private static ushort[] ShippedTable()
+        {
+            var table = new ushort[Me7Eeprom95040Checksum.PageCount];
+            for (int page = 0; page < table.Length; page++)
+            {
+                table[page] = Me7Eeprom95040Checksum.GetPageDescriptor(page);
+            }
+
+            return table;
+        }
+
+        private static void WriteWords(byte[] dest, int at, ushort[] words, int count = -1)
+        {
+            if (count < 0)
+            {
+                count = words.Length;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                dest[at + (i * 2)] = (byte)words[i];
+                dest[at + (i * 2) + 1] = (byte)(words[i] >> 8);
+            }
         }
     }
 }

@@ -50,6 +50,8 @@ namespace ECUFlasher
             ShowPlaceholder();
 
             InitializeComponent();
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
         }
 
         public ObservableCollection<EepromPageRow> Pages { get; private set; }
@@ -269,6 +271,7 @@ namespace ECUFlasher
         }
 
         private byte[] mDisplayedImage;
+        private FlashingControl mFlashing;
 
         // Pages of the on-screen image a KWP read could not get; they are FF, not chip data.
         private List<int> mMissingPages = new List<int>();
@@ -819,7 +822,7 @@ namespace ECUFlasher
                 return;
             }
 
-            var operation = new BootmodeReadEepromOperation(bootstrap, settings);
+            var operation = new BootmodeReadEepromOperation(bootstrap, settings, CurrentImageTable());
             StartBootmodeEepromOperation(operation, OnReadBootmodeEepromCompleted);
         }
 
@@ -950,9 +953,11 @@ namespace ECUFlasher
                 return;
             }
 
+            ushort[] imageTable = null;
             if (Is95040Layout(dataToWrite))
             {
-                var checksum = Me7Eeprom95040Checksum.Validate(dataToWrite);
+                imageTable = CurrentImageTable();
+                var checksum = Me7Eeprom95040Checksum.Validate(dataToWrite, 0, imageTable);
                 if (!checksum.AllChecksumPagesValid)
                 {
                     string csPrompt =
@@ -974,7 +979,7 @@ namespace ECUFlasher
 
                     if (csResult == UserPromptResult.YES)
                     {
-                        int pagesUpdated = Me7Eeprom95040Checksum.CorrectChecksums(dataToWrite);
+                        int pagesUpdated = Me7Eeprom95040Checksum.CorrectChecksums(dataToWrite, 0, imageTable);
                         App.DisplayStatusMessage(
                             "Corrected " + pagesUpdated + " EEPROM data-page checksum(s); pages 28-29 left unchanged.",
                             StatusMessageType.USER);
@@ -1009,7 +1014,8 @@ namespace ECUFlasher
                 bootstrap,
                 settings,
                 dataToWrite,
-                verify);
+                verify,
+                imageTable);
             StartBootmodeEepromOperation(operation, OnWriteBootmodeEepromCompleted);
         }
 
@@ -1070,11 +1076,12 @@ namespace ECUFlasher
             Pages.Clear();
             if (Is95040Layout(mDisplayedImage))
             {
-                var validation = Me7Eeprom95040Checksum.Validate(mDisplayedImage);
+                ushort[] imageTable = CurrentImageTable();
+                var validation = Me7Eeprom95040Checksum.Validate(mDisplayedImage, 0, imageTable);
                 ShowLegend(mDisplayedImage, validation.AllChecksumPagesValid);
                 for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
                 {
-                    Pages.Add(BuildRow(mDisplayedImage, page, validation.PageChecksumKinds[page]));
+                    Pages.Add(BuildRow(mDisplayedImage, page, validation.PageChecksumKinds[page], imageTable));
                 }
 
                 return;
@@ -1220,7 +1227,11 @@ namespace ECUFlasher
             };
         }
 
-        private static EepromPageRow BuildRow(byte[] image, int page, Me7Eeprom95040Checksum.PageChecksumKind pageKind)
+        private static EepromPageRow BuildRow(
+            byte[] image,
+            int page,
+            Me7Eeprom95040Checksum.PageChecksumKind pageKind,
+            ushort[] imageTable)
         {
             int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
             var cells = new List<EepromByteCell>(Me7Eeprom95040Checksum.PageSize);
@@ -1235,7 +1246,7 @@ namespace ECUFlasher
                 {
                     Hex = value.ToString("X2"),
                     Kind = CellKind(pageKind, index, Me7Eeprom95040Fields.RoleAt(offset)),
-                    ToolTip = CellToolTip(image, page, index, pageKind)
+                    ToolTip = CellToolTip(image, page, index, pageKind, imageTable)
                 });
             }
 
@@ -1317,7 +1328,8 @@ namespace ECUFlasher
             byte[] image,
             int page,
             int indexInPage,
-            Me7Eeprom95040Checksum.PageChecksumKind pageKind)
+            Me7Eeprom95040Checksum.PageChecksumKind pageKind,
+            ushort[] imageTable)
         {
             int offset = (page * Me7Eeprom95040Checksum.PageSize) + indexInPage;
             Me7Eeprom95040Fields.Role role = Me7Eeprom95040Fields.RoleAt(offset);
@@ -1325,7 +1337,7 @@ namespace ECUFlasher
             if (indexInPage >= 14 && pageKind != Me7Eeprom95040Checksum.PageChecksumKind.None)
             {
                 int pageOffset = page * Me7Eeprom95040Checksum.PageSize;
-                ushort descriptor = Me7Eeprom95040Checksum.GetPageDescriptor(page);
+                ushort descriptor = Me7Eeprom95040Checksum.ActiveDescriptor(page, image, pageOffset, imageTable);
                 ushort expected = Me7Eeprom95040Checksum.CalculatePageChecksum(
                     image,
                     pageOffset,
@@ -1457,6 +1469,94 @@ namespace ECUFlasher
             path = dialog.FileName;
             App.DisplayStatusMessage("Saved " + savedKind + " to: " + path, StatusMessageType.USER);
             return true;
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            WatchFlashImage();
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (mFlashing != null)
+            {
+                mFlashing.PropertyChanged -= OnFlashImageChanged;
+                mFlashing = null;
+            }
+        }
+
+        private void WatchFlashImage()
+        {
+            FlashingControl flashing = FindFlashingControl();
+            if (flashing == mFlashing)
+            {
+                return;
+            }
+
+            if (mFlashing != null)
+            {
+                mFlashing.PropertyChanged -= OnFlashImageChanged;
+            }
+
+            mFlashing = flashing;
+            if (mFlashing != null)
+            {
+                mFlashing.PropertyChanged += OnFlashImageChanged;
+            }
+        }
+
+        private void OnFlashImageChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == "FlashMemoryImage")
+            {
+                RefreshGrid();
+            }
+        }
+
+        private ushort[] CurrentImageTable()
+        {
+            WatchFlashImage();
+            byte[] flash = mFlashing != null && mFlashing.FlashMemoryImage != null
+                ? mFlashing.FlashMemoryImage.RawData
+                : null;
+            return Me7Eeprom95040Checksum.TryCopyImageTable(flash);
+        }
+
+        private FlashingControl FindFlashingControl()
+        {
+            DependencyObject root = Window.GetWindow(this);
+            if (root == null)
+            {
+                return null;
+            }
+
+            return FindLogicalChild<FlashingControl>(root);
+        }
+
+        private static T FindLogicalChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            foreach (object child in LogicalTreeHelper.GetChildren(parent))
+            {
+                var dep = child as DependencyObject;
+                if (dep == null)
+                {
+                    continue;
+                }
+
+                var match = dep as T;
+                if (match != null)
+                {
+                    return match;
+                }
+
+                match = FindLogicalChild<T>(dep);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
         }
 
     }
