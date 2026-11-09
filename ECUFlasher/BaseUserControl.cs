@@ -171,6 +171,31 @@ namespace ECUFlasher
         }
 
         public App App { get; private set; }
+
+        protected bool RequireConnectedAndIdle(List<string> reasonsDisabled)
+        {
+            if (App == null)
+            {
+                reasonsDisabled.Add("Internal program error");
+                return false;
+            }
+
+            bool result = true;
+
+            if ((App.CommInterface == null) || !App.CommInterface.IsConnected())
+            {
+                reasonsDisabled.Add("Not connected to ECU");
+                result = false;
+            }
+
+            if (App.OperationInProgress)
+            {
+                reasonsDisabled.Add("Another operation is in progress");
+                result = false;
+            }
+
+            return result;
+        }
     }
 }
 

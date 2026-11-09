@@ -1280,22 +1280,15 @@ namespace ECUFlasher
         // Bootmode ignores requireMemoryLayout and uses the detected flash layout.
         private bool CanExecuteFlashConnection(List<string> reasonsDisabled, bool requireMemoryLayout)
         {
+            bool result = RequireConnectedAndIdle(reasonsDisabled);
             if (App == null)
             {
-                reasonsDisabled.Add("Internal program error");
                 return false;
             }
 
-            bool result = true;
-
             if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
             {
-                if (!App.CommInterface.IsConnected())
-                {
-                    reasonsDisabled.Add("Not connected to ECU");
-                    result = false;
-                }
-                else
+                if (App.CommInterface.IsConnected())
                 {
                     var bootstrapInterface = App.CommInterface as BootstrapInterface;
                     if (bootstrapInterface != null && !bootstrapInterface.CanGetBootmodeFlashLayout())
@@ -1304,12 +1297,6 @@ namespace ECUFlasher
                             ?? "Flash layout not available (BootMode).");
                         result = false;
                     }
-                }
-
-                if (App.OperationInProgress)
-                {
-                    reasonsDisabled.Add("Another operation is in progress");
-                    result = false;
                 }
 
                 return result;
@@ -1321,22 +1308,11 @@ namespace ECUFlasher
                 result = false;
             }
 
-            if (!App.CommInterface.IsConnected())
-            {
-                reasonsDisabled.Add("Not connected to ECU");
-                result = false;
-            }
-
-            if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000 &&
-                App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode)
+            if ((App.CommInterface != null)
+                && (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+                && (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode))
             {
                 reasonsDisabled.Add("Not connected with KWP2000 or BootMode protocol");
-                result = false;
-            }
-
-            if (App.OperationInProgress)
-            {
-                reasonsDisabled.Add("Another operation is in progress");
                 result = false;
             }
 
@@ -1362,7 +1338,7 @@ namespace ECUFlasher
 
                     App.OperationInProgress = true;
                     App.PercentOperationComplete = 0.0f;
-                    OnReadExternalFlashStarted(false, false, false, null, null, this.OnReadFlashCompleted, null);
+                    OnReadExternalFlashStarted(false, false, false, null, null, this.OnReadFlashCompleted);
                 }
                 else if (ConfirmFlashOperation("Confirm Full Read ECU Flash Memory", FlashConfirmationKind.ReadEntire))
                 {
@@ -1370,42 +1346,26 @@ namespace ECUFlasher
                     App.PercentOperationComplete = 0.0f;
 
                     bool verifyRead = false;
-                    ReadExternalFlashOperation.UploadRange[] checksumRanges = null;
+                    int checksumSectorCount = 0;
                     if (IsNotBootmode() && IsBottomBootFirstBlock())
                     {
                         verifyRead = true;
                         if (chkVerifyRead.IsChecked != true)
                         {
-                            checksumRanges = FirstFourSectorChecksumRanges(FlashMemoryLayout);
-                            if (checksumRanges == null)
+                            if ((FlashMemoryLayout == null) || (FlashMemoryLayout.SectorSizes == null) || (FlashMemoryLayout.SectorSizes.Count < 4))
                             {
                                 verifyRead = false;
+                            }
+                            else
+                            {
+                                checksumSectorCount = 4;
                             }
                         }
                     }
 
-                    OnReadExternalFlashStarted(false, false, verifyRead, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted, checksumRanges);
+                    OnReadExternalFlashStarted(false, false, verifyRead, FlashMemoryImage.RawData, FlashMemoryLayout, this.OnReadFlashCompleted, checksumSectorCount);
                 }
             }
-        }
-
-        private static ReadExternalFlashOperation.UploadRange[] FirstFourSectorChecksumRanges(MemoryLayout layout)
-        {
-            if ((layout == null) || (layout.SectorSizes == null) || (layout.SectorSizes.Count < 4))
-            {
-                return null;
-            }
-
-            var ranges = new ReadExternalFlashOperation.UploadRange[4];
-            uint address = layout.BaseAddress;
-            for (int i = 0; i < ranges.Length; i++)
-            {
-                uint size = layout.SectorSizes[i];
-                ranges[i] = new ReadExternalFlashOperation.UploadRange(address, size);
-                address += size;
-            }
-
-            return ranges;
         }
 
         public ReactiveCommand ReadDiffFlashCommand
@@ -2050,7 +2010,7 @@ namespace ECUFlasher
             operation.Start();
         }
 
-        private void OnReadExternalFlashStarted(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel, ReadExternalFlashOperation.UploadRange[] checksumRanges = null)
+        private void OnReadExternalFlashStarted(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel, int checksumSectorCount = 0)
         {
             if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
             {
@@ -2058,7 +2018,7 @@ namespace ECUFlasher
             }
             else
             {
-                OnReadExternalFlashStarted_KWP2000(checkIfReadRequired, onlyReadRequiredSectors, shouldVerifyReadData, baseImage, flashLayout, operationCompletedDel, checksumRanges);
+                OnReadExternalFlashStarted_KWP2000(checkIfReadRequired, onlyReadRequiredSectors, shouldVerifyReadData, baseImage, flashLayout, operationCompletedDel, checksumSectorCount);
             }
         }
 
@@ -2083,7 +2043,7 @@ namespace ECUFlasher
             StartFlashOperation(operation, operationCompletedDel, "Reading ECU flash memory via BootMode.");
         }
 
-        private void OnReadExternalFlashStarted_KWP2000(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel, ReadExternalFlashOperation.UploadRange[] checksumRanges = null)
+        private void OnReadExternalFlashStarted_KWP2000(bool checkIfReadRequired, bool onlyReadRequiredSectors, bool shouldVerifyReadData, byte[] baseImage, MemoryLayout flashLayout, Operation.CompletedOperationDelegate operationCompletedDel, int checksumSectorCount = 0)
         {
             var kwp = KwpViewModel();
             if (IsHeldKWP1281Session())
@@ -2107,7 +2067,7 @@ namespace ECUFlasher
             settings.CheckIfSectorReadRequired = checkIfReadRequired;
             settings.OnlyReadNonMatchingSectors = onlyReadRequiredSectors;
             settings.VerifyReadData = shouldVerifyReadData;
-            settings.ChecksumRanges = checksumRanges;
+            settings.ChecksumSectorCount = checksumSectorCount;
             settings.SecuritySettings = GetSecuritySettings(kwp);
 
             var operation = new ReadExternalFlashOperation(kwp.KWP2000CommInterface, kwp.DesiredBaudRates, settings, sectorImages);

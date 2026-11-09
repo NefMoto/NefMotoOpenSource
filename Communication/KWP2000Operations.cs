@@ -333,7 +333,7 @@ namespace Communication
             mSkipProgrammingSessionPreconditions = true;
         }
 
-        protected static string RangeText(uint start, uint length)
+        internal static string RangeText(uint start, uint length)
         {
             return "0x" + start.ToString("X8") + "-0x" + (start + length - 1).ToString("X8");
         }
@@ -1071,7 +1071,7 @@ namespace Communication
             {
                 case Step.RequestUpload:
                 {
-                    mCommInterface.DisplayStatusMessage("Closing the open upload: uploading 0x" + mUploadAddress.ToString("X8") + " to 0x" + (mUploadAddress + 1).ToString("X8") + ".", StatusMessageType.USER);
+                    mCommInterface.DisplayStatusMessage("Closing the open upload: uploading " + KWP2000Operation.RangeText(mUploadAddress, 2) + ".", StatusMessageType.USER);
                     return new RequestUploadFromECUAction(mCommInterface, mUploadAddress, 2, TransferDataAction.CompressionType.Uncompressed, TransferDataAction.EncryptionType.Unencrypted);
                 }
                 case Step.Transfer:
@@ -1084,7 +1084,7 @@ namespace Communication
                 }
                 default:
                 {
-                    mCommInterface.DisplayStatusMessage("Programming flag checksum " + (mChecksumsSent + 1) + " of " + ChecksumCount + ": 0x" + mChecksumBlock.StartAddress.ToString("X8") + " to 0x" + (mChecksumBlock.EndAddress - 1).ToString("X8") + ".", StatusMessageType.USER);
+                    mCommInterface.DisplayStatusMessage("Programming flag checksum " + (mChecksumsSent + 1) + " of " + ChecksumCount + ": " + KWP2000Operation.RangeText(mChecksumBlock.StartAddress, mChecksumBlock.Size) + ".", StatusMessageType.USER);
                     return new ValidateFlashChecksumAction(mCommInterface, mChecksumBlock.StartAddress, mChecksumBlock.RawData);
                 }
             }
@@ -1138,26 +1138,14 @@ namespace Communication
 
     public class ReadExternalFlashOperation : KWP2000Operation
     {
-        public struct UploadRange
-        {
-            public uint StartAddress;
-            public uint Size;
-
-            public UploadRange(uint startAddress, uint size)
-            {
-                StartAddress = startAddress;
-                Size = size;
-            }
-        }
-
         public class ReadExternalFlashSettings
         {
             public bool CheckIfSectorReadRequired = true;
             public bool OnlyReadNonMatchingSectors = false;
             public bool VerifyReadData = true;
 
-            // Null checksums every uploaded sector when VerifyReadData is true.
-            public UploadRange[] ChecksumRanges = null;
+            // 0 checksums every sector when VerifyReadData is true.
+            public int ChecksumSectorCount = 0;
 
             public SecurityAccessAction.SecurityAccessSettings SecuritySettings = new SecurityAccessAction.SecurityAccessSettings();
         }
@@ -1191,7 +1179,7 @@ namespace Communication
             CheckIfSectorsRequireRead = readSettings.CheckIfSectorReadRequired;
             OnlyReadRequiredSectors = readSettings.OnlyReadNonMatchingSectors;
             ShouldVerifyReadSectors = readSettings.VerifyReadData;
-            mChecksumRanges = readSettings.ChecksumRanges;
+            mChecksumSectorCount = readSettings.ChecksumSectorCount;
 
             ElapsedTimeReadingUnrequiredSectors = TimeSpan.Zero;
             ElapsedTimeCheckingIfSectorsRequireReading = TimeSpan.Zero;
@@ -1217,8 +1205,23 @@ namespace Communication
 
         private bool ShouldChecksumSector(MemoryImage image)
         {
-            return (mChecksumRanges == null) || (mChecksumRanges.Length == 0)
-                || mChecksumRanges.Any(range => (image.StartAddress == range.StartAddress) && (image.Size == range.Size));
+            if (mChecksumSectorCount == 0)
+            {
+                return true;
+            }
+
+            int index = 0;
+            foreach (MemoryImage block in mFlashBlockList)
+            {
+                if (ReferenceEquals(block, image))
+                {
+                    return index < mChecksumSectorCount;
+                }
+
+                index++;
+            }
+
+            return false;
         }
 
         public TimeSpan ElapsedTimeReadingUnrequiredSectors { get; private set; }
@@ -1305,8 +1308,7 @@ namespace Communication
                         }
                         case ReadingState.CheckIfReadRequired:
                         {
-                            uint endAddress = currentMemoryImage.StartAddress + (uint)currentMemoryImage.RawData.Length - 1;
-                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if reading is necessary for range: 0x" + currentMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
+                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if reading is necessary for range: " + RangeText(currentMemoryImage.StartAddress, (uint)currentMemoryImage.RawData.Length), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, currentMemoryImage.StartAddress, currentMemoryImage.RawData);
                             break;
                         }
@@ -1327,8 +1329,7 @@ namespace Communication
                         }
                         case ReadingState.ValidateReadData:
                         {
-                            uint endAddress = currentMemoryImage.StartAddress + (uint)currentMemoryImage.RawData.Length - 1;
-                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if reading was successful for range: 0x" + currentMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
+                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if reading was successful for range: " + RangeText(currentMemoryImage.StartAddress, (uint)currentMemoryImage.RawData.Length), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, currentMemoryImage.StartAddress, currentMemoryImage.RawData);
                             break;
                         }
@@ -1570,8 +1571,7 @@ namespace Communication
                             if (ShouldVerifyReadSectors)
                             {
                                 MemoryImage uploaded = mCurrentBlock.Current;
-                                uint uploadedEnd = uploaded.StartAddress + uploaded.Size - 1;
-                                CommInterface.DisplayStatusMessage("Uploaded 0x" + uploaded.StartAddress.ToString("X8") + " to 0x" + uploadedEnd.ToString("X8") + ". No checksum.", StatusMessageType.USER);
+                                CommInterface.DisplayStatusMessage("Uploaded " + RangeText(uploaded.StartAddress, uploaded.Size) + ". No checksum.", StatusMessageType.USER);
                             }
 
                             mState = ReadingState.FinishedBlock;
@@ -1770,7 +1770,7 @@ namespace Communication
         private IEnumerator<MemoryImage> mCurrentBlock;
         private byte mMaxBlockSize;
         private bool mHasVerfiedRequestUploadSupported;
-        private readonly UploadRange[] mChecksumRanges;
+        private readonly int mChecksumSectorCount;
         private MemoryImage mFirstFinishedBlock;
         private ProgrammingFlagCloser mClearFlag;
         private volatile bool mCancelRequested;
@@ -2057,8 +2057,7 @@ namespace Communication
                         }
                         case FlashingState.CheckIfFlashRequired:
                         {
-                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length - 1;
-                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if flashing is necessary for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
+                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if flashing is necessary for range: " + RangeText(mCurrentBlock.mMemoryImage.StartAddress, (uint)mCurrentBlock.mMemoryImage.RawData.Length), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, mCurrentBlock.mMemoryImage.RawData);
                             break;
                         }
@@ -2083,8 +2082,7 @@ namespace Communication
                                 blankData[x] = 0xFF;
                             }
 
-                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length - 1;
-                            CommInterface.DisplayStatusMessage("Calculating flash checksum to verify if erase was successful for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
+                            CommInterface.DisplayStatusMessage("Calculating flash checksum to verify if erase was successful for range: " + RangeText(mCurrentBlock.mMemoryImage.StartAddress, (uint)mCurrentBlock.mMemoryImage.RawData.Length), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, blankData);
                             break;
                         }
@@ -2134,8 +2132,7 @@ namespace Communication
                         }
                         case FlashingState.ValidateFlashedData:
                         {
-                            uint endAddress = mCurrentBlock.mMemoryImage.StartAddress + (uint)mCurrentBlock.mMemoryImage.RawData.Length - 1;
-                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if flashing was successful for range: 0x" + mCurrentBlock.mMemoryImage.StartAddress.ToString("X8") + " to 0x" + endAddress.ToString("X8"), StatusMessageType.USER);
+                            CommInterface.DisplayStatusMessage("Calculating flash checksum to determine if flashing was successful for range: " + RangeText(mCurrentBlock.mMemoryImage.StartAddress, (uint)mCurrentBlock.mMemoryImage.RawData.Length), StatusMessageType.USER);
                             nextAction = new ValidateFlashChecksumAction(KWP2000CommInterface, mCurrentBlock.mMemoryImage.StartAddress, mCurrentBlock.mMemoryImage.RawData);
                             break;
                         }

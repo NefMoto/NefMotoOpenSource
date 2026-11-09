@@ -299,20 +299,7 @@ namespace ECUFlasher
             var held = App?.CommInterfaceViewModel as KWP2000Interface_ViewModel;
             if ((held != null) && held.IsHeldKWP1281Session())
             {
-                bool ok = true;
-                if ((App.CommInterface == null) || !App.CommInterface.IsConnected())
-                {
-                    reasonsDisabled.Add("Not connected to ECU");
-                    ok = false;
-                }
-
-                if (App.OperationInProgress)
-                {
-                    reasonsDisabled.Add("Another operation is in progress");
-                    ok = false;
-                }
-
-                return ok;
+                return RequireConnectedAndIdle(reasonsDisabled);
             }
 
             return CanExecuteApplicationSessionCommand(reasonsDisabled);
@@ -320,18 +307,10 @@ namespace ECUFlasher
 
         private bool CanExecuteApplicationSessionCommand(List<string> reasonsDisabled)
         {
-            if (App == null)
+            bool result = RequireConnectedAndIdle(reasonsDisabled);
+            if ((App == null) || (App.CommInterface == null))
             {
-                reasonsDisabled.Add("Internal program error");
-                return false;
-            }
-
-            bool result = true;
-
-            if (!App.CommInterface.IsConnected())
-            {
-                reasonsDisabled.Add("Not connected to ECU");
-                result = false;
+                return result;
             }
 
             if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
@@ -351,12 +330,6 @@ namespace ECUFlasher
             if ((kwpViewModel != null) && kwpViewModel.BlocksMe7Commands())
             {
                 reasonsDisabled.Add("This command is for ME7.");
-                result = false;
-            }
-
-            if (App.OperationInProgress)
-            {
-                reasonsDisabled.Add("Another operation is in progress");
                 result = false;
             }
 
