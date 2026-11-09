@@ -468,6 +468,12 @@ namespace Communication
         {
             if (ConnectionStatus == ConnectionStatusType.Connected)
             {
+                if (IsHeldKWP1281Session)
+                {
+                    ConnectionStatus = ConnectionStatusType.Disconnected;
+                    return;
+                }
+
                 ConnectionStatus = ConnectionStatusType.DisconnectionPending;
                 SendMessage((byte)KWP2000ServiceID.StopCommunication);
 

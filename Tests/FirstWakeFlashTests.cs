@@ -186,6 +186,22 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal("none", KWP1281CalibrationRead.FormatFaultBlock(new byte[] { 0xFF, 0xFF, 0x88 }));
             Assert.Equal("4492/17554 status 20", KWP1281CalibrationRead.FormatFaultBlock(new byte[] { 0x44, 0x92, 0x20 }));
         }
+
+        [Fact]
+        public void Vag_fault_word_is_the_p_code()
+        {
+            Assert.Equal((ushort)0x1626, PCode(0x465A));
+            Assert.Equal((ushort)0x1569, PCode(0x4621));
+            Assert.Equal((ushort)0x1568, PCode(0x4620));
+            Assert.Equal((ushort)0x0123, PCode(0x407B));
+        }
+
+        private static ushort PCode(ushort vag)
+        {
+            ushort pcode;
+            Assert.True(KWP1281CalibrationRead.TryPCode(vag, out pcode));
+            return pcode;
+        }
     }
 }
 

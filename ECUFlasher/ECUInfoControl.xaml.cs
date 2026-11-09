@@ -1110,7 +1110,8 @@ namespace ECUFlasher
                     continue;
                 }
 
-                list.Add(new KWP2000DTCInfo { DTC = code, Status = status });
+                KWP1281CalibrationRead.TryPCode(code, out ushort shown);
+                list.Add(new KWP2000DTCInfo { DTC = shown, Status = status });
             }
 
             return list;

@@ -115,6 +115,26 @@ namespace Communication
             return text;
         }
 
+        // 18010 is P1626. 16507 is P0123. The four digits of (word - 16384) are the P-code.
+        public static bool TryPCode(ushort vag, out ushort pcode)
+        {
+            pcode = vag;
+            int body = vag - 0x4000;
+            if ((body < 0) || (body > 9999))
+            {
+                return false;
+            }
+
+            int value = 0;
+            for (int place = 1; body > 0; body /= 10, place *= 16)
+            {
+                value += (body % 10) * place;
+            }
+
+            pcode = (ushort)value;
+            return true;
+        }
+
         private static int IndexOf(byte[] haystack, byte[] needle)
         {
             if ((haystack == null) || (needle == null) || (haystack.Length < needle.Length))
@@ -312,14 +332,14 @@ namespace Communication
                     dtcOk = ExchangeDtcs(mDtcClear, out live, out report);
                 }
 
+                if (live)
+                {
+                    EndHeldKWP1281Dialogue();
+                }
+
                 if (dtcFinished != null)
                 {
                     dtcFinished(dtcOk, report);
-                }
-
-                if (live)
-                {
-                    CloseHeldKWP1281();
                 }
 
                 return true;
@@ -801,6 +821,19 @@ namespace Communication
             return null;
         }
 
+        // End the block dialogue and leave the app connected. The next fault
+        // request slow-inits on this port. Tester present is not sent here.
+        private void EndHeldKWP1281Dialogue()
+        {
+            SendTitle((byte)KWP2000Interface.KWP1281BlockTitle.RequestEndCommunication);
+            mHost.ClearMessageBuffers();
+            mHost.mP2ECUResponseTimeOut.Reset();
+            mHost.mP2ECUResponseTimeOut.Start();
+            mHost.mP3TesterRequestTimeOut.Reset();
+            mHost.mP3TesterRequestTimeOut.Start();
+            mHost.DisplayStatusMessage("Fault exchange ended. The connection stays open.", StatusMessageType.USER);
+        }
+
         private void CloseHeldKWP1281()
         {
             if (!mHost.IsHeldKWP1281Session)
@@ -808,11 +841,7 @@ namespace Communication
                 return;
             }
 
-            mHost.mKWP1281BlockCounter++;
-            var endBlock = new KWP2000Interface.KWP1281Block();
-            endBlock.mBlockCounter = mHost.mKWP1281BlockCounter;
-            endBlock.mBlockTitle = (byte)KWP2000Interface.KWP1281BlockTitle.RequestEndCommunication;
-            mHost.KWP1281SendBlock(endBlock);
+            SendTitle((byte)KWP2000Interface.KWP1281BlockTitle.RequestEndCommunication);
             mHost.DisplayStatusMessage("KWP1281 session closed.", StatusMessageType.USER);
             mHost.ConnectionStatus = CommunicationInterface.ConnectionStatusType.Disconnected;
         }
