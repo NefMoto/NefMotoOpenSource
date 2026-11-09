@@ -46,3 +46,11 @@ build.bat publish
 - **WiX Toolset** (installer builds; MSI is **x64**, `-arch x64`). Version is [`.config/dotnet-tools.json`](../.config/dotnet-tools.json) (Dependabot can bump it). [`Installer/installer.ps1`](../Installer/installer.ps1) runs `dotnet tool restore` then `dotnet tool run wix` — no global `wix` on `PATH`. `make installer` and `build.bat installer` both invoke that script. UI and NetFx extensions are added at the json version during the installer build. `--acceptEula wix7` ([OSMF](https://wixtoolset.org/osmf/)) is hardcoded to match the WiX 7 pin; change both in the same commit.
 
 `make publish` / `build.bat publish` writes a framework-dependent copy to `publish/NefMotoECUFlasher`. It is not a substitute for the MSI: no shortcuts, no installer .NET check, and it still needs the .NET 10 Desktop runtime. `MemoryLayouts` is copied next to the executable. This is not a single-file exe.
+
+## Fake update check
+
+Set `NEFMOTO_FAKE_UPDATE=1` before starting the app. Every check reports a fake newer version and does not contact GitHub. The log records that the fake was active.
+
+```powershell
+$env:NEFMOTO_FAKE_UPDATE=1; & 'C:\Program Files\NefMotoECUFlasher\NefMotoECUFlasher.exe'
+```

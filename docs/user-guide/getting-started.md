@@ -15,25 +15,12 @@ To build from source instead, see [BUILDING.md](../BUILDING.md).
 
 ## Update check
 
-At startup the app asks GitHub (`api.github.com`) for the list of releases, at most once every 24 hours. If a newer release exists, a window shows the release notes for every version newer than yours, with these buttons:
+At startup the app checks for a newer release. If one exists, a window shows the release notes.
 
-- **Download MSI** opens the installer link in your browser. It is hidden if the release has no MSI.
-- **View Latest Release** opens the GitHub release page.
-- **Close** does nothing.
-
-The app never downloads or installs anything itself; you run the new MSI yourself.
-
-- **Help → Check for Updates...** checks right away and also reports when you are up to date.
-- **Help → Check for Updates at Startup** turns the startup check off or on. Turning it on clears the last-check time, so the next startup checks immediately.
-- Pre-releases (`-rc` tags) are only offered when the running build is itself a pre-release.
-- During a read or write, a found update is written to the status text instead of opening the window.
-- Builds from source without a release tag cannot be compared, so the startup check skips them.
-
-For testing, set the environment variable `NEFMOTO_FAKE_UPDATE=1` before starting the app. Every check then reports a fake newer version without contacting GitHub, and the log records that the fake was active:
-
-```powershell
-$env:NEFMOTO_FAKE_UPDATE=1; & 'C:\Program Files\NefMotoECUFlasher\NefMotoECUFlasher.exe'
-```
+- **Download MSI** opens the installer in your browser. You install it yourself.
+- **View Latest Release** opens the release page.
+- **Help → Check for Updates...** checks now.
+- **Help → Check for Updates at Startup** turns the startup check on or off.
 
 ## Cable
 
@@ -42,7 +29,8 @@ You need **either**:
 - A dumb-mode K+DCAN or KKL cable: USB-to-serial with an FTDI or CH340 chipset, K-line pass-through to the ECU (no protocol translation), **or**
 - A legacy Ross-Tech HEX-USB or HEX-USB+CAN with Ross-Tech VCP drivers, dumb K-line pass-through, and smart mode disabled — the interface must show up in NefMoto's device list (install VCP per [Ross-Tech](http://www.ross-tech.com/vag-com/usb/virtual-com-port.php) if it does not)
 
-Ross-Tech HEX-V2 and HEX-NET are not supported; they lack dumb K-line pass-through. Do not use KII-USB (poor pass-through).
+> [!WARNING]
+> Ross-Tech HEX-V2 and HEX-NET are not supported. They lack dumb K-line pass-through. Do not use KII-USB. Its pass-through is poor.
 
 FTDI and CH340 are equivalent for KWP2000. Some clone cables fail slow init on either chipset; that is a cable/driver problem, not “CH340 cannot do 5-baud.” Enable **Slow init timing log** on the **KWP2000 Settings** tab when diagnosing connect issues. Bootmode baud caveats for CH340: [Bootmode](bootmode.md#baud).
 
@@ -75,35 +63,19 @@ Tabs after you are connected:
 
 **KWP2000 Info:** **Read DTCs**, **Read EEPROM Mirror**, **Clear DTCs**, save/load a DTCs file. Those three buttons stay disabled in a programming session. **Read EEPROM Mirror** reports the page at `0x6001E0` and does not clear anything. For `P0602` or `P1681`, see [P0602](clearing-P0602.md).
 
-**KWP2000 Logging:** live variables while KWP2000 is connected. This is not [ME7Logger](https://nefariousmotorsports.com/forum/). After a flash write, logging stays broken until a complete power cycle ([Flashing](flashing.md#after-a-successful-write)).
+**KWP2000 Logging:** live variables while KWP2000 is connected. This is not [ME7Logger](https://nefariousmotorsports.com/forum/). After a flash write, logging stays broken until a complete power cycle ([Ident says RAM program after a write](troubleshooting.md#ident-says-ram-program-after-a-write)).
 
 ## Connect with slow init
 
 Slow init is the default. Use it on the bench and in the car unless you already know fast init works on that ECU.
 
-- **Connect address** on the Settings tab: `0x01` (default) or `0x11`. See [Which connect address](#which-connect-address).
 - Wait **at least 2.6 seconds** after a failed attempt before clicking Connect again. The ECU needs that idle time between slow inits.
 - In the car, K-line often goes through the cluster. That is slower and less predictable than a direct bench wire. A miss of the address complement is a handshake miss, not a CH340 5-baud failure.
 - **Verify cable in dumb mode** is on by default. A failure there usually means the adapter is not in dumb pass-through, or TX/RX echo is wrong.
 
-On the documented bench units (one ME7.1 and one ME7.5, both 29F800), slow init and fast init both work with FTDI and CH340. Other flash images may differ. There is no automatic fallback from fast to slow.
+Slow init and fast init both work with FTDI and CH340. Other flash images differ. There is no automatic fallback from fast to slow.
 
 Every KWP connect logs the ECU part number when the ECU reports it. A KWP1281 exchange logs it as `KWP1281 connect info:`. Otherwise the tool asks for the KWP2000 identification fields right after connect and logs lines such as `ECU Vehicle Manufacturer Spare Part Number: ...`, without changing session or baud. An ECU that refuses that request stays connected.
-
-### Which connect address
-
-- **`0x01` (default)** works on every ME7. On many ECUs it first runs a short exchange in the older KWP1281 protocol (the log shows `KWP1281 connect info:`), then a second slow init switches to KWP2000. About 10 seconds from Connect on the bench.
-- **`0x11`** goes straight to KWP2000. About 5 seconds from Connect on the bench.
-
-Use `0x01`:
-
-- After a flash write or abort, while the ECU may still be on the programming kernel. `0x11` has not been tested there.
-- If `0x11` does not connect. Some ECUs go straight to KWP2000 at `0x01` (no `KWP1281 connect info:` in the log); they have no `0x11` and `0x01` is already fast.
-- In a car where the cluster interferes with `0x11` on the K-line.
-
-Use `0x11` to connect faster, for example for **KWP2000 Logging**. With the engine running, `0x01` is expected to need a third slow init (about 15 seconds) because the ECU only hands over from KWP1281 with the engine stopped; `0x11` should not be affected. This comes from firmware analysis and has not been tested on a running engine.
-
-**Connect address** is not saved; it returns to `0x01` when you restart the app. Address meaning and hex detail: [KWP2000.md](../KWP2000.md#connect-ui).
 
 ## Fast init
 
@@ -133,9 +105,11 @@ On older ME7.1, slow init at `0x01` answers KWP1281 twice. Connect then uses `0x
 
 **On the bench:** direct K-line to the ECU, stable ground and +12 V, adapter in dumb mode.
 
-Typical ME7 K-line is ECU pin 43, which is OBD pin 7. Confirm against a pinout for your connector.
+Typical ME7 K-line is ECU pin 43, which is OBD pin 7. That is not the M5.9.2 programming-wake pin. Confirm against a pinout for your connector.
 
-**ME7.5 (121-pin) on the bench:** for KWP read/write, pin 121 must be at +12 V. Use the same switched +12 V as pins 3, 21, and 62. Pin 121 is the top right pin on the small ECU connector. The app prints this hint when it matters. A connect that works for ident can still fail a programming session if pin 121 is floating.
+**ME7.5 on the bench:** for KWP read/write, pin 121 must be at +12 V. Facing the ECU connector, it is the top right pin on the small connector, on the same switched +12 V as pins 3, 21, and 62. The app prints this hint when it matters. A connect that works for ident can still fail a programming session if that pin is floating.
+
+![ME7.5 pin 121 on the small connector](../images/me7.5-pin-121.svg)
 
 Bootmode uses the same power rails and a different entry pin (often pin 24 on ME7). See [Bootmode](bootmode.md).
 
@@ -145,7 +119,7 @@ Recommended first action: **KWP2000 Info** → **Read ECU Info**. Optionally **R
 
 A first flash action should be a **read** (backup), not a write. Layout selection, BT vs BB, and write recovery: [Flashing](flashing.md) and [Wrong Flash Layout](troubleshooting.md#wrong-flash-layout).
 
-After a **successful** KWP write, ident may show `THIS-IS-THE-RAM-PROGRAM` until a **complete** power cycle (ME7.5: all +12 off, including pin 121). That string is not a brick. After an **abort**, stay powered and retry. [Flashing](flashing.md#after-a-successful-write)
+After a KWP write, see [Ident says RAM program after a write](troubleshooting.md#ident-says-ram-program-after-a-write).
 
 ## Log file
 
@@ -163,4 +137,4 @@ Session log:
 - [Bootmode](bootmode.md)
 - [Troubleshooting](troubleshooting.md)
 - [README](../../README.md) — features, limitations, requirements
-- [KWP2000.md](../KWP2000.md) — developer bench notes
+- [KWP2000.md](../KWP2000.md) — developer notes

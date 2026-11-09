@@ -19,7 +19,7 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 ## Slow init fails
 
 - Wait **at least 2.6 seconds** between attempts.
-- Confirm **Slow Init**, baud **10400**, connect address `0x01`. If `0x11` fails and `0x01` works, the ECU has no `0x11`. See [Which connect address](getting-started.md#which-connect-address).
+- Confirm **Slow Init**, baud **10400**, connect address `0x01`. If `0x11` fails and `0x01` works, the ECU has no `0x11`. See [Which to use](../KWP2000.md#which-to-use).
 - Adapter in **dumb** mode (no protocol translation). **Verify cable in dumb mode** on **KWP2000 Settings**.
 - Enable **Slow init timing log** and retry. Compare the handshake against a known-good cable if you have one. Clone cables fail on FTDI and CH340; that is not a CH340-only 5-baud bug.
 - If you just tried **Fast Init**, wait 2.6 seconds, then slow init.
@@ -52,7 +52,7 @@ Leaving the ECU powered does not clear a failed write.
 - After a **successful** write: complete power cycle (ME7.5: all +12 off, including pin 121), then reconnect with **Slow Init**.
 - After an **abort** (Wrong Flash Layout, sector fail, comm drop you can resume): **do not** power cycle. Retry KWP on the same power-on.
 
-Developer detail: [Flashing](flashing.md#after-a-successful-write) and [KWP2000.md](../KWP2000.md#ram-kernel-after-write-this_is_the_ram_program).
+Developer detail: [KWP2000.md](../KWP2000.md#ram-kernel-after-write-this_is_the_ram_program).
 
 ## P0602 or P1681 after a flash
 
@@ -77,7 +77,7 @@ Recovery:
 - Entire-flash erase does **not** fix BT vs BB. It still uses the current sector list.
 - Switching layout in the same programming session is not implemented.
 
-This is not **Sector Erase Failed** (persistent data on a middle 64KB sector). [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103). [Flashing](flashing.md#after-an-abort)
+This is not **Sector Erase Failed** (persistent data on a middle 64KB sector). [Issue #103](https://github.com/NefMoto/NefMotoOpenSource/issues/103).
 
 Uniform `29F800` (sixteen 64KB sectors, no boot cluster) is a different mismatch.
 
@@ -89,7 +89,7 @@ Yes/No/Cancel prompt about persistent data on a sector that is **not** the boot 
 
 - Confirm the file matches the layout you selected.
 - **Verify Checksums** is on the **Flashing** tab (there is no separate Checksum tab).
-- After a write, verify can fail if the session dropped or the layout was wrong — see [Wrong Flash Layout](#wrong-flash-layout) and [Flashing](flashing.md).
+- After a write, verify can fail if the session drops or the layout is wrong. See [Wrong Flash Layout](#wrong-flash-layout) and [Flashing](flashing.md).
 
 ## Reporting a problem
 
@@ -102,7 +102,7 @@ Yes/No/Cancel prompt about persistent data on a sector that is **not** the boot 
 
 **Slow or fast init?** Slow init is the default. Use fast only when you know it works. Fast init takes significantly less time to connect, but is not always supported. [Getting started](getting-started.md#connect-with-slow-init)
 
-**Slow init address `0x01` or `0x11`?** `0x01` works everywhere. `0x11` connects in about half the time on ECUs that support it; not after a flash write. [Which connect address](getting-started.md#which-connect-address)
+**Slow init address `0x01` or `0x11`?** `0x01` works everywhere. `0x11` connects in about half the time on ECUs that support it; not after a flash write. [Which to use](../KWP2000.md#which-to-use)
 
 **Will my HEX-V2 / HEX-NET work?** No.
 

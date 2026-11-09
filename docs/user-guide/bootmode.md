@@ -28,22 +28,32 @@ Use **KWP2000**. Pin 43 selects which session the ECU answers.
 
 Pin 43 stays at +12 V for the whole attempt. Set it before you apply power.
 
-- Protocol **KWP2000**, connection method **Fast Init**. The connect-bar baud selects the speed byte. The write requests one byte: the fastest rate this ECU has accepted that is at or below that baud. 10400 is `0x14` and 38400 is `0x50`. A higher dropdown still requests `0x50`. The key is sent when the session answers `7F 10 33`, or when erase answers security-required `0x33`. After that key the same speed byte is sent again, then timing, then erase.
-- Connect. A good connect says `OK. Connect succeeded. First wake stayed KWP2000. Tester present is not sent.` The scan of `0x10` is silent. `0x01` answers, key bytes `0x6F` / `0x0F`.
-- **Full Write** wakes `0x11` and sends the loaded file. Let it run. Tester present is not sent, and the app does not close this session on its own.
+- Protocol **KWP2000**, connection method **Fast Init**. The connect-bar baud selects the speed byte.
+- Connect. A good connect says `OK. Connect succeeded. First wake stayed KWP2000. Tester present is not sent.`
+- **Full Write** sends the loaded file. Let it run. Tester present is not sent, and the app does not close this session on its own.
 - **Read DTCs** and **Clear DTCs** need the read session, pin 43 off +12 V. They are blocked on the programming wake.
 
 ### If the write fails
 
-Switch the ECU supply off, then back on. Set pin 43 to +12 V before the supply comes back, and run **Full Write** again. Leaving the ECU powered does not clear a failed write. [Troubleshooting](troubleshooting.md#m592-write-fails).
+[M5.9.2 write fails](troubleshooting.md#m592-write-fails).
 
-Measurements from the bench are in [M5.9.2](../M5.9.2.md).
+Protocol detail is in [M5.9.2](../M5.9.2.md).
 
 ## Entry and power
 
 Same ground and +12 V as a KWP bench. Bootmode needs the ECU in bootstrap, not a normal KWP session.
 
-Typical ME7 boot pin is **24** (hold at the level your pinout specifies while applying power). Confirm against a diagram for your connector. Simos3 / EDC15 entry differs; use a pinout for that ECU.
+Ground flash pin 24, or short the boot pads, as ignition power comes up. Release it after 2-3 seconds. Leave it grounded while programming and the write fails. The CPU samples P0L.4 at power-up.
+
+ME7.1 and ME7.5 have a pad pair for that net. Short the pads, or fit a switch across them.
+
+![ME7.1 boot pads](../images/me7.1-bootmode.png)
+
+ME7.1.1 boards differ. This one has a pad pair. On a board without them, ground flash pin 24. With the plugs to the right and the pin-1 mark at the top right of the flash, pin 24 is the second pin in from the left on the bottom edge.
+
+![ME7.1.1 boot pads](../images/me7.1.1-bootmode.png)
+
+Simos3 / EDC15 entry differs; use a pinout for that ECU.
 
 The app reports **Put ECU in boot mode** if the handshake never starts.
 
@@ -53,7 +63,7 @@ If the loader core is already running (`0xAA`), the app uploads the flash driver
 
 Default **57600**. Try **38400** if 57600 fails (especially CH340).
 
-M5.9.2 does not use this loader. Write needs pin 43 at +12 V. Read needs pin 43 off +12 V ([M5.9.2](#m592)).
+M5.9.2 does not use this loader. The programming wake is pin 43 at +12 V for a write, and off +12 V for a read ([M5.9.2](#m592)).
 
 9600 and 19200 can fail non-deterministically on CH340 (wrong ACKs, NAK, readback errors). Likely USB latency, buffering, jitter, or voltage — not baud error. Prefer FTDI at those lower rates. [Issue #44](https://github.com/NefMoto/NefMotoOpenSource/issues/44)
 
@@ -92,7 +102,7 @@ On the **EEPROM** tab. **Read EEPROM** reads the chip in bootmode, or through th
 
 Connected with KWP2000 instead of bootmode, **Read EEPROM** reads a 95040 through the ECU. It uses the development session, like **Read EEPROM Mirror**, and reads the mirror at `0x600000` one 16-byte page at a time. No login is needed and nothing is written.
 
-ME7.1.1 refuses pages 3 and 4 (SKC and cluster code) with `7F 23 12`. The read logs them as withheld and carries on. Then it reads RAM `0x380000-0x387FFF` and looks for the firmware's EEPROM shadow: one 16-byte slot per record id, in the high byte of the page descriptor. The base is where the most served pages match, and at least 4 must match. A withheld page is taken from its slot only when its own page checksum is valid. On 4Z7907551S `1037367582` the shadow is at `0x383DA8`. There, mirror pages plus shadow pages 3-4 matched a bootmode read except page 17, which changes at every start-up.
+ME7.1.1 refuses pages 3 and 4 (SKC and cluster code) with `7F 23 12`. The read logs them as withheld and carries on. Then it reads RAM `0x380000-0x387FFF` and looks for the firmware's EEPROM shadow: one 16-byte slot per record id, in the high byte of the page descriptor. The base is where the most served pages match, and at least 4 must match. A withheld page is taken from its slot only when its own page checksum is valid.
 
 Pages that still can't be read stay `FF` and the status log names them. **Save EEPROM File** keeps them as `FF`. **Write EEPROM** is disabled for an image with missing pages, because writing it would erase them on the chip.
 
@@ -133,7 +143,7 @@ The grid is read-only, 16 bytes per row. With no image loaded it stays on screen
 
 - **Immo Off** on a `95040` sets `0x012` and `0x022` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Page 1 and page 2 checksums are corrected.
 - **Immo Off** on a `95P08` sets `0x012` and `0x022` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Checksums are left unchanged, and the write dialog does not offer the `95040` checksum correction.
-- **Reset Lockout** sets `0x1EC`–`0x1ED` and `0x1FC`–`0x1FD` to `00 00`. The `P0602` flag and counters stay. Page 30 and page 31 checksums are corrected when those bytes change. This is the lockout field measured on ME7.5.
+- **Reset Lockout** sets `0x1EC`–`0x1ED` and `0x1FC`–`0x1FD` to `00 00`. The `P0602` flag and counters stay. Page 30 and page 31 checksums are corrected when those bytes change. This is the lockout field.
 - **Clear P0602** clears bit 7 at `0x1E8` and `0x1F8`. **Set P0602** sets that bit. Other bits, counters, and lockout bytes stay. Page 30 and page 31 checksums are corrected when those bytes change.
 
 ## Next
