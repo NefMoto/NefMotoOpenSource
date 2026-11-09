@@ -361,10 +361,10 @@ UnknownEDC15ResponseCode = 0x13,
         programmingDate = 0x99,//supported, not set
         [Description("Calibration Repair Shop Code or Calibration Equipment Serial Number")]
         calibrationRepairShopCodeOrCalibrationEquipmentSerialNumber = 0x9A,
-        [Description("Calibration Date")]
+        [Description("Calibration Identifier")] //ISO 14230-3 defines 0x9B as calibrationDate, but VAG uses it as calibrationIdentifier
         calibrationDate = 0x9B,//supported//ECU identification number.  SCA insertion requires this field
-        [Description("Calibration Equiment Software Number")]
-        calibrationEquipmentSoftwareNumber = 0x9C,//supported//flash status -  byte:flash status, byte:num flash attempts, byte:num successful flash attempts, byte:status of flash preconditions
+        [Description("Flash Status")] //ISO 14230-3 defines 0x9C as calibrationEquipmentSoftwareNumber, but VAG returns four status bytes
+        calibrationEquipmentSoftwareNumber = 0x9C,//supported//byte 0: flash consistency, byte 1: flash attempts, byte 2: successful attempts, byte 3: programming preconditions
         [Description("ECU Installation Date")]
         ECUInstallationDate = 0x9D,
         vehicleManufacturerSpecific1 = 0x9E,
