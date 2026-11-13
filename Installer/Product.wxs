@@ -14,6 +14,7 @@
   <?endif ?>
   <?define FullVersion=$(env.FULL_VERSION)?>
   <?define TargetDir=$(env.ECUFlasher_TargetDir)?>
+  <?define Nmflasher_TargetDir=$(env.Nmflasher_TargetDir)?>
   <?define MemoryLayouts_TargetDir=MemoryLayouts\?>
   <!-- No Package Id: new ProductCode each build (required for x86→x64; Keep UpgradeCode). -->
   <Package
@@ -174,6 +175,18 @@
       </Component>
       <Component Id="Checksum.dll" Guid="*">
         <File Id="Checksum.dll" Name="Checksum.dll" Source="$(var.TargetDir)Checksum.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="nmflasher.exe" Guid="*">
+        <File Id="nmflasher.exe" Name="nmflasher.exe" Source="$(var.Nmflasher_TargetDir)nmflasher.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="nmflasher.dll" Guid="*">
+        <File Id="nmflasher.dll" Name="nmflasher.dll" Source="$(var.Nmflasher_TargetDir)nmflasher.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="nmflasher.runtimeconfig.json" Guid="*">
+        <File Id="nmflasher.runtimeconfig.json" Name="nmflasher.runtimeconfig.json" Source="$(var.Nmflasher_TargetDir)nmflasher.runtimeconfig.json" KeyPath="yes" />
+      </Component>
+      <Component Id="nmflasher.deps.json" Guid="*">
+        <File Id="nmflasher.deps.json" Name="nmflasher.deps.json" Source="$(var.Nmflasher_TargetDir)nmflasher.deps.json" KeyPath="yes" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="RuntimeDlls" Directory="RuntimeTfmFolder">

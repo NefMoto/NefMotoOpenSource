@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>nmflasher</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <FullVersion Condition="'$(FullVersion)' == ''">$(FULL_VERSION)</FullVersion>
+    <FullVersion Condition="'$(FullVersion)' == ''">0.0.0.0</FullVersion>
+    <BaseVersion>$([System.Text.RegularExpressions.Regex]::Match($(FullVersion), '(\d+\.\d+(\.\d+)?(\.\d+)?)'))</BaseVersion>
+    <BaseVersion Condition="'$(BaseVersion)' == ''">0.0.0.0</BaseVersion>
+    <AssemblyVersion>$(BaseVersion)</AssemblyVersion>
+    <FileVersion>$(BaseVersion)</FileVersion>
+    <InformationalVersion>$(FullVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Communication\Communication.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--MemoryLayouts must sit next to the executable: without them KWP2000 read and write stay disabled-->
+    <Content Include="..\MemoryLayouts\*.MemoryLayout.xml" Link="MemoryLayouts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -121,7 +121,7 @@ namespace Communication
                                 // DQ answers StartDiagnosticSession with 7F 10 33 until this login.
                                 // That key sets bit 12 of [0xE074], so the login inside the programming
                                 // session gets a zero seed and must still send its key. A development
-                                // session stops after this login.
+                                // session stops after this login, except the flash upload path below.
                                 mState = State.PreNegotiateSecurityForProgrammingSession;
                             }
                             else
@@ -279,6 +279,18 @@ namespace Communication
                     success = action.CompletedWithoutCommunicationError;
                 }
                 #endregion
+                #region StartDiagnosticSession
+                else if ((mState == State.StartDiagnosticSession) && LeaveDevelopmentSessionForProgramming(action.CompletedWithoutCommunicationError))
+                {
+                    success = true;
+                }
+                #endregion
+                #region NegotiateSecurity
+                else if ((mState == State.NegotiateSecurity) && LeaveDevelopmentSessionAfterSecurityRefusal(success, action.CompletedWithoutCommunicationError))
+                {
+                    success = true;
+                }
+                #endregion
             }
 
             mMyLastStartedAction = null;
@@ -324,6 +336,17 @@ namespace Communication
         protected void EnableProgrammingSession(IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings)
         {
             EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
+            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
+            EnableAutoNegotiateSecurity(securitySettings);
+        }
+
+        // RequestUpload is served after a development session opened from the default
+        // session. The programming-session kernel answers a later 0x86 with NoProgram.
+        protected void EnableFlashUploadSession(IEnumerable<uint> baudRates, SecurityAccessAction.SecurityAccessSettings securitySettings)
+        {
+            mSecurityAfterDevelopmentSession = true;
+            mUploadFallsBackToProgramming = true;
+            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.DevelopmentSession, baudRates);
             EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
             EnableAutoNegotiateSecurity(securitySettings);
         }
@@ -414,7 +437,76 @@ namespace Communication
         {
             // The programming-session kernel clears 0x381B30. The pre-session key sets bit 12
             // of [0xE074], so this login gets a zero seed and must still send its key.
-            return mShouldAutoNegotiateSecurity && (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession);
+            if (!mShouldAutoNegotiateSecurity)
+            {
+                return false;
+            }
+
+            if (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+            {
+                return true;
+            }
+
+            // Accepting the development session clears security bit 12. The mask staged
+            // at 0xE1F4 enables RequestUpload. The login has to be repeated after it.
+            return mSecurityAfterDevelopmentSession
+                && (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.DevelopmentSession);
+        }
+
+        // One programming session after a development-session miss. A second refusal is not retried.
+        protected void OpenProgrammingSessionAfterDevelopment(string message)
+        {
+            mUploadFallsBackToProgramming = false;
+            mDesiredDiagnosticSessionType = KWP2000DiagnosticSessionType.ProgrammingSession;
+            mShouldAutoStartDiagnosticSession = true;
+            mState = State.Begin;
+            CommInterface.DisplayStatusMessage(message, StatusMessageType.USER);
+        }
+
+        // The development session did not become current. Other ECUs still read in the
+        // programming session, which has to be opened from here rather than from the kernel.
+        private bool LeaveDevelopmentSessionForProgramming(bool completedWithoutCommunicationError)
+        {
+            if (!mUploadFallsBackToProgramming
+                || !completedWithoutCommunicationError
+                || (mDesiredDiagnosticSessionType != KWP2000DiagnosticSessionType.DevelopmentSession)
+                || (KWP2000CommInterface.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.DevelopmentSession))
+            {
+                return false;
+            }
+
+            OpenProgrammingSessionAfterDevelopment("Development session did not start. Opening a programming session.");
+            return true;
+        }
+
+        // Development session started, but RequestUpload is still masked off.
+        protected bool FallBackToProgrammingSessionForUpload(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            if (!mUploadFallsBackToProgramming
+                || (result != ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                || (mDesiredDiagnosticSessionType != KWP2000DiagnosticSessionType.DevelopmentSession))
+            {
+                return false;
+            }
+
+            OpenProgrammingSessionAfterDevelopment("RequestUpload is not served in the development session. Opening a programming session.");
+            return true;
+        }
+
+        // ME7.1 and ME7.5 accept 0x86 and then refuse the login it requires. A granted
+        // login stays in the development session. One refusal opens 0x85.
+        private bool LeaveDevelopmentSessionAfterSecurityRefusal(bool success, bool completedWithoutCommunicationError)
+        {
+            if (success
+                || !mUploadFallsBackToProgramming
+                || !completedWithoutCommunicationError
+                || (mDesiredDiagnosticSessionType != KWP2000DiagnosticSessionType.DevelopmentSession))
+            {
+                return false;
+            }
+
+            OpenProgrammingSessionAfterDevelopment("Security access was refused in the development session. Opening a programming session.");
+            return true;
         }
 
         protected KWP2000Interface KWP2000CommInterface
@@ -439,6 +531,8 @@ namespace Communication
         private NegotiateTimingParameters.NegotiationTarget mTimingTarget;
 
         private bool mShouldAutoNegotiateSecurity;
+        private bool mSecurityAfterDevelopmentSession;
+        private bool mUploadFallsBackToProgramming;
         private SecurityAccessAction.SecurityAccessSettings mSecuritySettings;
 
         private CommunicationAction mMyLastStartedAction;
@@ -1153,9 +1247,7 @@ namespace Communication
         public ReadExternalFlashOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, ReadExternalFlashSettings readSettings, IEnumerable<MemoryImage> flashBlockList)
             : base(commInterface)
         {
-            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
-            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-            EnableAutoNegotiateSecurity(readSettings.SecuritySettings);
+            EnableFlashUploadSession(baudRates, readSettings.SecuritySettings);
 
             mFlashBlockList = flashBlockList;
             mCurrentBlock = mFlashBlockList.GetEnumerator();
@@ -1256,7 +1348,7 @@ namespace Communication
                         // The layout check leaves an accepted RequestUpload open. Until an upload ends with
                         // RequestTransferExit, the ME7 kernel does not count matching checksums toward
                         // clearing the programming flag, so checksum only after one sector has been uploaded.
-                        if (CheckIfSectorsRequireRead && mHasVerfiedRequestUploadSupported)
+                        if (CheckIfSectorsRequireRead && mHasVerfiedRequestUploadSupported && !mChecksumRoutineUnavailable)
                         {
                             mState = ReadingState.CheckIfReadRequired;
                         }
@@ -1454,7 +1546,12 @@ namespace Communication
                     }
                     else if (action.CompletedWithoutCommunicationError)
                     {
-                        if (mState == ReadingState.CheckIfReadRequired)
+                        if (((ValidateFlashChecksumAction)action).RoutineUnavailable)
+                        {
+                            AskChecksumUnavailableReadPrompt(action);
+                            return;
+                        }
+                        else if (mState == ReadingState.CheckIfReadRequired)
                         {
                             CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches, reading anyways.", StatusMessageType.USER);
                         }
@@ -1562,13 +1659,13 @@ namespace Communication
                                 return;
                             }
                         }
-                        else if (ShouldVerifyReadSectors && ShouldChecksumSector(mCurrentBlock.Current))
+                        else if (ShouldVerifyReadSectors && ShouldChecksumSector(mCurrentBlock.Current) && !mChecksumRoutineUnavailable)
                         {
                             mState = ReadingState.ValidateReadData;
                         }
                         else
                         {
-                            if (ShouldVerifyReadSectors)
+                            if (ShouldVerifyReadSectors && !mChecksumRoutineUnavailable)
                             {
                                 MemoryImage uploaded = mCurrentBlock.Current;
                                 CommInterface.DisplayStatusMessage("Uploaded " + RangeText(uploaded.StartAddress, uploaded.Size) + ". No checksum.", StatusMessageType.USER);
@@ -1587,6 +1684,14 @@ namespace Communication
                     string validationMesage = null;
 
                     var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                    if (FallBackToProgrammingSessionForUpload(validationResult))
+                    {
+                        mState = ReadingState.ValidateMemoryLayout;
+                        success = true;
+                        FinishReadAction(action, success);
+                        return;
+                    }
+
                     LayoutValidationText.Apply(validationResult, success, action.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
 
                     if (validationMesage != null)
@@ -1782,6 +1887,49 @@ namespace Communication
         private TransferDataAction.EncryptionType mEncryptionType;
 
         private bool mCurrentSectorRequiresRead;
+        private bool mChecksumRoutineUnavailable;
+
+        // This development session rejects checksum local id 0xC5. Ask before reading every sector.
+        private void AskChecksumUnavailableReadPrompt(CommunicationAction action)
+        {
+            string message = OnlyReadRequiredSectors
+                ? "This ECU does not serve the flash checksum in this session.\nA diff read cannot tell which sectors differ.\n\nClick OK to read every sector.\nClick Cancel to stop the read."
+                : "This ECU does not serve the flash checksum in this session.\nTransferred sectors would be kept without a checksum.\n\nClick OK to continue the full read.\nClick Cancel to stop the read.";
+
+            PostUserPrompt("Flash Checksum Not Available", message, UserPromptType.OK_CANCEL, result =>
+            {
+                if (result == UserPromptResult.OK)
+                {
+                    AcceptReadWithoutChecksum();
+                    FinishReadAction(action, true);
+                }
+                else
+                {
+                    mCancelRequested = true;
+                    CommInterface.DisplayStatusMessage("Stopped because the flash checksum is not available in this session.", StatusMessageType.USER);
+                    FinishReadAction(action, false);
+                }
+            });
+        }
+
+        private void AcceptReadWithoutChecksum()
+        {
+            mChecksumRoutineUnavailable = true;
+            CheckIfSectorsRequireRead = false;
+            OnlyReadRequiredSectors = false;
+            mCurrentSectorRequiresRead = true;
+
+            if (mState == ReadingState.ValidateReadData)
+            {
+                mState = ReadingState.FinishedBlock;
+                CommInterface.DisplayStatusMessage("Continuing the read. Transferred sectors are kept without a checksum.", StatusMessageType.USER);
+            }
+            else
+            {
+                mState = ReadingState.RequestUpload;
+                CommInterface.DisplayStatusMessage("Continuing with a full read. Every sector will be transferred.", StatusMessageType.USER);
+            }
+        }
 
         private uint mMirrorCheckOffset;
         private uint mMirrorCheckSize;
@@ -1805,9 +1953,9 @@ namespace Communication
         public WriteExternalFlashOperation(KWP2000Interface commInterface, IEnumerable<uint> baudRates, WriteExternalFlashSettings writeSettings, IEnumerable<MemoryImage> sectorImages)
             : base(commInterface)
         {
-            EnableAutoStartDiagnosticSession(KWP2000DiagnosticSessionType.ProgrammingSession, baudRates);
-            EnableAutoNegotiateTiming(NegotiateTimingParameters.NegotiationTarget.Limits);
-            EnableAutoNegotiateSecurity(writeSettings.SecuritySettings);
+            // Erase is in the programming kernel. Open that session from the default
+            // session. A development session serves upload and does not implement erase.
+            EnableProgrammingSession(baudRates, writeSettings.SecuritySettings);
 
             WasFailureCausedByPreviousIncompleteDownload = false;
 
@@ -2174,6 +2322,11 @@ namespace Communication
 
         protected override void OnActionCompleted(CommunicationAction action, bool success)
         {
+            if ((action is StartDiagnosticSessionAction) && !success && !mFlashBlockList.Any(block => block.mWasErased))
+            {
+                CommInterface.DisplayStatusMessage("Programming session did not start. The ECU flash was left unchanged.", StatusMessageType.USER);
+            }
+
             //only pay attention to actions started by this code
             if(action == mMyLastStartedAction)
             {
@@ -2208,11 +2361,20 @@ namespace Communication
                         }
                         else if (action.CompletedWithoutCommunicationError)
                         {
-                            //if we are in entire flash mode, and try to flash sectors, we fail.
-                            //if we are in sector mode, restarting in entire flash mode guarantees success.
+                            // A missing or failed erase-mode check is not evidence the chip erased the whole flash.
+                            // An ECU that does not erase by sector does not complete a chip erase either.
+                            if (((ValidateFlashChecksumAction)action).RoutineUnavailable)
+                            {
+                                mChecksumRoutineUnavailable = true;
+                                CommInterface.DisplayStatusMessage("Flash checksum is not available. Staying in sector erase mode.", StatusMessageType.USER);
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Could not determine the erase mode. Staying in sector erase mode.", StatusMessageType.USER);
+                            }
 
-                            CommInterface.DisplayStatusMessage("Failed to determine what erase mode ECU is in, assuming erase entire flash mode and restarting the flash process.", StatusMessageType.USER);
-                            RestartFlashingProcessAndEraseEntireFlashAtOnce();
+                            mValidatedEraseMode = true;
+                            mState = FlashingState.StartBlock;
                             success = true;
                         }
 
@@ -2283,8 +2445,35 @@ namespace Communication
                         }
                         else if(action.CompletedWithoutCommunicationError)
                         {
-                            CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches new data, flashing anyways.", StatusMessageType.USER);
-                            success = true;
+                            if (((ValidateFlashChecksumAction)action).RoutineUnavailable)
+                            {
+                                if (mCurrentBlock.mWasErased)
+                                {
+                                    mChecksumRoutineUnavailable = true;
+                                    mValidatedEraseMode = true;
+                                    mState = FlashingState.RequestDownload;
+                                    CommInterface.DisplayStatusMessage("Flash checksum is not available. Writing the erased sector from the loaded file.", StatusMessageType.USER);
+                                    success = true;
+                                }
+                                else if (EnterProgrammingSessionForErase())
+                                {
+                                    // Checksum again after the programming session. Erase waits until then.
+                                    mState = FlashingState.CheckIfFlashRequired;
+                                    success = true;
+                                }
+                                else
+                                {
+                                    // StartProgrammingBlock leads to erase. Stay here until the user answers.
+                                    mState = FlashingState.CheckIfFlashRequired;
+                                    AskChecksumUnavailableWritePrompt(action);
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches new data, flashing anyways.", StatusMessageType.USER);
+                                success = true;
+                            }
                         }
                     }
                     else if (mState == FlashingState.ValidateFlashedData)
@@ -2315,7 +2504,16 @@ namespace Communication
                         }
                         else
                         {
-                            CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches new data, assuming flashing was successful.", StatusMessageType.USER);
+                            if (((ValidateFlashChecksumAction)action).RoutineUnavailable)
+                            {
+                                mChecksumRoutineUnavailable = true;
+                                CommInterface.DisplayStatusMessage("Sector was written. The flash checksum routine is not available, so it was not verified.", StatusMessageType.USER);
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches new data, assuming flashing was successful.", StatusMessageType.USER);
+                            }
+
                             mCurrentBlock.mFlashComplete = true;
                             //request transfer exit sets the mFlashSuccessful to true
                             success = true;
@@ -2330,25 +2528,33 @@ namespace Communication
                             ElapsedTimeFlashingUnrequiredSectors += action.ActionElapsedTime;
                         }
 
-                        if (success)
+                        if (!success && ((ValidateFlashChecksumAction)action).RoutineUnavailable)
                         {
-                            if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
-                            {
-                                CommInterface.DisplayStatusMessage("Verified the memory sector was erased properly.", StatusMessageType.USER);
-                            }
-                            else
-                            {
-                                CommInterface.DisplayStatusMessage("The memory sector was NOT erased properly, will continue and attempt to write memory sector.", StatusMessageType.USER);
-                            }
+                            mChecksumRoutineUnavailable = true;
+                            CommInterface.DisplayStatusMessage("Sector erase was reported as failed, and the checksum routine is not available. Stopping without erasing the rest of the flash.", StatusMessageType.USER);
                         }
                         else
                         {
-                            CommInterface.DisplayStatusMessage("Failed to verify if the memory sector was erased properly, assuming erase was successful.", StatusMessageType.USER);
-                            success = true;
-                        }
+                            if (success)
+                            {
+                                if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
+                                {
+                                    CommInterface.DisplayStatusMessage("Verified the memory sector was erased properly.", StatusMessageType.USER);
+                                }
+                                else
+                                {
+                                    CommInterface.DisplayStatusMessage("The memory sector was NOT erased properly, will continue and attempt to write memory sector.", StatusMessageType.USER);
+                                }
+                            }
+                            else
+                            {
+                                CommInterface.DisplayStatusMessage("Failed to verify if the memory sector was erased properly, assuming erase was successful.", StatusMessageType.USER);
+                                success = true;
+                            }
 
-                        mCurrentBlock.mWasErased = true;
-                        mState = FlashingState.RequestDownload;
+                            mCurrentBlock.mWasErased = true;
+                            mState = FlashingState.RequestDownload;
+                        }
                     }
                 }
                 #endregion
@@ -2418,6 +2624,10 @@ namespace Communication
                                     UserPromptType.YES_NO_CANCEL,
                                     ApplyEraseFailurePromptResult);
                                 return;
+                            }
+                            else if (mChecksumRoutineUnavailable)
+                            {
+                                CommInterface.DisplayStatusMessage("Sector erase reported as failed. The checksum routine is not available, so the erase was not verified. Stopping without erasing the rest of the flash.", StatusMessageType.USER);
                             }
                             else//regular failure
                             {
@@ -2617,7 +2827,7 @@ namespace Communication
                             //at this point begin assuming that the sector was flashed correctly
                             mCurrentBlock.mFlashSuccessful = true;
 
-                            if (ShouldVerifyFlashedSectors)
+                            if (ShouldVerifyFlashedSectors && !mChecksumRoutineUnavailable)
                             {
                                 mState = FlashingState.ValidateFlashedData;
                             }
@@ -2653,6 +2863,25 @@ namespace Communication
                     string validationMesage = null;
 
                     var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
+                    if ((KWP2000CommInterface.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                        && ((validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                            || (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)))
+                    {
+                        // The kernel accepts local id 0xC5 and does not answer it. A resend
+                        // cannot be heard. Ask before erase instead of sending it.
+                        CommInterface.DisplayStatusMessage("RequestUpload is not served in the programming session. The checksum is not used. Nothing is erased yet.", StatusMessageType.USER);
+                        AskChecksumUnavailableWritePrompt(action);
+                        return;
+                    }
+
+                    if (FallBackToProgrammingSessionForUpload(validationResult))
+                    {
+                        mState = FlashingState.ValidateStartAndEndAddresses;
+                        success = true;
+                        FinishWriteAction(action, success);
+                        return;
+                    }
+
                     LayoutValidationText.Apply(validationResult, success, action.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
 
                     if (validationMesage != null)
@@ -2753,6 +2982,62 @@ namespace Communication
             }
 
             FinishWriteAfterPrompt(action, success);
+        }
+
+        // The development session can upload, and its routine 0x31 does not implement erase.
+        // Open the programming session once, then checksum again. Do not repeat the upload probe.
+        private bool EnterProgrammingSessionForErase()
+        {
+            if (mOpeningProgrammingSessionForErase
+                || (KWP2000CommInterface.CurrentDiagnosticSessionType != KWP2000DiagnosticSessionType.DevelopmentSession))
+            {
+                return false;
+            }
+
+            mOpeningProgrammingSessionForErase = true;
+            OpenProgrammingSessionAfterDevelopment("Flash erase is not served in the development session. Opening a programming session. Nothing is erased yet.");
+            return true;
+        }
+
+        // Shown before any erase. Cancel leaves the flash unchanged.
+        // OK writes every sector of the loaded file and does not switch the ECU to erase-entire mode.
+        private void AskChecksumUnavailableWritePrompt(CommunicationAction action)
+        {
+            PostUserPrompt(
+                "Flash Checksum Not Available",
+                "This session cannot compare sector checksums.\nThis tool cannot tell which sectors differ.\n\nClick OK to erase and write every sector in the loaded file.\nClick Cancel to stop. The ECU flash is left unchanged.",
+                UserPromptType.OK_CANCEL,
+                result =>
+                {
+                    if (result == UserPromptResult.OK)
+                    {
+                        AcceptFullWriteWithoutChecksum();
+                        FinishWriteAction(action, true);
+                    }
+                    else
+                    {
+                        CommInterface.DisplayStatusMessage("Stopped before erasing. The ECU flash was left unchanged.", StatusMessageType.USER);
+                        FinishWriteAction(action, false);
+                    }
+                });
+        }
+
+        private void AcceptFullWriteWithoutChecksum()
+        {
+            mChecksumRoutineUnavailable = true;
+            mValidatedEraseMode = true;
+            ShouldCheckIfFlashRequired = false;
+
+            foreach (FlashBlock block in mFlashBlockList)
+            {
+                if (!block.mFlashComplete)
+                {
+                    block.mFlashingIsRequired = true;
+                }
+            }
+
+            mState = FlashingState.StartProgrammingBlock;
+            CommInterface.DisplayStatusMessage("Continuing with a full write of every sector in the loaded file.", StatusMessageType.USER);
         }
 
         private void AskWritePrompt(CommunicationAction action, string title, string message, UserPromptType promptType, bool continueOnOk)
@@ -2965,6 +3250,8 @@ namespace Communication
         private bool mEraseEntireFlashAtOnce;
         private MemoryLayout mFlashMemoryLayout;
         private bool mValidatedEraseMode;
+        private bool mChecksumRoutineUnavailable;
+        private bool mOpeningProgrammingSessionForErase;
 
         private uint mTotalBytesToFlash;
         private uint mTotalBytesValidated;

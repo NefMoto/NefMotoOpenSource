@@ -1284,6 +1284,9 @@ namespace Communication
 
         public bool IsFlashChecksumCorrect{ get; private set; }
 
+        // This session's routine handler does not implement the checksum local id.
+        public bool RoutineUnavailable { get; private set; }
+
         public override bool Start()
         {
             bool started = false;
@@ -1349,7 +1352,18 @@ namespace Communication
                         }
                         else if (message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
                         {
+                            RoutineUnavailable = true;
                             DisplayStatusMessage("ECU reports sub function not supported or invalid format while attempting to validate checksum.", StatusMessageType.USER);
+
+                            ActionCompleted(false);
+
+                            handled = true;
+                        }
+                        else if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
+                        {
+                            // This session's routine 0x31 does not accept local id 0xC5, and answers 0x22.
+                            RoutineUnavailable = true;
+                            DisplayStatusMessage("ECU reports the flash checksum routine is not available in this session.", StatusMessageType.USER);
 
                             ActionCompleted(false);
 

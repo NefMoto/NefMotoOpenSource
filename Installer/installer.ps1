@@ -1,4 +1,4 @@
-# Called by Makefile and build.bat. Requires FULL_VERSION, NET_TFM, DOTNET_MAJOR, ECUFlasher_TargetDir.
+# Called by Makefile and build.bat. Requires FULL_VERSION, NET_TFM, DOTNET_MAJOR, ECUFlasher_TargetDir, Nmflasher_TargetDir.
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
