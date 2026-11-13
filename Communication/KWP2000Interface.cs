@@ -32,8 +32,11 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Xml.Serialization;
+
+[assembly: InternalsVisibleTo("NefMotoOpenSource.Tests")]
 
 namespace Communication
 {
@@ -917,13 +920,30 @@ namespace Communication
 
         // First wake was already KWP2000. There was no KWP1281 session.
         // Slow init and fast init both count when the key bytes are the programming pair.
+        // Calibration ident 1A 9B that does not contain M5.9 is not that wake. ME7 in any ident counts the same way.
+        private bool mConnectIdentExcludesFirstWake;
+
         public bool IsFirstWakeKWP2000()
         {
-            return (Kwp1281ConnectInfo == null)
+            return !mConnectIdentExcludesFirstWake
+                && (Kwp1281ConnectInfo == null)
                 && (CommunicationKeyByte1 == 0x6F)
                 && (CommunicationKeyByte2 == KWP_2000_PROTOCOL_KEY_BYTE_2)
                 && ((CommunicationAddress == DEFAULT_ECU_SLOWINIT_KWP1281_ADDRESS)
                     || (CommunicationAddress == DEFAULT_ECU_SLOWINIT_KWP2000_ADDRESS));
+        }
+
+        internal static bool ConnectIdentExcludesFirstWake(byte option, string text)
+        {
+            return (text != null)
+                && (text.IndexOf("M5.9", StringComparison.Ordinal) < 0)
+                && ((text.IndexOf("ME7", StringComparison.Ordinal) >= 0)
+                    || (option == (byte)KWP2000IdentificationOption.calibrationDate));
+        }
+
+        internal void NoteConnectIdent(byte option, string text)
+        {
+            mConnectIdentExcludesFirstWake |= ConnectIdentExcludesFirstWake(option, text);
         }
 
 
@@ -1264,6 +1284,7 @@ namespace Communication
                         //this way we can respect the old settings when we start connecting
                         shouldReset = true;
                         mSlowInitFellThroughToKwp2000Address = false;
+                        mConnectIdentExcludesFirstWake = false;
                         Kwp1281ConnectInfo = null;
                     }
                     else if (_ConnectionStatus == ConnectionStatusType.Connected)

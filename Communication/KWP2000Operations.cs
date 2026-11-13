@@ -3504,6 +3504,7 @@ namespace Communication
 
             if (text.Length > 0)
             {
+                KWP2000CommInterface.NoteConnectIdent(identAction.IdentificationOption, text);
                 var name = DescriptionAttributeConverterLogic.GetDescriptionAttribute((KWP2000IdentificationOption)identAction.IdentificationOption);
                 CommInterface.DisplayStatusMessage("ECU " + name + ": " + text, StatusMessageType.USER);
 

@@ -23,12 +23,12 @@ The table has 30-byte entries:
 
 Complements from +6: `0x11` → `0xEE`, `0x01` (KWP2000 entry) → `0xFE`, `0xFE` → `0x01`, `0x33` → `0xCC`.
 
-Key bytes in this table include the odd parity bit. KWP1281 `01 8A` is the connect log's `KB1=0x01 KB2=0x0A`. KWP2000 `EF 8F` is already the form the log shows.
+Key bytes in this table include the odd parity bit. KWP1281 `01 8A` is the connect log's `KB1=0x01 KB2=0x0A`. KWP2000 `EF 8F` is logged as `KB1=0x6F KB2=0x0F`.
 
 Two table shapes:
 
 - `0x01` is KWP1281 (keys `01 8A`) and `0x11` is KWP2000 (keys `EF 8F`). `0x33` is the OBD entry, also gated by a coding word.
-- `0x01` is KWP2000 directly. There is no `0x11` entry.
+- `0x01` is KWP2000 directly. There is no `0x11` entry. Calibration ident `1A 9B` that does not contain `M5.9` keeps the ME7 path ([M5.9.2](M5.9.2.md)).
 
 ### KWP1281 then KWP2000 on `0x01`
 

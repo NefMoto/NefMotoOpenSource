@@ -129,6 +129,17 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal("C400000003FFFF0001010A81FE", Bytes(FirstWakeFlashCodec.EraseRequest(0, 0x3FFFF)));
         }
 
+        [Theory]
+        [InlineData((byte)0x9B, "8D0907551M  00027TO2.7l V6/5VT     G", true)]
+        [InlineData((byte)0x87, "P0000ME7.1.1", true)]
+        [InlineData((byte)0x94, "1037360857", false)]
+        [InlineData((byte)0x9B, "8D0907558M  1.8L R4/5VT MOTR 55/1/M5.92/05", false)]
+        [InlineData((byte)0x9B, null, false)]
+        public void Calibration_ident_without_m5_excludes_first_wake(byte option, string? text, bool excludes)
+        {
+            Assert.Equal(excludes, KWP2000Interface.ConnectIdentExcludesFirstWake(option, text));
+        }
+
         private static string Bytes(byte[] data)
         {
             return BitConverter.ToString(data).Replace("-", "");
