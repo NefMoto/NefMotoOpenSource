@@ -479,22 +479,37 @@ namespace Communication
             return true;
         }
 
-        // Development session started, but RequestUpload is still masked off.
+        // Development session is current, but RequestUpload is masked off (0x11 or 0x90)
+        // or security for it was refused (0x33). One programming session. A general
+        // reject (0x10) means the flash handler ran, so the kernel is not opened.
         protected bool FallBackToProgrammingSessionForUpload(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
             if (!mUploadFallsBackToProgramming
-                || (result != ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
                 || (mDesiredDiagnosticSessionType != KWP2000DiagnosticSessionType.DevelopmentSession))
             {
                 return false;
             }
 
-            OpenProgrammingSessionAfterDevelopment("RequestUpload is not served in the development session. Opening a programming session.");
+            string message;
+            if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+            {
+                message = "RequestUpload is not served in the development session. Opening a programming session.";
+            }
+            else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
+            {
+                message = "Security access was refused for RequestUpload. Opening a programming session.";
+            }
+            else
+            {
+                return false;
+            }
+
+            OpenProgrammingSessionAfterDevelopment(message);
             return true;
         }
 
-        // ME7.1 and ME7.5 accept 0x86 and then refuse the login it requires. A granted
-        // login stays in the development session. One refusal opens 0x85.
+        // The login inside 0x86 was refused. Stay there and still send RequestUpload.
+        // 0x11, 0x90, or 0x33 from that probe opens programming once. 0x10 does not.
         private bool LeaveDevelopmentSessionAfterSecurityRefusal(bool success, bool completedWithoutCommunicationError)
         {
             if (success
@@ -505,7 +520,7 @@ namespace Communication
                 return false;
             }
 
-            OpenProgrammingSessionAfterDevelopment("Security access was refused in the development session. Opening a programming session.");
+            CommInterface.DisplayStatusMessage("Security access was refused in the development session. RequestUpload will still be tried.", StatusMessageType.USER);
             return true;
         }
 
@@ -1825,9 +1840,13 @@ namespace Communication
                         mState = ReadingState.ClearFlagAfterFailure;
                         success = true;
                     }
-                    else
+                    else if (KWP2000CommInterface.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
                     {
                         CommInterface.DisplayStatusMessage("No sector finished, so the programming flag stays set. Use Clear DTCs.", StatusMessageType.USER);
+                    }
+                    else
+                    {
+                        CommInterface.DisplayStatusMessage("The read failed before the programming kernel was started.", StatusMessageType.USER);
                     }
                 }
             }
