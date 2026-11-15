@@ -899,6 +899,15 @@ namespace Communication
                 || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected);
         }
 
+        // A programming session that does not serve upload cannot compare sectors.
+        // The write asks before erase. MustAbort is the OK-only dialog and is not used here.
+        public static bool AskBeforeErase(KWP2000DiagnosticSessionType session, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            return (session == KWP2000DiagnosticSessionType.ProgrammingSession)
+                && ((result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                    || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected));
+        }
+
         public static void ContinuePrompt(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool writing, out string title, out string body)
         {
             string verb = writing ? "writing" : "reading";
@@ -2863,9 +2872,7 @@ namespace Communication
                     string validationMesage = null;
 
                     var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-                    if ((KWP2000CommInterface.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
-                        && ((validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-                            || (validationResult == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected)))
+                    if (LayoutValidationText.AskBeforeErase(KWP2000CommInterface.CurrentDiagnosticSessionType, validationResult))
                     {
                         // The kernel accepts local id 0xC5 and does not answer it. A resend
                         // cannot be heard. Ask before erase instead of sending it.
