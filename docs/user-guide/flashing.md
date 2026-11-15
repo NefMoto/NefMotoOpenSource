@@ -35,7 +35,7 @@ BT is rarely seen on Bosch ECUs.
 - **Full Read Flash** — whole layout, checksummed as **Verify Read** sets (below), then saved. Bootmode and layouts whose sector 0 is not 16 KB at `0x800000` upload with no checksum.
 - **Diff Read Flash** — sectors that differ from the loaded file. The first sector is always uploaded. Later matching sectors are checksum skips.
 
-A KWP read opens a development session from the default session, then logs in again. If that session does not start, the login is refused, or upload is not served, the tool opens a programming session once and continues there. ME7.1 and ME7.5 refuse that development-session login and continue in the programming session.
+A KWP read opens a development session from the default session, then logs in again. A refused login stays in that session and the upload probe is still sent. Programming opens once if the development session does not start, or if the probe returns `0x11`, `0x90`, or `0x33`. A general reject stays out of the programming kernel. Family exceptions are in [KWP2000](../KWP2000.md).
 
 If the ECU does not serve the flash checksum in the session, a dialog asks before the transfer changes. **OK** reads every sector. **Cancel** stops the read.
 
