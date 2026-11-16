@@ -28,6 +28,9 @@ debug $(DEBUG_DIR)/NefMotoECUFlasher.exe: force
 release $(RELEASE_DIR)/NefMotoECUFlasher.exe: force
 	@$(MAKE) CONFIG=Release build
 
+nmflasher/bin/Release/nmflasher.exe: $(RELEASE_DIR)/NefMotoECUFlasher.exe
+	@test -f $@ || { echo "missing $@"; exit 1; }
+
 test: build
 	@echo "Running tests ($(CONFIG))..."
 	@dotnet test Tests/NefMotoOpenSource.Tests.csproj --configuration $(CONFIG) --no-build --verbosity normal
@@ -36,10 +39,11 @@ build:
 	@echo "Building with dotnet ($(CONFIG))..."
 	FULL_VERSION=$(FULL_VERSION) dotnet build ECUFlasher.sln --configuration $(CONFIG) --verbosity minimal
 
-installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
+installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe nmflasher/bin/Release/nmflasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
 	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
 	@FULL_VERSION=$(FULL_VERSION) NET_TFM=$(NET_TFM) DOTNET_MAJOR=$(DOTNET_MAJOR) \
 	ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
+	Nmflasher_TargetDir="nmflasher/bin/Release/" \
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -File Installer/installer.ps1
 
 # Framework-dependent publish folder (not single-file, not the MSI). Still needs the Desktop runtime matching NetTfm.

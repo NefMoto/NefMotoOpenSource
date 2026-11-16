@@ -3729,11 +3729,6 @@ connectEndTime = connectStartTime + connectTime + 3;
 
                                 //we have a partial message, we should try to receive more
                                 numBytesToReceive = additionalBytesNeededForMessage;
-
-                                if (numBytesToReceive > 0)
-                                {
-                                    DisplayStatusMessage("Received incomplete message, reading " + additionalBytesNeededForMessage + " more bytes even though none appear to be waiting.", StatusMessageType.DEV);
-                                }
                             }
 
                             p1TimerExpiredFlushReceiveBuffer = false;

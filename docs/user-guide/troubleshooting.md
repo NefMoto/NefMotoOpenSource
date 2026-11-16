@@ -89,6 +89,7 @@ Yes/No/Cancel prompt about persistent data on a sector that is **not** the boot 
 
 - Confirm the file matches the layout you selected.
 - **Verify Checksums** is on the **Flashing** tab (there is no separate Checksum tab).
+- A write opens the programming session from the default session. If that session does not start, nothing is erased. If that session does not serve upload, the write asks before erasing every sector in the file. A read that does not get a checksum asks before transferring every sector. See [Flashing](flashing.md).
 - After a write, verify can fail if the session drops or the layout is wrong. See [Wrong Flash Layout](#wrong-flash-layout) and [Flashing](flashing.md).
 
 ## Reporting a problem

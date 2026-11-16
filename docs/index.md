@@ -14,7 +14,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 
 ## Developer / maintainer
 
-- [KWP2000.md](KWP2000.md) — connect, RAM kernel after write, settings persistence
+- [KWP2000.md](KWP2000.md) — connect, RAM kernel after write, settings persistence, ECU family exceptions
 - [M5.9.2.md](M5.9.2.md) — M5.9.2 first-wake KWP: pin 43, speed byte, security, erase, and download
 - [ME7-K-line-addresses.md](ME7-K-line-addresses.md) — slow-init and fast-init addresses in the application firmware
 - [P1681-P0602.md](P1681-P0602.md) — `P0602` / `P1681`: the EEPROM flag, what clears it, and the one-byte edit
