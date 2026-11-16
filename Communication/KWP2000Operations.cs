@@ -490,19 +490,14 @@ namespace Communication
                 return false;
             }
 
-            string message;
-            if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-            {
-                message = "RequestUpload is not served in the development session. Opening a programming session.";
-            }
-            else if (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
-            {
-                message = "Security access was refused for RequestUpload. Opening a programming session.";
-            }
-            else
+            if (!LayoutValidationText.UploadProbeOpensProgramming(result))
             {
                 return false;
             }
+
+            string message = (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
+                ? "Security access was refused for RequestUpload. Opening a programming session."
+                : "RequestUpload is not served in the development session. Opening a programming session.";
 
             OpenProgrammingSessionAfterDevelopment(message);
             return true;
@@ -912,6 +907,14 @@ namespace Communication
             return (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted)
                 || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
                 || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected);
+        }
+
+        // 0x11 and 0x90 are RequestUploadNotSupported. 0x33 is SecurityAccessNotGranted.
+        // 0x10 (RequestUploadRejected) means the flash handler ran, so the kernel stays closed.
+        public static bool UploadProbeOpensProgramming(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            return (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted);
         }
 
         // A programming session that does not serve upload cannot compare sectors.

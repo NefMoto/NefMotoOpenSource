@@ -1287,6 +1287,14 @@ namespace Communication
         // This session's routine handler does not implement the checksum local id.
         public bool RoutineUnavailable { get; private set; }
 
+        // 0x12 and 0x22 mean this session does not serve checksum local id 0xC5.
+        // 0x22 is not a reason to open the programming kernel.
+        public static bool ChecksumNrcMeansUnavailable(byte nrc)
+        {
+            return (nrc == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
+                || (nrc == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError);
+        }
+
         public override bool Start()
         {
             bool started = false;
@@ -1350,20 +1358,18 @@ namespace Communication
 
                             handled = true;
                         }
-                        else if (message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
+                        else if (ChecksumNrcMeansUnavailable(message.mData[1]))
                         {
                             RoutineUnavailable = true;
-                            DisplayStatusMessage("ECU reports sub function not supported or invalid format while attempting to validate checksum.", StatusMessageType.USER);
-
-                            ActionCompleted(false);
-
-                            handled = true;
-                        }
-                        else if (message.mData[1] == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)
-                        {
-                            // This session's routine 0x31 does not accept local id 0xC5, and answers 0x22.
-                            RoutineUnavailable = true;
-                            DisplayStatusMessage("ECU reports the flash checksum routine is not available in this session.", StatusMessageType.USER);
+                            if (message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
+                            {
+                                DisplayStatusMessage("ECU reports sub function not supported or invalid format while attempting to validate checksum.", StatusMessageType.USER);
+                            }
+                            else
+                            {
+                                // This session's routine 0x31 does not accept local id 0xC5, and answers 0x22.
+                                DisplayStatusMessage("ECU reports the flash checksum routine is not available in this session.", StatusMessageType.USER);
+                            }
 
                             ActionCompleted(false);
 
