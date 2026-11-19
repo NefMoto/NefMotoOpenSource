@@ -21,10 +21,8 @@ Contact by Email: nyet@nyet.org
 using System;
 using System.Diagnostics;
 using System.IO.Ports;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Microsoft.Win32.SafeHandles;
 
 namespace Communication
 {
@@ -62,7 +60,7 @@ namespace Communication
                 return false;
             }
 
-            if (!TryGetSafeHandle(serialPort, out SafeHandle handle) || handle == null || handle.IsInvalid)
+            if (!SerialPortSafeHandle.TryGet(serialPort, out SafeHandle handle) || handle == null || handle.IsInvalid)
             {
                 return PollBytesToWrite(serialPort, timeoutMs);
             }
@@ -88,42 +86,6 @@ namespace Communication
             }
 
             return ClearCommError(handle, out _, out COMSTAT finalStat) && finalStat.cbOutQue == 0;
-        }
-
-        private static bool TryGetSafeHandle(SerialPort serialPort, out SafeHandle handle)
-        {
-            handle = null;
-            try
-            {
-                object stream = serialPort.BaseStream;
-                if (stream == null)
-                {
-                    return false;
-                }
-
-                const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-                foreach (string fieldName in new[] { "_handle", "handle" })
-                {
-                    FieldInfo field = stream.GetType().GetField(fieldName, flags);
-                    if (field?.GetValue(stream) is SafeHandle safeHandle && !safeHandle.IsInvalid)
-                    {
-                        handle = safeHandle;
-                        return true;
-                    }
-                }
-
-                PropertyInfo prop = stream.GetType().GetProperty("SafeFileHandle", flags);
-                if (prop?.GetValue(stream) is SafeHandle propHandle && !propHandle.IsInvalid)
-                {
-                    handle = propHandle;
-                    return true;
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
         }
 
         private static bool PollBytesToWrite(SerialPort serialPort, uint timeoutMs)

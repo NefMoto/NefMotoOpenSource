@@ -48,10 +48,7 @@ namespace Communication
         {
             var devices = new List<DeviceInfo>();
 
-            // Enumerate FTDI devices
             devices.AddRange(FtdiCommunicationDevice.Enumerate(LogMessage));
-
-            // Enumerate CH340 devices
             devices.AddRange(Ch340CommunicationDevice.Enumerate(LogMessage));
 
             return devices;
@@ -68,15 +65,17 @@ namespace Communication
                 return null;
             }
 
-            switch (deviceInfo.Type)
+            if (deviceInfo is SerialPortDeviceInfo)
             {
-                case DeviceType.FTDI:
-                    return new FtdiCommunicationDevice();
-                case DeviceType.CH340:
-                    return new Ch340CommunicationDevice();
-                default:
-                    return null;
+                return new SerialPortCommunicationDeviceBase();
             }
+
+            if (deviceInfo is FtdiDeviceInfo)
+            {
+                return new FtdiCommunicationDevice();
+            }
+
+            return null;
         }
     }
 }

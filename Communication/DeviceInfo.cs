@@ -158,21 +158,25 @@ namespace Communication
     }
 
     /// <summary>
-    /// Device information for CH340 devices
+    /// USB serial cable opened by port name (Windows COM port or macOS /dev/cu.*).
+    /// FTDI keeps DeviceType.FTDI so KWP uses the break path rather than the CH340 workarounds.
+    /// CH340 device id stays port plus description, which is what Windows enumeration used.
     /// </summary>
-    public class Ch340DeviceInfo : DeviceInfo
+    public class SerialPortDeviceInfo : DeviceInfo
     {
+        private readonly DeviceType _type;
         private readonly string _portName;
         private readonly string _description;
         private readonly string _serialNumber;
         private readonly string _deviceID;
 
-        public Ch340DeviceInfo(string portName, string description = null, string serialNumber = null, string deviceID = null)
+        public SerialPortDeviceInfo(DeviceType type, string portName, string description = null, string serialNumber = null)
         {
+            _type = type;
             _portName = portName ?? throw new ArgumentNullException(nameof(portName));
-            _description = description ?? $"CH340 Device ({portName})";
+            _description = description ?? (type + " Device (" + portName + ")");
             _serialNumber = serialNumber ?? string.Empty;
-            _deviceID = deviceID ?? portName;
+            _deviceID = type == DeviceType.CH340 ? _portName + "_" + _description : _portName;
         }
 
         public override string Description
@@ -192,37 +196,29 @@ namespace Communication
 
         public override DeviceType Type
         {
-            get { return DeviceType.CH340; }
+            get { return _type; }
         }
 
         /// <summary>
-        /// Gets the COM port name (e.g., "COM3")
+        /// COM port name or callout path used to open the cable.
         /// </summary>
         public string PortName
         {
             get { return _portName; }
         }
 
-        /// <summary>
-        /// Gets the device ID as string (for UI binding compatibility)
-        /// </summary>
-        public override object IDProp
-        {
-            get { return _deviceID; }
-        }
-
         public override bool Equals(object obj)
         {
-            if (obj is Ch340DeviceInfo other)
+            if (obj is SerialPortDeviceInfo other)
             {
-                return _portName == other._portName;
+                return _type == other._type && _portName == other._portName;
             }
             return false;
         }
 
         public override int GetHashCode()
         {
-            return _portName.GetHashCode();
+            return _type.GetHashCode() ^ _portName.GetHashCode();
         }
     }
 }

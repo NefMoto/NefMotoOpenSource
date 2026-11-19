@@ -111,7 +111,7 @@ nmflasher bootmode write full -i image.bin
 ```
 
 - `-h` and `--help` print the command summary and exit. `--version` prints the build version and exits. Neither connects.
-- `usb` prints each FTDI device as index, description, and serial. It does not connect. `--usb N` selects that index. One attached device is used when `--usb` is omitted.
+- `usb` prints each FTDI or CH340 device as index, type, description, and serial. It does not connect. `--usb N` selects that index. One attached device is used when `--usb` is omitted.
 - `layouts` prints each layout basename. It does not connect. Pass one of those names to `--layout`.
 - `kwp info` reads ECU identification in the standard session, the same entries as **Read ECU Info**. `bootmode info` reads the boot-mode ECU information. The ECU must already be in boot mode. See [Bootmode](bootmode.md).
 - `-i` is the image to write, or the file a diff read compares. `-o` is the file a read saves.

@@ -230,14 +230,14 @@ namespace ECUFlasher
                 };
             }
 
-            if (info is Ch340DeviceInfo ch340)
+            if (info is SerialPortDeviceInfo serial)
             {
                 return new SavedDevice
                 {
-                    Kind = DeviceType.CH340,
-                    Description = ch340.Description,
-                    SerialNumber = ch340.SerialNumber,
-                    PortName = ch340.PortName,
+                    Kind = serial.Type,
+                    Description = serial.Description,
+                    SerialNumber = serial.SerialNumber,
+                    PortName = serial.PortName,
                 };
             }
 
@@ -271,15 +271,15 @@ namespace ECUFlasher
                 return !string.IsNullOrEmpty(SerialNumber) && ftdi.SerialNumber == SerialNumber;
             }
 
-            if (info is Ch340DeviceInfo ch340)
+            if (info is SerialPortDeviceInfo serial)
             {
-                if (!string.IsNullOrEmpty(SerialNumber) && !string.IsNullOrEmpty(ch340.SerialNumber) &&
-                    ch340.SerialNumber == SerialNumber)
+                if (!string.IsNullOrEmpty(SerialNumber) && !string.IsNullOrEmpty(serial.SerialNumber) &&
+                    serial.SerialNumber == SerialNumber)
                 {
                     return true;
                 }
 
-                return !string.IsNullOrEmpty(PortName) && ch340.PortName == PortName;
+                return !string.IsNullOrEmpty(PortName) && serial.PortName == PortName;
             }
 
             return false;

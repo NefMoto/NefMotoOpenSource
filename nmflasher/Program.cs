@@ -145,7 +145,7 @@ namespace Nmflasher
         {
             if (Process.GetProcessesByName("ECUFlasher").Length > 0)
             {
-                Log("ECUFlasher is running. Close it. It owns the FTDI device.");
+                Log("ECUFlasher is running. Close it. It owns the USB serial device.");
                 status = 1;
                 return null;
             }
@@ -172,7 +172,7 @@ namespace Nmflasher
         static int WithKwp(Request request, DeviceInfo device, Func<KWP2000Interface, ManualResetEvent, int> body)
         {
             string initName = request.Slow ? "Slow" : "Fast";
-            Log("Opening FTDI " + device.Description + " " + device.SerialNumber + ". " + initName + " init.");
+            Log("Opening " + OpenLabel(device) + ". " + initName + " init.");
             Log("Session baud list: " + string.Join(", ", SessionBaudRates(request.Baud)) + ".");
 
             var kwp = new KWP2000Interface(LogStatus);
@@ -214,7 +214,7 @@ namespace Nmflasher
         static int WithBoot(Request request, DeviceInfo device, Func<BootstrapInterface, int> body)
         {
             uint baud = request.HasBaud ? request.Baud : DefaultBootmodeBaud;
-            Log("Opening FTDI " + device.Description + " " + device.SerialNumber + " at " + baud + ".");
+            Log("Opening " + OpenLabel(device) + " at " + baud + ".");
             Log("The ECU must already be in boot mode.");
 
             var boot = new BootstrapInterface(LogStatus);
@@ -325,10 +325,10 @@ namespace Nmflasher
 
         static int ListUsb()
         {
-            var devices = FtdiDevices();
+            var devices = ListedDevices();
             if (devices.Count == 0)
             {
-                Log("No FTDI device.");
+                Log("No USB serial device.");
                 return 1;
             }
 
@@ -1008,12 +1008,12 @@ namespace Nmflasher
             }
         }
 
-        static List<DeviceInfo> FtdiDevices()
+        static List<DeviceInfo> ListedDevices()
         {
             var devices = new List<DeviceInfo>();
             foreach (DeviceInfo info in DeviceManager.EnumerateAllDevices())
             {
-                if (info.Type == DeviceType.FTDI)
+                if ((info.Type == DeviceType.FTDI) || (info.Type == DeviceType.CH340))
                 {
                     devices.Add(info);
                 }
@@ -1022,20 +1022,25 @@ namespace Nmflasher
             return devices;
         }
 
+        static string OpenLabel(DeviceInfo device)
+        {
+            return device.Type + " " + device.Description + " " + device.SerialNumber;
+        }
+
         static void PrintDevices(IReadOnlyList<DeviceInfo> devices)
         {
             for (int i = 0; i < devices.Count; i++)
             {
-                Log(i + "  " + devices[i].Description + "  " + devices[i].SerialNumber);
+                Log(i + "  " + devices[i].Type + "  " + devices[i].Description + "  " + devices[i].SerialNumber);
             }
         }
 
         static DeviceInfo? SelectDevice(int? index, out int status)
         {
-            var devices = FtdiDevices();
+            var devices = ListedDevices();
             if (devices.Count == 0)
             {
-                Log("No FTDI device.");
+                Log("No USB serial device.");
                 status = 1;
                 return null;
             }
@@ -1060,7 +1065,7 @@ namespace Nmflasher
                 return devices[0];
             }
 
-            Log("More than one FTDI device. Pass --usb N.");
+            Log("More than one USB serial device. Pass --usb N.");
             PrintDevices(devices);
             status = 2;
             return null;
@@ -1385,7 +1390,7 @@ namespace Nmflasher
             writer.WriteLine("A write erases sectors as part of the write. There is no erase command.");
             writer.WriteLine();
             writer.WriteLine("Commands:");
-            Command(writer, "usb", "Print each FTDI device as index, description, and serial.");
+            Command(writer, "usb", "Print each FTDI or CH340 device as index, description, and serial.");
             Command(writer, "layouts", "Print each layout basename under MemoryLayouts.");
             Command(writer, "kwp info", "Read ECU identification in the standard session.");
             Command(writer, "bootmode info", "Read boot-mode device, bus, and flash layout information.");

@@ -31,34 +31,43 @@ using Shared;
 namespace Communication
 {
     /// <summary>
-    /// Base class for SerialPort-based communication devices (CH340, etc.).
-    /// Shares common logic for COM port I/O, DTR/RTS, and WMI-based enumeration.
+    /// Serial-port cable. Opens a <see cref="SerialPortDeviceInfo"/> and enumerates CH340 via WMI.
     /// </summary>
-    public abstract class SerialPortCommunicationDeviceBase : ICommunicationDevice
+    public class SerialPortCommunicationDeviceBase : ICommunicationDevice
     {
         protected SerialPort _serialPort;
         protected DeviceInfo _deviceInfo;
 
-        protected SerialPortCommunicationDeviceBase()
+        public SerialPortCommunicationDeviceBase()
         {
             _serialPort = null;
             _deviceInfo = null;
         }
 
         /// <summary>
-        /// Device type (CH340, etc.)
+        /// Cable type from the opened <see cref="SerialPortDeviceInfo"/>. FTDI until a device is open.
         /// </summary>
-        public abstract DeviceType Type { get; }
+        public DeviceType Type
+        {
+            get { return _deviceInfo != null ? _deviceInfo.Type : DeviceType.FTDI; }
+        }
+
+        private const string DefaultDeviceName = "Unknown serial device";
 
         /// <summary>
-        /// Default device name when no device info is set
+        /// Opens <see cref="SerialPortDeviceInfo"/> ports. Returns false for D2XX device info.
         /// </summary>
-        protected abstract string DefaultDeviceName { get; }
+        protected bool TryGetPortName(DeviceInfo deviceInfo, out string portName)
+        {
+            portName = null;
+            if (deviceInfo is SerialPortDeviceInfo serial)
+            {
+                portName = serial.PortName;
+                return true;
+            }
 
-        /// <summary>
-        /// Attempts to get the COM port name from the given device info. Returns false if wrong type.
-        /// </summary>
-        protected abstract bool TryGetPortName(DeviceInfo deviceInfo, out string portName);
+            return false;
+        }
 
         private bool CheckIsOpen()
         {
@@ -301,10 +310,9 @@ namespace Communication
         }
 
         /// <summary>
-        /// Shared enumeration: finds COM ports matching the given USB VID and creates DeviceInfo via the factory.
-        /// Uses a single WMI query filtered by VID so phantom/BT COM ports are not scanned per-port.
+        /// Windows: one WMI query for the VID so phantom/BT COM ports are not scanned per-port.
         /// </summary>
-        protected static IEnumerable<DeviceInfo> EnumerateByVid(
+        internal static IEnumerable<DeviceInfo> EnumerateByVid(
             string vid,
             string logPrefix,
             Func<string, string, string, DeviceInfo> createDeviceInfo,
@@ -321,7 +329,13 @@ namespace Communication
                         continue;
                     }
 
-                    devices.Add(createDeviceInfo(candidate.PortName, candidate.Description, candidate.SerialNumber));
+                    DeviceInfo info = createDeviceInfo(candidate.PortName, candidate.Description, candidate.SerialNumber);
+                    if (info == null)
+                    {
+                        continue;
+                    }
+
+                    devices.Add(info);
                 }
             }
             catch (Exception ex)
