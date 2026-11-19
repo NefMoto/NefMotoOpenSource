@@ -35,6 +35,14 @@ namespace Nmflasher
 
         static readonly object LogLock = new object();
         static readonly uint[] KnownBaudRates = { 9600, 10400, 38400, 52800, 124800 };
+        static bool Force;
+
+        static readonly (int Bytes, string Name, string Word)[] SizeLayouts =
+        {
+            (1024 * 1024, "29F800BB", "1m"),
+            (512 * 1024, "29F400BB", "512k"),
+            (256 * 1024, "29F200", "256k"),
+        };
 
         public static int Main(string[] args)
         {
@@ -79,6 +87,7 @@ namespace Nmflasher
 
         static int Run(Request request)
         {
+            Force = request.Force;
             if (request.Info)
             {
                 return RunInfo(request);
@@ -97,7 +106,7 @@ namespace Nmflasher
             }
 
             MemoryLayout? layout = null;
-            if (request.Kwp)
+            if (request.Kwp && !KwpReadWithoutLayout(request))
             {
                 if (!TryLoadKwpLayout(request, image, out layout))
                 {
@@ -119,7 +128,7 @@ namespace Nmflasher
 
             if (request.Kwp)
             {
-                return RunKwp(request, device, layout!, image);
+                return RunKwp(request, device, layout, image);
             }
 
             return RunBootmode(request, device, image);
@@ -403,6 +412,13 @@ namespace Nmflasher
                 return false;
             }
 
+            string resolved = ResolveLayoutName(name);
+            if (!resolved.Equals(LayoutBasename(name), StringComparison.OrdinalIgnoreCase))
+            {
+                Log(name + " selects layout " + resolved + ".");
+            }
+
+            name = resolved;
             layout = LoadLayout(name, out string? error);
             if (layout == null)
             {
@@ -420,10 +436,35 @@ namespace Nmflasher
             return true;
         }
 
-        static int RunKwp(Request request, DeviceInfo device, MemoryLayout layout, byte[]? image)
+        static int RunKwp(Request request, DeviceInfo device, MemoryLayout? layout, byte[]? image)
         {
             return WithKwp(request, device, (kwp, terminated) =>
             {
+                if (kwp.IsHeldKWP1281Session)
+                {
+                    if (request.Read && !request.Diff)
+                    {
+                        if (!string.IsNullOrEmpty(request.LayoutName))
+                        {
+                            Log("Layout is not used on this session.");
+                        }
+
+                        return FinishCalibrationRead(kwp, terminated, request.OutputPath!);
+                    }
+
+                    Log("This is the M5.9.2 read session. It copies 0x0000-0xBFFF."
+                        + (request.Read ? " Diff read is not available." : " It does not write."));
+                    return 1;
+                }
+
+                if (layout == null)
+                {
+                    Log("This is not the M5.9.2 read session. Pass --layout.");
+                    Log(SizeLayoutText());
+                    int listed = ListLayouts();
+                    return listed == 0 ? 2 : listed;
+                }
+
                 uint[] baudRates = SessionBaudRates(request.Baud);
                 Operation operation = request.Read
                     ? CreateKwpRead(kwp, baudRates, layout, image, request)
@@ -470,6 +511,25 @@ namespace Nmflasher
             settings.EraseEntireFlashAtOnce = false;
             settings.FlashMemoryLayout = layout;
             return new WriteExternalFlashOperation(kwp, baudRates, settings, sectors);
+        }
+
+        static int FinishCalibrationRead(KWP2000Interface kwp, ManualResetEvent terminated, string outputPath)
+        {
+            var operation = new KWP1281CalibrationReadOperation(kwp);
+            bool success = WaitForOperation(
+                operation,
+                "Reading calibration 0x0000-0xBFFF. This is not a full flash read.",
+                () => ReleaseKwp(kwp, terminated));
+            if (!success || (operation.Calibration == null))
+            {
+                Log("Calibration read failed.");
+                return 1;
+            }
+
+            return SaveRead(
+                new MemoryImage(operation.Calibration, 0),
+                outputPath,
+                "Calibration read succeeded. 49152 bytes, 0x0000-0xBFFF. Not a full flash image.");
         }
 
         static int FinishKwpRead(Operation operation, bool success, MemoryLayout layout, string outputPath)
@@ -554,7 +614,7 @@ namespace Nmflasher
             return SaveRead(operation.mReadFlashMemory, outputPath);
         }
 
-        static int SaveRead(MemoryImage image, string outputPath)
+        static int SaveRead(MemoryImage image, string outputPath, string? succeeded = null)
         {
             if (!image.SaveToFile(outputPath))
             {
@@ -562,7 +622,7 @@ namespace Nmflasher
                 return 1;
             }
 
-            Log("Reading ECU flash memory succeeded.");
+            Log(succeeded ?? "Reading ECU flash memory succeeded.");
             Log("Wrote " + image.Size + " bytes to " + Path.GetFullPath(outputPath) + ".");
             return 0;
         }
@@ -672,24 +732,41 @@ namespace Nmflasher
             return buffer;
         }
 
+        static bool KwpReadWithoutLayout(Request request)
+        {
+            return request.Kwp && request.Read && !request.Diff && string.IsNullOrEmpty(request.LayoutName);
+        }
+
+        internal static string ResolveLayoutName(string name)
+        {
+            string compact = name.Trim().ToLowerInvariant();
+            foreach (var size in SizeLayouts)
+            {
+                if ((compact == size.Word) || (compact == size.Word + "b"))
+                {
+                    return size.Name;
+                }
+            }
+
+            return LayoutBasename(name);
+        }
+
         static string? LayoutNameForLength(int length)
         {
-            if (length == 1024 * 1024)
+            foreach (var size in SizeLayouts)
             {
-                return "29F800BB";
-            }
-
-            if (length == 512 * 1024)
-            {
-                return "29F400BB";
-            }
-
-            if (length == 256 * 1024)
-            {
-                return "29F200";
+                if (length == size.Bytes)
+                {
+                    return size.Name;
+                }
             }
 
             return null;
+        }
+
+        static string SizeLayoutText()
+        {
+            return string.Join(", ", SizeLayouts.Select(size => size.Word + "/" + size.Word + "b selects " + size.Name)) + ".";
         }
 
         static MemoryLayout? LoadLayout(string name, out string? error)
@@ -764,39 +841,27 @@ namespace Nmflasher
                 Log(line);
             }
 
-            if (request.Yes)
+            if (request.Force)
             {
-                Log("Continuing because --yes was passed.");
+                Log("Continuing because --force was passed.");
                 return true;
             }
 
-            Log("Type ok or cancel.");
-            while (true)
-            {
-                string? line = Console.ReadLine();
-                if (line == null)
-                {
-                    return false;
-                }
-
-                if (line.Trim().Equals("ok", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-
-                if (line.Trim().Equals("cancel", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                Log("Type ok or cancel.");
-            }
+            return ReadChoice(UserPromptType.OK_CANCEL) == UserPromptResult.OK;
         }
 
         static List<string> Checklist(Request request)
         {
             var lines = new List<string>();
-            if (request.Read && !request.Diff)
+            if (KwpReadWithoutLayout(request))
+            {
+                lines.Add("If you are ready to read, confirm the following things:");
+                lines.Add("1) The engine is not running.");
+                lines.Add("2) On M5.9.2, pin 43 is off +12 V.");
+                lines.Add("A held M5.9.2 session reads 0x0000-0xBFFF (49152 bytes), not the whole flash.");
+                lines.Add("Any other ECU needs --layout. Nothing is read until the session type is known.");
+            }
+            else if (request.Read && !request.Diff)
             {
                 lines.Add("If you are ready to read, confirm the following things:");
                 lines.Add("1) You have loaded a valid memory layout for the ECU.");
@@ -837,8 +902,6 @@ namespace Nmflasher
                 lines.Add("The ECU must already be in boot mode. Ground the boot pin as power comes up, then release it.");
             }
 
-            lines.Add(string.Empty);
-            lines.Add("Click OK to confirm, otherwise Cancel.");
             return lines;
         }
 
@@ -871,31 +934,66 @@ namespace Nmflasher
 
         static UserPromptResult Ask(string title, string message, UserPromptType promptType)
         {
+            if (Force)
+            {
+                LogPrompt(title, message);
+                if (TryForcedAnswer(promptType, out UserPromptResult forced))
+                {
+                    Log(forced == UserPromptResult.CHECK
+                        ? "Checking the layout mirror because --force was passed."
+                        : "Continuing because --force was passed.");
+                    return forced;
+                }
+
+                Log("Stopping. --force does not erase the entire flash.");
+                return UserPromptResult.CANCEL;
+            }
+
+            LogPrompt(title, message);
+            return ReadChoice(promptType);
+        }
+
+        static UserPromptResult ReadChoice(UserPromptType promptType)
+        {
             while (true)
             {
-                lock (LogLock)
-                {
-                    Console.Error.WriteLine(title);
-                    if (!string.IsNullOrEmpty(message))
-                    {
-                        Console.Error.WriteLine(message);
-                    }
-
-                    Console.Error.WriteLine(PromptHint(promptType));
-                }
-
+                Log(PromptHint(promptType));
                 string? line = Console.ReadLine();
-                if (line == null)
-                {
-                    return UserPromptResult.CANCEL;
-                }
-
-                if (TryMapAnswer(line.Trim(), promptType, out UserPromptResult result))
+                if ((line != null) && TryMapAnswer(line.Trim(), promptType, out UserPromptResult result))
                 {
                     return result;
                 }
 
-                Log("Answer with " + PromptHint(promptType) + ".");
+                if (line == null)
+                {
+                    return UserPromptResult.CANCEL;
+                }
+            }
+        }
+
+        static void LogPrompt(string title, string message)
+        {
+            Log(title);
+            if (!string.IsNullOrEmpty(message))
+            {
+                Log(message);
+            }
+        }
+
+        static bool TryForcedAnswer(UserPromptType promptType, out UserPromptResult result)
+        {
+            switch (promptType)
+            {
+                case UserPromptType.OK:
+                case UserPromptType.OK_CANCEL:
+                    result = UserPromptResult.OK;
+                    return true;
+                case UserPromptType.CONTINUE_CHECK_CANCEL:
+                    result = UserPromptResult.CHECK;
+                    return true;
+                default:
+                    result = UserPromptResult.NONE;
+                    return false;
             }
         }
 
@@ -904,21 +1002,27 @@ namespace Nmflasher
             switch (promptType)
             {
                 case UserPromptType.OK:
-                    return "ok";
                 case UserPromptType.OK_CANCEL:
-                    return "ok, cancel";
+                    return "Press Enter to continue. Ctrl-C aborts.";
                 case UserPromptType.YES_NO_CANCEL:
-                    return "yes, no, cancel";
+                    return "yes, no, or cancel";
                 case UserPromptType.CONTINUE_CHECK_CANCEL:
-                    return "yes (check), no (continue), check, ok (continue), cancel";
+                    return "yes checks, no continues, cancel aborts";
                 default:
-                    return "cancel";
+                    return "Ctrl-C aborts.";
             }
         }
 
         static bool TryMapAnswer(string answer, UserPromptType promptType, out UserPromptResult result)
         {
             result = UserPromptResult.NONE;
+            if ((answer.Length == 0)
+                && ((promptType == UserPromptType.OK) || (promptType == UserPromptType.OK_CANCEL)))
+            {
+                result = UserPromptResult.OK;
+                return true;
+            }
+
             if (answer.Equals("cancel", StringComparison.OrdinalIgnoreCase))
             {
                 if (promptType == UserPromptType.OK)
@@ -1071,7 +1175,7 @@ namespace Nmflasher
             return null;
         }
 
-        static bool TryParse(string[] args, out Request? request, out string? error)
+        internal static bool TryParse(string[] args, out Request? request, out string? error)
         {
             request = new Request();
             error = null;
@@ -1085,7 +1189,25 @@ namespace Nmflasher
             for (int i = 0; i < args.Length; i++)
             {
                 string arg = args[i];
-                if ((arg == "-i") || (arg == "-o") || (arg == "--layout") || (arg == "--baud") || (arg == "--usb"))
+                if (arg == "--layout")
+                {
+                    if (request.LayoutName != null)
+                    {
+                        error = "--layout was given twice.";
+                        return false;
+                    }
+
+                    if (((i + 1) >= args.Length) || args[i + 1].StartsWith("-"))
+                    {
+                        request.LayoutList = true;
+                        continue;
+                    }
+
+                    request.LayoutName = args[++i];
+                    continue;
+                }
+
+                if ((arg == "-i") || (arg == "-o") || (arg == "--baud") || (arg == "--usb"))
                 {
                     if ((i + 1) >= args.Length)
                     {
@@ -1113,16 +1235,6 @@ namespace Nmflasher
                         }
 
                         request.OutputPath = value;
-                    }
-                    else if (arg == "--layout")
-                    {
-                        if (request.LayoutName != null)
-                        {
-                            error = "--layout was given twice.";
-                            return false;
-                        }
-
-                        request.LayoutName = value;
                     }
                     else if (arg == "--baud")
                     {
@@ -1173,15 +1285,15 @@ namespace Nmflasher
                     continue;
                 }
 
-                if (arg == "--yes")
+                if ((arg == "-f") || (arg == "--force"))
                 {
-                    if (request.Yes)
+                    if (request.Force)
                     {
-                        error = "--yes was given twice.";
+                        error = "--force was given twice.";
                         return false;
                     }
 
-                    request.Yes = true;
+                    request.Force = true;
                     continue;
                 }
 
@@ -1192,6 +1304,11 @@ namespace Nmflasher
                 }
 
                 positionals.Add(arg);
+            }
+
+            if (request.LayoutList)
+            {
+                return true;
             }
 
             if (positionals.Count == 1)
@@ -1301,11 +1418,6 @@ namespace Nmflasher
                     error = "A full read does not take -i.";
                     return false;
                 }
-                else if (request.Kwp && (request.LayoutName == null))
-                {
-                    error = "A full KWP read needs --layout.";
-                    return false;
-                }
             }
             else
             {
@@ -1350,9 +1462,9 @@ namespace Nmflasher
                 return false;
             }
 
-            if ((request.InputPath != null) || (request.OutputPath != null) || (request.LayoutName != null) || request.NoVerify || request.Yes)
+            if ((request.InputPath != null) || (request.OutputPath != null) || (request.LayoutName != null) || request.NoVerify || request.Force)
             {
-                error = "info does not take -i, -o, --layout, --no-verify, or --yes.";
+                error = "info does not take -i, -o, --layout, --no-verify, or --force.";
                 return false;
             }
 
@@ -1369,7 +1481,7 @@ namespace Nmflasher
                 || request.UsbIndex.HasValue
                 || request.Slow
                 || request.NoVerify
-                || request.Yes;
+                || request.Force;
         }
 
         static void Usage(TextWriter writer)
@@ -1377,9 +1489,11 @@ namespace Nmflasher
             writer.WriteLine("Usage: nmflasher [-h|--help] [-V|--version]");
             writer.WriteLine("       nmflasher usb");
             writer.WriteLine("       nmflasher layouts");
+            writer.WriteLine("       nmflasher --layout");
             writer.WriteLine("       nmflasher kwp info");
             writer.WriteLine("       nmflasher bootmode info");
             writer.WriteLine("       nmflasher kwp read full --layout NAME -o FILE");
+            writer.WriteLine("       nmflasher kwp read full -o FILE");
             writer.WriteLine("       nmflasher kwp read diff -i FILE -o FILE");
             writer.WriteLine("       nmflasher kwp write full -i FILE");
             writer.WriteLine("       nmflasher kwp write diff -i FILE");
@@ -1394,7 +1508,7 @@ namespace Nmflasher
             Command(writer, "layouts", "Print each layout basename under MemoryLayouts.");
             Command(writer, "kwp info", "Read ECU identification in the standard session.");
             Command(writer, "bootmode info", "Read boot-mode device, bus, and flash layout information.");
-            Command(writer, "kwp read full", "Read the whole layout. Requires --layout and -o.");
+            Command(writer, "kwp read full", "Read the layout, or the M5.9.2 calibration. Requires -o.");
             Command(writer, "kwp read diff", "Read sectors that differ from -i. Requires -i and -o.");
             Command(writer, "kwp write full", "Write every sector from -i.");
             Command(writer, "kwp write diff", "Write sectors that differ from -i.");
@@ -1405,17 +1519,24 @@ namespace Nmflasher
             Option(writer, "-V, --version", "print the build version and exit");
             Option(writer, "-i FILE", "image to write, or the file a diff read compares");
             Option(writer, "-o FILE", "file a read saves");
-            Option(writer, "--layout NAME", "layout basename under MemoryLayouts");
+            Option(writer, "--layout [NAME]", "layout basename, 1m, 512k, or 256k; no NAME lists them");
             Option(writer, "--usb N", "device index from usb; one device is used if omitted");
             Option(writer, "--baud RATE", "KWP session baud, or the boot-mode baud");
             Option(writer, "--slow", "use KWP slow init; fast init is the default");
             Option(writer, "--no-verify", "match clearing Verify Read or Verify Write");
-            Option(writer, "--yes", "print the confirmation and do not wait");
+            Option(writer, "-f, --force", "answer confirmation prompts and do not wait");
             writer.WriteLine();
+            writer.WriteLine("--layout with no name prints the layout names and does not connect.");
+            writer.WriteLine(SizeLayoutText());
             writer.WriteLine("With -i and no --layout, 1 MB selects 29F800BB, 512 KB selects 29F400BB,");
             writer.WriteLine("and 256 KB selects 29F200. Any other length asks for --layout. A full KWP");
-            writer.WriteLine("read has no image, so it requires --layout. The image length must match");
-            writer.WriteLine("the layout before a write starts.");
+            writer.WriteLine("read with no --layout reads 0x0000-0xBFFF on a held M5.9.2 session.");
+            writer.WriteLine("Any other ECU still needs --layout. 29F800BB is not assumed. The image");
+            writer.WriteLine("length must match the layout before a write.");
+            writer.WriteLine();
+            writer.WriteLine("Press Enter to continue a prompt. Ctrl-C aborts. -f and --force answer");
+            writer.WriteLine("confirmation prompts and do not wait. They do not erase the entire flash");
+            writer.WriteLine("when a sector erase fails.");
             writer.WriteLine();
             writer.WriteLine("The default KWP session baud list is 124800, 52800, 38400, 10400, 9600.");
             writer.WriteLine("Boot mode defaults to 57600 and reads the chip id. Diff read and diff write");
@@ -1475,7 +1596,7 @@ namespace Nmflasher
             }
         }
 
-        sealed class Request
+        internal sealed class Request
         {
             public bool UsbList;
             public bool LayoutList;
@@ -1491,7 +1612,7 @@ namespace Nmflasher
             public int? UsbIndex;
             public bool Slow;
             public bool NoVerify;
-            public bool Yes;
+            public bool Force;
         }
     }
 }
