@@ -10,9 +10,10 @@ Log file: `%AppData%\Nefarious Motorsports\NefMoto VW Audi ME7 Flasher Logger\Ne
 
 ## Device not in the list
 
-- Click **Refresh Devices**. Enumeration is deferred until the window loads; it can take a few seconds.
-- Windows only. CH340 listing uses WMI.
-- FTDI: official driver installed; the COM port visible in Device Manager. Clone cables labeled **KWP2000** often use counterfeit FTDI chips; stock Windows FTDI drivers blacklist them and they will not work. See [Getting started — Cable](getting-started.md#cable).
+- Click **Refresh Devices**. Enumeration is deferred until the window loads; it can take a few seconds. The ECUFlasher window is Windows only; on macOS and Linux run `nmflasher usb`.
+- Windows: CH340 listing uses WMI. FTDI needs the official driver and a COM port visible in Device Manager. Clone cables labeled **KWP2000** often use counterfeit FTDI chips; stock Windows FTDI drivers blacklist them and they will not work. See [Getting started — Cable](getting-started.md#cable).
+- macOS: a genuine FTDI adapter uses the built-in driver and shows up as `/dev/cu.usbserial-*`. A CH340 adapter needs WCH's DriverKit extension, approved once in System Settings, and shows up as `/dev/cu.wchusbserial*`. See [Getting started — Cable](getting-started.md#cable).
+- Linux: the kernel drivers `ftdi_sio` and `ch341` create `/dev/ttyUSB*` or `/dev/ttyACM*`. If `nmflasher` cannot open the node, the user must be allowed to open it, typically by being in the `dialout` group. See [Getting started — Cable](getting-started.md#cable).
 - Ross-Tech HEX-USB / HEX-USB+CAN: install [VCP](http://www.ross-tech.com/vag-com/usb/virtual-com-port.php), dumb pass-through, smart mode off. HEX-V2 and HEX-NET will never appear as a usable dumb K-line device. See [Getting started — Cable](getting-started.md#cable).
 - Try another USB port. Unplug other serial adapters so the list is obvious.
 

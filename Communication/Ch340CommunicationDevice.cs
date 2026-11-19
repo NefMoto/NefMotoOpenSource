@@ -26,7 +26,7 @@ namespace Communication
 {
     /// <summary>
     /// CH340 KKL line helpers and Windows WMI enumeration (VID 0x1A86).
-    /// macOS enumeration is one IOKit walk in <see cref="SerialPortCommunicationDeviceBase.EnumerateMac"/>.
+    /// macOS and Linux enumeration is <see cref="SerialPortCommunicationDeviceBase.EnumerateUsbSerial"/>.
     /// Slow init uses per-bit SetBreak; low-baud UART is the fallback.
     /// Bootmode: DTR 100 ms high, 100 ms low, then DTR=0, RTS=0.
     /// </summary>
@@ -69,7 +69,7 @@ namespace Communication
         }
 
         /// <summary>
-        /// Windows COM ports for VID 0x1A86. Empty of macOS devices; those come from EnumerateMac.
+        /// Windows COM ports for VID 0x1A86. macOS and Linux devices come from EnumerateUsbSerial.
         /// </summary>
         public static IEnumerable<DeviceInfo> Enumerate(DisplayStatusMessageDelegate logMessage = null)
         {

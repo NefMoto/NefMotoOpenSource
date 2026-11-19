@@ -9,7 +9,7 @@ If connect fails, see [Troubleshooting](troubleshooting.md).
 - Download the MSI from the [latest GitHub release](https://github.com/NefMoto/NefMotoOpenSource/releases/latest).
 - The installer is 64-bit and goes to `C:\Program Files\NefMotoECUFlasher`. An older 32-bit install under Program Files (x86) should be replaced on upgrade. `nmflasher.exe` is in that folder.
 - The MSI checks for the [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe). The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not enough. The runtime is not bundled in the MSI.
-- The MSI and ECUFlasher window are Windows only. `nmflasher` lists FTDI and CH340 cables on macOS; see [Cable](#cable).
+- The MSI and ECUFlasher window are Windows only. `nmflasher` lists FTDI and CH340 cables on macOS and Linux; see [Cable](#cable).
 
 To build from source instead, see [BUILDING.md](../BUILDING.md).
 
@@ -39,6 +39,8 @@ Shopping: any cable that is a USB serial adapter plus a dumb K-line transceiver.
 Many cheap cables labeled **KWP2000** are FTDI clones. The FTDI drivers that ship with Windows blacklist those chips, so they never show up as a working COM port and will not work with NefMoto. Use a genuine FTDI adapter or a CH340 cable instead.
 
 On macOS, `nmflasher` opens these cables as serial ports. A genuine FTDI adapter uses the driver built into macOS and shows up as `/dev/cu.usbserial-*`. A CH340 adapter needs WCH's CH340 DriverKit extension, approved once in System Settings, and shows up as `/dev/cu.wchusbserial*`.
+
+On Linux, `nmflasher` opens these cables as serial ports. The kernel drivers `ftdi_sio` (FTDI) and `ch341` (CH340) create `/dev/ttyUSB*` or `/dev/ttyACM*`. The user must be allowed to open that node, typically by being in the `dialout` group.
 
 ## First launch
 

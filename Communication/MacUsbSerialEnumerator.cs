@@ -26,25 +26,6 @@ using System.Text;
 namespace Communication
 {
     /// <summary>
-    /// One macOS USB serial callout device (IOCalloutDevice) and the USB identity of its parent.
-    /// </summary>
-    internal readonly struct MacUsbSerialPort
-    {
-        public MacUsbSerialPort(int vendorId, string calloutPath, string productName, string serialNumber)
-        {
-            VendorId = vendorId;
-            CalloutPath = calloutPath;
-            ProductName = productName;
-            SerialNumber = serialNumber;
-        }
-
-        public int VendorId { get; }
-        public string CalloutPath { get; }
-        public string ProductName { get; }
-        public string SerialNumber { get; }
-    }
-
-    /// <summary>
     /// Lists IOSerialBSDClient callout nodes and walks IOService parents for idVendor.
     /// macOS only. Callers must check <see cref="OperatingSystem.IsMacOS"/> first.
     /// </summary>
@@ -56,9 +37,9 @@ namespace Communication
         private const int CFNumberSInt32 = 3;
         private const int MaxParentDepth = 24;
 
-        public static List<MacUsbSerialPort> Query()
+        public static List<UsbSerialPort> Query()
         {
-            var found = new List<MacUsbSerialPort>();
+            var found = new List<UsbSerialPort>();
             IntPtr matching = IOServiceMatching("IOSerialBSDClient");
             if (matching == IntPtr.Zero)
             {
@@ -93,7 +74,7 @@ namespace Communication
             return found;
         }
 
-        private static void AddIfUsbSerial(uint service, List<MacUsbSerialPort> found)
+        private static void AddIfUsbSerial(uint service, List<UsbSerialPort> found)
         {
             string callout = ReadString(service, "IOCalloutDevice");
             if (string.IsNullOrEmpty(callout))
@@ -106,7 +87,7 @@ namespace Communication
                 return;
             }
 
-            found.Add(new MacUsbSerialPort(vendorId, callout, product, serial));
+            found.Add(new UsbSerialPort(vendorId, callout, product, serial));
         }
 
         private static bool TryFindUsbIdentity(uint entry, out int vendorId, out string product, out string serial)

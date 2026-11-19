@@ -23,8 +23,28 @@ using System;
 namespace Communication
 {
     /// <summary>
+    /// One USB serial node and the vendor identity above it.
+    /// </summary>
+    internal readonly struct UsbSerialPort
+    {
+        public UsbSerialPort(int vendorId, string portPath, string productName, string serialNumber)
+        {
+            VendorId = vendorId;
+            PortPath = portPath;
+            ProductName = productName;
+            SerialNumber = serialNumber;
+        }
+
+        public int VendorId { get; }
+        public string PortPath { get; }
+        public string ProductName { get; }
+        public string SerialNumber { get; }
+    }
+
+    /// <summary>
     /// Maps a USB vendor id and serial-port path to a <see cref="DeviceInfo"/>.
-    /// Dial-in nodes (/dev/tty.*) are skipped. Callout nodes and Windows COM names are kept.
+    /// macOS dial-in nodes (/dev/tty.*) and Linux /dev/ttyS* are skipped.
+    /// Callout nodes, /dev/ttyUSB*, /dev/ttyACM*, and Windows COM names are kept.
     /// </summary>
     public static class UsbSerialDeviceMapping
     {
@@ -70,12 +90,14 @@ namespace Communication
                 return false;
             }
 
-            if (portName.StartsWith("/dev/", StringComparison.Ordinal) && !name.StartsWith("cu.", StringComparison.Ordinal))
+            if (!portName.StartsWith("/dev/", StringComparison.Ordinal))
             {
-                return false;
+                return true;
             }
 
-            return true;
+            return name.StartsWith("cu.", StringComparison.Ordinal)
+                || name.StartsWith("ttyUSB", StringComparison.Ordinal)
+                || name.StartsWith("ttyACM", StringComparison.Ordinal);
         }
     }
 }

@@ -30,6 +30,7 @@ public sealed class UsbSerialDeviceMappingTests
     [InlineData(0x0403, "")]
     [InlineData(0x0403, "/dev/tty.usbserial-A1")]
     [InlineData(0x1A86, "/dev/tty.wchusbserial1410")]
+    [InlineData(0x0403, "/dev/ttyS0")]
     public void SkippedPorts_ReturnNull(int vendorId, string portName)
     {
         Assert.Null(UsbSerialDeviceMapping.TryCreate(vendorId, portName, "X", "S"));
@@ -77,6 +78,21 @@ public sealed class UsbSerialDeviceMappingTests
         Assert.Equal("USB Serial", ch340.Description);
         Assert.Equal("SER", ch340.SerialNumber);
         Assert.Equal("/dev/cu.wchusbserial1410_USB Serial", ch340.DeviceID);
+    }
+
+    [Theory]
+    [InlineData("/dev/ttyUSB0")]
+    [InlineData("/dev/ttyACM0")]
+    public void LinuxUsbNode_BuildsFtdiInfo(string portName)
+    {
+        DeviceInfo info = UsbSerialDeviceMapping.TryCreate(
+            UsbSerialDeviceMapping.FtdiVendorId, portName, "FT232R", "A1");
+
+        SerialPortDeviceInfo ftdi = Assert.IsType<SerialPortDeviceInfo>(info);
+        Assert.Equal(DeviceType.FTDI, ftdi.Type);
+        Assert.Equal(portName, ftdi.PortName);
+        Assert.Equal("FT232R", ftdi.Description);
+        Assert.Equal("A1", ftdi.SerialNumber);
     }
 
     [Fact]

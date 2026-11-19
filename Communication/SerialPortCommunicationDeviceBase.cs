@@ -234,7 +234,7 @@ namespace Communication
         {
             if (!CheckIsOpen()) return false;
             // System.IO.Ports on Unix pulses tcsendbreak. Hold the line with TIOCSBRK instead.
-            if (OperatingSystem.IsMacOS())
+            if (UsePosixSerial())
             {
                 return PosixSerialPort.TrySetBreak(_serialPort, state);
             }
@@ -313,7 +313,7 @@ namespace Communication
         public bool WaitForTransmitDrain(uint timeoutMs)
         {
             if (!CheckIsOpen()) return false;
-            if (OperatingSystem.IsMacOS())
+            if (UsePosixSerial())
             {
                 return PosixSerialPort.TryDrain(_serialPort, timeoutMs);
             }
@@ -321,19 +321,24 @@ namespace Communication
             return Win32SerialTransmitDrain.TryWaitForTxEmpty(_serialPort, timeoutMs);
         }
 
+        private static bool UsePosixSerial()
+        {
+            return OperatingSystem.IsMacOS() || OperatingSystem.IsLinux();
+        }
+
         /// <summary>
-        /// macOS: one IOKit walk, then <see cref="UsbSerialDeviceMapping.TryCreate"/> per callout.
+        /// macOS and Linux: one USB serial walk, then <see cref="UsbSerialDeviceMapping.TryCreate"/> per node.
         /// </summary>
-        internal static IEnumerable<DeviceInfo> EnumerateMac(DisplayStatusMessageDelegate logMessage = null)
+        internal static IEnumerable<DeviceInfo> EnumerateUsbSerial(DisplayStatusMessageDelegate logMessage = null)
         {
             var devices = new List<DeviceInfo>();
             try
             {
-                foreach (MacUsbSerialPort port in MacUsbSerialEnumerator.Query())
+                foreach (UsbSerialPort port in QueryUsbSerialPorts())
                 {
                     DeviceInfo info = UsbSerialDeviceMapping.TryCreate(
-                        port.VendorId, port.CalloutPath, port.ProductName, port.SerialNumber);
-                    if (info == null || !IsPortAccessible(port.CalloutPath))
+                        port.VendorId, port.PortPath, port.ProductName, port.SerialNumber);
+                    if (info == null || !IsPortAccessible(port.PortPath))
                     {
                         continue;
                     }
@@ -344,11 +349,21 @@ namespace Communication
             catch (Exception ex)
             {
                 logMessage?.Invoke(
-                    "EnumerateMacUsb: Exception: " + ex.GetType().Name + ": " + ex.Message,
+                    "EnumerateUsbSerial: Exception: " + ex.GetType().Name + ": " + ex.Message,
                     StatusMessageType.LOG);
             }
 
             return devices;
+        }
+
+        private static IEnumerable<UsbSerialPort> QueryUsbSerialPorts()
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                return LinuxUsbSerialEnumerator.Query();
+            }
+
+            return MacUsbSerialEnumerator.Query();
         }
 
         /// <summary>
