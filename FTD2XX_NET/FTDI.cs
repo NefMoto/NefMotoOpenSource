@@ -88,6 +88,13 @@ namespace FTD2XX_NET
 
         static FTDI()
         {
+            // kernel32 LoadLibrary throws from this type initializer on macOS and
+            // would hide every other cable. Leave the handle zero off Windows.
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
             if (hFTD2XXDLL == IntPtr.Zero)
             {
                 hFTD2XXDLL = LoadLibrary("FTD2XX.DLL");

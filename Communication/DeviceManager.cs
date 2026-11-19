@@ -27,7 +27,7 @@ namespace Communication
 {
     /// <summary>
     /// Manages device enumeration and creation of communication device instances.
-    /// Enumerates FTDI (via FTD2XX_NET) and CH340 (via WMI/COM port detection).
+    /// Enumerates FTDI (D2XX on Windows, serial callout on macOS) and CH340 (WMI on Windows, IOKit on macOS).
     /// </summary>
     /// <remarks>
     /// To add a new cable type: (1) Implement ICommunicationDevice (e.g. Cp2102CommunicationDevice),
@@ -48,8 +48,18 @@ namespace Communication
         {
             var devices = new List<DeviceInfo>();
 
+            // Windows D2XX. The loader is a no-op off Windows, so this stays empty on macOS.
             devices.AddRange(FtdiCommunicationDevice.Enumerate(LogMessage));
-            devices.AddRange(Ch340CommunicationDevice.Enumerate(LogMessage));
+
+            if (OperatingSystem.IsMacOS())
+            {
+                // One IOKit walk for FTDI and CH340 callout devices.
+                devices.AddRange(SerialPortCommunicationDeviceBase.EnumerateMac(LogMessage));
+            }
+            else
+            {
+                devices.AddRange(Ch340CommunicationDevice.Enumerate(LogMessage));
+            }
 
             return devices;
         }

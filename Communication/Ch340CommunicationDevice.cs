@@ -26,6 +26,7 @@ namespace Communication
 {
     /// <summary>
     /// CH340 KKL line helpers and Windows WMI enumeration (VID 0x1A86).
+    /// macOS enumeration is one IOKit walk in <see cref="SerialPortCommunicationDeviceBase.EnumerateMac"/>.
     /// Slow init uses per-bit SetBreak; low-baud UART is the fallback.
     /// Bootmode: DTR 100 ms high, 100 ms low, then DTR=0, RTS=0.
     /// </summary>
@@ -68,7 +69,7 @@ namespace Communication
         }
 
         /// <summary>
-        /// Windows COM ports for VID 0x1A86.
+        /// Windows COM ports for VID 0x1A86. Empty of macOS devices; those come from EnumerateMac.
         /// </summary>
         public static IEnumerable<DeviceInfo> Enumerate(DisplayStatusMessageDelegate logMessage = null)
         {
@@ -76,7 +77,7 @@ namespace Communication
                 "1A86",
                 "EnumerateCh340Devices",
                 (portName, description, serialNumber) =>
-                    new SerialPortDeviceInfo(DeviceType.CH340, portName, description, serialNumber),
+                    UsbSerialDeviceMapping.TryCreate(UsbSerialDeviceMapping.Ch340VendorId, portName, description, serialNumber),
                 logMessage);
         }
 
