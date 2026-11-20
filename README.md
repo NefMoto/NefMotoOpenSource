@@ -57,7 +57,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 ### Platform
 
-- **Windows only** — WMI device enumeration (CH340 detection). [Getting started](docs/user-guide/getting-started.md#install)
+- The ECUFlasher window and the MSI are Windows only. [Getting started](docs/user-guide/getting-started.md#install)
+- `nmflasher` opens FTDI and CH340 cables on macOS and Linux. macOS FTDI uses the built-in driver (`/dev/cu.usbserial-*`); macOS CH340 needs WCH's DriverKit extension (`/dev/cu.wchusbserial*`). Linux uses the kernel `ftdi_sio` and `ch341` drivers (`/dev/ttyUSB*` or `/dev/ttyACM*`); opening the node usually requires the `dialout` group. [Getting started — Cable](docs/user-guide/getting-started.md#cable)
 
 ### ECU Support
 
@@ -94,11 +95,11 @@ Pre-built releases are available at: <https://github.com/NefMoto/NefMotoOpenSour
 
 Install steps: [Getting started](docs/user-guide/getting-started.md#install).
 
-The MSI is 64-bit and installs to `C:\Program Files\NefMotoECUFlasher`. Upgrading from an older x86 install should replace the copy under Program Files (x86).
+The MSI is 64-bit and installs to `C:\Program Files\NefMotoECUFlasher`. Upgrading from an older x86 install should replace the copy under Program Files (x86). The MSI is Windows only. On macOS and Linux, build `nmflasher` from source. [BUILDING.md](docs/BUILDING.md)
 
 ## Requirements
 
-- Windows operating system
+- Windows for the ECUFlasher window and the MSI. `nmflasher` also runs on macOS and Linux; build it from source. [BUILDING.md](docs/BUILDING.md)
 - [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe) — the MSI checks for this. The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not sufficient.
 - OBD-II/USB cable — **either**:
   - A dumb-mode K+DCAN or KKL cable: USB-to-serial with an FTDI or CH340 chipset, K-line pass-through to the ECU (no protocol translation), **or**
