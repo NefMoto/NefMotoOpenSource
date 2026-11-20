@@ -927,11 +927,8 @@ namespace Communication
                 || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted);
         }
 
-        // Programming-session RequestUpload NoProgram/reject does not mean 0xC5 is missing.
-        // ME7.1.1 (#161): layout upload returns NoProgram, then programming 0xC5 may
-        // answer and Diff Write can skip. On some ME7.1.1 units (#149) 0xC5 never
-        // returns; CheckIfFlashRequired asks before erase on that no-reply.
-        // MustAbort still stops the read. This gate is write-only.
+        // Write-only. Programming NoProgram/reject skips layout validation but still tries 0xC5.
+        // No-reply on 0xC5 asks before erase. MustAbort still stops the read.
         public static bool ContinueWriteWithoutLayoutValidation(KWP2000DiagnosticSessionType session, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
             return (session == KWP2000DiagnosticSessionType.ProgrammingSession)
@@ -1173,12 +1170,8 @@ namespace Communication
         private byte mMaxBlockSize;
     }
 
-    /// <summary>
-    /// Closing step for the programming flag: a 2-byte upload, transfer, and exit, then three matching checksums.
-    /// </summary>
-    // ME7 kernel: an accepted RequestUpload (the layout check sends one) blocks the 33 C5
-    // match streak until an upload finishes with RequestTransferExit. Three matches in a row
-    // with no open upload clear bit 7 of 95040 page 30/31 byte 8, which the login set.
+    // Layout probe accepted RequestUpload -> 2-byte upload+exit, then three matching 0xC5.
+    // Otherwise checksums only (ME7.1.1 NoProgram). A failed RequestUpload falls through too.
     internal class ProgrammingFlagCloser
     {
         private const int ChecksumCount = 3;
@@ -1191,12 +1184,17 @@ namespace Communication
             Checksum
         }
 
-        public ProgrammingFlagCloser(KWP2000Interface commInterface, uint uploadAddress, MemoryImage checksumBlock)
+        public ProgrammingFlagCloser(KWP2000Interface commInterface, uint uploadAddress, MemoryImage checksumBlock, bool closeOpenUpload = true)
         {
             mCommInterface = commInterface;
             mUploadAddress = uploadAddress;
             mChecksumBlock = checksumBlock;
             mMaxBlockSize = TransferDataAction.DEFAULT_MAX_BLOCK_SIZE;
+            mStep = closeOpenUpload ? Step.RequestUpload : Step.Checksum;
+            if (!closeOpenUpload)
+            {
+                mCommInterface.DisplayStatusMessage("No open upload to close. Sending matching checksums for the programming flag.", StatusMessageType.USER);
+            }
         }
 
         public CommunicationAction NextAction()
@@ -1229,6 +1227,13 @@ namespace Communication
         /// </summary>
         public bool OnActionCompleted(CommunicationAction action, bool success)
         {
+            if ((mStep == Step.RequestUpload) && !success)
+            {
+                mCommInterface.DisplayStatusMessage("RequestUpload is not served for the flag close. Trying matching checksums only.", StatusMessageType.USER);
+                mStep = Step.Checksum;
+                return false;
+            }
+
             var checksum = action as ValidateFlashChecksumAction;
             if (!success || ((checksum != null) && !checksum.IsFlashChecksumCorrect))
             {
@@ -1250,7 +1255,7 @@ namespace Communication
             }
             else if (++mChecksumsSent == ChecksumCount)
             {
-                return End("Sent " + ChecksumCount + " matching checksums with the upload closed. The programming flag should be clear.");
+                return End("Sent " + ChecksumCount + " matching checksums. The programming flag should be clear.");
             }
 
             return false;
@@ -2178,8 +2183,15 @@ namespace Communication
                                 FlashBlock clearFlagBlock = mFlashBlockList.FirstOrDefault(b => b.mFlashComplete && b.mFlashSuccessful);
                                 if (clearFlagBlock != null)
                                 {
-                                    mClearFlag = new ProgrammingFlagCloser(KWP2000CommInterface, mFlashBlockList.First().mMemoryImage.StartAddress, clearFlagBlock.mMemoryImage);
-                                    mState = FlashingState.ClearFlag;
+                                    if (mChecksumRoutineUnavailable)
+                                    {
+                                        CommInterface.DisplayStatusMessage("Flash checksum is not available, so the programming flag was not closed. Use Clear DTCs.", StatusMessageType.USER);
+                                    }
+                                    else
+                                    {
+                                        mClearFlag = new ProgrammingFlagCloser(KWP2000CommInterface, mFlashBlockList.First().mMemoryImage.StartAddress, clearFlagBlock.mMemoryImage, mLayoutUploadAccepted);
+                                        mState = FlashingState.ClearFlag;
+                                    }
                                 }
                             }
                         }
@@ -2987,6 +2999,7 @@ namespace Communication
                     }
                     else if (success)
                     {
+                        mLayoutUploadAccepted = true;
                         mState = FlashingState.StartBlock;
                     }
                 }
@@ -3041,6 +3054,7 @@ namespace Communication
             if (promptResult == UserPromptResult.OK)
             {
                 success = true;
+                mLayoutUploadAccepted = true;
                 mState = FlashingState.StartBlock;
             }
             else if (promptResult == UserPromptResult.CHECK)
@@ -3342,6 +3356,7 @@ namespace Communication
         private FlashBlock mCurrentBlock;
         private bool mClearFlagAttempted;
         private ProgrammingFlagCloser mClearFlag;
+        private bool mLayoutUploadAccepted;
 
         private byte mMaxBlockSize;
         private bool mEraseEntireFlashAtOnce;

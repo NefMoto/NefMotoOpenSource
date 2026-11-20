@@ -60,7 +60,7 @@ A matching sample is strong evidence of mirroring, not proof of chip size. A mis
 
 A KWP write opens a programming session from the default session. If that fails, nothing is erased. No upload in that session: layout probe skipped, Diff Write still tries sector checksums; unavailable/no-reply asks before erase (**Cancel** stops, **OK** writes every loaded sector). Failed erase-mode checks stay on sector erase.
 
-A KWP write that finishes (full or diff) ends with a 2-byte upload at the start of flash and three checksums of a sector that matches the file. That clears the EEPROM bit behind `P0602` ([P0602](clearing-P0602.md)).
+A finished KWP write clears the programming flag (`P0602`): 2-byte upload+exit if the layout probe opened upload, else three matching checksums (ME7.1.1). Details: [P0602](clearing-P0602.md).
 
 Confirmation requires: valid file and layout (BT vs BB must match the chip), engine not running, battery at least 12 V, adaptations will reset, the process can run uninterrupted.
 

@@ -144,7 +144,7 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
-        public void Write_keeps_checksum_after_programming_session_NoProgram()
+        public void Write_keeps_checksum_and_skips_flag_upload_after_NoProgram()
         {
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
@@ -155,16 +155,12 @@ namespace NefMotoOpenSource.Tests
             Assert.NotNull(dir);
             string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
             Assert.Contains("ContinueWriteWithoutLayoutValidation", text);
-            Assert.Contains("AskContinueWriteWithoutLayoutValidationPrompt", text);
             Assert.Contains("Sector checksums will still be tried", text);
             Assert.Contains("Flash checksum got no reply", text);
+            Assert.Contains("new ProgrammingFlagCloser(KWP2000CommInterface, mFlashBlockList.First().mMemoryImage.StartAddress, clearFlagBlock.mMemoryImage, mLayoutUploadAccepted)", text);
+            Assert.Contains("Trying matching checksums only", text);
             Assert.DoesNotContain("AskBeforeErase", text);
-            int continueGate = text.IndexOf("ContinueWriteWithoutLayoutValidation(KWP2000CommInterface.CurrentDiagnosticSessionType, validationResult)", StringComparison.Ordinal);
-            Assert.True(continueGate >= 0);
-            int acceptFull = text.IndexOf("AcceptFullWriteWithoutChecksum()", continueGate, StringComparison.Ordinal);
-            int nextRegion = text.IndexOf("#region", continueGate + 1, StringComparison.Ordinal);
-            Assert.True(acceptFull < 0 || acceptFull > nextRegion,
-                "Layout NoProgram must not call AcceptFullWriteWithoutChecksum before leaving the validation region.");
+            Assert.DoesNotContain("ShouldCloseOpenUpload", text);
         }
 
         [Theory]
