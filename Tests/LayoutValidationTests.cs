@@ -26,17 +26,17 @@ namespace NefMotoOpenSource.Tests
     public class LayoutValidationTests
     {
         [Fact]
-        public void Programming_session_NoProgram_asks_before_erase()
+        public void Programming_session_NoProgram_continues_write_without_layout_validation()
         {
-            Assert.True(LayoutValidationText.AskBeforeErase(
+            Assert.True(LayoutValidationText.ContinueWriteWithoutLayoutValidation(
                 KWP2000DiagnosticSessionType.ProgrammingSession,
                 ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported));
         }
 
         [Fact]
-        public void Programming_session_upload_reject_asks_before_erase()
+        public void Programming_session_upload_reject_continues_write_without_layout_validation()
         {
-            Assert.True(LayoutValidationText.AskBeforeErase(
+            Assert.True(LayoutValidationText.ContinueWriteWithoutLayoutValidation(
                 KWP2000DiagnosticSessionType.ProgrammingSession,
                 ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected));
         }
@@ -44,9 +44,9 @@ namespace NefMotoOpenSource.Tests
         [Theory]
         [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession)]
         [InlineData(KWP2000DiagnosticSessionType.StandardSession)]
-        public void Upload_unavailable_outside_programming_does_not_ask(KWP2000DiagnosticSessionType session)
+        public void Upload_unavailable_outside_programming_does_not_continue_write_without_layout(KWP2000DiagnosticSessionType session)
         {
-            Assert.False(LayoutValidationText.AskBeforeErase(
+            Assert.False(LayoutValidationText.ContinueWriteWithoutLayoutValidation(
                 session,
                 ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported));
         }
@@ -56,7 +56,7 @@ namespace NefMotoOpenSource.Tests
         [InlineData(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.EndIsntHighest)]
         public void Address_rejects_stay_on_the_layout_probe(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
-            Assert.False(LayoutValidationText.AskBeforeErase(KWP2000DiagnosticSessionType.ProgrammingSession, result));
+            Assert.False(LayoutValidationText.ContinueWriteWithoutLayoutValidation(KWP2000DiagnosticSessionType.ProgrammingSession, result));
             Assert.False(LayoutValidationText.UploadProbeOpensProgramming(result));
         }
 
@@ -85,7 +85,7 @@ namespace NefMotoOpenSource.Tests
         [Fact]
         public void Served_upload_stays_on_the_layout_probe()
         {
-            Assert.False(LayoutValidationText.AskBeforeErase(
+            Assert.False(LayoutValidationText.ContinueWriteWithoutLayoutValidation(
                 KWP2000DiagnosticSessionType.ProgrammingSession,
                 ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid));
             Assert.False(LayoutValidationText.MustAbort(
@@ -93,17 +93,17 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
-        public void Development_session_general_reject_does_not_ask()
+        public void Development_session_general_reject_does_not_continue_write_without_layout()
         {
-            Assert.False(LayoutValidationText.AskBeforeErase(
+            Assert.False(LayoutValidationText.ContinueWriteWithoutLayoutValidation(
                 KWP2000DiagnosticSessionType.DevelopmentSession,
                 ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected));
         }
 
         [Fact]
-        public void Security_refusal_opens_programming_and_does_not_ask()
+        public void Security_refusal_opens_programming_and_does_not_continue_write_without_layout()
         {
-            Assert.False(LayoutValidationText.AskBeforeErase(
+            Assert.False(LayoutValidationText.ContinueWriteWithoutLayoutValidation(
                 KWP2000DiagnosticSessionType.ProgrammingSession,
                 ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted));
             Assert.True(LayoutValidationText.MustAbort(
@@ -141,6 +141,30 @@ namespace NefMotoOpenSource.Tests
             Assert.NotNull(dir);
             string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
             Assert.Contains("ChecksumReadStepFor", text);
+        }
+
+        [Fact]
+        public void Write_keeps_checksum_after_programming_session_NoProgram()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
+            {
+                dir = dir.Parent;
+            }
+
+            Assert.NotNull(dir);
+            string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
+            Assert.Contains("ContinueWriteWithoutLayoutValidation", text);
+            Assert.Contains("AskContinueWriteWithoutLayoutValidationPrompt", text);
+            Assert.Contains("Sector checksums will still be tried", text);
+            Assert.Contains("Flash checksum got no reply", text);
+            Assert.DoesNotContain("AskBeforeErase", text);
+            int continueGate = text.IndexOf("ContinueWriteWithoutLayoutValidation(KWP2000CommInterface.CurrentDiagnosticSessionType, validationResult)", StringComparison.Ordinal);
+            Assert.True(continueGate >= 0);
+            int acceptFull = text.IndexOf("AcceptFullWriteWithoutChecksum()", continueGate, StringComparison.Ordinal);
+            int nextRegion = text.IndexOf("#region", continueGate + 1, StringComparison.Ordinal);
+            Assert.True(acceptFull < 0 || acceptFull > nextRegion,
+                "Layout NoProgram must not call AcceptFullWriteWithoutChecksum before leaving the validation region.");
         }
 
         [Theory]

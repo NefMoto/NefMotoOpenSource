@@ -927,9 +927,12 @@ namespace Communication
                 || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted);
         }
 
-        // A programming session that does not serve upload cannot compare sectors.
-        // The write asks before erase. MustAbort is the OK-only dialog and is not used here.
-        public static bool AskBeforeErase(KWP2000DiagnosticSessionType session, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        // Programming-session RequestUpload NoProgram/reject does not mean 0xC5 is missing.
+        // ME7.1.1 (#161): layout upload returns NoProgram, then programming 0xC5 may
+        // answer and Diff Write can skip. On some ME7.1.1 units (#149) 0xC5 never
+        // returns; CheckIfFlashRequired asks before erase on that no-reply.
+        // MustAbort still stops the read. This gate is write-only.
+        public static bool ContinueWriteWithoutLayoutValidation(KWP2000DiagnosticSessionType session, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
             return (session == KWP2000DiagnosticSessionType.ProgrammingSession)
                 && ((result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
@@ -2505,7 +2508,7 @@ namespace Communication
                                 CommInterface.DisplayStatusMessage("Flash checksum does not match new data, flashing is necessary.", StatusMessageType.USER);
                             }
                         }
-                        else if(action.CompletedWithoutCommunicationError)
+                        else if (action.CompletedWithoutCommunicationError)
                         {
                             if (((ValidateFlashChecksumAction)action).RoutineUnavailable)
                             {
@@ -2536,6 +2539,19 @@ namespace Communication
                                 CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches new data, flashing anyways.", StatusMessageType.USER);
                                 success = true;
                             }
+                        }
+                        else if (!mCurrentBlock.mWasErased)
+                        {
+                            // No reply (ME7.1.1 #149 hang). Do not erase until the user accepts a full write.
+                            mState = FlashingState.CheckIfFlashRequired;
+                            CommInterface.DisplayStatusMessage("Flash checksum got no reply. The checksum is not used. Nothing is erased yet.", StatusMessageType.USER);
+                            AskChecksumUnavailableWritePrompt(action);
+                            return;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches new data, flashing anyways.", StatusMessageType.USER);
+                            success = true;
                         }
                     }
                     else if (mState == FlashingState.ValidateFlashedData)
@@ -2925,12 +2941,11 @@ namespace Communication
                     string validationMesage = null;
 
                     var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-                    if (LayoutValidationText.AskBeforeErase(KWP2000CommInterface.CurrentDiagnosticSessionType, validationResult))
+                    if (LayoutValidationText.ContinueWriteWithoutLayoutValidation(KWP2000CommInterface.CurrentDiagnosticSessionType, validationResult))
                     {
-                        // The kernel accepts local id 0xC5 and does not answer it. A resend
-                        // cannot be heard. Ask before erase instead of sending it.
-                        CommInterface.DisplayStatusMessage("RequestUpload is not served in the programming session. The checksum is not used. Nothing is erased yet.", StatusMessageType.USER);
-                        AskChecksumUnavailableWritePrompt(action);
+                        // Layout upload is off. Sector 0xC5 may still answer (ME7.1.1).
+                        CommInterface.DisplayStatusMessage("RequestUpload is not served in the programming session. Sector checksums will still be tried. Nothing is erased yet.", StatusMessageType.USER);
+                        AskContinueWriteWithoutLayoutValidationPrompt(action);
                         return;
                     }
 
@@ -3057,6 +3072,28 @@ namespace Communication
             mOpeningProgrammingSessionForErase = true;
             OpenProgrammingSessionAfterDevelopment("Flash erase is not served in the development session. Opening a programming session. Nothing is erased yet.");
             return true;
+        }
+
+        // Layout upload failed in the programming session. Keep Diff Write checksums enabled.
+        private void AskContinueWriteWithoutLayoutValidationPrompt(CommunicationAction action)
+        {
+            PostUserPrompt(
+                "Unable to validate memory layout",
+                "RequestUpload is not served in this programming session, so the memory layout could not be validated.\n\nDiff Write will still compare sector checksums when the ECU answers.\n\nClick OK to continue. Click Cancel to stop. Nothing is erased yet.",
+                UserPromptType.OK_CANCEL,
+                result =>
+                {
+                    if (result == UserPromptResult.OK)
+                    {
+                        mState = FlashingState.StartBlock;
+                        FinishWriteAction(action, true);
+                    }
+                    else
+                    {
+                        CommInterface.DisplayStatusMessage("Stopped before erasing. The ECU flash was left unchanged.", StatusMessageType.USER);
+                        FinishWriteAction(action, false);
+                    }
+                });
         }
 
         // Shown before any erase. Cancel leaves the flash unchanged.
