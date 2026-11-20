@@ -113,20 +113,34 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Theory]
-        [InlineData((byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError)]
-        [InlineData((byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)]
-        public void Checksum_nrc_means_the_routine_is_unavailable(byte nrc)
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, false, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
+        [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.NoProgram, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.NoProgram, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ServiceNotSupported, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.ServiceNotSupported, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.GeneralReject, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.GeneralReject, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        public void Checksum_read_step(KWP2000DiagnosticSessionType session, KWP2000ResponseCode nrc, bool mayOpenProgramming, ValidateFlashChecksumAction.ChecksumReadStep step)
         {
-            Assert.True(ValidateFlashChecksumAction.ChecksumNrcMeansUnavailable(nrc));
+            Assert.Equal(step, ValidateFlashChecksumAction.ChecksumReadStepFor(session, (byte)nrc, mayOpenProgramming));
         }
 
-        [Theory]
-        [InlineData((byte)KWP2000ResponseCode.NoProgram)]
-        [InlineData((byte)KWP2000ResponseCode.ServiceNotSupported)]
-        [InlineData((byte)KWP2000ResponseCode.GeneralReject)]
-        public void Other_checksum_nrc_does_not_continue_the_read(byte nrc)
+        [Fact]
+        public void Read_switches_on_ChecksumReadStepFor()
         {
-            Assert.False(ValidateFlashChecksumAction.ChecksumNrcMeansUnavailable(nrc));
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
+            {
+                dir = dir.Parent;
+            }
+
+            Assert.NotNull(dir);
+            string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
+            Assert.Contains("ChecksumReadStepFor", text);
         }
 
         [Theory]

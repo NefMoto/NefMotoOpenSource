@@ -1287,13 +1287,41 @@ namespace Communication
         // This session's routine handler does not implement the checksum local id.
         public bool RoutineUnavailable { get; private set; }
 
-        // 0x12 and 0x22 mean this session does not serve checksum local id 0xC5.
-        // 0x22 is not a reason to open the programming kernel.
-        public static bool ChecksumNrcMeansUnavailable(byte nrc)
+        public enum ChecksumReadStep
         {
-            return (nrc == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
-                || (nrc == (byte)KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError);
+            OpenProgramming,
+            UnavailablePrompt,
+            ContinueWithoutChecksum
         }
+
+        // The read's checksum-failure branch. mayOpenProgramming is the one-shot fallback.
+        // 0x12 means this handler has no checksum local id.
+        // 0x22 in the development session is the address gate. One programming session.
+        // 0x22 in the programming session means the kernel was asked and refused.
+        public static ChecksumReadStep ChecksumReadStepFor(KWP2000DiagnosticSessionType session, byte nrc, bool mayOpenProgramming)
+        {
+            switch ((KWP2000ResponseCode)nrc)
+            {
+                case KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError when (session == KWP2000DiagnosticSessionType.DevelopmentSession) && mayOpenProgramming:
+                {
+                    return ChecksumReadStep.OpenProgramming;
+                }
+                case KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError when session == KWP2000DiagnosticSessionType.ProgrammingSession:
+                case KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat:
+                {
+                    return ChecksumReadStep.UnavailablePrompt;
+                }
+                default:
+                {
+                    return ChecksumReadStep.ContinueWithoutChecksum;
+                }
+            }
+        }
+
+        // Negative response code from the checksum routine, when one arrived.
+        public bool HasChecksumResponse { get; private set; }
+
+        public byte ChecksumResponseCode { get; private set; }
 
         public override bool Start()
         {
@@ -1349,47 +1377,75 @@ namespace Communication
                 {
                     if (message.DataLength >= 2)
                     {
-                        if ((message.mData[1] == (byte)KWP2000ResponseCode.GeneralReject)
-                            || (message.mData[1] == (byte)KWP2000ResponseCode.DownloadNotAccepted))
-                        {
-                            DisplayStatusMessage("Checksum validation routine did not start or complete correctly.", StatusMessageType.USER);
+                        HasChecksumResponse = true;
+                        ChecksumResponseCode = message.mData[1];
 
-                            ActionCompleted(false);
-
-                            handled = true;
-                        }
-                        else if (ChecksumNrcMeansUnavailable(message.mData[1]))
+                        switch ((KWP2000ResponseCode)message.mData[1])
                         {
-                            RoutineUnavailable = true;
-                            if (message.mData[1] == (byte)KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat)
+                            case KWP2000ResponseCode.GeneralReject:
+                            case KWP2000ResponseCode.DownloadNotAccepted:
                             {
+                                DisplayStatusMessage("Checksum validation routine did not start or complete correctly.", StatusMessageType.USER);
+
+                                ActionCompleted(false);
+
+                                handled = true;
+                                break;
+                            }
+                            case KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat:
+                            {
+                                RoutineUnavailable = true;
                                 DisplayStatusMessage("ECU reports sub function not supported or invalid format while attempting to validate checksum.", StatusMessageType.USER);
+
+                                ActionCompleted(false);
+
+                                handled = true;
+                                break;
                             }
-                            else
+                            case KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError:
                             {
-                                // This session's routine 0x31 does not accept local id 0xC5, and answers 0x22.
-                                DisplayStatusMessage("ECU reports the flash checksum routine is not available in this session.", StatusMessageType.USER);
+                                switch (KWP2000CommInterface.CurrentDiagnosticSessionType)
+                                {
+                                    case KWP2000DiagnosticSessionType.ProgrammingSession:
+                                    {
+                                        // Programming session routine 0x31 does not accept local id 0xC5, and answers 0x22.
+                                        RoutineUnavailable = true;
+                                        DisplayStatusMessage("ECU reports the flash checksum routine is not available in this session.", StatusMessageType.USER);
+
+                                        ActionCompleted(false);
+
+                                        handled = true;
+                                        break;
+                                    }
+                                    case KWP2000DiagnosticSessionType.DevelopmentSession:
+                                    {
+                                        ActionCompleted(false);
+
+                                        handled = true;
+                                        break;
+                                    }
+                                }
+
+                                break;
                             }
+                            case KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested:
+                            {
+                                DisplayStatusMessage("ECU reports security access requested while attempting to validate checksum.", StatusMessageType.USER);
 
-                            ActionCompleted(false);
+                                ActionCompleted(false);
 
-                            handled = true;
-                        }
-                        else if (message.mData[1] == (byte)KWP2000ResponseCode.SecurityAccessDenied_SecurityAccessRequested)
-                        {
-                            DisplayStatusMessage("ECU reports security access requested while attempting to validate checksum.", StatusMessageType.USER);
+                                handled = true;
+                                break;
+                            }
+                            case KWP2000ResponseCode.RoutineNotCompleteOrServiceInProgress:
+                            {
+                                DisplayStatusMessage("ECU reports routine not complete while attempting to validate checksum.", StatusMessageType.USER);
 
-                            ActionCompleted(false);
+                                ActionCompleted(false);
 
-                            handled = true;
-                        }
-                        else if (message.mData[1] == (byte)KWP2000ResponseCode.RoutineNotCompleteOrServiceInProgress)
-                        {
-                            DisplayStatusMessage("ECU reports routine not complete while attempting to validate checksum.", StatusMessageType.USER);
-
-                            ActionCompleted(false);
-
-                            handled = true;
+                                handled = true;
+                                break;
+                            }
                         }
                     }
                 }

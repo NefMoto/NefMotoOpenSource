@@ -503,6 +503,16 @@ namespace Communication
             return true;
         }
 
+        // The upload fallback is still available and the desired session is still development.
+        protected bool MayOpenProgrammingSessionForChecksum
+        {
+            get
+            {
+                return mUploadFallsBackToProgramming
+                    && (mDesiredDiagnosticSessionType == KWP2000DiagnosticSessionType.DevelopmentSession);
+            }
+        }
+
         // The login inside 0x86 was refused. Stay there and still send RequestUpload.
         // 0x11, 0x90, or 0x33 from that probe opens programming once. 0x10 does not.
         private bool LeaveDevelopmentSessionAfterSecurityRefusal(bool success, bool completedWithoutCommunicationError)
@@ -1573,12 +1583,33 @@ namespace Communication
                     }
                     else if (action.CompletedWithoutCommunicationError)
                     {
-                        if (((ValidateFlashChecksumAction)action).RoutineUnavailable)
+                        var checksum = (ValidateFlashChecksumAction)action;
+                        if (checksum.HasChecksumResponse)
                         {
-                            AskChecksumUnavailableReadPrompt(action);
-                            return;
+                            switch (ValidateFlashChecksumAction.ChecksumReadStepFor(
+                                KWP2000CommInterface.CurrentDiagnosticSessionType,
+                                checksum.ChecksumResponseCode,
+                                MayOpenProgrammingSessionForChecksum))
+                            {
+                                case ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming:
+                                {
+                                    // Layout validation in the programming session runs before any 0xC5.
+                                    // RequestUpload 0x11 or 0x90 stops the read and does not send checksum.
+                                    OpenProgrammingSessionAfterDevelopment("Flash checksum is not served in the development session. Opening a programming session.");
+                                    mHasVerfiedRequestUploadSupported = false;
+                                    mState = ReadingState.ValidateMemoryLayout;
+                                    FinishReadAction(action, true);
+                                    return;
+                                }
+                                case ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt:
+                                {
+                                    AskChecksumUnavailableReadPrompt(action);
+                                    return;
+                                }
+                            }
                         }
-                        else if (mState == ReadingState.CheckIfReadRequired)
+
+                        if (mState == ReadingState.CheckIfReadRequired)
                         {
                             CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches, reading anyways.", StatusMessageType.USER);
                         }
