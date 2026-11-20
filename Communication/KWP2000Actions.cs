@@ -1517,37 +1517,7 @@ namespace Communication
 
         protected ushort CalculateChecksum(byte[] data)
         {
-            uint[] tempBuffer = new uint[256];
-
-            for (uint x = 0; x < 256; x++)
-            {
-                uint curVal = x;
-
-                for (uint y = 0; y < 8; y++)
-                {
-                    if ((curVal & 0x00000001) != 0)
-                    {
-                        curVal = (curVal >> 1) ^ 0xEDB88320;
-                    }
-                    else
-                    {
-                        curVal >>= 1;
-                    }
-                }
-
-                tempBuffer[x] = curVal;
-            }
-
-            uint checksum = 0xFFFFFFFF;
-
-            for (uint x = 0; x < data.Length; x++)
-            {
-                checksum = (checksum >> 8) ^ tempBuffer[((byte)(checksum & 0xFF)) ^ data[x]];
-            }
-
-            checksum ^= 0xFFFFFFFF;
-
-            return (ushort)(checksum & 0xFFFF);
+            return (ushort)(BootmodeRangeChecksum.Compute(data) & 0xFFFF);
         }
 
         protected uint mStartAddress;

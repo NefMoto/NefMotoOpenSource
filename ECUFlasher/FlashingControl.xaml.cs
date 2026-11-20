@@ -767,12 +767,20 @@ namespace ECUFlasher
 
         public bool IsVerifyWriteEnabled
         {
-            get { return IsNotBootmode(); }
+            get { return true; }
         }
 
         public bool IsVerifyReadEnabled
         {
-            get { return IsNotBootmode() && IsBottomBootFirstBlock(); }
+            get
+            {
+                if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+                {
+                    return true;
+                }
+
+                return IsBottomBootFirstBlock();
+            }
         }
 
         private bool IsNotBootmode()
@@ -1136,9 +1144,7 @@ namespace ECUFlasher
                 return;
 
             LogLoadedFlashFile(logLabel);
-            bool verify = (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
-                ? false
-                : chkVerifyWrite.IsChecked.Value;
+            bool verify = chkVerifyWrite.IsChecked == true;
             OnWriteExternalFlashStarted(FlashMemoryImage.RawData, FlashMemoryLayout, OnWriteFlashCompleted, diff, verify);
         }
 
@@ -1175,12 +1181,6 @@ namespace ECUFlasher
 
         private bool CanExecuteWriteDiffFlashCommand(List<string> reasonsDisabled)
         {
-            if (App?.CommInterface?.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
-            {
-                reasonsDisabled.Add("Diff write is not supported for BootMode protocol");
-                return false;
-            }
-
             if (RejectMe7Only(reasonsDisabled)) return false;
 
             return CanExecuteFlashConnection(reasonsDisabled, true);
@@ -1347,7 +1347,11 @@ namespace ECUFlasher
 
                     bool verifyRead = false;
                     int checksumSectorCount = 0;
-                    if (IsNotBootmode() && IsBottomBootFirstBlock())
+                    if (!IsNotBootmode())
+                    {
+                        verifyRead = chkVerifyRead.IsChecked == true;
+                    }
+                    else if (IsBottomBootFirstBlock())
                     {
                         verifyRead = true;
                         if (chkVerifyRead.IsChecked != true)
@@ -1407,6 +1411,17 @@ namespace ECUFlasher
 
             if (RejectMe7Only(reasonsDisabled)) return false;
 
+            if (App.CommInterface != null && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
+            {
+                if (!IsFlashFileOK)
+                {
+                    reasonsDisabled.Add("Specified flash file is not correct");
+                    return false;
+                }
+
+                return CanExecuteFlashConnection(reasonsDisabled, false);
+            }
+
             bool result = true;
 
             if (!IsMemoryLayoutOK)
@@ -1429,14 +1444,7 @@ namespace ECUFlasher
 
             if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
             {
-                if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
-                {
-                    reasonsDisabled.Add("Diff read is not yet supported for BootMode protocol");
-                }
-                else
-                {
-                    reasonsDisabled.Add("Not connected with KWP2000 protocol");
-                }
+                reasonsDisabled.Add("Not connected with KWP2000 protocol");
                 result = false;
             }
 
@@ -1858,6 +1866,8 @@ namespace ECUFlasher
             var writeSettings = new BootmodeWriteExternalFlashOperation.BootmodeWriteExternalFlashSettings();
             writeSettings.Variant = InferBootmodeVariantFromLayout(layout);
             writeSettings.FlashMemoryLayout = layout;
+            writeSettings.SkipMatchingSectors = diffWrite;
+            writeSettings.VerifyWrittenData = verify;
 
             var sectorImages = MemoryUtils.SplitMemoryImageIntoSectors(flashMemoryImage, layout);
 
@@ -2014,7 +2024,7 @@ namespace ECUFlasher
         {
             if (App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode)
             {
-                OnReadExternalFlashStarted_Bootmode(baseImage, operationCompletedDel);
+                OnReadExternalFlashStarted_Bootmode(baseImage, onlyReadRequiredSectors, shouldVerifyReadData, operationCompletedDel);
             }
             else
             {
@@ -2022,7 +2032,7 @@ namespace ECUFlasher
             }
         }
 
-        private void OnReadExternalFlashStarted_Bootmode(byte[] baseImage, Operation.CompletedOperationDelegate operationCompletedDel)
+        private void OnReadExternalFlashStarted_Bootmode(byte[] baseImage, bool skipMatchingSectors, bool verifyReadData, Operation.CompletedOperationDelegate operationCompletedDel)
         {
             BootstrapInterface bootstrap;
             MemoryLayout layout;
@@ -2038,6 +2048,8 @@ namespace ECUFlasher
             settings.Variant = InferBootmodeVariantFromLayout(layout);
             settings.StartAddress = layout.BaseAddress;
             settings.Size = (uint)layout.Size;
+            settings.SkipMatchingSectors = skipMatchingSectors;
+            settings.VerifyReadData = verifyReadData;
 
             var operation = new BootmodeReadExternalFlashOperation(bootstrap, settings, sectorImages);
             StartFlashOperation(operation, operationCompletedDel, "Reading ECU flash memory via BootMode.");

@@ -55,8 +55,8 @@ A matching sample is strong evidence of mirroring, not proof of chip size. A mis
 
 - **Full Write Flash** — every sector in the layout
 - **Diff Write Flash** — sectors whose ECU checksum does not match the file. A full match skips every sector, does not erase, and leaves the connection open. A write that erases a sector still disconnects at the end.
-- **Verify Write** — checked by default on KWP (read-back after program)
-- **Verify Read** — checked by default. Checked, a bottom-boot KWP full read checksums every sector. Unchecked, that read checksums only sectors 0–3. Disabled in bootmode and when sector 0 is not 16 KB at `0x800000`.
+- **Verify Write** — checked by default. On KWP, the written sector is read back. On boot mode, each programmed sector is checksummed on the ECU. A matching boot-mode sector is still skipped before erase
+- **Verify Read** — checked by default. Checked, a bottom-boot KWP full read checksums every sector, and a bootmode read checksums each transferred sector. Unchecked, that KWP read checksums only sectors 0–3 and a bootmode read does not checksum. Disabled on KWP when sector 0 is not 16 KB at `0x800000`.
 
 A KWP write opens a programming session from the default session, before any erase. If that session does not start, the write stops and the flash is left unchanged. The programming kernel does not serve upload, so the layout probe is skipped. That session's checksum is not used. A dialog asks before any erase. **Cancel** leaves the flash unchanged. **OK** erases and writes every sector in the loaded file. A missing checksum, or any other failed erase-mode check, does not switch the ECU to erase-entire mode.
 
@@ -110,7 +110,9 @@ nmflasher kwp read diff -i base.bin -o out.bin
 nmflasher kwp write full -i image.bin
 nmflasher kwp write diff -i image.bin
 nmflasher bootmode read full -o out.bin
+nmflasher bootmode read diff -i base.bin -o out.bin
 nmflasher bootmode write full -i image.bin
+nmflasher bootmode write diff -i image.bin
 ```
 
 - `-h` and `--help` print the command summary and exit. `--version` prints the build version and exits. Neither connects.
@@ -120,7 +122,7 @@ nmflasher bootmode write full -i image.bin
 - `-i` is the image to write, or the file a diff read compares. `-o` is the file a read saves.
 - `--layout` is a basename from [Layout](#layout), or `1m`/`1mb` (`29F800BB`), `512k`/`512kb` (`29F400BB`), or `256k`/`256kb` (`29F200`). Case does not matter. When `-i` is present and `--layout` is omitted, those same three sizes are selected from the file length. Any other length asks for `--layout`. A full KWP read with no `--layout` copies `0x0000`-`0xBFFF` on a held M5.9.2 session (pin 43 off +12 V). That is the calibration, not the whole flash. Any other ECU still needs `--layout`. `29F800BB` is not assumed. The image length must match the layout before a write starts.
 - KWP uses fast init. `--slow` uses slow init. `--baud` sets the session baud. The default list is 124800, 52800, 38400, 10400, 9600.
-- Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write are not available in boot mode. Boot mode reads the chip id and builds the layout. Boot-mode write does not verify.
+- Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write checksum each sector on the ECU. Boot mode reads the chip id and builds the layout. A boot-mode write checksums each programmed sector unless `--no-verify` is set.
 - `--no-verify` matches clearing **Verify Read** or **Verify Write**. On a full KWP read of a bottom-boot layout whose first sector is 16 KB at `0x800000`, that checksums the first four sectors instead of every sector.
 - Press Enter to continue. Ctrl-C aborts. `-f` and `--force` answer the confirmation prompts and do not wait. On **Sector Erase Failed** they stop the write. They do not erase the entire flash. A mirror question runs the sample check. A cancelled write does not connect.
 - There is no erase command. A write erases sectors as part of the write.

@@ -36,7 +36,7 @@ namespace Communication
     /// </summary>
     /// <remarks>
     /// <para><b>State:</b> DeviceID 0xAA = core already running. LastKnownFlashDeviceID is this connection's FC_GETSTATE result and is cleared on disconnect. A running core always gets LoadFlashDriver plus FC_GETSTATE. A flash id from an earlier connect is not reused.</para>
-    /// <para><b>Limitations:</b> Diff read not supported (MiniMon has no checksum-for-range). Flash ID query uses the ME7 driver and bus setup.</para>
+    /// <para><b>Limitations:</b> A range checksum is uploaded to 0xF840 and called directly. Flash ID query uses the ME7 driver and bus setup.</para>
     /// <para><b>I/O:</b> SendBytes/ReceiveBytes loop until full count or timeout; ReceiveBytes Math.Max(minTimeoutMs, numBytes*3) ms (default min 1000; MiniMon_Call uses 3000 to match C167BootTool ser.timeout=3); Write timeout ~data.Length*5 ms for echo.</para>
     /// <para><b>Troubleshooting:</b> 0xFD (NAK) vs 0xEA often baud/timing; FTDI more reliable. Connection failed: "Put ECU in boot mode". Core running and FC_GETSTATE failed: flashing UI dialog "Flash Type Not Detected", then "Disconnect, power-cycle ECU to full boot mode, reconnect to detect flash type."</para>
     /// <para><b>Constants:</b> CPU IDs 0x55/0xA5/0xB5/0xC5/0xD5, 0xAA core running. Flash IDs 0x22AB/0x2258/0x2223/0x22D6. Driver 0x00F600. ME7 base 0x800000, Simos3/EDC15 0x400000.</para>
@@ -269,6 +269,9 @@ namespace Communication
         /// EEPROM C_WRITESPI of a 0x200 block can exceed the default 1 s ReceiveBytes floor.
         /// </summary>
         private const uint MiniMonCallResultTimeoutMs = 3000;
+
+        /// <summary>A 64 KB sector checksum is about a second. This covers that call.</summary>
+        private const uint RangeChecksumTimeoutMs = 8000;
 
         public BootstrapInterface(DisplayStatusMessageDelegate displayStatusMessage)
             : base(displayStatusMessage)
@@ -1331,6 +1334,11 @@ namespace Communication
 
         bool MiniMon_Call(uint address, byte[] registerParams, out byte[] registerResults)
         {
+            return MiniMon_Call(address, registerParams, out registerResults, MiniMonCallResultTimeoutMs);
+        }
+
+        bool MiniMon_Call(uint address, byte[] registerParams, out byte[] registerResults, uint resultTimeoutMs)
+        {
             Debug.Assert((0xFF000000 & address) == 0);
             Debug.Assert(registerParams.Length == 16);
             registerResults = null;
@@ -1358,10 +1366,10 @@ namespace Communication
 
             // Wait for R8–R15 after the callee returns. C167BootTool CallAtAddress uses ser.timeout=3
             // for this (plus A_ACK2); SPI EEPROM write of a full 0x200 block needs more than 1 s.
-            if (!ReceiveBytes(16, out registerResults, MiniMonCallResultTimeoutMs))
+            if (!ReceiveBytes(16, out registerResults, resultTimeoutMs))
             {
                 DisplayStatusMessage(
-                    $"MiniMon_Call: timed out waiting for register results ({MiniMonCallResultTimeoutMs}ms).",
+                    $"MiniMon_Call: timed out waiting for register results ({resultTimeoutMs}ms).",
                     StatusMessageType.LOG);
                 return false;
             }
@@ -1953,8 +1961,11 @@ namespace Communication
         /// uploaded can still name the CPU. A flash id from an earlier connect is not reused.
         /// Called from ConnectionStatus setter when transitioning to ConnectionPending, Disconnected, DisconnectionPending, or CommunicationTerminated.
         /// </summary>
+        private bool mChecksumRoutineLoaded;
+
         private void ResetBootmodeConnectionState()
         {
+            mChecksumRoutineLoaded = false;
             mLastBootmodeLayout = null;
             mLastBootmodeLayoutError = null;
             LastKnownFlashDeviceID = 0;
@@ -1968,6 +1979,68 @@ namespace Communication
         /// <summary>
         /// Gets the base flash address for the specified ECU variant.
         /// </summary>
+        /// <summary>
+        /// CRC-32 of <paramref name="length"/> bytes at <paramref name="offset"/> from the variant flash base.
+        /// Uploads the routine at <see cref="BootmodeRangeChecksum.LoadAddress"/> once per connection.
+        /// Configures the external bus for a flash read.
+        /// </summary>
+        public bool TryChecksumExternalRange(ECUFlashVariant variant, uint offset, uint length, out uint crc)
+        {
+            crc = 0;
+            if (!IsConnected())
+            {
+                DisplayStatusMessage("Not connected to ECU. Cannot checksum flash.", StatusMessageType.USER);
+                return false;
+            }
+
+            if ((length == 0) || ((length & 1) != 0) || (length > 0x1FFFE))
+            {
+                DisplayStatusMessage($"Range checksum needs an even length up to 131070 bytes, got {length}.", StatusMessageType.USER);
+                return false;
+            }
+
+            if (!mChecksumRoutineLoaded)
+            {
+                if (!MiniMon_WriteBlock(BootmodeRangeChecksum.LoadAddress, BootmodeRangeChecksum.Image, out byte functionResult))
+                {
+                    DisplayStatusMessage($"Failed to upload the range checksum routine (result=0x{functionResult:X2}).", StatusMessageType.USER);
+                    return false;
+                }
+
+                mChecksumRoutineLoaded = true;
+                DisplayStatusMessage($"Range checksum routine loaded at 0x{BootmodeRangeChecksum.LoadAddress:X4} ({BootmodeRangeChecksum.Image.Length} bytes).", StatusMessageType.LOG);
+            }
+
+            if (!ConfigureRegistersForExternalFlashRead(variant))
+            {
+                DisplayStatusMessage("Failed to configure registers for a range checksum.", StatusMessageType.USER);
+                return false;
+            }
+
+            uint address = GetFlashBaseAddress(variant) + offset;
+            byte[] regParams = new byte[16];
+            PutU16LE(regParams, 2, (ushort)(length / 2));
+            PutU16LE(regParams, 4, (ushort)(address & 0xFFFF));
+            PutU16LE(regParams, 6, (ushort)((address >> 16) & 0xFFFF));
+
+            if (!MiniMon_Call(BootmodeRangeChecksum.LoadAddress, regParams, out byte[] regResults, RangeChecksumTimeoutMs))
+            {
+                DisplayStatusMessage($"Range checksum failed at 0x{address:X6}, length {length}.", StatusMessageType.USER);
+                return false;
+            }
+
+            ushort error = (ushort)(regResults[14] | (regResults[15] << 8));
+            if (error != 0)
+            {
+                DisplayStatusMessage($"Range checksum rejected the length at 0x{address:X6} (R15=0x{error:X4}).", StatusMessageType.USER);
+                return false;
+            }
+
+            crc = (uint)(regResults[8] | (regResults[9] << 8) | (regResults[10] << 16) | (regResults[11] << 24));
+            DisplayStatusMessage($"Range checksum 0x{address:X6} length {length}: 0x{crc:X8}.", StatusMessageType.LOG);
+            return true;
+        }
+
         public uint GetFlashBaseAddress(ECUFlashVariant variant)
         {
             switch (variant)

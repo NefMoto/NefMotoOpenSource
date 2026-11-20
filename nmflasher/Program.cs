@@ -575,7 +575,13 @@ namespace Nmflasher
                 Log("Chip layout is " + layout.Size + " bytes, base 0x" + layout.BaseAddress.ToString("X6") + ".");
                 if (request.Read)
                 {
-                    return FinishBootmodeRead(boot, layout, request.OutputPath!);
+                    if (request.Diff && ((image == null) || ((uint)image.Length != layout.Size)))
+                    {
+                        Log("Image is " + (image == null ? 0 : image.Length) + " bytes. The chip layout is " + layout.Size + " bytes.");
+                        return 1;
+                    }
+
+                    return FinishBootmodeRead(boot, layout, request.OutputPath!, request.Diff ? image : null, !request.NoVerify);
                 }
 
                 if ((image == null) || ((uint)image.Length != layout.Size))
@@ -587,6 +593,8 @@ namespace Nmflasher
                 var settings = new BootmodeWriteExternalFlashOperation.BootmodeWriteExternalFlashSettings();
                 settings.Variant = InferBootmodeVariant(layout);
                 settings.FlashMemoryLayout = layout;
+                settings.SkipMatchingSectors = request.Diff;
+                settings.VerifyWrittenData = !request.NoVerify;
                 var sectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(image, layout));
                 var operation = new BootmodeWriteExternalFlashOperation(boot, settings, sectors);
                 bool success = WaitForOperation(operation, "Writing ECU flash memory (bootmode).", () => CloseBoot(boot));
@@ -595,14 +603,16 @@ namespace Nmflasher
             });
         }
 
-        static int FinishBootmodeRead(BootstrapInterface boot, MemoryLayout layout, string outputPath)
+        static int FinishBootmodeRead(BootstrapInterface boot, MemoryLayout layout, string outputPath, byte[]? baseImage, bool verify)
         {
-            byte[] readImage = BlankImage(layout);
+            byte[] readImage = baseImage ?? BlankImage(layout);
             var sectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(readImage, layout));
             var settings = new BootmodeReadExternalFlashOperation.BootmodeReadExternalFlashSettings();
             settings.Variant = InferBootmodeVariant(layout);
             settings.StartAddress = layout.BaseAddress;
             settings.Size = layout.Size;
+            settings.SkipMatchingSectors = baseImage != null;
+            settings.VerifyReadData = verify;
             var operation = new BootmodeReadExternalFlashOperation(boot, settings, sectors);
             bool success = WaitForOperation(operation, "Reading ECU flash memory via BootMode.", () => CloseBoot(boot));
             if (!success || (operation.mReadFlashMemory == null))
@@ -1379,12 +1389,6 @@ namespace Nmflasher
                 return false;
             }
 
-            if (!request.Kwp && request.Diff)
-            {
-                error = "Diff read and diff write are not available in boot mode.";
-                return false;
-            }
-
             if (!request.Kwp && request.Slow)
             {
                 error = "--slow applies to KWP.";
@@ -1498,7 +1502,9 @@ namespace Nmflasher
             writer.WriteLine("       nmflasher kwp write full -i FILE");
             writer.WriteLine("       nmflasher kwp write diff -i FILE");
             writer.WriteLine("       nmflasher bootmode read full -o FILE");
+            writer.WriteLine("       nmflasher bootmode read diff -i FILE -o FILE");
             writer.WriteLine("       nmflasher bootmode write full -i FILE");
+            writer.WriteLine("       nmflasher bootmode write diff -i FILE");
             writer.WriteLine();
             writer.WriteLine("Read ECU information, or read or write flash over KWP or boot mode.");
             writer.WriteLine("A write erases sectors as part of the write. There is no erase command.");
@@ -1513,7 +1519,9 @@ namespace Nmflasher
             Command(writer, "kwp write full", "Write every sector from -i.");
             Command(writer, "kwp write diff", "Write sectors that differ from -i.");
             Command(writer, "bootmode read full", "Read the chip. The ECU must already be in boot mode.");
+            Command(writer, "bootmode read diff", "Read sectors that differ from -i. The ECU must already be in boot mode.");
             Command(writer, "bootmode write full", "Write -i. The ECU must already be in boot mode.");
+            Command(writer, "bootmode write diff", "Write sectors that differ from -i. The ECU must already be in boot mode.");
             writer.WriteLine("Options:");
             Option(writer, "-h, --help", "show this help and exit");
             Option(writer, "-V, --version", "print the build version and exit");
@@ -1540,7 +1548,8 @@ namespace Nmflasher
             writer.WriteLine();
             writer.WriteLine("The default KWP session baud list is 124800, 52800, 38400, 10400, 9600.");
             writer.WriteLine("Boot mode defaults to 57600 and reads the chip id. Diff read and diff write");
-            writer.WriteLine("are not available in boot mode. Boot-mode write does not verify.");
+            writer.WriteLine("checksum each sector on the ECU. A boot-mode write checksums each programmed");
+            writer.WriteLine("sector unless --no-verify is set.");
             writer.WriteLine();
             writer.WriteLine("On a full KWP read of a bottom-boot layout whose first sector is 16 KB at");
             writer.WriteLine("0x800000, --no-verify checksums the first four sectors instead of every sector.");

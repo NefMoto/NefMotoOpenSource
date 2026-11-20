@@ -20,6 +20,7 @@ Contact by Email: nyet@nyet.org
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using Communication;
 using Xunit;
@@ -62,6 +63,9 @@ public sealed class LinuxUsbSerialEnumeratorTests
         }
         finally
         {
+            RemoveLink(Path.Combine(root, "class", "tty", "ttyUSB0", "device"));
+            RemoveLink(Path.Combine(root, "class", "tty", "ttyUSB1", "device"));
+            RemoveLink(Path.Combine(root, "class", "tty", "ttyS0", "device"));
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, true);
@@ -82,9 +86,42 @@ public sealed class LinuxUsbSerialEnumeratorTests
 
         string tty = Path.Combine(root, "class", "tty", ttyName);
         Directory.CreateDirectory(tty);
-        Directory.CreateSymbolicLink(
-            Path.Combine(tty, "device"),
-            Path.Combine("..", "..", "..", "devices", "usb", usbName, ifaceName));
+        LinkDevice(Path.Combine(tty, "device"), Path.Combine("..", "..", "..", "devices", "usb", usbName, ifaceName));
+    }
+
+    private static void LinkDevice(string linkPath, string relativeTarget)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(linkPath, relativeTarget);
+            return;
+        }
+        catch (IOException) when (OperatingSystem.IsWindows())
+        {
+        }
+
+        string directory = Path.GetDirectoryName(linkPath) ?? throw new IOException("No directory for " + linkPath);
+        string absolute = Path.GetFullPath(Path.Combine(directory, relativeTarget));
+        using Process process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = "/c mklink /J \"" + linkPath + "\" \"" + absolute + "\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        }) ?? throw new IOException("Could not start cmd");
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            throw new IOException("Could not link " + linkPath);
+        }
+    }
+
+    private static void RemoveLink(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path);
+        }
     }
 
     private static void WritePlain(string root, string ttyName)
@@ -94,8 +131,6 @@ public sealed class LinuxUsbSerialEnumeratorTests
         File.WriteAllText(Path.Combine(plain, "idVendor"), "0403\n");
         string tty = Path.Combine(root, "class", "tty", ttyName);
         Directory.CreateDirectory(tty);
-        Directory.CreateSymbolicLink(
-            Path.Combine(tty, "device"),
-            Path.Combine("..", "..", "..", "devices", "platform", "serial"));
+        LinkDevice(Path.Combine(tty, "device"), Path.Combine("..", "..", "..", "devices", "platform", "serial"));
     }
 }
