@@ -19,6 +19,9 @@ make installer
 # Framework-dependent publish folder (not the MSI; still needs .NET 10)
 make publish
 
+# Self-contained single-file nmflasher tar.gz for one RID (linux-x64, linux-arm64, osx-x64, osx-arm64)
+make nmflasher RID=linux-x64
+
 # Clean build artifacts
 make clean
 ```
@@ -41,11 +44,13 @@ build.bat publish
 
 ## Prerequisites
 
-- **.NET 10 SDK** (preferred) or **Visual Studio** with MSBuild. End users of the MSI need the **.NET 10 Desktop Runtime**, not only the console runtime.
+- **.NET 10 SDK** (preferred) or **Visual Studio** with MSBuild. End users of the MSI need the **.NET 10 Desktop Runtime**, not only the console runtime. The Unix `nmflasher` release archives are self-contained and do not need a separate runtime.
 - Target framework is `NetTfm` in [`Directory.Build.props`](../Directory.Build.props) (`net10.0`). Shared libraries and tests use that TFM (no WPF). The WPF app is `$(NetTfm)-windows`. `EnableWindowsTargeting` lets non-Windows hosts restore the windows TFM. Output dirs do not include the TFM (`ECUFlasher/bin/msil/Debug` / `Release`).
 - **WiX Toolset** (installer builds; MSI is **x64**, `-arch x64`). Version is [`.config/dotnet-tools.json`](../.config/dotnet-tools.json) (Dependabot can bump it). [`Installer/installer.ps1`](../Installer/installer.ps1) runs `dotnet tool restore` then `dotnet tool run wix` — no global `wix` on `PATH`. `make installer` and `build.bat installer` both invoke that script. UI and NetFx extensions are added at the json version during the installer build. `--acceptEula wix7` ([OSMF](https://wixtoolset.org/osmf/)) is hardcoded to match the WiX 7 pin; change both in the same commit.
 
 `make publish` / `build.bat publish` writes a framework-dependent copy to `publish/NefMotoECUFlasher`. It is not a substitute for the MSI: no shortcuts, no installer .NET check, and it still needs the .NET 10 Desktop runtime. `MemoryLayouts` is copied next to the executable. This is not a single-file exe.
+
+`make nmflasher RID=…` writes a self-contained single-file `nmflasher` plus `MemoryLayouts/` to `publish/nmflasher-<rid>/` and packs `nmflasher-<version>-<rid>.tar.gz` in the repo root. `build.yml` smokes `linux-x64` and `osx-arm64` on every push/PR. Release CI publishes all four RIDs (`linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`). [RELEASE.md](RELEASE.md)
 
 ## Fake update check
 
