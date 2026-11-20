@@ -31,7 +31,8 @@ using Shared;
 namespace Communication
 {
     /// <summary>
-    /// Serial-port cable. Opens a <see cref="SerialPortDeviceInfo"/> and enumerates CH340 via WMI.
+    /// Base class for SerialPort-based communication devices (CH340, macOS FTDI VCP).
+    /// Shares common logic for COM port I/O, DTR/RTS, and USB serial enumeration.
     /// </summary>
     public class SerialPortCommunicationDeviceBase : ICommunicationDevice
     {
@@ -232,6 +233,12 @@ namespace Communication
         public bool SetBreak(bool state)
         {
             if (!CheckIsOpen()) return false;
+            // System.IO.Ports on Unix pulses tcsendbreak. Hold the line with TIOCSBRK instead.
+            if (UsePosixSerial())
+            {
+                return PosixSerialPort.TrySetBreak(_serialPort, state);
+            }
+
             try { _serialPort.BreakState = state; return true; }
             catch { return false; }
         }
@@ -306,7 +313,57 @@ namespace Communication
         public bool WaitForTransmitDrain(uint timeoutMs)
         {
             if (!CheckIsOpen()) return false;
+            if (UsePosixSerial())
+            {
+                return PosixSerialPort.TryDrain(_serialPort, timeoutMs);
+            }
+
             return Win32SerialTransmitDrain.TryWaitForTxEmpty(_serialPort, timeoutMs);
+        }
+
+        private static bool UsePosixSerial()
+        {
+            return OperatingSystem.IsMacOS() || OperatingSystem.IsLinux();
+        }
+
+        /// <summary>
+        /// macOS and Linux: one USB serial walk, then <see cref="UsbSerialDeviceMapping.TryCreate"/> per node.
+        /// </summary>
+        internal static IEnumerable<DeviceInfo> EnumerateUsbSerial(DisplayStatusMessageDelegate logMessage = null)
+        {
+            var devices = new List<DeviceInfo>();
+            try
+            {
+                foreach (UsbSerialPort port in QueryUsbSerialPorts())
+                {
+                    DeviceInfo info = UsbSerialDeviceMapping.TryCreate(
+                        port.VendorId, port.PortPath, port.ProductName, port.SerialNumber);
+                    if (info == null || !IsPortAccessible(port.PortPath))
+                    {
+                        continue;
+                    }
+
+                    devices.Add(info);
+                }
+            }
+            catch (Exception ex)
+            {
+                logMessage?.Invoke(
+                    "EnumerateUsbSerial: Exception: " + ex.GetType().Name + ": " + ex.Message,
+                    StatusMessageType.LOG);
+            }
+
+            return devices;
+        }
+
+        private static IEnumerable<UsbSerialPort> QueryUsbSerialPorts()
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                return LinuxUsbSerialEnumerator.Query();
+            }
+
+            return MacUsbSerialEnumerator.Query();
         }
 
         /// <summary>
