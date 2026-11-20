@@ -10,22 +10,25 @@ on:
         description: 'Tag to build (e.g., v1.1.1.1 or v1.1.1.1-rc1)'
         required: true
 
-# Restrict GITHUB_TOKEN. Creating/deleting a GitHub release and uploading the MSI need
+# Restrict GITHUB_TOKEN. Creating/deleting a GitHub release and uploading assets need
 # contents: write. git-cliff may call the GitHub API for PR titles (CI is not --offline).
 permissions:
   contents: write
   pull-requests: read
 
 jobs:
-  build-and-release:
-    runs-on: windows-latest
-
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      prev_tag: ${{ steps.release.outputs.prev_tag }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v7
       with:
         ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
-        fetch-depth: 0  # Fetch all history for git describe
+        fetch-depth: 0
 
     - name: Determine tag and release type
       id: release
@@ -43,15 +46,12 @@ jobs:
           fi
         fi
 
-        # Check if tag contains a hyphen followed by letters/numbers (e.g., -rc1, -beta, -alpha, etc.)
-        # This matches pre-release tags like v1.9.4.4-rc2, v1.0.0-beta, etc.
         if echo "$tag" | grep -qE -- '-[a-zA-Z0-9]+'; then
           isPrerelease="true"
         else
           isPrerelease="false"
         fi
 
-        # Nearest ancestor tag (often the prior RC on the same release line)
         prev_tag=$(git describe --tags --match 'v[0-9]*' --abbrev=0 "${tag}^" 2>/dev/null || true)
         if [ -z "$prev_tag" ]; then
           echo "Error: Could not find previous stable tag before $tag"
@@ -62,6 +62,16 @@ jobs:
         echo "prerelease=$isPrerelease" >> $GITHUB_OUTPUT
         echo "prev_tag=$prev_tag" >> $GITHUB_OUTPUT
         echo "Building for tag: $tag (prerelease: $isPrerelease, previous: $prev_tag)"
+
+  windows-msi:
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ needs.prepare.outputs.tag }}
+        fetch-depth: 0
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
@@ -79,65 +89,110 @@ jobs:
     - name: Build installer
       env:
         # NEVER export VERSION, the SDK will use it (incorrectly), expecting a sanitized version like "1.2.3.4"
-        FULL_VERSION: ${{ steps.release.outputs.tag }}
+        FULL_VERSION: ${{ needs.prepare.outputs.tag }}
       run: make installer
       shell: bash
+
+    - name: Upload MSI artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: windows-msi
+        path: Installer/bin/Release/NefMotoECUFlasher-*.msi
+        if-no-files-found: error
+
+  unix-tarball:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64, linux-arm64, osx-x64, osx-arm64]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ needs.prepare.outputs.tag }}
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Publish nmflasher tar.gz
+      env:
+        FULL_VERSION: ${{ needs.prepare.outputs.tag }}
+        RID: ${{ matrix.rid }}
+      run: make nmflasher
+
+    - name: Upload tar.gz artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: nmflasher-${{ matrix.rid }}
+        path: nmflasher-${{ needs.prepare.outputs.tag }}-${{ matrix.rid }}.tar.gz
+        if-no-files-found: error
+
+  publish-release:
+    needs: [prepare, windows-msi, unix-tarball]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ needs.prepare.outputs.tag }}
+        fetch-depth: 0
+
+    - name: Download release assets
+      uses: actions/download-artifact@v7
+      with:
+        path: release-assets
+        merge-multiple: true
 
     - name: Install git-cliff
       uses: taiki-e/install-action@v2
       with:
         tool: git-cliff
 
-    - name: Find MSI file
-      id: find_msi
-      shell: pwsh
-      run: |
-        $msi = Get-ChildItem -Path "Installer/bin/Release" -Filter "NefMotoECUFlasher-*.msi" | Select-Object -First 1
-        if (-not $msi) {
-          Write-Error "MSI file not found in Installer/bin/Release"
-          exit 1
-        }
-        # Get relative path using forward slashes (works on Windows too)
-        $workspace = $env:GITHUB_WORKSPACE
-        $fullPath = $msi.FullName
-        $relativePath = $fullPath -replace [regex]::Escape($workspace), '' -replace '^\\', '' -replace '\\', '/'
-        echo "msi_path=$relativePath" >> $env:GITHUB_OUTPUT
-        echo "msi_name=$($msi.Name)" >> $env:GITHUB_OUTPUT
-        Write-Host "Found MSI: $($msi.Name) at $relativePath"
-        Write-Host "Full path: $fullPath"
-
-    - name: Generate release notes with MSI link
+    - name: Generate release notes
       id: release_notes
       shell: bash
       env:
         GITHUB_REPO: ${{ github.repository }}
+        tag: ${{ needs.prepare.outputs.tag }}
+        prev_tag: ${{ needs.prepare.outputs.prev_tag }}
+        prerelease: ${{ needs.prepare.outputs.prerelease }}
       run: |
-        tag="${{ steps.release.outputs.tag }}"
-        msiName="${{ steps.find_msi.outputs.msi_name }}"
+        set -euo pipefail
+        cd release-assets
+        msiName=$(ls NefMotoECUFlasher-*.msi | head -1)
+        cd ..
         msiUrl="https://github.com/${{ github.repository }}/releases/download/${tag}/${msiName}"
-        prev_tag="${{ steps.release.outputs.prev_tag }}"
-        prerelease="${{ steps.release.outputs.prerelease }}"
 
-        # Generate changelog with git-cliff: stable uses -l (since previous stable), RC uses explicit range
         if [ "$prerelease" = "true" ]; then
           cliffBody=$(git cliff "$prev_tag..$tag")
-          # git-cliff labels range output with last stable tag (tag_pattern), not the range start
           releaseBody="## What's Changed (since ${prev_tag})"
           releaseBody="${releaseBody}"$'\n'"$(echo "$cliffBody" | tail -n +2 | sed "s|^\*\*Full Changelog\*\*:.*|**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${tag}|")"
         else
           releaseBody=$(git cliff -l)
         fi
 
-        # Fallback if git-cliff produced nothing
         if [ -z "$releaseBody" ]; then
           releaseBody="## What's Changed"$'\n'$'\n'"Release ${tag}"
         fi
 
-        # Append MSI download link and runtime requirement
-        releaseBody="${releaseBody}"$'\n'$'\n'"## Downloads"$'\n'$'\n'"📦 [Download Installer](${msiUrl}) (${msiName})"
-        releaseBody="${releaseBody}"$'\n'$'\n'"Requires the [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe). The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not sufficient."
+        releaseBody="${releaseBody}"$'\n'$'\n'"## Downloads"$'\n'
+        releaseBody="${releaseBody}"$'\n'"### Windows"$'\n'
+        releaseBody="${releaseBody}"$'\n'"- [Download Installer](${msiUrl}) (${msiName})"$'\n'
+        releaseBody="${releaseBody}"$'\n'"Requires the [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe). The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not sufficient."$'\n'
+        releaseBody="${releaseBody}"$'\n'"### macOS and Linux (nmflasher)"$'\n'
+        for rid in linux-x64 linux-arm64 osx-x64 osx-arm64; do
+          name="nmflasher-${tag}-${rid}.tar.gz"
+          test -f "release-assets/${name}" || { echo "missing ${name}"; exit 1; }
+          url="https://github.com/${{ github.repository }}/releases/download/${tag}/${name}"
+          releaseBody="${releaseBody}"$'\n'"- [${name}](${url})"
+        done
+        releaseBody="${releaseBody}"$'\n'$'\n'"These archives are self-contained (no separate .NET install). Unpack and run ./nmflasher from the folder. On Linux the user must be able to open the serial node, typically by being in the dialout group."
 
-        # Multiline output for GITHUB_OUTPUT
         {
           echo "body<<EOF"
           echo "$releaseBody"
@@ -149,7 +204,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        tag="${{ steps.release.outputs.tag }}"
+        tag="${{ needs.prepare.outputs.tag }}"
         # Deleting/recreating a tag leaves the old release object; create then fails with already_exists.
         release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
           --jq ".[] | select(.tag_name==\"${tag}\") | .id" | head -1)
@@ -163,9 +218,9 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v3
       with:
-        files: ${{ steps.find_msi.outputs.msi_path }}
-        tag_name: ${{ steps.release.outputs.tag }}
-        prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
+        files: release-assets/*
+        tag_name: ${{ needs.prepare.outputs.tag }}
+        prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
         draft: false
         body: ${{ steps.release_notes.outputs.body }}
       env:

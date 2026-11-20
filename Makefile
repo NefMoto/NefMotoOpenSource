@@ -17,8 +17,11 @@ RELEASE_DIR := ECUFlasher/bin/msil/Release
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(FULL_VERSION).msi
 PUBLISH_DIR := publish/NefMotoECUFlasher
+# Self-contained nmflasher publish. Set RID (linux-x64, linux-arm64, osx-x64, osx-arm64).
+NMFLASHER_PUBLISH_DIR := publish/nmflasher-$(RID)
+NMFLASHER_TARBALL := nmflasher-$(FULL_VERSION)-$(RID).tar.gz
 
-.PHONY: all debug release test clean installer publish help force
+.PHONY: all debug release test clean installer publish nmflasher help force
 
 all: debug
 
@@ -53,10 +56,27 @@ publish:
 	@test -d "$(PUBLISH_DIR)/MemoryLayouts" || { echo "error: MemoryLayouts missing from $(PUBLISH_DIR)"; exit 1; }
 	@ls "$(PUBLISH_DIR)/MemoryLayouts"/*.MemoryLayout.xml >/dev/null
 
+# Self-contained single-file nmflasher for one RID. Writes publish/nmflasher-$(RID)/ and nmflasher-$(FULL_VERSION)-$(RID).tar.gz.
+nmflasher:
+	@test -n "$(RID)" || { echo "error: set RID (linux-x64, linux-arm64, osx-x64, osx-arm64)"; exit 1; }
+	@echo "Publishing nmflasher $(RID) to $(NMFLASHER_PUBLISH_DIR) ($(FULL_VERSION))..."
+	@rm -rf "$(NMFLASHER_PUBLISH_DIR)"
+	@FULL_VERSION=$(FULL_VERSION) dotnet publish nmflasher/nmflasher.csproj \
+		--configuration Release -r $(RID) --self-contained true \
+		-p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+		-p:DebugType=None -p:DebugSymbols=false \
+		-o $(NMFLASHER_PUBLISH_DIR) --verbosity minimal
+	@test -f "$(NMFLASHER_PUBLISH_DIR)/nmflasher" || { echo "error: nmflasher missing from $(NMFLASHER_PUBLISH_DIR)"; exit 1; }
+	@test -d "$(NMFLASHER_PUBLISH_DIR)/MemoryLayouts" || { echo "error: MemoryLayouts missing from $(NMFLASHER_PUBLISH_DIR)"; exit 1; }
+	@ls "$(NMFLASHER_PUBLISH_DIR)/MemoryLayouts"/*.MemoryLayout.xml >/dev/null
+	@tar -C publish -czf "$(NMFLASHER_TARBALL)" "nmflasher-$(RID)"
+	@echo "Wrote $(NMFLASHER_TARBALL)"
+
 clean:
 	@echo "Cleaning build artifacts..."
 	@find . -type d \( -name "bin" -o -name "obj" \) -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf publish
+	@rm -f nmflasher-*-linux-*.tar.gz nmflasher-*-osx-*.tar.gz
 
 help:
 	@echo "Available targets:"
@@ -64,6 +84,7 @@ help:
 	@echo "  make release   - Build in Release configuration"
 	@echo "  make test      - Build and run unit tests"
 	@echo "  make publish   - Framework-dependent publish folder (not MSI)"
+	@echo "  make nmflasher RID=linux-x64 - Self-contained single-file nmflasher tar.gz"
 	@echo "  make installer - Build the MSI installer"
 	@echo "  make clean     - Remove all build artifacts"
 	@echo "  make help      - Show this help message"

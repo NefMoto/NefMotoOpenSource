@@ -95,12 +95,12 @@ Pre-built releases are available at: <https://github.com/NefMoto/NefMotoOpenSour
 
 Install steps: [Getting started](docs/user-guide/getting-started.md#install).
 
-The MSI is 64-bit and installs to `C:\Program Files\NefMotoECUFlasher`. Upgrading from an older x86 install should replace the copy under Program Files (x86). The MSI is Windows only. On macOS and Linux, build `nmflasher` from source. [BUILDING.md](docs/BUILDING.md)
+The MSI is 64-bit and installs to `C:\Program Files\NefMotoECUFlasher`. Upgrading from an older x86 install should replace the copy under Program Files (x86). The MSI is Windows only. On macOS and Linux, download the matching self-contained `nmflasher-*-osx-*.tar.gz` or `nmflasher-*-linux-*.tar.gz` from the release page, or build from source. [Getting started](docs/user-guide/getting-started.md#install), [BUILDING.md](docs/BUILDING.md)
 
 ## Requirements
 
-- Windows for the ECUFlasher window and the MSI. `nmflasher` also runs on macOS and Linux; build it from source. [BUILDING.md](docs/BUILDING.md)
-- [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe) — the MSI checks for this. The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not sufficient.
+- Windows for the ECUFlasher window and the MSI. `nmflasher` also runs on macOS and Linux via the release tar.gz archives or a source build. [Getting started](docs/user-guide/getting-started.md#install)
+- [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe) — the MSI checks for this. The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not sufficient. The Unix `nmflasher` tar.gz archives are self-contained and do not need a separate .NET install.
 - OBD-II/USB cable — **either**:
   - A dumb-mode K+DCAN or KKL cable: USB-to-serial with an FTDI or CH340 chipset, K-line pass-through to the ECU (no protocol translation), **or**
   - A legacy Ross-Tech HEX-USB or HEX-USB+CAN with Ross-Tech VCP drivers, dumb K-line pass-through, and smart mode disabled — the interface must show up in NefMoto's device list (install VCP per [Ross-Tech](http://www.ross-tech.com/vag-com/usb/virtual-com-port.php) if it does not)
