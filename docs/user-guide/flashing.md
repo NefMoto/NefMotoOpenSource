@@ -100,9 +100,12 @@ nmflasher --help
 nmflasher --version
 nmflasher usb
 nmflasher layouts
+nmflasher --layout
 nmflasher kwp info
 nmflasher bootmode info
 nmflasher kwp read full --layout 29F800BB -o out.bin
+nmflasher kwp read full --layout 512k -o out.bin
+nmflasher kwp read full -o calibration.bin
 nmflasher kwp read diff -i base.bin -o out.bin
 nmflasher kwp write full -i image.bin
 nmflasher kwp write diff -i image.bin
@@ -112,14 +115,14 @@ nmflasher bootmode write full -i image.bin
 
 - `-h` and `--help` print the command summary and exit. `--version` prints the build version and exits. Neither connects.
 - `usb` prints each FTDI or CH340 device as index, type, description, and serial. It does not connect. `--usb N` selects that index. One attached device is used when `--usb` is omitted.
-- `layouts` prints each layout basename. It does not connect. Pass one of those names to `--layout`.
+- `layouts`, and `--layout` with no name, print each layout basename. They do not connect. Pass one of those names to `--layout`.
 - `kwp info` reads ECU identification in the standard session, the same entries as **Read ECU Info**. `bootmode info` reads the boot-mode ECU information. The ECU must already be in boot mode. See [Bootmode](bootmode.md).
 - `-i` is the image to write, or the file a diff read compares. `-o` is the file a read saves.
-- `--layout` is a basename from [Layout](#layout). When `-i` is present and `--layout` is omitted, 1 MB selects `29F800BB`, 512 KB selects `29F400BB`, and 256 KB selects `29F200`. Any other length asks for `--layout`. A full KWP read has no image, so it requires `--layout`. The image length must match the layout before a write starts.
+- `--layout` is a basename from [Layout](#layout), or `1m`/`1mb` (`29F800BB`), `512k`/`512kb` (`29F400BB`), or `256k`/`256kb` (`29F200`). Case does not matter. When `-i` is present and `--layout` is omitted, those same three sizes are selected from the file length. Any other length asks for `--layout`. A full KWP read with no `--layout` copies `0x0000`-`0xBFFF` on a held M5.9.2 session (pin 43 off +12 V). That is the calibration, not the whole flash. Any other ECU still needs `--layout`. `29F800BB` is not assumed. The image length must match the layout before a write starts.
 - KWP uses fast init. `--slow` uses slow init. `--baud` sets the session baud. The default list is 124800, 52800, 38400, 10400, 9600.
 - Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write are not available in boot mode. Boot mode reads the chip id and builds the layout. Boot-mode write does not verify.
 - `--no-verify` matches clearing **Verify Read** or **Verify Write**. On a full KWP read of a bottom-boot layout whose first sector is 16 KB at `0x800000`, that checksums the first four sectors instead of every sector.
-- `--yes` prints the confirmation and does not wait. A write that is cancelled does not connect.
+- Press Enter to continue. Ctrl-C aborts. `-f` and `--force` answer the confirmation prompts and do not wait. On **Sector Erase Failed** they stop the write. They do not erase the entire flash. A mirror question runs the sample check. A cancelled write does not connect.
 - There is no erase command. A write erases sectors as part of the write.
 
 ## Next
