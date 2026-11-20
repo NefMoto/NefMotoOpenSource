@@ -17,11 +17,11 @@ RELEASE_DIR := ECUFlasher/bin/msil/Release
 
 INSTALLER := Installer/bin/Release/NefMotoECUFlasher-$(FULL_VERSION).msi
 PUBLISH_DIR := publish/NefMotoECUFlasher
-# Self-contained nmflasher publish. Set RID (linux-x64, linux-arm64, osx-x64, osx-arm64).
-NMFLASHER_PUBLISH_DIR := publish/nmflasher-$(RID)
-NMFLASHER_TARBALL := nmflasher-$(FULL_VERSION)-$(RID).tar.gz
+# Self-contained ecuflash publish. Set RID (linux-x64, linux-arm64, osx-x64, osx-arm64).
+ECUFLASH_PUBLISH_DIR := publish/ecuflash-$(RID)
+ECUFLASH_TARBALL := ecuflash-$(FULL_VERSION)-$(RID).tar.gz
 
-.PHONY: all debug release test clean installer publish nmflasher help force
+.PHONY: all debug release test clean installer publish ecuflash help force
 
 all: debug
 
@@ -31,7 +31,7 @@ debug $(DEBUG_DIR)/NefMotoECUFlasher.exe: force
 release $(RELEASE_DIR)/NefMotoECUFlasher.exe: force
 	@$(MAKE) CONFIG=Release build
 
-nmflasher/bin/Release/nmflasher.exe: $(RELEASE_DIR)/NefMotoECUFlasher.exe
+ecuflash/bin/Release/ecuflash.exe: $(RELEASE_DIR)/NefMotoECUFlasher.exe
 	@test -f $@ || { echo "missing $@"; exit 1; }
 
 test: build
@@ -42,11 +42,11 @@ build:
 	@echo "Building with dotnet ($(CONFIG))..."
 	FULL_VERSION=$(FULL_VERSION) dotnet build ECUFlasher.sln --configuration $(CONFIG) --verbosity minimal
 
-installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe nmflasher/bin/Release/nmflasher.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
+installer $(INSTALLER): $(RELEASE_DIR)/NefMotoECUFlasher.exe ecuflash/bin/Release/ecuflash.exe Installer/Product.wxs Makefile Directory.Build.props .config/dotnet-tools.json Installer/installer.ps1
 	@echo "Building $(INSTALLER) ($(FULL_VERSION), $(NET_TFM))..."
 	@FULL_VERSION=$(FULL_VERSION) NET_TFM=$(NET_TFM) DOTNET_MAJOR=$(DOTNET_MAJOR) \
 	ECUFlasher_TargetDir="$(RELEASE_DIR)/" \
-	Nmflasher_TargetDir="nmflasher/bin/Release/" \
+	Ecuflash_TargetDir="ecuflash/bin/Release/" \
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -File Installer/installer.ps1
 
 # Framework-dependent publish folder (not single-file, not the MSI). Still needs the Desktop runtime matching NetTfm.
@@ -56,27 +56,27 @@ publish:
 	@test -d "$(PUBLISH_DIR)/MemoryLayouts" || { echo "error: MemoryLayouts missing from $(PUBLISH_DIR)"; exit 1; }
 	@ls "$(PUBLISH_DIR)/MemoryLayouts"/*.MemoryLayout.xml >/dev/null
 
-# Self-contained single-file nmflasher for one RID. Writes publish/nmflasher-$(RID)/ and nmflasher-$(FULL_VERSION)-$(RID).tar.gz.
-nmflasher:
+# Self-contained single-file ecuflash for one RID. Writes publish/ecuflash-$(RID)/ and ecuflash-$(FULL_VERSION)-$(RID).tar.gz.
+ecuflash:
 	@test -n "$(RID)" || { echo "error: set RID (linux-x64, linux-arm64, osx-x64, osx-arm64)"; exit 1; }
-	@echo "Publishing nmflasher $(RID) to $(NMFLASHER_PUBLISH_DIR) ($(FULL_VERSION))..."
-	@rm -rf "$(NMFLASHER_PUBLISH_DIR)"
-	@FULL_VERSION=$(FULL_VERSION) dotnet publish nmflasher/nmflasher.csproj \
+	@echo "Publishing ecuflash $(RID) to $(ECUFLASH_PUBLISH_DIR) ($(FULL_VERSION))..."
+	@rm -rf "$(ECUFLASH_PUBLISH_DIR)"
+	@FULL_VERSION=$(FULL_VERSION) dotnet publish ecuflash/ecuflash.csproj \
 		--configuration Release -r $(RID) --self-contained true \
 		-p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
 		-p:DebugType=None -p:DebugSymbols=false \
-		-o $(NMFLASHER_PUBLISH_DIR) --verbosity minimal
-	@test -f "$(NMFLASHER_PUBLISH_DIR)/nmflasher" || { echo "error: nmflasher missing from $(NMFLASHER_PUBLISH_DIR)"; exit 1; }
-	@test -d "$(NMFLASHER_PUBLISH_DIR)/MemoryLayouts" || { echo "error: MemoryLayouts missing from $(NMFLASHER_PUBLISH_DIR)"; exit 1; }
-	@ls "$(NMFLASHER_PUBLISH_DIR)/MemoryLayouts"/*.MemoryLayout.xml >/dev/null
-	@tar -C publish -czf "$(NMFLASHER_TARBALL)" "nmflasher-$(RID)"
-	@echo "Wrote $(NMFLASHER_TARBALL)"
+		-o $(ECUFLASH_PUBLISH_DIR) --verbosity minimal
+	@test -f "$(ECUFLASH_PUBLISH_DIR)/ecuflash" || { echo "error: ecuflash missing from $(ECUFLASH_PUBLISH_DIR)"; exit 1; }
+	@test -d "$(ECUFLASH_PUBLISH_DIR)/MemoryLayouts" || { echo "error: MemoryLayouts missing from $(ECUFLASH_PUBLISH_DIR)"; exit 1; }
+	@ls "$(ECUFLASH_PUBLISH_DIR)/MemoryLayouts"/*.MemoryLayout.xml >/dev/null
+	@tar -C publish -czf "$(ECUFLASH_TARBALL)" "ecuflash-$(RID)"
+	@echo "Wrote $(ECUFLASH_TARBALL)"
 
 clean:
 	@echo "Cleaning build artifacts..."
 	@find . -type d \( -name "bin" -o -name "obj" \) -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf publish
-	@rm -f nmflasher-*-linux-*.tar.gz nmflasher-*-osx-*.tar.gz
+	@rm -f ecuflash-*-linux-*.tar.gz ecuflash-*-osx-*.tar.gz
 
 help:
 	@echo "Available targets:"
@@ -84,7 +84,7 @@ help:
 	@echo "  make release   - Build in Release configuration"
 	@echo "  make test      - Build and run unit tests"
 	@echo "  make publish   - Framework-dependent publish folder (not MSI)"
-	@echo "  make nmflasher RID=linux-x64 - Self-contained single-file nmflasher tar.gz"
+	@echo "  make ecuflash RID=linux-x64 - Self-contained single-file ecuflash tar.gz"
 	@echo "  make installer - Build the MSI installer"
 	@echo "  make clean     - Remove all build artifacts"
 	@echo "  make help      - Show this help message"

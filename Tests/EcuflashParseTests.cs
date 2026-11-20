@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: nyet@nyet.org
 */
 
-using Nmflasher;
+using Ecuflash;
 using Xunit;
 
 namespace NefMotoOpenSource.Tests
 {
-    public class NmflasherParseTests
+    public class EcuflashParseTests
     {
         static Program.Request Parse(params string[] args)
         {

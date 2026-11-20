@@ -119,17 +119,17 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: Publish nmflasher tar.gz
+    - name: Publish ecuflash tar.gz
       env:
         FULL_VERSION: ${{ needs.prepare.outputs.tag }}
         RID: ${{ matrix.rid }}
-      run: make nmflasher
+      run: make ecuflash
 
     - name: Upload tar.gz artifact
       uses: actions/upload-artifact@v7
       with:
-        name: nmflasher-${{ matrix.rid }}
-        path: nmflasher-${{ needs.prepare.outputs.tag }}-${{ matrix.rid }}.tar.gz
+        name: ecuflash-${{ matrix.rid }}
+        path: ecuflash-${{ needs.prepare.outputs.tag }}-${{ matrix.rid }}.tar.gz
         if-no-files-found: error
 
   publish-release:
@@ -184,14 +184,14 @@ jobs:
         releaseBody="${releaseBody}"$'\n'"### Windows"$'\n'
         releaseBody="${releaseBody}"$'\n'"- [Download Installer](${msiUrl}) (${msiName})"$'\n'
         releaseBody="${releaseBody}"$'\n'"Requires the [.NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe). The SDK, console runtime, ASP.NET runtime, and .NET 8 Desktop runtime are not sufficient."$'\n'
-        releaseBody="${releaseBody}"$'\n'"### macOS and Linux (nmflasher)"$'\n'
+        releaseBody="${releaseBody}"$'\n'"### macOS and Linux (ecuflash)"$'\n'
         for rid in linux-x64 linux-arm64 osx-x64 osx-arm64; do
-          name="nmflasher-${tag}-${rid}.tar.gz"
+          name="ecuflash-${tag}-${rid}.tar.gz"
           test -f "release-assets/${name}" || { echo "missing ${name}"; exit 1; }
           url="https://github.com/${{ github.repository }}/releases/download/${tag}/${name}"
           releaseBody="${releaseBody}"$'\n'"- [${name}](${url})"
         done
-        releaseBody="${releaseBody}"$'\n'$'\n'"These archives are self-contained (no separate .NET install). Unpack and run ./nmflasher from the folder. On Linux the user must be able to open the serial node, typically by being in the dialout group."
+        releaseBody="${releaseBody}"$'\n'$'\n'"These archives are self-contained (no separate .NET install). Unpack and run ./ecuflash from the folder. On Linux the user must be able to open the serial node, typically by being in the dialout group."
 
         {
           echo "body<<EOF"

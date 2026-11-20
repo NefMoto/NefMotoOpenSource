@@ -18,7 +18,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ApplicationShared", "Applic
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NefMotoOpenSource.Tests", "Tests\NefMotoOpenSource.Tests.csproj", "{B83E1A2C-5D4F-4E9B-9C3A-7F8E2D1B0A4C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "nmflasher", "nmflasher\nmflasher.csproj", "{E7C3B91A-4F2D-4C88-9A17-6D0E5B2F8C31}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ecuflash", "ecuflash\ecuflash.csproj", "{E7C3B91A-4F2D-4C88-9A17-6D0E5B2F8C31}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

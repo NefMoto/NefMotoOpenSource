@@ -14,7 +14,7 @@
   <?endif ?>
   <?define FullVersion=$(env.FULL_VERSION)?>
   <?define TargetDir=$(env.ECUFlasher_TargetDir)?>
-  <?define Nmflasher_TargetDir=$(env.Nmflasher_TargetDir)?>
+  <?define Ecuflash_TargetDir=$(env.Ecuflash_TargetDir)?>
   <?define MemoryLayouts_TargetDir=MemoryLayouts\?>
   <!-- No Package Id: new ProductCode each build (required for x86→x64; Keep UpgradeCode). -->
   <Package
@@ -176,17 +176,17 @@
       <Component Id="Checksum.dll" Guid="*">
         <File Id="Checksum.dll" Name="Checksum.dll" Source="$(var.TargetDir)Checksum.dll" KeyPath="yes" />
       </Component>
-      <Component Id="nmflasher.exe" Guid="*">
-        <File Id="nmflasher.exe" Name="nmflasher.exe" Source="$(var.Nmflasher_TargetDir)nmflasher.exe" KeyPath="yes" />
+      <Component Id="ecuflash.exe" Guid="*">
+        <File Id="ecuflash.exe" Name="ecuflash.exe" Source="$(var.Ecuflash_TargetDir)ecuflash.exe" KeyPath="yes" />
       </Component>
-      <Component Id="nmflasher.dll" Guid="*">
-        <File Id="nmflasher.dll" Name="nmflasher.dll" Source="$(var.Nmflasher_TargetDir)nmflasher.dll" KeyPath="yes" />
+      <Component Id="ecuflash.dll" Guid="*">
+        <File Id="ecuflash.dll" Name="ecuflash.dll" Source="$(var.Ecuflash_TargetDir)ecuflash.dll" KeyPath="yes" />
       </Component>
-      <Component Id="nmflasher.runtimeconfig.json" Guid="*">
-        <File Id="nmflasher.runtimeconfig.json" Name="nmflasher.runtimeconfig.json" Source="$(var.Nmflasher_TargetDir)nmflasher.runtimeconfig.json" KeyPath="yes" />
+      <Component Id="ecuflash.runtimeconfig.json" Guid="*">
+        <File Id="ecuflash.runtimeconfig.json" Name="ecuflash.runtimeconfig.json" Source="$(var.Ecuflash_TargetDir)ecuflash.runtimeconfig.json" KeyPath="yes" />
       </Component>
-      <Component Id="nmflasher.deps.json" Guid="*">
-        <File Id="nmflasher.deps.json" Name="nmflasher.deps.json" Source="$(var.Nmflasher_TargetDir)nmflasher.deps.json" KeyPath="yes" />
+      <Component Id="ecuflash.deps.json" Guid="*">
+        <File Id="ecuflash.deps.json" Name="ecuflash.deps.json" Source="$(var.Ecuflash_TargetDir)ecuflash.deps.json" KeyPath="yes" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="RuntimeDlls" Directory="RuntimeTfmFolder">

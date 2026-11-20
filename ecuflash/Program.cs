@@ -25,7 +25,7 @@ using System.Xml.Serialization;
 using Communication;
 using Shared;
 
-namespace Nmflasher
+namespace Ecuflash
 {
     public static class Program
     {
@@ -56,7 +56,7 @@ namespace Nmflasher
 
                 if ((arg == "-V") || (arg == "--version"))
                 {
-                    Console.WriteLine("nmflasher " + VersionText());
+                    Console.WriteLine("ecuflash " + VersionText());
                     return 0;
                 }
             }
@@ -65,10 +65,10 @@ namespace Nmflasher
             {
                 if (!string.IsNullOrEmpty(error))
                 {
-                    Console.Error.WriteLine("nmflasher: " + error);
+                    Console.Error.WriteLine("ecuflash: " + error);
                 }
 
-                Console.Error.WriteLine("Try 'nmflasher --help' for more information.");
+                Console.Error.WriteLine("Try 'ecuflash --help' for more information.");
                 return 2;
             }
 
@@ -938,7 +938,7 @@ namespace Nmflasher
                 completed(result);
             });
             thread.IsBackground = true;
-            thread.Name = "nmflasher prompt";
+            thread.Name = "ecuflash prompt";
             thread.Start();
         }
 
@@ -1490,21 +1490,21 @@ namespace Nmflasher
 
         static void Usage(TextWriter writer)
         {
-            writer.WriteLine("Usage: nmflasher [-h|--help] [-V|--version]");
-            writer.WriteLine("       nmflasher usb");
-            writer.WriteLine("       nmflasher layouts");
-            writer.WriteLine("       nmflasher --layout");
-            writer.WriteLine("       nmflasher kwp info");
-            writer.WriteLine("       nmflasher bootmode info");
-            writer.WriteLine("       nmflasher kwp read full --layout NAME -o FILE");
-            writer.WriteLine("       nmflasher kwp read full -o FILE");
-            writer.WriteLine("       nmflasher kwp read diff -i FILE -o FILE");
-            writer.WriteLine("       nmflasher kwp write full -i FILE");
-            writer.WriteLine("       nmflasher kwp write diff -i FILE");
-            writer.WriteLine("       nmflasher bootmode read full -o FILE");
-            writer.WriteLine("       nmflasher bootmode read diff -i FILE -o FILE");
-            writer.WriteLine("       nmflasher bootmode write full -i FILE");
-            writer.WriteLine("       nmflasher bootmode write diff -i FILE");
+            writer.WriteLine("Usage: ecuflash [-h|--help] [-V|--version]");
+            writer.WriteLine("       ecuflash usb");
+            writer.WriteLine("       ecuflash layouts");
+            writer.WriteLine("       ecuflash --layout");
+            writer.WriteLine("       ecuflash kwp info");
+            writer.WriteLine("       ecuflash bootmode info");
+            writer.WriteLine("       ecuflash kwp read full --layout NAME -o FILE");
+            writer.WriteLine("       ecuflash kwp read full -o FILE");
+            writer.WriteLine("       ecuflash kwp read diff -i FILE -o FILE");
+            writer.WriteLine("       ecuflash kwp write full -i FILE");
+            writer.WriteLine("       ecuflash kwp write diff -i FILE");
+            writer.WriteLine("       ecuflash bootmode read full -o FILE");
+            writer.WriteLine("       ecuflash bootmode read diff -i FILE -o FILE");
+            writer.WriteLine("       ecuflash bootmode write full -i FILE");
+            writer.WriteLine("       ecuflash bootmode write diff -i FILE");
             writer.WriteLine();
             writer.WriteLine("Read ECU information, or read or write flash over KWP or boot mode.");
             writer.WriteLine("A write erases sectors as part of the write. There is no erase command.");

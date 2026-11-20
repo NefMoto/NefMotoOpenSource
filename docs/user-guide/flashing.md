@@ -92,27 +92,27 @@ Do not use entire-flash erase to “fix” a BT/BB mismatch.
 
 ## Command line
 
-`nmflasher` is the command-line form of this tab. It uses the same read and write operations, and it prints the same confirmation before it connects. The installer places `nmflasher.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
+`ecuflash` is the command-line form of this tab. It uses the same read and write operations, and it prints the same confirmation before it connects. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
 
 ```text
-nmflasher -h
-nmflasher --help
-nmflasher --version
-nmflasher usb
-nmflasher layouts
-nmflasher --layout
-nmflasher kwp info
-nmflasher bootmode info
-nmflasher kwp read full --layout 29F800BB -o out.bin
-nmflasher kwp read full --layout 512k -o out.bin
-nmflasher kwp read full -o calibration.bin
-nmflasher kwp read diff -i base.bin -o out.bin
-nmflasher kwp write full -i image.bin
-nmflasher kwp write diff -i image.bin
-nmflasher bootmode read full -o out.bin
-nmflasher bootmode read diff -i base.bin -o out.bin
-nmflasher bootmode write full -i image.bin
-nmflasher bootmode write diff -i image.bin
+ecuflash -h
+ecuflash --help
+ecuflash --version
+ecuflash usb
+ecuflash layouts
+ecuflash --layout
+ecuflash kwp info
+ecuflash bootmode info
+ecuflash kwp read full --layout 29F800BB -o out.bin
+ecuflash kwp read full --layout 512k -o out.bin
+ecuflash kwp read full -o calibration.bin
+ecuflash kwp read diff -i base.bin -o out.bin
+ecuflash kwp write full -i image.bin
+ecuflash kwp write diff -i image.bin
+ecuflash bootmode read full -o out.bin
+ecuflash bootmode read diff -i base.bin -o out.bin
+ecuflash bootmode write full -i image.bin
+ecuflash bootmode write diff -i image.bin
 ```
 
 - `-h` and `--help` print the command summary and exit. `--version` prints the build version and exits. Neither connects.
