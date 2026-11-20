@@ -148,11 +148,26 @@ namespace Communication
         private readonly BootmodeNopCommunicationAction mNOPAction;
     }
 
+    static class RangeCompare
+    {
+        internal enum Kind { Failed, Match, Differ }
+
+        internal static Kind Check(BootstrapInterface boot, BootstrapInterface.ECUFlashVariant variant, uint offset, uint length, byte[] data)
+        {
+            if (!boot.TryChecksumExternalRange(variant, offset, length, out uint crc))
+            {
+                return Kind.Failed;
+            }
+
+            return crc == BootmodeRangeChecksum.Compute(data) ? Kind.Match : Kind.Differ;
+        }
+    }
+
     /// <summary>
-    /// Bootmode flash read operation. Diff read not supported (MiniMon has no checksum-for-range); all sectors read.
-    /// Checksum verification via MiniMon_GetChecksum() not yet implemented.
+    /// Bootmode flash read. When <see cref="BootmodeReadExternalFlashSettings.SkipMatchingSectors"/> is set,
+    /// a sector whose range checksum matches the loaded bytes is not transferred.
     /// </summary>
-    /// <remarks>TODO: On block read failure, retry that block N times (e.g. 2–3) with short delay before failing operation. Implement in ReadFlashThread.</remarks>
+    /// <remarks>A CRC mismatch reads the sector again, up to 3 times. A failed transfer stops the read.</remarks>
     public class BootmodeReadExternalFlashOperation : CommunicationOperation
     {
         public class BootmodeReadExternalFlashSettings
@@ -160,6 +175,8 @@ namespace Communication
             public BootstrapInterface.ECUFlashVariant Variant = BootstrapInterface.ECUFlashVariant.ME7;
             public uint StartAddress = 0;
             public uint Size = 0;
+            public bool SkipMatchingSectors = false;
+            public bool VerifyReadData = false;
         }
 
         public BootmodeReadExternalFlashOperation(BootstrapInterface commInterface, BootmodeReadExternalFlashSettings readSettings, IEnumerable<MemoryImage> flashBlockList)
@@ -244,6 +261,17 @@ namespace Communication
                 int blockIndex = 0;
                 uint bytesReadFromPreviousBlocks = 0;
 
+                void Take(byte[] data, uint size)
+                {
+                    readSectorData.Add(data);
+                    bytesReadFromPreviousBlocks += size;
+                    mTotalBytesRead = bytesReadFromPreviousBlocks;
+                    if (mTotalBytesToRead > 0)
+                    {
+                        OnUpdatePercentComplete(((float)mTotalBytesRead / (float)mTotalBytesToRead) * 100.0f);
+                    }
+                }
+
                 foreach (var block in mFlashBlockList)
                 {
                     blockIndex++;
@@ -259,44 +287,82 @@ namespace Communication
 
                     CommInterface.DisplayStatusMessage($"ReadFlashThread: Block {blockIndex}/{mFlashBlockList.Count()}: StartAddress=0x{block.StartAddress:X6}, Size={blockSize}, Offset=0x{blockStartAddress:X6}", StatusMessageType.LOG);
 
-                    byte[] blockData;
-                    if (mBootstrapInterface.ReadExternalFlash(
-                        mSettings.Variant,
-                        blockStartAddress,
-                        blockSize,
-                        out blockData,
-                        (bytesReadInBlock, totalBytesInBlock) =>
-                        {
-                            // Calculate overall progress: bytes from previous blocks + bytes read in current block
-                            uint totalBytesReadSoFar = bytesReadFromPreviousBlocks + bytesReadInBlock;
-                            if (mTotalBytesToRead > 0)
-                            {
-                                float percentComplete = ((float)totalBytesReadSoFar / (float)mTotalBytesToRead) * 100.0f;
-                                OnUpdatePercentComplete(percentComplete);
-                            }
-                        },
-                        blockIndex,  // sectorNumber
-                        mFlashBlockList.Count()))  // totalSectors
+                    if (mSettings.SkipMatchingSectors)
                     {
-                        CommInterface.DisplayStatusMessage($"ReadFlashThread: Block {blockIndex} read successfully, got {blockData?.Length ?? 0} bytes", StatusMessageType.LOG);
-                        readSectorData.Add(blockData);
-                        bytesReadFromPreviousBlocks += blockSize;
-                        mTotalBytesRead = bytesReadFromPreviousBlocks;
-
-                        // Update overall progress to 100% for this block
-                        if (mTotalBytesToRead > 0)
+                        RangeCompare.Kind compared = RangeCompare.Check(mBootstrapInterface, mSettings.Variant, blockStartAddress, blockSize, block.RawData);
+                        if (compared == RangeCompare.Kind.Failed)
                         {
-                            float percentComplete = ((float)mTotalBytesRead / (float)mTotalBytesToRead) * 100.0f;
-                            OnUpdatePercentComplete(percentComplete);
+                            CommInterface.DisplayStatusMessage($"ReadFlashThread: Checksum failed for block {blockIndex}", StatusMessageType.USER);
+                            success = false;
+                            break;
                         }
+
+                        if (compared == RangeCompare.Kind.Match)
+                        {
+                            CommInterface.DisplayStatusMessage($"Checksum matches, skipping read of sector {blockIndex}.", StatusMessageType.USER);
+                            Take(block.RawData, blockSize);
+                            continue;
+                        }
+
+                        CommInterface.DisplayStatusMessage($"Checksum differs, reading sector {blockIndex}.", StatusMessageType.USER);
                     }
-                    else
+
+                    byte[] blockData = null;
+                    bool readOk = false;
+                    for (int attempt = 1; attempt <= 3; attempt++)
                     {
-                        CommInterface.DisplayStatusMessage($"ReadFlashThread: Block {blockIndex} read FAILED at offset 0x{blockStartAddress:X6}, size {blockSize}", StatusMessageType.LOG);
-                        CommInterface.DisplayStatusMessage($"ReadFlashThread: ReadExternalFlash returned false for block {blockIndex}", StatusMessageType.USER);
+                        if (!mBootstrapInterface.ReadExternalFlash(
+                            mSettings.Variant,
+                            blockStartAddress,
+                            blockSize,
+                            out blockData,
+                            (bytesReadInBlock, totalBytesInBlock) =>
+                            {
+                                uint totalBytesReadSoFar = bytesReadFromPreviousBlocks + bytesReadInBlock;
+                                if (mTotalBytesToRead > 0)
+                                {
+                                    OnUpdatePercentComplete(((float)totalBytesReadSoFar / (float)mTotalBytesToRead) * 100.0f);
+                                }
+                            },
+                            blockIndex,
+                            mFlashBlockList.Count()))
+                        {
+                            CommInterface.DisplayStatusMessage($"ReadFlashThread: Block {blockIndex} read FAILED at offset 0x{blockStartAddress:X6}, size {blockSize}", StatusMessageType.LOG);
+                            CommInterface.DisplayStatusMessage($"ReadFlashThread: ReadExternalFlash returned false for block {blockIndex}", StatusMessageType.USER);
+                            break;
+                        }
+
+                        if (!mSettings.VerifyReadData)
+                        {
+                            readOk = true;
+                            break;
+                        }
+
+                        RangeCompare.Kind compared = RangeCompare.Check(mBootstrapInterface, mSettings.Variant, blockStartAddress, (uint)blockData.Length, blockData);
+                        if (compared == RangeCompare.Kind.Failed)
+                        {
+                            CommInterface.DisplayStatusMessage($"ReadFlashThread: Verify checksum failed for block {blockIndex}", StatusMessageType.USER);
+                            break;
+                        }
+
+                        if (compared == RangeCompare.Kind.Match)
+                        {
+                            CommInterface.DisplayStatusMessage($"Checksum matches read data, sector {blockIndex}.", StatusMessageType.USER);
+                            readOk = true;
+                            break;
+                        }
+
+                        CommInterface.DisplayStatusMessage($"Checksum does not match sector {blockIndex}, attempt {attempt} of 3.", StatusMessageType.USER);
+                    }
+
+                    if (!readOk)
+                    {
                         success = false;
                         break;
                     }
+
+                    CommInterface.DisplayStatusMessage($"ReadFlashThread: Block {blockIndex} read successfully, got {blockData.Length} bytes", StatusMessageType.LOG);
+                    Take(blockData, blockSize);
                 }
 
                 if (success)
@@ -392,6 +458,8 @@ namespace Communication
         {
             public BootstrapInterface.ECUFlashVariant Variant = BootstrapInterface.ECUFlashVariant.ME7;
             public MemoryLayout FlashMemoryLayout;
+            public bool SkipMatchingSectors = false;
+            public bool VerifyWrittenData = true;
         }
 
         public BootmodeWriteExternalFlashOperation(BootstrapInterface commInterface, BootmodeWriteExternalFlashSettings writeSettings, IEnumerable<MemoryImage> sectorImages)
@@ -469,6 +537,20 @@ namespace Communication
 
         private void WriteFlashThread()
         {
+            bool Fail(string message, StatusMessageType type = StatusMessageType.USER)
+            {
+                CommInterface.DisplayStatusMessage(message, type);
+                mState = WritingState.Failed;
+                StartNextAction();
+                return true;
+            }
+
+            bool EnsureWriteBus()
+            {
+                return mBootstrapInterface.ConfigureRegistersForExternalFlashWrite(mSettings.Variant)
+                    || Fail("WriteFlashThread: Failed to configure registers for write");
+            }
+
             try
             {
                 CommInterface.DisplayStatusMessage("WriteFlashThread: Starting bootmode flash write", StatusMessageType.LOG);
@@ -476,11 +558,8 @@ namespace Communication
                 uint writeAddressBase = mBootstrapInterface.GetFlashWriteBaseAddress(mSettings.Variant);
                 uint readAddressBase = mBootstrapInterface.GetFlashBaseAddress(mSettings.Variant);
 
-                if (!mBootstrapInterface.ConfigureRegistersForExternalFlashWrite(mSettings.Variant))
+                if (!EnsureWriteBus())
                 {
-                    CommInterface.DisplayStatusMessage("WriteFlashThread: Failed to configure registers for write", StatusMessageType.USER);
-                    mState = WritingState.Failed;
-                    StartNextAction();
                     return;
                 }
 
@@ -493,21 +572,43 @@ namespace Communication
                     sectorIndex++;
                     if (!IsRunning)
                     {
-                        CommInterface.DisplayStatusMessage($"WriteFlashThread: Operation stopped at sector {sectorIndex}", StatusMessageType.LOG);
-                        mState = WritingState.Failed;
-                        StartNextAction();
+                        Fail($"WriteFlashThread: Operation stopped at sector {sectorIndex}", StatusMessageType.LOG);
                         return;
                     }
 
                     uint sectorSize = (uint)sectorImage.Size;
                     byte[] sectorData = sectorImage.RawData;
 
+                    if (mSettings.SkipMatchingSectors)
+                    {
+                        RangeCompare.Kind compared = RangeCompare.Check(mBootstrapInterface, mSettings.Variant, sectorOffset, sectorSize, sectorData);
+                        if (compared == RangeCompare.Kind.Failed)
+                        {
+                            Fail($"WriteFlashThread: Checksum failed for sector {sectorIndex}. Nothing was erased.");
+                            return;
+                        }
+
+                        if (compared == RangeCompare.Kind.Match)
+                        {
+                            CommInterface.DisplayStatusMessage($"Checksum matches, skipping erase of sector {sectorIndex}.", StatusMessageType.USER);
+                            mBytesWritten += sectorSize;
+                            UpdateProgress();
+                            mNumSuccessfullyFlashedSectors++;
+                            sectorOffset += sectorSize;
+                            continue;
+                        }
+
+                        CommInterface.DisplayStatusMessage($"Checksum differs, erasing sector {sectorIndex}.", StatusMessageType.USER);
+                        if (!EnsureWriteBus())
+                        {
+                            return;
+                        }
+                    }
+
                     CommInterface.DisplayStatusMessage($"WriteFlashThread: Erasing sector {sectorIndex}/{mTotalSectors} (offset 0x{sectorOffset:X6}, size {sectorSize})", StatusMessageType.LOG);
                     if (!mBootstrapInterface.EraseSector(writeAddressBase, readAddressBase, sectorOffset, sectorIndex - 1, sectorSize))
                     {
-                        CommInterface.DisplayStatusMessage($"WriteFlashThread: Erase failed for sector {sectorIndex}", StatusMessageType.USER);
-                        mState = WritingState.Failed;
-                        StartNextAction();
+                        Fail($"WriteFlashThread: Erase failed for sector {sectorIndex}");
                         return;
                     }
 
@@ -536,14 +637,34 @@ namespace Communication
                         uint blockOffset = sectorOffset + (uint)blockStart;
                         if (!mBootstrapInterface.ProgramBlock(mSettings.Variant, writeAddressBase, readAddressBase, blockOffset, blockData))
                         {
-                            CommInterface.DisplayStatusMessage($"WriteFlashThread: Program failed at sector {sectorIndex}, block {blockIdx}", StatusMessageType.USER);
-                            mState = WritingState.Failed;
-                            StartNextAction();
+                            Fail($"WriteFlashThread: Program failed at sector {sectorIndex}, block {blockIdx}");
                             return;
                         }
 
                         mBytesWritten += (uint)blockLen;
                         UpdateProgress();
+                    }
+
+                    if (mSettings.VerifyWrittenData)
+                    {
+                        RangeCompare.Kind compared = RangeCompare.Check(mBootstrapInterface, mSettings.Variant, sectorOffset, sectorSize, sectorData);
+                        if (compared == RangeCompare.Kind.Failed)
+                        {
+                            Fail($"WriteFlashThread: Verify checksum failed for sector {sectorIndex}");
+                            return;
+                        }
+
+                        if (compared != RangeCompare.Kind.Match)
+                        {
+                            Fail($"Checksum does not match written sector {sectorIndex}.");
+                            return;
+                        }
+
+                        CommInterface.DisplayStatusMessage($"Checksum matches written data, sector {sectorIndex}.", StatusMessageType.USER);
+                        if (!EnsureWriteBus())
+                        {
+                            return;
+                        }
                     }
 
                     mNumSuccessfullyFlashedSectors++;
@@ -556,10 +677,8 @@ namespace Communication
             }
             catch (Exception ex)
             {
-                CommInterface.DisplayStatusMessage($"WriteFlashThread: EXCEPTION - {ex.GetType().Name}: {ex.Message}", StatusMessageType.USER);
                 CommInterface.DisplayStatusMessage($"WriteFlashThread: {ex.StackTrace}", StatusMessageType.LOG);
-                mState = WritingState.Failed;
-                StartNextAction();
+                Fail($"WriteFlashThread: EXCEPTION - {ex.GetType().Name}: {ex.Message}");
             }
         }
 

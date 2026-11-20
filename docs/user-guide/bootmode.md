@@ -85,9 +85,9 @@ Then **KWP2000 Info** → **Read ECU Info** (device ID, CPU family, SYSCON / BUS
 On **Flashing**, the layout combo is **disabled**. Layout comes from the flash device ID (`FC_GETSTATE`). Tooltip shows base address, size, and sector count when detection succeeded. A running core gets the same driver upload and `FC_GETSTATE` on every connect. A flash id from an earlier connect is not reused. If that query fails, the combo shows **Flash type not detected** and **Flash Type Not Detected** appears.
 
 - **Full Read Flash** / **Full Write Flash**
-- **Diff Read Flash** is not supported in bootmode (the loader has no checksum-for-range)
-- **Verify Write** is forced off for bootmode flash write
-- **Verify Read** is off in bootmode. A bootmode full read sends no `0xC5`
+- **Diff Read Flash** / **Diff Write Flash** skip a sector whose checksum matches the loaded file. The routine is uploaded to `0xF840`. A bootmode read sends no `0xC5`
+- **Verify Write** — checked, each programmed sector is checksummed after the write. Unchecked, a bootmode write does not checksum. A matching sector is still skipped before erase
+- **Verify Read** — checked, each transferred sector is checksummed after the read. Unchecked, a bootmode read does not checksum
 - Variant (ME7 vs Simos3 vs EDC15) is taken from the detected layout base (ME7 `0x800000`, Simos3/EDC15 `0x400000`). There is no separate variant dropdown.
 
 **File > Choose Flash File** still loads a `.bin` for write.

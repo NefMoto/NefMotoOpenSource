@@ -159,6 +159,16 @@ namespace Communication.Properties {
                 return ((byte[])(obj));
             }
         }
+
+        /// <summary>
+        ///   Range CRC-32 routine uploaded to 0xF840. From BootmodeRangeChecksum.bin.
+        /// </summary>
+        internal static byte[] BootmodeRangeChecksum {
+            get {
+                object obj = ResourceManager.GetObject("BootmodeRangeChecksum", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }
 
