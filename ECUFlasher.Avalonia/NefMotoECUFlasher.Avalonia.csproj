@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\ProgramIcon.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AssemblyName>NefMotoECUFlasher.Avalonia</AssemblyName>
+    <RootNamespace>NefMotoECUFlasher.Avalonia</RootNamespace>
+    <FullVersion Condition="'$(FullVersion)' == ''">$(FULL_VERSION)</FullVersion>
+    <FullVersion Condition="'$(FullVersion)' == ''">0.0.0.0</FullVersion>
+    <BaseVersion>$([System.Text.RegularExpressions.Regex]::Match($(FullVersion), '(\d+\.\d+(\.\d+)?(\.\d+)?)'))</BaseVersion>
+    <BaseVersion Condition="'$(BaseVersion)' == ''">0.0.0.0</BaseVersion>
+    <AssemblyVersion>$(BaseVersion)</AssemblyVersion>
+    <FileVersion>$(BaseVersion)</FileVersion>
+    <InformationalVersion>$(FullVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\MemoryLayouts\*.MemoryLayout.xml" Link="MemoryLayouts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApplicationShared\ApplicationShared.csproj" />
+    <ProjectReference Include="..\Communication\Communication.csproj" />
+    <ProjectReference Include="..\Checksum\Checksum.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\FTD2XX_NET\FTD2XX_NET.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.21" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.21" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.21" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.21" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.21">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+  </ItemGroup>
+</Project>

@@ -20,8 +20,9 @@ PUBLISH_DIR := publish/NefMotoECUFlasher
 # Self-contained ecuflash publish. Set RID (linux-x64, linux-arm64, osx-x64, osx-arm64).
 ECUFLASH_PUBLISH_DIR := publish/ecuflash-$(RID)
 ECUFLASH_TARBALL := ecuflash-$(FULL_VERSION)-$(RID).tar.gz
+AVALONIA_PROJ := ECUFlasher.Avalonia/NefMotoECUFlasher.Avalonia.csproj
 
-.PHONY: all debug release test clean installer publish ecuflash help force
+.PHONY: all debug release test clean installer publish ecuflash run-avalonia help force
 
 all: debug
 
@@ -72,6 +73,10 @@ ecuflash:
 	@tar -C publish -czf "$(ECUFLASH_TARBALL)" "ecuflash-$(RID)"
 	@echo "Wrote $(ECUFLASH_TARBALL)"
 
+run-avalonia:
+	@echo "Building and running Avalonia companion ($(CONFIG))..."
+	@FULL_VERSION=$(FULL_VERSION) dotnet run --project $(AVALONIA_PROJ) --configuration $(CONFIG) --no-launch-profile
+
 clean:
 	@echo "Cleaning build artifacts..."
 	@find . -type d \( -name "bin" -o -name "obj" \) -exec rm -rf {} + 2>/dev/null || true
@@ -85,6 +90,7 @@ help:
 	@echo "  make test      - Build and run unit tests"
 	@echo "  make publish   - Framework-dependent publish folder (not MSI)"
 	@echo "  make ecuflash RID=linux-x64 - Self-contained single-file ecuflash tar.gz"
+	@echo "  make run-avalonia - Build and run the Avalonia companion UI"
 	@echo "  make installer - Build the MSI installer"
 	@echo "  make clean     - Remove all build artifacts"
 	@echo "  make help      - Show this help message"

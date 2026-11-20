@@ -1,0 +1,100 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NefMotoECUFlasher.Avalonia.ViewModels"
+        x:Class="NefMotoECUFlasher.Avalonia.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="ECUFlash"
+        Icon="/Assets/ProgramIcon.ico"
+        Width="720"
+        Height="600"
+        MinWidth="560"
+        MinHeight="420">
+  <DockPanel Margin="12">
+    <Border DockPanel.Dock="Top"
+            Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource BorderSubtleBrush}"
+            BorderThickness="1"
+            CornerRadius="4"
+            Padding="12"
+            Margin="0,0,0,12">
+      <StackPanel Spacing="10">
+        <TextBlock Text="Device"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource NefMotoAccentBrush}" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <ComboBox Grid.Column="0"
+                    ItemsSource="{Binding Devices.Devices}"
+                    SelectedItem="{Binding Devices.SelectedDevice}"
+                    IsEnabled="{Binding Devices.CanSelectDevice}"
+                    HorizontalAlignment="Stretch"
+                    PlaceholderText="Refresh to list cables">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding DisplayName}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Grid.Column="1"
+                  Content="Refresh"
+                  Command="{Binding Devices.RefreshDevicesCommand}"
+                  Classes="accent" />
+        </Grid>
+
+        <TextBlock Text="Layout"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource NefMotoAccentBrush}"
+                   Margin="0,4,0,0" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <ComboBox Grid.Column="0"
+                    ItemsSource="{Binding Layouts.LayoutNames}"
+                    SelectedItem="{Binding Layouts.SelectedLayoutName}"
+                    HorizontalAlignment="Stretch"
+                    PlaceholderText="Refresh to list layouts" />
+          <Button Grid.Column="1"
+                  Content="Refresh"
+                  Command="{Binding Layouts.RefreshLayoutsCommand}" />
+        </Grid>
+
+        <TextBlock Text="Protocol"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource NefMotoAccentBrush}"
+                   Margin="0,4,0,0" />
+        <ComboBox ItemsSource="{Binding Protocols}"
+                  SelectedItem="{Binding SelectedProtocol}"
+                  HorizontalAlignment="Stretch" />
+
+        <TextBlock Text="Actions"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource NefMotoAccentBrush}"
+                   Margin="0,4,0,0" />
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Button Content="Info" Command="{Binding Actions.InfoCommand}" />
+          <Button Content="Flash" Command="{Binding Actions.FlashCommand}" />
+          <Button Content="Verify" Command="{Binding Actions.VerifyCommand}"
+                  ToolTip.Tip="#159 bootmode verify (stub)" />
+          <Button Content="DTC" Command="{Binding Actions.DtcCommand}"
+                  ToolTip.Tip="#160 (stub)" />
+          <Button Content="Immo / EEPROM" Command="{Binding Actions.ImmoCommand}"
+                  ToolTip.Tip="#160 (stub)" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+
+    <DockPanel>
+      <TextBlock DockPanel.Dock="Top"
+                 Text="Log"
+                 FontWeight="SemiBold"
+                 Foreground="{StaticResource NefMotoAccentBrush}"
+                 Margin="0,0,0,6" />
+      <TextBox Text="{Binding LogText}"
+               IsReadOnly="True"
+               AcceptsReturn="True"
+               TextWrapping="Wrap"
+               FontFamily="Menlo, Consolas, monospace"
+               Background="{StaticResource LogBackgroundBrush}"
+               Foreground="{StaticResource LogForegroundBrush}"
+               CaretBrush="{StaticResource LogForegroundBrush}"
+               BorderBrush="{StaticResource BorderSubtleBrush}" />
+    </DockPanel>
+  </DockPanel>
+</Window>

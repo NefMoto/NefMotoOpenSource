@@ -1,0 +1,29 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="NefMotoECUFlasher.Avalonia.App"
+             Name="ECUFlash"
+             RequestedThemeVariant="Light">
+  <Application.Resources>
+    <ResourceDictionary>
+      <Color x:Key="NefMotoAccentColor">#FF901212</Color>
+      <SolidColorBrush x:Key="NefMotoAccentBrush" Color="{StaticResource NefMotoAccentColor}" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFF5F5F5" />
+      <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFFFF" />
+      <SolidColorBrush x:Key="BorderSubtleBrush" Color="#FFD0D0D0" />
+      <SolidColorBrush x:Key="LogBackgroundBrush" Color="#FF1E1E1E" />
+      <SolidColorBrush x:Key="LogForegroundBrush" Color="#FFE0E0E0" />
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Button.accent">
+      <Setter Property="Background" Value="{StaticResource NefMotoAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+  </Application.Styles>
+</Application>
