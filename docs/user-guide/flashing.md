@@ -58,9 +58,9 @@ A matching sample is strong evidence of mirroring, not proof of chip size. A mis
 - **Verify Write** — checked by default. On KWP, the written sector is read back. On boot mode, each programmed sector is checksummed on the ECU. A matching boot-mode sector is still skipped before erase
 - **Verify Read** — checked by default. Checked, a bottom-boot KWP full read checksums every sector, and a bootmode read checksums each transferred sector. Unchecked, that KWP read checksums only sectors 0–3 and a bootmode read does not checksum. Disabled on KWP when sector 0 is not 16 KB at `0x800000`.
 
-A KWP write opens a programming session from the default session, before any erase. If that session does not start, the write stops and the flash is left unchanged. The programming kernel does not serve upload, so the layout probe is skipped. That session's checksum is not used. A dialog asks before any erase. **Cancel** leaves the flash unchanged. **OK** erases and writes every sector in the loaded file. A missing checksum, or any other failed erase-mode check, does not switch the ECU to erase-entire mode.
+A KWP write opens a programming session from the default session. If that fails, nothing is erased. No upload in that session: layout probe skipped, Diff Write still tries sector checksums; unavailable/no-reply asks before erase (**Cancel** stops, **OK** writes every loaded sector). Failed erase-mode checks stay on sector erase.
 
-A KWP write that finishes (full or diff) ends with a 2-byte upload at the start of flash and three checksums of a sector that matches the file. That clears the EEPROM bit behind `P0602` ([P0602](clearing-P0602.md)).
+A finished KWP write clears the programming flag (`P0602`): 2-byte upload+exit if the layout probe opened upload, else three matching checksums (ME7.1.1). Details: [P0602](clearing-P0602.md).
 
 Confirmation requires: valid file and layout (BT vs BB must match the chip), engine not running, battery at least 12 V, adaptations will reset, the process can run uninterrupted.
 
