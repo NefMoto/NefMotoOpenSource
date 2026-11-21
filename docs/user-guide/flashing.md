@@ -121,7 +121,7 @@ ecuflash bootmode write full -i image.bin
 ecuflash bootmode write diff -i image.bin
 ```
 
-- `-h` and `--help` print the command summary and exit. `--version` prints the build version and exits. Neither connects.
+- No arguments, `-h`, and `-?` print the usage and exit. `--help` prints the command descriptions and options. `--version` prints the build version and exits. None of them connect.
 - `usb` prints each FTDI or CH340 device as index, type, description, and serial. It does not connect. `--usb N` selects that index. One attached device is used when `--usb` is omitted. On macOS, genuine FTDI uses the built-in driver (`/dev/cu.usbserial-*`) and CH340 needs WCH's DriverKit extension (`/dev/cu.wchusbserial*`). On Linux, the kernel drivers create `/dev/ttyUSB*` or `/dev/ttyACM*`; opening the node usually requires the `dialout` group.
 - `layouts`, and `--layout` with no name, print each layout basename. They do not connect. Pass one of those names to `--layout`.
 - `kwp info` reads ECU identification in the standard session, the same entries as **Read ECU Info**. `-o` writes those lines to a file.

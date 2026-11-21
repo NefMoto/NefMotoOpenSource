@@ -46,14 +46,20 @@ namespace Ecuflash
 
         public static int Main(string[] args)
         {
+            if (args.Any(arg => arg == "--help"))
+            {
+                Help(Console.Out);
+                return 0;
+            }
+
+            if ((args.Length == 0) || args.Any(arg => (arg == "-h") || (arg == "-?")))
+            {
+                Usage(Console.Out);
+                return 0;
+            }
+
             foreach (string arg in args)
             {
-                if ((arg == "-h") || (arg == "--help"))
-                {
-                    Usage(Console.Out);
-                    return 0;
-                }
-
                 if ((arg == "-V") || (arg == "--version"))
                 {
                     Console.WriteLine("ecuflash " + VersionText());
@@ -68,7 +74,7 @@ namespace Ecuflash
                     Console.Error.WriteLine("ecuflash: " + error);
                 }
 
-                Console.Error.WriteLine("Try 'ecuflash --help' for more information.");
+                Console.Error.WriteLine("Try 'ecuflash -h' for usage.");
                 return 2;
             }
 
@@ -1974,7 +1980,7 @@ namespace Ecuflash
 
         static void Usage(TextWriter writer)
         {
-            writer.WriteLine("Usage: ecuflash [-h|--help] [-V|--version]");
+            writer.WriteLine("Usage: ecuflash [-h|-?] [--help] [-V|--version]");
             writer.WriteLine("       ecuflash usb");
             writer.WriteLine("       ecuflash layouts");
             writer.WriteLine("       ecuflash --layout");
@@ -1994,76 +2000,50 @@ namespace Ecuflash
             writer.WriteLine("       ecuflash bootmode read diff -i FILE -o FILE");
             writer.WriteLine("       ecuflash bootmode write full -i FILE");
             writer.WriteLine("       ecuflash bootmode write diff -i FILE");
+        }
+
+        static void Help(TextWriter writer)
+        {
+            Usage(writer);
             writer.WriteLine();
-            writer.WriteLine("Read ECU information, read or clear DTCs, turn immo off, or read or write flash.");
             writer.WriteLine("A write erases sectors as part of the write. There is no erase command.");
+            writer.WriteLine("Boot-mode commands need the ECU already in boot mode.");
             writer.WriteLine();
             writer.WriteLine("Commands:");
             Command(writer, "usb", "Print each FTDI or CH340 device as index, description, and serial.");
             Command(writer, "layouts", "Print each layout basename under MemoryLayouts.");
-            Command(writer, "kwp info", "Read ECU identification in the standard session. -o writes the same lines to a file.");
+            Command(writer, "kwp info", "Read ECU identification. -o writes the same lines to a file.");
             Command(writer, "kwp dtc read", "Read diagnostic trouble codes. -o writes the same lines to a file.");
             Command(writer, "kwp dtc clear", "Clear diagnostic information.");
-            Command(writer, "bootmode info", "Read boot-mode device, bus, and flash layout information. -o writes the same lines to a file.");
+            Command(writer, "bootmode info", "Read device, bus, and flash layout. -o writes the same lines to a file.");
             Command(writer, "bootmode immo off", "Read the EEPROM, set immo off, save a backup, and write it back.");
-            Command(writer, "bootmode verify", "Checksum each sector of -i on the ECU. Does not read or write the chip.");
-            Command(writer, "bootmode reset", "Software reset. The port closes. The boot pin chooses the loader or flash.");
+            Command(writer, "bootmode verify", "Checksum each sector of -i. Does not read or write the chip.");
+            Command(writer, "bootmode reset", "Software reset, then close the port. The boot pin chooses what starts.");
             Command(writer, "kwp read full", "Read the layout, or the M5.9.2 calibration. Requires -o.");
             Command(writer, "kwp read diff", "Read sectors that differ from -i. Requires -i and -o.");
             Command(writer, "kwp write full", "Write every sector from -i.");
             Command(writer, "kwp write diff", "Write sectors that differ from -i.");
-            Command(writer, "bootmode read full", "Read the chip. The ECU must already be in boot mode.");
-            Command(writer, "bootmode read diff", "Read sectors that differ from -i. The ECU must already be in boot mode.");
-            Command(writer, "bootmode write full", "Write -i. The ECU must already be in boot mode.");
-            Command(writer, "bootmode write diff", "Write sectors that differ from -i. The ECU must already be in boot mode.");
+            Command(writer, "bootmode read full", "Read the chip.");
+            Command(writer, "bootmode read diff", "Read sectors that differ from -i.");
+            Command(writer, "bootmode write full", "Write -i.");
+            Command(writer, "bootmode write diff", "Write sectors that differ from -i.");
             writer.WriteLine("Options:");
-            Option(writer, "-h, --help", "show this help and exit");
+            Option(writer, "-h, -?", "print the usage and exit");
+            Option(writer, "--help", "print this help and exit");
             Option(writer, "-V, --version", "print the build version and exit");
-            Option(writer, "-i FILE", "image to write, or the file a diff read compares");
-            Option(writer, "-o FILE", "file a read saves, the info or DTC lines, or the immo-off backup");
-            Option(writer, "--layout [NAME]", "layout basename, 1m, 512k, or 256k; no NAME lists them");
+            Option(writer, "-i FILE", "image to write, or the file a diff read or verify compares");
+            Option(writer, "-o FILE", "file a read saves, or the info, DTC, or immo-off lines");
+            Option(writer, "--layout [NAME]", "layout basename or 1m, 512k, 256k; no NAME lists them");
             Option(writer, "--usb N", "device index from usb; one device is used if omitted");
             Option(writer, "--baud RATE", "KWP session baud, or the boot-mode baud");
-            Option(writer, "--slow", "use KWP slow init; fast init is the default");
+            Option(writer, "--slow", "KWP slow init; fast init is the default");
             Option(writer, "--no-verify", "match clearing Verify Read or Verify Write");
-            Option(writer, "--95p08", "ME7.1.1 95P08 on P6.3; default immo preset is 95040 on P4.7");
+            Option(writer, "--95p08", "ME7.1.1 95P08 on P6.3; immo off defaults to 95040 on P4.7");
             Option(writer, "-f, --force", "answer confirmation prompts and do not wait");
             writer.WriteLine();
-            writer.WriteLine("--layout with no name prints the layout names and does not connect.");
             writer.WriteLine(SizeLayoutText());
-            writer.WriteLine("With -i and no --layout, 1 MB selects 29F800BB, 512 KB selects 29F400BB,");
-            writer.WriteLine("and 256 KB selects 29F200. Any other length asks for --layout. A full KWP");
-            writer.WriteLine("read with no --layout reads 0x0000-0xBFFF on a held M5.9.2 session.");
-            writer.WriteLine("Any other ECU still needs --layout. 29F800BB is not assumed. The image");
-            writer.WriteLine("length must match the layout before a write.");
-            writer.WriteLine();
-            writer.WriteLine("Press Enter to continue a prompt. Ctrl-C aborts. -f and --force answer");
-            writer.WriteLine("confirmation prompts and do not wait. They do not erase the entire flash");
-            writer.WriteLine("when a sector erase fails.");
-            writer.WriteLine();
-            writer.WriteLine("The default KWP session baud list is 124800, 52800, 38400, 10400, 9600.");
-            writer.WriteLine("Boot mode defaults to 57600 and reads the chip id. Diff read and diff write");
-            writer.WriteLine("checksum each sector on the ECU. A boot-mode write checksums each programmed");
-            writer.WriteLine("sector unless --no-verify is set.");
-            writer.WriteLine();
-            writer.WriteLine("kwp info, bootmode info, and kwp dtc read print each entry. -o writes those lines to a file.");
-            writer.WriteLine("Without -o the list is only printed. A DTC line is Pxxxx, the status byte, and the name.");
-            writer.WriteLine("A held M5.9.2 session uses the KWP1281 fault list. kwp dtc clear sends the");
-            writer.WriteLine("tester clear for group 0x0000. It does not checksum the programming flag.");
-            writer.WriteLine("Leave a programming session with an ignition cycle before either command.");
-            writer.WriteLine();
-            writer.WriteLine("bootmode immo off uses 95040 SSC, 512 bytes, chip select P4.7 (ME7.1 and");
-            writer.WriteLine("ME7.5). --95p08 uses 95P08 SSC, 1024 bytes, chip select P6.3 (ME7.1.1).");
-            writer.WriteLine("The bytes at 0x012 and 0x022 must match. They are set to 0x02. On a 95040");
-            writer.WriteLine("the page 1 and page 2 checksums are corrected. The image from before that");
-            writer.WriteLine("edit is saved as eeprom-95040-before-immo.bin, or eeprom-95p08-before-immo.bin");
-            writer.WriteLine("with --95p08. -o chooses that file. An existing file is left in place and");
-            writer.WriteLine("the chip is not written. The write is verified unless --no-verify is set.");
-            writer.WriteLine("If immo is already off, the chip is not written.");
-            writer.WriteLine();
-            writer.WriteLine("On a full KWP read of a bottom-boot layout whose first sector is 16 KB at");
-            writer.WriteLine("0x800000, --no-verify checksums the first four sectors instead of every sector.");
-            writer.WriteLine("A cancelled write does not connect.");
+            writer.WriteLine("A full KWP read with no --layout reads 0x0000-0xBFFF on a held M5.9.2 session.");
+            writer.WriteLine("KWP baud list: 124800, 52800, 38400, 10400, 9600. Boot mode defaults to 57600.");
         }
 
         static void Command(TextWriter writer, string name, string text)
