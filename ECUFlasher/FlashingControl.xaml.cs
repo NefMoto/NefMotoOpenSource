@@ -928,6 +928,7 @@ namespace ECUFlasher
                         _VerifyChecksumsCommand.WatchConnection(App);
                         _VerifyChecksumsCommand.AddWatchedProperty(App, "OperationInProgress");
                         _VerifyChecksumsCommand.AddWatchedProperty(this, "IsFlashFileOK");
+                        _VerifyChecksumsCommand.AddWatchedProperty(this, "IsMemoryLayoutOK");
                     }
 
                     _VerifyChecksumsCommand.CanExecuteMethod = delegate (List<string> reasonsDisabled)
@@ -954,6 +955,12 @@ namespace ECUFlasher
                             result = false;
                         }
 
+                        if (IsBootmodeChipVerify() && !IsMemoryLayoutOK)
+                        {
+                            reasonsDisabled.Add("Specified memory layout is not correct");
+                            result = false;
+                        }
+
                         return result;
                     };
                 }
@@ -965,6 +972,12 @@ namespace ECUFlasher
 
         private void OnVerifyChecksums()
         {
+            if (IsBootmodeChipVerify())
+            {
+                BeginCheckIfFlashMatches("Confirm Verify Checksums");
+                return;
+            }
+
             App.CurrentOperation = new Checksum.ValidateChecksumsOperation(FlashMemoryImage.RawData);
             App.CurrentOperation.CompletedOperationEvent += this.OnVerifyChecksumsCompleted;
 
@@ -1056,9 +1069,10 @@ namespace ECUFlasher
                             result = false;
                         }
 
-                        if (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+                        if ((App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.KWP2000)
+                            && (App.CommInterface.CurrentProtocol != CommunicationInterface.Protocol.BootMode))
                         {
-                            reasonsDisabled.Add("Not connected with KWP2000 protocol");
+                            reasonsDisabled.Add("Not connected with KWP2000 or BootMode protocol");
                             result = false;
                         }
 
@@ -1079,13 +1093,18 @@ namespace ECUFlasher
 
         private void OnCheckIfFlashMatches()
         {
+            BeginCheckIfFlashMatches("Confirm Check if Flash Matches");
+        }
+
+        private void BeginCheckIfFlashMatches(string title)
+        {
             //done to trigger a reload of the memory layout and flash files and cause them to revalidate
             FileNameToFlash = FileNameToFlash;
             MemoryLayoutFileName = MemoryLayoutFileName;
 
             if (CheckIfFlashMatchesCommand.IsEnabled)
             {
-                if (ConfirmFlashOperation("Confirm Check if Flash Matches", FlashConfirmationKind.CheckIfFlashMatches))
+                if (ConfirmFlashOperation(title, FlashConfirmationKind.CheckIfFlashMatches))
                 {
                     CheckIfFlashMatches();
                 }
@@ -1807,8 +1826,21 @@ namespace ECUFlasher
                 && FlashMemoryLayout.SectorSizes[0] == ChecksumFlashBlocksOperation.SectorSize;
         }
 
+        private bool IsBootmodeChipVerify()
+        {
+            return App.CommInterface != null
+                && App.CommInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode
+                && App.CommInterface.IsConnected();
+        }
+
         private void CheckIfFlashMatches()
         {
+            if (IsBootmodeChipVerify())
+            {
+                CheckIfFlashMatchesBootmode();
+                return;
+            }
+
             var KWP2000CommViewModel = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
 
             if (KWP2000CommViewModel == null)
@@ -1819,7 +1851,27 @@ namespace ECUFlasher
 
             var sectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(FlashMemoryImage.RawData, FlashMemoryLayout));
             var operation = new ChecksumFlashBlocksOperation(KWP2000CommViewModel.KWP2000CommInterface, KWP2000CommViewModel.DesiredBaudRates, GetSecuritySettings(KWP2000CommViewModel), sectors);
-            StartFlashOperation(operation, this.CheckIfFlashMatchesOperationCompleted, "Checking if flash matches flash file, one checksum per sector.");
+            StartFlashOperation(operation, this.CheckIfFlashMatchesOperationCompleted, BootmodeVerifyFlashOperation.UserStatus);
+        }
+
+        private void CheckIfFlashMatchesBootmode()
+        {
+            BootstrapInterface bootstrap;
+            MemoryLayout layout;
+            if (!TryGetBootmodeLayoutAndUpdateUI(out bootstrap, out layout, "verify"))
+            {
+                return;
+            }
+
+            byte[] image = FlashMemoryImage != null ? FlashMemoryImage.RawData : null;
+            if ((image == null) || ((uint)image.Length != layout.Size))
+            {
+                App.DisplayStatusMessage(BootmodeVerifyFlashOperation.LengthMessage(layout.Size, image), StatusMessageType.USER);
+                return;
+            }
+
+            var operation = new BootmodeVerifyFlashOperation(bootstrap, layout, image);
+            StartFlashOperation(operation, this.CheckIfFlashMatchesOperationCompleted, BootmodeVerifyFlashOperation.UserStatus);
         }
 
         private void CheckIfFlashMatchesOperationCompleted(Operation operation, bool success)
@@ -1827,9 +1879,7 @@ namespace ECUFlasher
             // BeginInvoke so the finished dialog does not block the KWP send thread.
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                string statusMessage = success
-                    ? "Flash memory matches flash file."
-                    : "One or more sectors differ (see the list above) or the checksum failed.";
+                string statusMessage = BootmodeVerifyFlashOperation.ResultMessage(success);
 
                 operation.CompletedOperationEvent -= this.CheckIfFlashMatchesOperationCompleted;
 
@@ -2202,6 +2252,10 @@ namespace ECUFlasher
                     lines.Add("If you are ready to check if flash matches, confirm the following things:");
                     lines.Add("1) You have loaded a valid file and memory layout for the ECU.");
                     lines.Add("2) The engine is not running.");
+                    if ((commInterface != null) && (commInterface.CurrentProtocol == CommunicationInterface.Protocol.BootMode))
+                    {
+                        lines.Add("Each sector is checksummed on the ECU. The sector bytes are not read.");
+                    }
                     break;
 
                 case FlashConfirmationKind.ReadEntire:

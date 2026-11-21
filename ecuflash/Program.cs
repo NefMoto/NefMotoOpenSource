@@ -114,7 +114,7 @@ namespace Ecuflash
                 }
             }
 
-            if (!Confirm(request))
+            if (!request.Verify && !Confirm(request))
             {
                 Log("Cancelled. Nothing was sent.");
                 return 1;
@@ -573,20 +573,23 @@ namespace Ecuflash
                 }
 
                 Log("Chip layout is " + layout.Size + " bytes, base 0x" + layout.BaseAddress.ToString("X6") + ".");
+                if (request.Verify)
+                {
+                    return FinishBootmodeVerify(boot, layout, image);
+                }
+
                 if (request.Read)
                 {
-                    if (request.Diff && ((image == null) || ((uint)image.Length != layout.Size)))
+                    if (request.Diff && !ImageFits(layout, image))
                     {
-                        Log("Image is " + (image == null ? 0 : image.Length) + " bytes. The chip layout is " + layout.Size + " bytes.");
                         return 1;
                     }
 
                     return FinishBootmodeRead(boot, layout, request.OutputPath!, request.Diff ? image : null, !request.NoVerify);
                 }
 
-                if ((image == null) || ((uint)image.Length != layout.Size))
+                if (!ImageFits(layout, image))
                 {
-                    Log("Image is " + (image == null ? 0 : image.Length) + " bytes. The chip layout is " + layout.Size + " bytes.");
                     return 1;
                 }
 
@@ -595,7 +598,7 @@ namespace Ecuflash
                 settings.FlashMemoryLayout = layout;
                 settings.SkipMatchingSectors = request.Diff;
                 settings.VerifyWrittenData = !request.NoVerify;
-                var sectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(image, layout));
+                var sectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(image!, layout));
                 var operation = new BootmodeWriteExternalFlashOperation(boot, settings, sectors);
                 bool success = WaitForOperation(operation, "Writing ECU flash memory (bootmode).", () => CloseBoot(boot));
                 Log(BootmodeWriteResult(operation, success));
@@ -622,6 +625,30 @@ namespace Ecuflash
             }
 
             return SaveRead(operation.mReadFlashMemory, outputPath);
+        }
+
+        static int FinishBootmodeVerify(BootstrapInterface boot, MemoryLayout layout, byte[]? image)
+        {
+            if (!ImageFits(layout, image))
+            {
+                return 1;
+            }
+
+            var operation = new BootmodeVerifyFlashOperation(boot, layout, image!);
+            bool success = WaitForOperation(operation, BootmodeVerifyFlashOperation.UserStatus, () => CloseBoot(boot));
+            Log(BootmodeVerifyFlashOperation.ResultMessage(success));
+            return success ? 0 : 1;
+        }
+
+        static bool ImageFits(MemoryLayout layout, byte[]? image)
+        {
+            if ((image != null) && ((uint)image.Length == layout.Size))
+            {
+                return true;
+            }
+
+            Log(BootmodeVerifyFlashOperation.LengthMessage(layout.Size, image!));
+            return false;
         }
 
         static int SaveRead(MemoryImage image, string outputPath, string? succeeded = null)
@@ -1347,12 +1374,17 @@ namespace Ecuflash
 
             if (positionals.Count == 2)
             {
+                if (positionals[1].Equals("verify", StringComparison.OrdinalIgnoreCase))
+                {
+                    return ParseVerify(positionals, request, out error);
+                }
+
                 return ParseInfo(positionals, request, out error);
             }
 
             if (positionals.Count != 3)
             {
-                error = "Pass usb, layouts, or kwp or bootmode, then info, read, or write.";
+                error = "Pass usb, layouts, or kwp or bootmode, then info, verify, read, or write.";
                 return false;
             }
 
@@ -1366,6 +1398,12 @@ namespace Ecuflash
             else if (!protocol.Equals("bootmode", StringComparison.OrdinalIgnoreCase))
             {
                 error = "Protocol must be kwp or bootmode.";
+                return false;
+            }
+
+            if (verb.Equals("verify", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "verify does not take full or diff. Pass bootmode verify -i FILE.";
                 return false;
             }
 
@@ -1389,16 +1427,13 @@ namespace Ecuflash
                 return false;
             }
 
-            if (!request.Kwp && request.Slow)
+            if (!request.Kwp)
             {
-                error = "--slow applies to KWP.";
-                return false;
-            }
-
-            if (!request.Kwp && (request.LayoutName != null))
-            {
-                error = "Boot mode reads the chip id. Do not pass --layout.";
-                return false;
+                error = BootmodeOptionError(request);
+                if (error != null)
+                {
+                    return false;
+                }
             }
 
             if (request.Read)
@@ -1441,12 +1476,54 @@ namespace Ecuflash
             return true;
         }
 
+        static bool ParseVerify(List<string> positionals, Request request, out string? error)
+        {
+            if (positionals[0].Equals("kwp", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Full-chip verify is a bootmode command.";
+                return false;
+            }
+
+            if (!positionals[0].Equals("bootmode", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Protocol must be kwp or bootmode.";
+                return false;
+            }
+
+            error = BootmodeOptionError(request)
+                ?? (request.NoVerify ? "verify does not take --no-verify." : null)
+                ?? (request.OutputPath != null ? "verify does not take -o." : null)
+                ?? (request.InputPath == null ? "verify needs -i image.bin." : null);
+            if (error != null)
+            {
+                return false;
+            }
+
+            request.Verify = true;
+            return true;
+        }
+
+        static string? BootmodeOptionError(Request request)
+        {
+            if (request.Slow)
+            {
+                return "--slow applies to KWP.";
+            }
+
+            if (request.LayoutName != null)
+            {
+                return "Boot mode reads the chip id. Do not pass --layout.";
+            }
+
+            return null;
+        }
+
         static bool ParseInfo(List<string> positionals, Request request, out string? error)
         {
             error = null;
             if (!positionals[1].Equals("info", StringComparison.OrdinalIgnoreCase))
             {
-                error = "Pass usb, layouts, or kwp or bootmode, then info, read, or write.";
+                error = "Pass usb, layouts, or kwp or bootmode, then info, verify, read, or write.";
                 return false;
             }
 
@@ -1496,6 +1573,7 @@ namespace Ecuflash
             writer.WriteLine("       ecuflash --layout");
             writer.WriteLine("       ecuflash kwp info");
             writer.WriteLine("       ecuflash bootmode info");
+            writer.WriteLine("       ecuflash bootmode verify -i FILE");
             writer.WriteLine("       ecuflash kwp read full --layout NAME -o FILE");
             writer.WriteLine("       ecuflash kwp read full -o FILE");
             writer.WriteLine("       ecuflash kwp read diff -i FILE -o FILE");
@@ -1514,6 +1592,7 @@ namespace Ecuflash
             Command(writer, "layouts", "Print each layout basename under MemoryLayouts.");
             Command(writer, "kwp info", "Read ECU identification in the standard session.");
             Command(writer, "bootmode info", "Read boot-mode device, bus, and flash layout information.");
+            Command(writer, "bootmode verify", "Checksum each sector of -i on the ECU. Does not read or write the chip.");
             Command(writer, "kwp read full", "Read the layout, or the M5.9.2 calibration. Requires -o.");
             Command(writer, "kwp read diff", "Read sectors that differ from -i. Requires -i and -o.");
             Command(writer, "kwp write full", "Write every sector from -i.");
@@ -1612,6 +1691,7 @@ namespace Ecuflash
             public bool Info;
             public bool Kwp;
             public bool Read;
+            public bool Verify;
             public bool Diff;
             public string? LayoutName;
             public string? InputPath;

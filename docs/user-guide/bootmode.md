@@ -86,6 +86,7 @@ On **Flashing**, the layout combo is **disabled**. Layout comes from the flash d
 
 - **Full Read Flash** / **Full Write Flash**
 - **Diff Read Flash** / **Diff Write Flash** skip a sector whose checksum matches the loaded file. The routine is uploaded to `0xF840`. A bootmode read sends no `0xC5`
+- **Verify Checksums**, while connected, checksums each sector against the loaded file. Sector bytes are not read. A differing sector is named. Nothing is saved. `ecuflash bootmode verify -i` runs the same check
 - **Verify Write** — checked, each programmed sector is checksummed after the write. Unchecked, a bootmode write does not checksum. A matching sector is still skipped before erase
 - **Verify Read** — checked, each transferred sector is checksummed after the read. Unchecked, a bootmode read does not checksum
 - Variant (ME7 vs Simos3 vs EDC15) is taken from the detected layout base (ME7 `0x800000`, Simos3/EDC15 `0x400000`). There is no separate variant dropdown.

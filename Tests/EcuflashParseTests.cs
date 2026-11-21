@@ -74,6 +74,30 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
+        public void Bootmode_verify_takes_an_image()
+        {
+            Program.Request request = Parse("bootmode", "verify", "-i", "image.bin", "-f");
+            Assert.True(request.Verify);
+            Assert.False(request.Read);
+            Assert.False(request.Kwp);
+            Assert.Equal("image.bin", request.InputPath);
+            Assert.True(request.Force);
+        }
+
+        [Theory]
+        [InlineData("bootmode verify", "verify needs -i image.bin.")]
+        [InlineData("bootmode verify -i image.bin -o out.bin", "verify does not take -o.")]
+        [InlineData("bootmode verify -i image.bin --layout 29F800BB", "Boot mode reads the chip id. Do not pass --layout.")]
+        [InlineData("bootmode verify -i image.bin --no-verify", "verify does not take --no-verify.")]
+        [InlineData("kwp verify -i image.bin", "Full-chip verify is a bootmode command.")]
+        [InlineData("bootmode verify full -i image.bin", "verify does not take full or diff. Pass bootmode verify -i FILE.")]
+        public void Bootmode_verify_rejects_a_bad_command(string command, string expected)
+        {
+            Assert.False(Program.TryParse(command.Split(' '), out _, out string? error));
+            Assert.Equal(expected, error);
+        }
+
+        [Fact]
         public void Full_kwp_read_keeps_the_layout_word()
         {
             Program.Request request = Parse("kwp", "write", "full", "-i", "image.bin", "--layout", "512k");

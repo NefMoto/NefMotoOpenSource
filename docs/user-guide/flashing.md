@@ -28,7 +28,7 @@ BT is rarely seen on Bosch ECUs.
 
 **File > Choose Flash File** loads a `.bin` (or any file). Size must match the selected layout. The path stays in the box on the Flashing tab.
 
-**Verify Checksums** checks ME7 checksums in the loaded file. There is no separate Checksum tab. **Correct Checksums** is not on the tab.
+**Verify Checksums** checks ME7 checksums in the loaded file. Connected in boot mode, it checksums each sector on the ECU. See [Bootmode](bootmode.md#flash). There is no separate Checksum tab. **Correct Checksums** is not on the tab.
 
 ## Read
 
@@ -92,7 +92,7 @@ Do not use entire-flash erase to “fix” a BT/BB mismatch.
 
 ## Command line
 
-`ecuflash` is the command-line form of this tab. It uses the same read and write operations, and it prints the same confirmation before it connects. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
+`ecuflash` is the command-line form of this tab. Read and write use the same operations as this tab and print the same confirmation before connecting. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
 
 ```text
 ecuflash -h
@@ -103,6 +103,7 @@ ecuflash layouts
 ecuflash --layout
 ecuflash kwp info
 ecuflash bootmode info
+ecuflash bootmode verify -i image.bin
 ecuflash kwp read full --layout 29F800BB -o out.bin
 ecuflash kwp read full --layout 512k -o out.bin
 ecuflash kwp read full -o calibration.bin
@@ -119,10 +120,10 @@ ecuflash bootmode write diff -i image.bin
 - `usb` prints each FTDI or CH340 device as index, type, description, and serial. It does not connect. `--usb N` selects that index. One attached device is used when `--usb` is omitted. On macOS, genuine FTDI uses the built-in driver (`/dev/cu.usbserial-*`) and CH340 needs WCH's DriverKit extension (`/dev/cu.wchusbserial*`). On Linux, the kernel drivers create `/dev/ttyUSB*` or `/dev/ttyACM*`; opening the node usually requires the `dialout` group.
 - `layouts`, and `--layout` with no name, print each layout basename. They do not connect. Pass one of those names to `--layout`.
 - `kwp info` reads ECU identification in the standard session, the same entries as **Read ECU Info**. `bootmode info` reads the boot-mode ECU information. The ECU must already be in boot mode. See [Bootmode](bootmode.md).
-- `-i` is the image to write, or the file a diff read compares. `-o` is the file a read saves.
+- `-i` is the image to write, or the file a diff read or `bootmode verify` compares. `-o` is the file a read saves.
 - `--layout` is a basename from [Layout](#layout), or `1m`/`1mb` (`29F800BB`), `512k`/`512kb` (`29F400BB`), or `256k`/`256kb` (`29F200`). Case does not matter. When `-i` is present and `--layout` is omitted, those same three sizes are selected from the file length. Any other length asks for `--layout`. A full KWP read with no `--layout` copies `0x0000`-`0xBFFF` on a held M5.9.2 session (pin 43 off +12 V). That is the calibration, not the whole flash. Any other ECU still needs `--layout`. `29F800BB` is not assumed. The image length must match the layout before a write starts.
 - KWP uses fast init. `--slow` uses slow init. `--baud` sets the session baud. The default list is 124800, 52800, 38400, 10400, 9600.
-- Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write checksum each sector on the ECU. Boot mode reads the chip id and builds the layout. A boot-mode write checksums each programmed sector unless `--no-verify` is set.
+- Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write checksum each sector on the ECU. Boot mode reads the chip id and builds the layout. A boot-mode write checksums each programmed sector unless `--no-verify` is set. `bootmode verify -i` checksums each sector against that file.
 - `--no-verify` matches clearing **Verify Read** or **Verify Write**. On a full KWP read of a bottom-boot layout whose first sector is 16 KB at `0x800000`, that checksums the first four sectors instead of every sector.
 - Press Enter to continue. Ctrl-C aborts. `-f` and `--force` answer the confirmation prompts and do not wait. On **Sector Erase Failed** they stop the write. They do not erase the entire flash. A mirror question runs the sample check. A cancelled write does not connect.
 - There is no erase command. A write erases sectors as part of the write.

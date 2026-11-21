@@ -164,6 +164,84 @@ namespace Communication
     }
 
     /// <summary>
+    /// Range-CRC compare of each loaded sector. Sector bytes are not transferred.
+    /// A mismatch is logged and checking continues. A failed call stops.
+    /// </summary>
+    public class BootmodeVerifyFlashOperation : BootmodeBackgroundOperation
+    {
+        public const string UserStatus = "Checking if flash matches flash file, one checksum per sector.";
+
+        public BootmodeVerifyFlashOperation(BootstrapInterface commInterface, MemoryLayout layout, byte[] image)
+            : base(commInterface, "Bootmode flash verify")
+        {
+            mBootstrapInterface = commInterface;
+            mVariant = layout.BaseAddress == 0x400000
+                ? BootstrapInterface.ECUFlashVariant.Simos3
+                : BootstrapInterface.ECUFlashVariant.ME7;
+            mFlashBase = layout.BaseAddress;
+            mSectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(image, layout));
+        }
+
+        public static string ResultMessage(bool success)
+        {
+            return success
+                ? "Flash memory matches flash file."
+                : "One or more sectors differ (see the list above) or the checksum failed.";
+        }
+
+        public static string LengthMessage(uint layoutSize, byte[] image)
+        {
+            int length = image == null ? 0 : image.Length;
+            return "Image is " + length + " bytes. The chip layout is " + layoutSize + " bytes.";
+        }
+
+        protected override bool RunWorker()
+        {
+            if (mSectors.Count == 0)
+            {
+                CommInterface.DisplayStatusMessage("The flash layout has no sectors.", StatusMessageType.USER);
+                return false;
+            }
+
+            uint total = (uint)mSectors.Sum(sector => (long)sector.Size);
+            uint done = 0;
+            bool allMatched = true;
+            for (int index = 0; index < mSectors.Count; index++)
+            {
+                if (!IsRunning)
+                {
+                    return false;
+                }
+
+                MemoryImage sector = mSectors[index];
+                string range = "sector " + (index + 1) + " " + KWP2000Operation.RangeText(sector.StartAddress, sector.Size);
+                RangeCompare.Kind compared = RangeCompare.Check(
+                    mBootstrapInterface, mVariant, sector.StartAddress - mFlashBase, sector.Size, sector.RawData);
+                if (compared == RangeCompare.Kind.Failed)
+                {
+                    CommInterface.DisplayStatusMessage("Checksum " + range + " failed.", StatusMessageType.USER);
+                    return false;
+                }
+
+                bool differ = compared == RangeCompare.Kind.Differ;
+                allMatched &= !differ;
+                CommInterface.DisplayStatusMessage(
+                    "Checksum " + range + (differ ? " reported a mismatch." : " matched."),
+                    StatusMessageType.USER);
+                done += sector.Size;
+                ReportProgress(done, total);
+            }
+
+            return allMatched;
+        }
+
+        private readonly BootstrapInterface mBootstrapInterface;
+        private readonly BootstrapInterface.ECUFlashVariant mVariant;
+        private readonly uint mFlashBase;
+        private readonly List<MemoryImage> mSectors;
+    }
+
+    /// <summary>
     /// Bootmode flash read. When <see cref="BootmodeReadExternalFlashSettings.SkipMatchingSectors"/> is set,
     /// a sector whose range checksum matches the loaded bytes is not transferred.
     /// </summary>
