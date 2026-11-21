@@ -30,6 +30,18 @@ namespace Communication
         public ushort DTC { get; set; }
         public byte Status { get; set; }
 
+        public static string NameOf(ushort code)
+        {
+            string name;
+            return KWP2000VAGDTCDictionary.DTCStrings.TryGetValue(code, out name) ? name : "Unknown DTC";
+        }
+
+        public string DisplayLine()
+        {
+            string line = "DTC: P" + DTC.ToString("X4") + " Status: 0x" + Status.ToString("X2") + " " + NameOf(DTC);
+            return StatusText.Length == 0 ? line : line + " (" + StatusText + ")";
+        }
+
         public string StatusText
         {
             get { return FormatSetStatusBits(Status); }

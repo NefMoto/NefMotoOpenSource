@@ -6,8 +6,8 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 
 - [Docs index](docs/index.md)
 - [Getting started](docs/user-guide/getting-started.md) — install, cable, first connect
-- [Flashing](docs/user-guide/flashing.md) — KWP read/write, layouts
-- [Bootmode](docs/user-guide/bootmode.md) — bootstrap, EEPROM
+- [Flashing](docs/user-guide/flashing.md) — KWP read/write, layouts, command line
+- [Bootmode](docs/user-guide/bootmode.md) — bootstrap, EEPROM, immo off
 - [Troubleshooting](docs/user-guide/troubleshooting.md)
 
 ## Features
@@ -31,6 +31,7 @@ Open-source tool for reading, writing, and tuning VW/Audi ME7 ECUs via KWP2000
 - Read ECU identification information (KWP2000 and Bootmode)
 - Bootmode ECU information: Device ID, CPU family, system registers (SYSCON, BUSCON, ADDRSEL), memory status
 - Read and clear diagnostic trouble codes (DTCs)
+- `ecuflash` reads and writes flash, reads KWP and boot-mode identification, reads and clears DTCs, and turns immo off in boot mode. [Command line](docs/user-guide/flashing.md#command-line)
 - Extended data logging
 - Memory layout validation
 - Checksum calculation and verification

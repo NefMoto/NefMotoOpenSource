@@ -93,6 +93,16 @@ namespace Ecuflash
                 return RunInfo(request);
             }
 
+            if (request.DtcRead || request.DtcClear)
+            {
+                return RunDtc(request);
+            }
+
+            if (request.ImmoOff)
+            {
+                return RunImmoOff(request);
+            }
+
             byte[]? image = null;
             if (request.InputPath != null)
             {
@@ -267,53 +277,34 @@ namespace Ecuflash
                     return 1;
                 }
 
-                PrintKwpInfo(operation.ECUInfo);
-                return 0;
+                return PrintKwpInfo(operation.ECUInfo, request.OutputPath);
             });
         }
 
-        static void PrintKwpInfo(KWP2000IdentificationInfo identInfo)
+        static int PrintKwpInfo(KWP2000IdentificationInfo identInfo, string? outputPath)
         {
+            List<string> lines;
             if (identInfo.IdentOptionData.Count == 0)
             {
                 Log("No ECU info read.");
-                return;
+                lines = new List<string>();
             }
-
-            Log("Read " + identInfo.IdentOptionData.Count + " ECU info entries:");
-            bool sawRamProgramIdent = false;
-            foreach (byte identOption in identInfo.IdentOptionData.Keys)
+            else
             {
-                string identOptionString = "";
-                KWP2000IdentificationOptionValue optionValue;
-                if (identInfo.GetIdentificationOptionValue(identOption, out optionValue))
+                Log("Read " + identInfo.IdentOptionData.Count + " ECU info entries:");
+                lines = identInfo.OptionLines(out bool ramProgram);
+                foreach (string line in lines)
                 {
-                    identOptionString = optionValue.ToString();
+                    Log(line);
                 }
 
-                Log("\t0x" + identOption.ToString("X2") + ", " + IdentOptionName(identOption) + ": " + identOptionString);
-                if (!sawRamProgramIdent && KWP2000RamProgramIdent.ContainsRamProgramIdent(identOptionString))
+                if (ramProgram)
                 {
-                    sawRamProgramIdent = true;
+                    Log(KWP2000RamProgramIdent.UserStatusMessage);
                 }
             }
 
-            if (sawRamProgramIdent)
-            {
-                Log(KWP2000RamProgramIdent.UserStatusMessage);
-            }
-        }
-
-        static string IdentOptionName(byte identOption)
-        {
-            var identOptionEnum = (KWP2000IdentificationOption)identOption;
-            object description = DescriptionAttributeConverterLogic.GetDescriptionAttribute(identOptionEnum);
-            if (description != null)
-            {
-                return description.ToString() ?? identOptionEnum.ToString();
-            }
-
-            return identOptionEnum.ToString();
+            return (outputPath != null) && !SaveLines(outputPath, lines, "ECU info entries") ? 1 : 0;
         }
 
         static int RunBootmodeInfo(Request request, DeviceInfo device)
@@ -322,14 +313,252 @@ namespace Ecuflash
             {
                 Log("Reading bootmode ECU information...");
                 var entries = BootmodeEcuInfo.Read(boot);
+                var lines = new List<string>();
                 foreach (BootmodeEcuInfo.Entry entry in entries)
                 {
-                    Log(entry.Name + ": " + entry.Value);
+                    string line = entry.Name + ": " + entry.Value;
+                    lines.Add(line);
+                    Log(line);
                 }
 
                 Log("Read " + entries.Count + " bootmode ECU info entries.");
-                return 0;
+                return (request.OutputPath != null) && !SaveLines(request.OutputPath, lines, "bootmode ECU info entries") ? 1 : 0;
             });
+        }
+
+        static int RunDtc(Request request)
+        {
+            return RunOnDevice(request, device => WithKwp(request, device, (kwp, terminated) =>
+            {
+                if (kwp.IsHeldKWP1281Session)
+                {
+                    return FinishHeldDtcs(kwp, request.DtcClear, request.OutputPath);
+                }
+
+                if (kwp.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
+                {
+                    Log("ECU is in a programming session. Turn the ignition off first.");
+                    return 1;
+                }
+
+                uint[] baudRates = SessionBaudRates(request.Baud);
+                if (request.DtcClear)
+                {
+                    var clear = new ClearDiagnosticInformationOperation(kwp, baudRates);
+                    bool cleared = WaitForOperation(clear, "Clearing ECU diagnostic information.", () => ReleaseKwp(kwp, terminated));
+                    Log(cleared
+                        ? "Clearing ECU diagnostic information succeeded."
+                        : "Clearing ECU diagnostic information failed.");
+                    return cleared ? 0 : 1;
+                }
+
+                var read = new ReadDiagnosticTroubleCodesOperation(kwp, baudRates);
+                bool success = WaitForOperation(read, "Reading all ECU DTCs.", () => ReleaseKwp(kwp, terminated));
+                if (!success)
+                {
+                    Log("Reading all ECU DTCs failed.");
+                    return 1;
+                }
+
+                return FinishDtcRead(read.DTCsRead, read.ExpectedNumDTCs, request.OutputPath);
+            }));
+        }
+
+        static int FinishHeldDtcs(KWP2000Interface kwp, bool clear, string? outputPath)
+        {
+            Log(clear ? "Clearing ECU DTCs." : "Reading ECU DTCs.");
+            using var done = new ManualResetEvent(false);
+            bool ok = false;
+            string report = "";
+            kwp.RequestHeldKWP1281Dtcs(clear, (success, text) =>
+            {
+                ok = success;
+                report = text ?? "";
+                try
+                {
+                    done.Set();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            });
+
+            if (!done.WaitOne(TimeSpan.FromMinutes(OperationWaitMinutes)))
+            {
+                Log("The operation did not finish within " + OperationWaitMinutes + " minutes.");
+                return 1;
+            }
+
+            Log(ok ? report : ("DTC request failed. " + report));
+            if (!ok || clear)
+            {
+                return ok ? 0 : 1;
+            }
+
+            var held = KWP1281CalibrationRead.ParseFaultReport(report);
+            return FinishDtcRead(held, held.Count, outputPath);
+        }
+
+        static int FinishDtcRead(IEnumerable<KWP2000DTCInfo> dtcs, int expected, string? outputPath)
+        {
+            var lines = new List<string>();
+            foreach (KWP2000DTCInfo dtc in dtcs)
+            {
+                lines.Add(dtc.DisplayLine());
+            }
+
+            Log("Read " + lines.Count + " of " + expected + " DTCs.");
+            if (lines.Count == 0)
+            {
+                Log("No DTCs.");
+            }
+
+            foreach (string line in lines)
+            {
+                Log(line);
+            }
+
+            if ((outputPath != null) && !SaveLines(outputPath, lines, "DTCs"))
+            {
+                return 1;
+            }
+
+            Log("Reading all ECU DTCs succeeded.");
+            return 0;
+        }
+
+        static bool SaveLines(string path, IReadOnlyList<string> lines, string label)
+        {
+            try
+            {
+                string text = (lines.Count == 0) ? "" : string.Join("\n", lines) + "\n";
+                File.WriteAllText(path, text);
+            }
+            catch (Exception ex)
+            {
+                Log("The read finished, but the file was not saved: " + ex.Message);
+                return false;
+            }
+
+            Log("Wrote " + lines.Count + " " + label + " to " + Path.GetFullPath(path) + ".");
+            return true;
+        }
+
+        static int RunImmoOff(Request request)
+        {
+            return RunOnDevice(request, device => WithBoot(request, device, boot => FinishImmoOff(request, boot)));
+        }
+
+        static int RunOnDevice(Request request, Func<DeviceInfo, int> body)
+        {
+            DeviceInfo? device = ClaimDevice(request, out int status);
+            return device == null ? status : body(device);
+        }
+
+        static int FinishImmoOff(Request request, BootstrapInterface boot)
+        {
+            BootstrapInterface.BootmodeEepromSettings settings = ImmoSettings(request);
+            Log("Preset: " + ImmoPreset(request) + ".");
+            var read = new BootmodeReadEepromOperation(boot, settings);
+            bool readOk = WaitForOperation(read, "Reading EEPROM.", () => CloseBoot(boot));
+            if (!readOk || (read.ReadMemory == null) || (read.ReadMemory.RawData == null))
+            {
+                Log("Reading EEPROM failed. Chip was not written.");
+                return 1;
+            }
+
+            byte[] original = (byte[])read.ReadMemory.RawData.Clone();
+            if ((uint)original.Length != settings.Size)
+            {
+                Log("EEPROM read is " + original.Length + " bytes. Preset is " + settings.Size + " bytes. Chip was not written.");
+                return 1;
+            }
+
+            byte[] image = (byte[])original.Clone();
+            Me7Eeprom95040Immo.Result result = request.Eeprom95P08
+                ? Me7Eeprom95P08Immo.TryDisable(image)
+                : Me7Eeprom95040Immo.TryDisable(image);
+            if (result != Me7Eeprom95040Immo.Result.Applied)
+            {
+                bool already = result == Me7Eeprom95040Immo.Result.AlreadyOff;
+                Log(already ? "Immo is already off. Chip was not written." : "Immo bytes do not match. Chip was not written.");
+                if ((request.OutputPath != null) && !SaveImmoBytes(request.OutputPath, original))
+                {
+                    return 1;
+                }
+
+                return already ? 0 : 1;
+            }
+
+            string backupPath = request.OutputPath ?? DefaultImmoBackupName(request);
+            if (!SaveImmoBytes(backupPath, original))
+            {
+                Log("Chip was not written.");
+                return 1;
+            }
+
+            bool verify = !request.NoVerify;
+            var write = new BootmodeWriteEepromOperation(boot, settings, image, verify);
+            bool wrote = WaitForOperation(write, "Writing EEPROM.", () => CloseBoot(boot));
+            if (!wrote)
+            {
+                Log("Writing EEPROM failed. The backup from before the edit is " + Path.GetFullPath(backupPath) + ".");
+                return 1;
+            }
+
+            Log(verify ? "Immo off. Written and verified." : "Immo off. Written (not verified).");
+            return 0;
+        }
+
+        static bool SaveImmoBytes(string path, byte[] data)
+        {
+            if (File.Exists(path))
+            {
+                Log("File already exists: " + Path.GetFullPath(path) + ". Pass -o with a new name.");
+                return false;
+            }
+
+            try
+            {
+                File.WriteAllBytes(path, data);
+            }
+            catch (Exception ex)
+            {
+                Log("The file was not saved: " + ex.Message);
+                return false;
+            }
+
+            Log("Wrote " + data.Length + " bytes to " + Path.GetFullPath(path) + ".");
+            return true;
+        }
+
+        static string DefaultImmoBackupName(Request request)
+        {
+            return request.Eeprom95P08 ? "eeprom-95p08-before-immo.bin" : "eeprom-95040-before-immo.bin";
+        }
+
+        static string ImmoPreset(Request request)
+        {
+            return request.Eeprom95P08
+                ? "ME7.1.1 P6.3, 95P08 SSC 1024 B"
+                : "ME7.5 P4.7, 95040 SSC 512 B";
+        }
+
+        static BootstrapInterface.BootmodeEepromSettings ImmoSettings(Request request)
+        {
+            if (!request.Eeprom95P08)
+            {
+                return BootstrapInterface.BootmodeEepromSettings.ForMe75();
+            }
+
+            return new BootstrapInterface.BootmodeEepromSettings
+            {
+                Periph = BootstrapInterface.BootmodeEepromPeriph.SSC,
+                EepromType = BootstrapInterface.BootmodeEepromType.Type95040,
+                PortNumber = 6,
+                PinNumber = 3,
+                Size = (uint)Me7Eeprom95P08Immo.EepromSize
+            };
         }
 
         static int ListUsb()
@@ -1334,6 +1563,18 @@ namespace Ecuflash
                     continue;
                 }
 
+                if (arg == "--95p08")
+                {
+                    if (request.Eeprom95P08)
+                    {
+                        error = "--95p08 was given twice.";
+                        return false;
+                    }
+
+                    request.Eeprom95P08 = true;
+                    continue;
+                }
+
                 if (arg.StartsWith("-"))
                 {
                     error = "Unknown option " + arg + ".";
@@ -1345,7 +1586,7 @@ namespace Ecuflash
 
             if (request.LayoutList)
             {
-                return true;
+                return Accept(request, out error);
             }
 
             if (positionals.Count == 1)
@@ -1368,7 +1609,7 @@ namespace Ecuflash
                         request.LayoutList = true;
                     }
 
-                    return true;
+                    return Accept(request, out error);
                 }
             }
 
@@ -1384,8 +1625,18 @@ namespace Ecuflash
 
             if (positionals.Count != 3)
             {
-                error = "Pass usb, layouts, or kwp or bootmode, then info, verify, read, or write.";
+                error = CommandError();
                 return false;
+            }
+
+            if (positionals[1].Equals("dtc", StringComparison.OrdinalIgnoreCase))
+            {
+                return ParseDtc(positionals, request, out error);
+            }
+
+            if (positionals[1].Equals("immo", StringComparison.OrdinalIgnoreCase))
+            {
+                return ParseImmo(positionals, request, out error);
             }
 
             string protocol = positionals[0];
@@ -1413,7 +1664,15 @@ namespace Ecuflash
             }
             else if (!verb.Equals("write", StringComparison.OrdinalIgnoreCase))
             {
-                error = "Command must be read or write.";
+                error = "Command must be read, write, dtc, or immo.";
+                return false;
+            }
+
+            if (mode.Equals("dtc", StringComparison.OrdinalIgnoreCase)
+                || mode.Equals("immo", StringComparison.OrdinalIgnoreCase)
+                || mode.Equals("off", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Pass kwp dtc read, kwp dtc clear, or bootmode immo off.";
                 return false;
             }
 
@@ -1473,7 +1732,96 @@ namespace Ecuflash
                 }
             }
 
+            return Accept(request, out error);
+        }
+
+        static bool ParseDtc(List<string> positionals, Request request, out string? error)
+        {
+            if (!positionals[0].Equals("kwp", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "DTC read and clear are KWP commands.";
+                return false;
+            }
+
+            bool read = positionals[2].Equals("read", StringComparison.OrdinalIgnoreCase);
+            bool clear = positionals[2].Equals("clear", StringComparison.OrdinalIgnoreCase);
+            if (!read && !clear)
+            {
+                error = "DTC command must be read or clear.";
+                return false;
+            }
+
+            if ((request.InputPath != null) || (request.LayoutName != null) || request.NoVerify || request.Eeprom95P08)
+            {
+                error = "dtc does not take -i, --layout, --no-verify, or --95p08.";
+                return false;
+            }
+
+            if (clear && (request.OutputPath != null))
+            {
+                error = "dtc clear does not take -o.";
+                return false;
+            }
+
+            request.Kwp = true;
+            request.DtcRead = read;
+            request.DtcClear = clear;
+            error = null;
             return true;
+        }
+
+        static bool ParseImmo(List<string> positionals, Request request, out string? error)
+        {
+            if (!positionals[0].Equals("bootmode", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Immo off is a bootmode command.";
+                return false;
+            }
+
+            if (!positionals[2].Equals("off", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Immo command must be off.";
+                return false;
+            }
+
+            if (request.Slow)
+            {
+                error = "--slow applies to KWP.";
+                return false;
+            }
+
+            if (request.LayoutName != null)
+            {
+                error = "immo off does not take --layout.";
+                return false;
+            }
+
+            if (request.InputPath != null)
+            {
+                error = "immo off does not take -i.";
+                return false;
+            }
+
+            request.ImmoOff = true;
+            error = null;
+            return true;
+        }
+
+        static bool Accept(Request request, out string? error)
+        {
+            if (request.Eeprom95P08 && !request.ImmoOff)
+            {
+                error = "--95p08 applies to bootmode immo off.";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        static string CommandError()
+        {
+            return "Pass usb, layouts, or kwp or bootmode, then info, verify, read, write, dtc, or immo.";
         }
 
         static bool ParseVerify(List<string> positionals, Request request, out string? error)
@@ -1500,7 +1848,7 @@ namespace Ecuflash
             }
 
             request.Verify = true;
-            return true;
+            return Accept(request, out error);
         }
 
         static string? BootmodeOptionError(Request request)
@@ -1523,7 +1871,7 @@ namespace Ecuflash
             error = null;
             if (!positionals[1].Equals("info", StringComparison.OrdinalIgnoreCase))
             {
-                error = "Pass usb, layouts, or kwp or bootmode, then info, verify, read, or write.";
+                error = CommandError();
                 return false;
             }
 
@@ -1543,14 +1891,14 @@ namespace Ecuflash
                 return false;
             }
 
-            if ((request.InputPath != null) || (request.OutputPath != null) || (request.LayoutName != null) || request.NoVerify || request.Force)
+            if ((request.InputPath != null) || (request.LayoutName != null) || request.NoVerify || request.Force)
             {
-                error = "info does not take -i, -o, --layout, --no-verify, or --force.";
+                error = "info does not take -i, --layout, --no-verify, or --force.";
                 return false;
             }
 
             request.Info = true;
-            return true;
+            return Accept(request, out error);
         }
 
         static bool HasFlashOption(Request request)
@@ -1571,8 +1919,11 @@ namespace Ecuflash
             writer.WriteLine("       ecuflash usb");
             writer.WriteLine("       ecuflash layouts");
             writer.WriteLine("       ecuflash --layout");
-            writer.WriteLine("       ecuflash kwp info");
-            writer.WriteLine("       ecuflash bootmode info");
+            writer.WriteLine("       ecuflash kwp info [-o FILE]");
+            writer.WriteLine("       ecuflash kwp dtc read [-o FILE]");
+            writer.WriteLine("       ecuflash kwp dtc clear");
+            writer.WriteLine("       ecuflash bootmode info [-o FILE]");
+            writer.WriteLine("       ecuflash bootmode immo off");
             writer.WriteLine("       ecuflash bootmode verify -i FILE");
             writer.WriteLine("       ecuflash kwp read full --layout NAME -o FILE");
             writer.WriteLine("       ecuflash kwp read full -o FILE");
@@ -1584,14 +1935,17 @@ namespace Ecuflash
             writer.WriteLine("       ecuflash bootmode write full -i FILE");
             writer.WriteLine("       ecuflash bootmode write diff -i FILE");
             writer.WriteLine();
-            writer.WriteLine("Read ECU information, or read or write flash over KWP or boot mode.");
+            writer.WriteLine("Read ECU information, read or clear DTCs, turn immo off, or read or write flash.");
             writer.WriteLine("A write erases sectors as part of the write. There is no erase command.");
             writer.WriteLine();
             writer.WriteLine("Commands:");
             Command(writer, "usb", "Print each FTDI or CH340 device as index, description, and serial.");
             Command(writer, "layouts", "Print each layout basename under MemoryLayouts.");
-            Command(writer, "kwp info", "Read ECU identification in the standard session.");
-            Command(writer, "bootmode info", "Read boot-mode device, bus, and flash layout information.");
+            Command(writer, "kwp info", "Read ECU identification in the standard session. -o writes the same lines to a file.");
+            Command(writer, "kwp dtc read", "Read diagnostic trouble codes. -o writes the same lines to a file.");
+            Command(writer, "kwp dtc clear", "Clear diagnostic information.");
+            Command(writer, "bootmode info", "Read boot-mode device, bus, and flash layout information. -o writes the same lines to a file.");
+            Command(writer, "bootmode immo off", "Read the EEPROM, set immo off, save a backup, and write it back.");
             Command(writer, "bootmode verify", "Checksum each sector of -i on the ECU. Does not read or write the chip.");
             Command(writer, "kwp read full", "Read the layout, or the M5.9.2 calibration. Requires -o.");
             Command(writer, "kwp read diff", "Read sectors that differ from -i. Requires -i and -o.");
@@ -1605,12 +1959,13 @@ namespace Ecuflash
             Option(writer, "-h, --help", "show this help and exit");
             Option(writer, "-V, --version", "print the build version and exit");
             Option(writer, "-i FILE", "image to write, or the file a diff read compares");
-            Option(writer, "-o FILE", "file a read saves");
+            Option(writer, "-o FILE", "file a read saves, the info or DTC lines, or the immo-off backup");
             Option(writer, "--layout [NAME]", "layout basename, 1m, 512k, or 256k; no NAME lists them");
             Option(writer, "--usb N", "device index from usb; one device is used if omitted");
             Option(writer, "--baud RATE", "KWP session baud, or the boot-mode baud");
             Option(writer, "--slow", "use KWP slow init; fast init is the default");
             Option(writer, "--no-verify", "match clearing Verify Read or Verify Write");
+            Option(writer, "--95p08", "ME7.1.1 95P08 on P6.3; default immo preset is 95040 on P4.7");
             Option(writer, "-f, --force", "answer confirmation prompts and do not wait");
             writer.WriteLine();
             writer.WriteLine("--layout with no name prints the layout names and does not connect.");
@@ -1629,6 +1984,21 @@ namespace Ecuflash
             writer.WriteLine("Boot mode defaults to 57600 and reads the chip id. Diff read and diff write");
             writer.WriteLine("checksum each sector on the ECU. A boot-mode write checksums each programmed");
             writer.WriteLine("sector unless --no-verify is set.");
+            writer.WriteLine();
+            writer.WriteLine("kwp info, bootmode info, and kwp dtc read print each entry. -o writes those lines to a file.");
+            writer.WriteLine("Without -o the list is only printed. A DTC line is Pxxxx, the status byte, and the name.");
+            writer.WriteLine("A held M5.9.2 session uses the KWP1281 fault list. kwp dtc clear sends the");
+            writer.WriteLine("tester clear for group 0x0000. It does not checksum the programming flag.");
+            writer.WriteLine("Leave a programming session with an ignition cycle before either command.");
+            writer.WriteLine();
+            writer.WriteLine("bootmode immo off uses 95040 SSC, 512 bytes, chip select P4.7 (ME7.1 and");
+            writer.WriteLine("ME7.5). --95p08 uses 95P08 SSC, 1024 bytes, chip select P6.3 (ME7.1.1).");
+            writer.WriteLine("The bytes at 0x012 and 0x022 must match. They are set to 0x02. On a 95040");
+            writer.WriteLine("the page 1 and page 2 checksums are corrected. The image from before that");
+            writer.WriteLine("edit is saved as eeprom-95040-before-immo.bin, or eeprom-95p08-before-immo.bin");
+            writer.WriteLine("with --95p08. -o chooses that file. An existing file is left in place and");
+            writer.WriteLine("the chip is not written. The write is verified unless --no-verify is set.");
+            writer.WriteLine("If immo is already off, the chip is not written.");
             writer.WriteLine();
             writer.WriteLine("On a full KWP read of a bottom-boot layout whose first sector is 16 KB at");
             writer.WriteLine("0x800000, --no-verify checksums the first four sectors instead of every sector.");
@@ -1702,6 +2072,10 @@ namespace Ecuflash
             public bool Slow;
             public bool NoVerify;
             public bool Force;
+            public bool DtcRead;
+            public bool DtcClear;
+            public bool ImmoOff;
+            public bool Eeprom95P08;
         }
     }
 }

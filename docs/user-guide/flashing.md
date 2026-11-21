@@ -92,7 +92,7 @@ Do not use entire-flash erase to “fix” a BT/BB mismatch.
 
 ## Command line
 
-`ecuflash` is the command-line form of this tab. Read and write use the same operations as this tab and print the same confirmation before connecting. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
+Flash read and write use the same operations as this tab and print the same confirmation before connecting. `kwp info`, `kwp dtc read`, `kwp dtc clear`, `bootmode info`, and `bootmode immo off` connect without that prompt. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
 
 ```text
 ecuflash -h
@@ -101,8 +101,12 @@ ecuflash --version
 ecuflash usb
 ecuflash layouts
 ecuflash --layout
-ecuflash kwp info
-ecuflash bootmode info
+ecuflash kwp info -o info.txt
+ecuflash kwp dtc read -o dtcs.txt
+ecuflash kwp dtc clear
+ecuflash bootmode info -o boot.txt
+ecuflash bootmode immo off
+ecuflash bootmode immo off --95p08 -o backup.bin
 ecuflash bootmode verify -i image.bin
 ecuflash kwp read full --layout 29F800BB -o out.bin
 ecuflash kwp read full --layout 512k -o out.bin
@@ -119,8 +123,11 @@ ecuflash bootmode write diff -i image.bin
 - `-h` and `--help` print the command summary and exit. `--version` prints the build version and exits. Neither connects.
 - `usb` prints each FTDI or CH340 device as index, type, description, and serial. It does not connect. `--usb N` selects that index. One attached device is used when `--usb` is omitted. On macOS, genuine FTDI uses the built-in driver (`/dev/cu.usbserial-*`) and CH340 needs WCH's DriverKit extension (`/dev/cu.wchusbserial*`). On Linux, the kernel drivers create `/dev/ttyUSB*` or `/dev/ttyACM*`; opening the node usually requires the `dialout` group.
 - `layouts`, and `--layout` with no name, print each layout basename. They do not connect. Pass one of those names to `--layout`.
-- `kwp info` reads ECU identification in the standard session, the same entries as **Read ECU Info**. `bootmode info` reads the boot-mode ECU information. The ECU must already be in boot mode. See [Bootmode](bootmode.md).
-- `-i` is the image to write, or the file a diff read or `bootmode verify` compares. `-o` is the file a read saves.
+- `kwp info` reads ECU identification in the standard session, the same entries as **Read ECU Info**. `-o` writes those lines to a file.
+- `bootmode info` reads the boot-mode ECU information. The ECU must already be in boot mode. `-o` writes those lines to a file. See [Bootmode](bootmode.md).
+- `kwp dtc read` prints each diagnostic trouble code, the same list as **Read DTCs**. `-o` writes those lines to a file. `kwp dtc clear` clears that list, the same tester clear as **Clear DTCs**. It does not checksum the programming flag. A programming session must be left with an ignition cycle first. A held M5.9.2 session uses the KWP1281 fault list. See [Getting started](getting-started.md#logging-and-dtcs).
+- `bootmode immo off` reads the physical EEPROM, sets immo off, saves the image from before that edit, and writes the chip. The ECU must already be in boot mode. The default preset is `95040` SSC, 512 bytes, chip select P4.7 (ME7.1 and ME7.5). `--95p08` selects `95P08` SSC, 1024 bytes, chip select P6.3 (ME7.1.1). The bytes at `0x012` and `0x022` must match. They are set to `0x02`. On a `95040` the page 1 and page 2 checksums are corrected. The default backup names are `eeprom-95040-before-immo.bin` and `eeprom-95p08-before-immo.bin`. `-o` chooses that file. An existing file is left in place and the chip is not written. The write is verified unless `--no-verify` is set. If immo is already off, the chip is not written. See [Bootmode](bootmode.md).
+- `-i` is the image to write, or the file a diff read or `bootmode verify` compares. `-o` is the file a read saves, the info or DTC lines, or the immo-off backup.
 - `--layout` is a basename from [Layout](#layout), or `1m`/`1mb` (`29F800BB`), `512k`/`512kb` (`29F400BB`), or `256k`/`256kb` (`29F200`). Case does not matter. When `-i` is present and `--layout` is omitted, those same three sizes are selected from the file length. Any other length asks for `--layout`. A full KWP read with no `--layout` copies `0x0000`-`0xBFFF` on a held M5.9.2 session (pin 43 off +12 V). That is the calibration, not the whole flash. Any other ECU still needs `--layout`. `29F800BB` is not assumed. The image length must match the layout before a write starts.
 - KWP uses fast init. `--slow` uses slow init. `--baud` sets the session baud. The default list is 124800, 52800, 38400, 10400, 9600.
 - Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write checksum each sector on the ECU. Boot mode reads the chip id and builds the layout. A boot-mode write checksums each programmed sector unless `--no-verify` is set. `bootmode verify -i` checksums each sector against that file.

@@ -98,6 +98,78 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
+        public void Kwp_dtc_read_is_a_standard_session_command()
+        {
+            Program.Request request = Parse("kwp", "dtc", "read", "--slow", "--baud", "10400", "--usb", "0");
+            Assert.True(request.Kwp);
+            Assert.True(request.DtcRead);
+            Assert.False(request.DtcClear);
+            Assert.True(request.Slow);
+            Assert.Equal(10400u, request.Baud);
+            Assert.Equal(0, request.UsbIndex);
+            Assert.Null(request.OutputPath);
+        }
+
+        [Theory]
+        [InlineData("kwp", true)]
+        [InlineData("bootmode", false)]
+        public void Info_keeps_the_output_file(string protocol, bool kwp)
+        {
+            Program.Request request = Parse(protocol, "info", "-o", "info.txt");
+            Assert.True(request.Info);
+            Assert.Equal(kwp, request.Kwp);
+            Assert.Equal("info.txt", request.OutputPath);
+        }
+
+        [Fact]
+        public void Kwp_dtc_read_keeps_the_output_file()
+        {
+            Program.Request request = Parse("kwp", "dtc", "read", "-o", "dtcs.txt");
+            Assert.True(request.DtcRead);
+            Assert.Equal("dtcs.txt", request.OutputPath);
+        }
+
+        [Fact]
+        public void Kwp_dtc_clear_is_a_kwp_command()
+        {
+            Program.Request request = Parse("KWP", "DTC", "CLEAR");
+            Assert.True(request.DtcClear);
+            Assert.False(request.DtcRead);
+            Assert.True(request.Kwp);
+        }
+
+        [Fact]
+        public void Bootmode_immo_off_keeps_the_backup_and_the_95p08_preset()
+        {
+            Program.Request request = Parse("bootmode", "immo", "off", "--95p08", "-o", "backup.bin", "--no-verify");
+            Assert.True(request.ImmoOff);
+            Assert.False(request.Kwp);
+            Assert.True(request.Eeprom95P08);
+            Assert.Equal("backup.bin", request.OutputPath);
+            Assert.True(request.NoVerify);
+            Assert.False(request.Force);
+        }
+
+        [Theory]
+        [InlineData("bootmode dtc read", "DTC read and clear are KWP commands.")]
+        [InlineData("kwp dtc write", "DTC command must be read or clear.")]
+        [InlineData("kwp dtc read -i image.bin", "dtc does not take -i, --layout, --no-verify, or --95p08.")]
+        [InlineData("kwp dtc clear -o dtcs.txt", "dtc clear does not take -o.")]
+        [InlineData("kwp immo off", "Immo off is a bootmode command.")]
+        [InlineData("bootmode immo on", "Immo command must be off.")]
+        [InlineData("bootmode immo off -i image.bin", "immo off does not take -i.")]
+        [InlineData("bootmode immo off --layout 29F800BB", "immo off does not take --layout.")]
+        [InlineData("bootmode immo off --slow", "--slow applies to KWP.")]
+        [InlineData("kwp info --95p08", "--95p08 applies to bootmode immo off.")]
+        [InlineData("kwp read dtc", "Pass kwp dtc read, kwp dtc clear, or bootmode immo off.")]
+        [InlineData("bootmode immo off --95p08 --95p08", "--95p08 was given twice.")]
+        public void Dtc_and_immo_reject_a_bad_command(string command, string expected)
+        {
+            Assert.False(Program.TryParse(command.Split(' '), out _, out string? error));
+            Assert.Equal(expected, error);
+        }
+
+        [Fact]
         public void Full_kwp_read_keeps_the_layout_word()
         {
             Program.Request request = Parse("kwp", "write", "full", "-i", "image.bin", "--layout", "512k");

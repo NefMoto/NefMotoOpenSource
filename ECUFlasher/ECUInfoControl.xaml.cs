@@ -346,13 +346,6 @@ namespace ECUFlasher
             var held = App.CommInterfaceViewModel as KWP2000Interface_ViewModel;
             if ((held != null) && held.IsHeldKWP1281Session())
             {
-                string heldMessage = "Click OK to confirm, otherwise Cancel.";
-                heldMessage += "\n\nAre you sure you want to clear diagnostic information?";
-                if (App.DisplayUserPrompt("Confirm Clear Diagnostic Information", heldMessage, UserPromptType.OK_CANCEL) != UserPromptResult.OK)
-                {
-                    return;
-                }
-
                 App.OperationInProgress = true;
                 App.PercentOperationComplete = -1.0f;
                 App.DisplayStatusMessage("Clearing ECU DTCs.", StatusMessageType.USER);
@@ -363,19 +356,13 @@ namespace ECUFlasher
                 return;
             }
 
-            string confirmationMessage = "Click OK to confirm, otherwise Cancel.";
-            confirmationMessage += "\n\nAre you sure you want to clear diagnostic information?";
-
-            if(App.DisplayUserPrompt("Confirm Clear Diagnostic Information", confirmationMessage, UserPromptType.OK_CANCEL) == UserPromptResult.OK)
+            if (HasProgrammingEepromDtc(ECUDTCs))
             {
-                if (HasProgrammingEepromDtc(ECUDTCs))
-                {
-                    StartEepromMirrorFlagCheck(EepromMirrorReadPurpose.OfferBeforeDtcClear);
-                }
-                else
-                {
-                    StartTesterClear(false);
-                }
+                StartEepromMirrorFlagCheck(EepromMirrorReadPurpose.OfferBeforeDtcClear);
+            }
+            else
+            {
+                StartTesterClear(false);
             }
         }
 
@@ -653,65 +640,24 @@ namespace ECUFlasher
             }), null);
         }
 
-        public static string GetIdentOptionName(byte identOption)
-        {
-            // Handle bootmode info entries (0xFF)
-            if (identOption == 0xFF)
-            {
-                return "Bootmode Info";
-            }
-
-            var identOptionName = "Unknown";
-
-            var identOptionEnum = (KWP2000IdentificationOption)Enum.ToObject(typeof(KWP2000IdentificationOption), identOption);
-
-            identOptionName = identOptionEnum.ToString();
-
-            var identOptionEnumDesc = DescriptionAttributeConverter.GetDescriptionAttribute(identOptionEnum);
-
-            if (identOptionEnumDesc != null)
-            {
-                identOptionName = identOptionEnumDesc.ToString();
-            }
-
-            return identOptionName;
-        }
-
         private void DisplayReadECUInfo(KWP2000IdentificationInfo identInfo)
         {
-            if (identInfo.IdentOptionData.Count > 0)
-            {
-                App.DisplayStatusMessage("Read " + identInfo.IdentOptionData.Count + " ECU info entries:", StatusMessageType.USER);
-
-                bool sawRamProgramIdent = false;
-
-                foreach (var identOption in identInfo.IdentOptionData.Keys)
-                {
-                    var identOptionName = GetIdentOptionName(identOption);
-
-                    string identOptionString = "";
-
-                    KWP2000IdentificationOptionValue optionValue;
-                    if (identInfo.GetIdentificationOptionValue(identOption, out optionValue))
-                    {
-                        identOptionString = optionValue.ToString();
-                    }
-
-                    App.DisplayStatusMessage("\t0x" + identOption.ToString("X2") + ", " + identOptionName + ": " + identOptionString, StatusMessageType.USER);
-                    if (!sawRamProgramIdent && KWP2000RamProgramIdent.ContainsRamProgramIdent(identOptionString))
-                    {
-                        sawRamProgramIdent = true;
-                    }
-                }
-
-                if (sawRamProgramIdent)
-                {
-                    App.DisplayStatusMessage(KWP2000RamProgramIdent.UserStatusMessage, StatusMessageType.USER);
-                }
-            }
-            else
+            if (identInfo.IdentOptionData.Count == 0)
             {
                 App.DisplayStatusMessage("No ECU info read.", StatusMessageType.USER);
+                return;
+            }
+
+            App.DisplayStatusMessage("Read " + identInfo.IdentOptionData.Count + " ECU info entries:", StatusMessageType.USER);
+            bool ramProgram;
+            foreach (string line in identInfo.OptionLines(out ramProgram))
+            {
+                App.DisplayStatusMessage(line, StatusMessageType.USER);
+            }
+
+            if (ramProgram)
+            {
+                App.DisplayStatusMessage(KWP2000RamProgramIdent.UserStatusMessage, StatusMessageType.USER);
             }
         }
 
@@ -790,53 +736,12 @@ namespace ECUFlasher
                     body = body.Substring(after + 8);
                 }
 
-                ECUDTCs = ParseHeldFaults(body);
+                ECUDTCs = new ObservableCollection<KWP2000DTCInfo>(KWP1281CalibrationRead.ParseFaultReport(body));
                 DisplayDTCsRead(ECUDTCs);
             }
 
             App.PercentOperationComplete = 100.0f;
             App.OperationInProgress = false;
-        }
-
-        private static ObservableCollection<KWP2000DTCInfo> ParseHeldFaults(string text)
-        {
-            var list = new ObservableCollection<KWP2000DTCInfo>();
-            if (string.IsNullOrEmpty(text))
-            {
-                return list;
-            }
-
-            string[] parts = text.Split(new char[] { ',', ';' });
-            foreach (string part in parts)
-            {
-                string piece = part.Trim();
-                int slash = piece.LastIndexOf('/');
-                if (slash < 4)
-                {
-                    continue;
-                }
-
-                int statusAt = piece.IndexOf(" status ", slash, StringComparison.Ordinal);
-                if ((statusAt < 0) || ((statusAt + 10) > piece.Length))
-                {
-                    continue;
-                }
-
-                string hexCode = piece.Substring(slash - 4, 4);
-                string statusHex = piece.Substring(statusAt + 8, 2);
-                ushort code;
-                byte status;
-                if (!ushort.TryParse(hexCode, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out code)
-                    || !byte.TryParse(statusHex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out status))
-                {
-                    continue;
-                }
-
-                KWP1281CalibrationRead.TryPCode(code, out ushort shown);
-                list.Add(new KWP2000DTCInfo { DTC = shown, Status = status });
-            }
-
-            return list;
         }
 
         private const uint EepromMirrorPage30Address = 0x6001E0;
@@ -1046,38 +951,9 @@ namespace ECUFlasher
             return string.Join(" ", page.Take((int)EepromMirrorPage30Size).Select((b, i) => i == EepromMirrorFlagIndex ? "[" + b.ToString("X2") + "]" : b.ToString("X2")));
         }
 
-        public static string GetDTCName(ushort DTCnum)
-        {
-            string dtcString = "Unknown DTC";
-
-            if (KWP2000VAGDTCDictionary.DTCStrings.ContainsKey(DTCnum))
-            {
-                dtcString = KWP2000VAGDTCDictionary.DTCStrings[DTCnum];
-            }
-
-            return dtcString;
-        }
-
         private void DisplayDTCsRead(IEnumerable<KWP2000DTCInfo> dtcs)
         {
-            string dtcOutput = "";
-
-            foreach (var dtc in dtcs)
-            {
-                if (dtcOutput.Length > 0)
-                {
-                    dtcOutput += "\n";
-                }
-
-                dtcOutput += "DTC: P" + dtc.DTC.ToString("X4") + " Status: 0x" + dtc.Status.ToString("X2") + " " + GetDTCName(dtc.DTC);
-
-                if (dtc.StatusText.Length > 0)
-                {
-                    dtcOutput += " (" + dtc.StatusText + ")";
-                }
-            }
-
-            App.DisplayStatusMessage(dtcOutput, StatusMessageType.USER);
+            App.DisplayStatusMessage(string.Join("\n", dtcs.Select(dtc => dtc.DisplayLine())), StatusMessageType.USER);
         }
 
         private void ClearDiagnosticInformation()
@@ -1306,7 +1182,7 @@ namespace ECUFlasher
         {
             if (value != null)
             {
-                return ECUInfoControl.GetIdentOptionName((byte)value);
+                return KWP2000IdentificationInfo.OptionName((byte)value);
             }
 
             return null;
@@ -1328,7 +1204,7 @@ namespace ECUFlasher
                 {
                     var app = Application.Current as App;
 
-                    return ECUInfoControl.GetDTCName((ushort)value);
+                    return KWP2000DTCInfo.NameOf((ushort)value);
                 }
             }
 

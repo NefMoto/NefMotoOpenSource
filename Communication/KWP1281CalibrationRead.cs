@@ -19,6 +19,8 @@ Contact by Email: nyet@nyet.org
 */
 
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 
 using Shared;
@@ -113,6 +115,44 @@ namespace Communication
             }
 
             return text;
+        }
+
+        public static List<KWP2000DTCInfo> ParseFaultReport(string text)
+        {
+            var list = new List<KWP2000DTCInfo>();
+            if (string.IsNullOrEmpty(text))
+            {
+                return list;
+            }
+
+            foreach (string part in text.Split(',', ';'))
+            {
+                string piece = part.Trim();
+                int slash = piece.LastIndexOf('/');
+                if (slash < 4)
+                {
+                    continue;
+                }
+
+                int statusAt = piece.IndexOf(" status ", slash, StringComparison.Ordinal);
+                if ((statusAt < 0) || ((statusAt + 10) > piece.Length))
+                {
+                    continue;
+                }
+
+                ushort code;
+                byte status;
+                if (!ushort.TryParse(piece.Substring(slash - 4, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out code)
+                    || !byte.TryParse(piece.Substring(statusAt + 8, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out status))
+                {
+                    continue;
+                }
+
+                TryPCode(code, out ushort shown);
+                list.Add(new KWP2000DTCInfo { DTC = shown, Status = status });
+            }
+
+            return list;
         }
 
         // 18010 is P1626. 16507 is P0123. The four digits of (word - 16384) are the P-code.

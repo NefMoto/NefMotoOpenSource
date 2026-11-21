@@ -25,6 +25,8 @@ using System.Diagnostics;
 using System.Text;
 using System.Xml.Serialization;
 
+using Shared;
+
 namespace Communication
 {
     public struct KWP2000FlashStatus
@@ -641,6 +643,47 @@ namespace Communication
             }
 
             return (optionValue != null);
+        }
+
+        public static string OptionName(byte identOption)
+        {
+            if (identOption == 0xFF)
+            {
+                return "Bootmode Info";
+            }
+
+            var identOptionEnum = (KWP2000IdentificationOption)identOption;
+            object description = DescriptionAttributeConverterLogic.GetDescriptionAttribute(identOptionEnum);
+            if (description != null)
+            {
+                return description.ToString() ?? identOptionEnum.ToString();
+            }
+
+            return identOptionEnum.ToString();
+        }
+
+        public List<string> OptionLines(out bool ramProgram)
+        {
+            var lines = new List<string>();
+            ramProgram = false;
+            foreach (byte identOption in IdentOptionData.Keys)
+            {
+                string value = "";
+                KWP2000IdentificationOptionValue optionValue;
+                if (GetIdentificationOptionValue(identOption, out optionValue))
+                {
+                    value = optionValue.ToString();
+                }
+
+                if (!ramProgram && KWP2000RamProgramIdent.ContainsRamProgramIdent(value))
+                {
+                    ramProgram = true;
+                }
+
+                lines.Add("\t0x" + identOption.ToString("X2") + ", " + OptionName(identOption) + ": " + value);
+            }
+
+            return lines;
         }
     }
 

@@ -78,7 +78,7 @@ FTDI and CH340 are equivalent for KWP. Bootmode is where CH340 baud caveats belo
 - Baud as above
 - **Connect Boot Mode**
 
-Then **KWP2000 Info** → **Read ECU Info** (device ID, CPU family, SYSCON / BUSCON / ADDRSEL, memory status).
+Then **KWP2000 Info** → **Read ECU Info** (device ID, CPU family, SYSCON / BUSCON / ADDRSEL, memory status). `ecuflash bootmode info` prints the same entries. `-o` writes those lines to a file. See [Flashing — Command line](flashing.md#command-line).
 
 ## Flash
 
@@ -146,6 +146,8 @@ The grid is read-only, 16 bytes per row. With no image loaded it stays on screen
 - **Immo Off** on a `95P08` sets `0x012` and `0x022` to `0x02`. Both copies must match. **Immo On** sets that pair to `0x01` when both are `0x02`. Checksums are left unchanged, and the write dialog does not offer the `95040` checksum correction.
 - **Reset Lockout** sets `0x1EC`–`0x1ED` and `0x1FC`–`0x1FD` to `00 00`. The `P0602` flag and counters stay. Page 30 and page 31 checksums are corrected when those bytes change. This is the lockout field.
 - **Clear P0602** clears bit 7 at `0x1E8` and `0x1F8`. **Set P0602** sets that bit. Other bits, counters, and lockout bytes stay. Page 30 and page 31 checksums are corrected when those bytes change.
+
+`ecuflash bootmode immo off` reads the chip, sets those immo bytes, saves the previous image, and writes the chip. The default preset is `95040` on P4.7. `--95p08` selects `95P08` on P6.3. `-o` chooses the backup. An existing file is left in place and the chip is not written. See [Flashing — Command line](flashing.md#command-line).
 
 ## Next
 

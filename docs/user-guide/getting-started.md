@@ -64,7 +64,7 @@ Tabs after you are connected:
 
 ## Logging and DTCs
 
-**KWP2000 Info:** **Read DTCs**, **Read EEPROM Mirror**, **Clear DTCs**, save/load a DTCs file. Those three buttons stay disabled in a programming session. **Read EEPROM Mirror** reports the page at `0x6001E0` and does not clear anything. For `P0602` or `P1681`, see [P0602](clearing-P0602.md).
+**KWP2000 Info:** **Read DTCs**, **Read EEPROM Mirror**, **Clear DTCs**, save/load a DTCs file. Those three buttons stay disabled in a programming session. **Read EEPROM Mirror** reports the page at `0x6001E0` and does not clear anything. For `P0602` or `P1681`, see [P0602](clearing-P0602.md). `ecuflash kwp info` reads the same identification as **Read ECU Info**. `ecuflash kwp dtc read` and `ecuflash kwp dtc clear` do that read and clear without the window. `-o` writes the info or DTC lines to a file. Clear does not checksum the programming flag. See [Flashing — Command line](flashing.md#command-line).
 
 **KWP2000 Logging:** live variables while KWP2000 is connected. This is not [ME7Logger](https://nefariousmotorsports.com/forum/). After a flash write, logging stays broken until a complete power cycle ([Ident says RAM program after a write](troubleshooting.md#ident-says-ram-program-after-a-write)).
 
@@ -118,7 +118,7 @@ Bootmode uses the same power rails and a different entry pin (often pin 24 on ME
 
 ## After you connect
 
-Recommended first action: **KWP2000 Info** → **Read ECU Info**. Optionally **Read DTCs**. That confirms the session without touching flash.
+Recommended first action: **KWP2000 Info** → **Read ECU Info**, or `ecuflash kwp info`. Optionally **Read DTCs**, or `ecuflash kwp dtc read`. That confirms the session without touching flash. `-o` writes those lines to a file. [Flashing — Command line](flashing.md#command-line).
 
 A first flash action should be a **read** (backup), not a write. Layout selection, BT vs BB, and write recovery: [Flashing](flashing.md) and [Wrong Flash Layout](troubleshooting.md#wrong-flash-layout).
 

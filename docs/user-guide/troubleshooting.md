@@ -57,7 +57,7 @@ Developer detail: [KWP2000.md](../KWP2000.md#ram-kernel-after-write-this_is_the_
 
 ## P0602 or P1681 after a flash
 
-`P1681` is the same fault as `P0602`. After a tester clear, `P0602` can return on the next key cycle while a flag in the ECU's EEPROM stays set. A write that finishes clears that flag. [P0602](clearing-P0602.md).
+`P1681` is the same fault as `P0602`. After a tester clear, including `ecuflash kwp dtc clear`, `P0602` can return on the next key cycle while a flag in the ECU's EEPROM stays set. A write that finishes clears that flag. [P0602](clearing-P0602.md).
 
 ## Bootmode NAK or wrong ACK
 
