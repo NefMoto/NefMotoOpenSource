@@ -324,7 +324,9 @@ namespace ECUFlasher
         {
             if (message != null)
             {
-                if (messageType == StatusMessageType.USER)
+                if ((messageType == StatusMessageType.USER)
+                    || (messageType == StatusMessageType.ERROR)
+                    || (messageType == StatusMessageType.PROGRESS))
                 {
                     mStatusTextBuilder.AppendLine(message);
                     OnPropertyChanged(new PropertyChangedEventArgs("StatusText"));

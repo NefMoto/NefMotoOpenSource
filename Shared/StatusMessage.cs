@@ -25,16 +25,22 @@ using System.Text;
 
 namespace Shared
 {
-    // USER and LOG always go to the log file. DEV and DEV_USER go to the log
-    // file in debug builds. TRACE is debugger output only: per-frame traffic
-    // during large reads and writes.
+    // Sink matrix: docs/status-message-sinks.md
+    // ERROR — failures; GUI pane + log; CLI stderr at default.
+    // PROGRESS — long-op start/%/outcome; GUI pane + log; CLI stderr at default.
+    // USER — status-pane narrative; log; CLI stderr at -v.
+    // LOG — log file (CLI at -vv); not the GUI pane.
+    // DEV / DEV_USER — log file in debug builds; CLI at -vvv.
+    // TRACE — debugger/per-frame; CLI stderr with -d/--debug only.
     public enum StatusMessageType
     {
         USER,
         LOG,
         DEV,
         DEV_USER,
-        TRACE
+        TRACE,
+        ERROR,
+        PROGRESS
     };
 
     public enum UserPromptType

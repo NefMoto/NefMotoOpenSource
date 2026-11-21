@@ -36,9 +36,34 @@ namespace Checksum
             ImageToCheck = imageToCheck;
         }
 
+        public DisplayStatusMessageDelegate DisplayStatusMessageHandler { get; set; }
+
         protected void DisplayStatusMessage(string message, StatusMessageType messageType)
         {
-            //TODO: hook this up
+            if (DisplayStatusMessageHandler != null)
+            {
+                DisplayStatusMessageHandler(message, messageType);
+            }
+        }
+
+        protected static void WithStatus(BaseChecksum checksum, DisplayStatusMessageDelegate statusMessage, Action body)
+        {
+            if (statusMessage != null)
+            {
+                checksum.DisplayStatusMessageEvent += statusMessage;
+            }
+
+            try
+            {
+                body();
+            }
+            finally
+            {
+                if (statusMessage != null)
+                {
+                    checksum.DisplayStatusMessageEvent -= statusMessage;
+                }
+            }
         }
 
         protected static bool DetectChecksums(byte[] imageToCheck, out uint baseAddress, out IEnumerable<BaseChecksum> detectedChecksums)
@@ -120,7 +145,7 @@ namespace Checksum
                 bool areChecksumsCorrect;
                 uint numChecksums;
                 uint numIncorrectChecksums;
-                var success = ValidateChecksums(ImageToCheck, out areChecksumsCorrect, out numChecksums, out numIncorrectChecksums);
+                var success = ValidateChecksums(ImageToCheck, DisplayStatusMessageHandler, out areChecksumsCorrect, out numChecksums, out numIncorrectChecksums);
 
                 AreChecksumsCorrect = areChecksumsCorrect;
                 NumChecksums = numChecksums;
@@ -134,6 +159,11 @@ namespace Checksum
 
         public static bool ValidateChecksums(byte[] imageToCheck, out bool areChecksumsCorrect, out uint numChecksums, out uint numIncorrectChecksums)
         {
+            return ValidateChecksums(imageToCheck, null, out areChecksumsCorrect, out numChecksums, out numIncorrectChecksums);
+        }
+
+        public static bool ValidateChecksums(byte[] imageToCheck, DisplayStatusMessageDelegate statusMessage, out bool areChecksumsCorrect, out uint numChecksums, out uint numIncorrectChecksums)
+        {
             areChecksumsCorrect = false;
             numChecksums = 0;
             numIncorrectChecksums = 0;
@@ -146,24 +176,26 @@ namespace Checksum
 
                 var memImageToCheck = new MemoryImage(imageToCheck, baseAddress);
 
+                uint incorrect = 0;
                 foreach (var checksum in detectedChecksums)
                 {
-                    checksum.SetMemoryReference(memImageToCheck);
-
-                    if (!checksum.IsCorrect(false))
+                    WithStatus(checksum, statusMessage, () =>
                     {
-                        numIncorrectChecksums++;
-                    }
+                        checksum.SetMemoryReference(memImageToCheck);
+
+                        if (!checksum.IsCorrect(false))
+                        {
+                            incorrect++;
+                        }
+                    });
                 }
 
+                numIncorrectChecksums = incorrect;
                 areChecksumsCorrect = (numIncorrectChecksums == 0);
-
                 return true;
             }
-            else
-            {
-                return false;
-            }
+
+            return false;
         }
     }
 
@@ -185,7 +217,7 @@ namespace Checksum
             {
                 uint numChecksums;
                 uint numCorrectedChecksums;
-                var success = CorrectChecksums(ImageToCheck, out numChecksums, out numCorrectedChecksums);
+                var success = CorrectChecksums(ImageToCheck, DisplayStatusMessageHandler, out numChecksums, out numCorrectedChecksums);
 
                 NumChecksums = numChecksums;
                 NumCorrectedChecksums = numCorrectedChecksums;
@@ -198,6 +230,11 @@ namespace Checksum
 
         public static bool CorrectChecksums(byte[] imageToCheck, out uint numChecksums, out uint numCorrectedChecksums)
         {
+            return CorrectChecksums(imageToCheck, null, out numChecksums, out numCorrectedChecksums);
+        }
+
+        public static bool CorrectChecksums(byte[] imageToCheck, DisplayStatusMessageDelegate statusMessage, out uint numChecksums, out uint numCorrectedChecksums)
+        {
             //TODO: make sure we are actually updating checksum data and not some random data
 
             numCorrectedChecksums = 0;
@@ -205,44 +242,38 @@ namespace Checksum
 
             uint baseAddress;
             IEnumerable<BaseChecksum> detectedChecksums;
-            if (DetectChecksums(imageToCheck, out baseAddress, out detectedChecksums))
+            if (!DetectChecksums(imageToCheck, out baseAddress, out detectedChecksums))
             {
-                numChecksums = (uint)detectedChecksums.Count();
+                return false;
+            }
 
-                var memImageToCheck = new MemoryImage(imageToCheck, baseAddress);
-
-                foreach (var checksum in detectedChecksums)
+            numChecksums = (uint)detectedChecksums.Count();
+            var memImageToCheck = new MemoryImage(imageToCheck, baseAddress);
+            uint corrected = 0;
+            foreach (var checksum in detectedChecksums)
+            {
+                WithStatus(checksum, statusMessage, () =>
                 {
                     checksum.SetMemoryReference(memImageToCheck);
 
                     if (checksum.UpdateChecksum(true) && checksum.CommitChecksum())
                     {
-                        numCorrectedChecksums++;
+                        corrected++;
                     }
-                }
-
-                bool corrected = (numChecksums == numCorrectedChecksums);
-
-                if (corrected)
-                {
-                    foreach (var checksum in detectedChecksums)
-                    {
-                        checksum.SetMemoryReference(memImageToCheck);
-
-                        if (!checksum.IsCorrect(false))
-                        {
-                            corrected = false;
-                            break;
-                        }
-                    }
-                }
-
-                return corrected;
+                });
             }
-            else
+
+            numCorrectedChecksums = corrected;
+            if (numChecksums != numCorrectedChecksums)
             {
                 return false;
             }
+
+            bool areCorrect;
+            uint ignoredCount;
+            uint incorrect;
+            return ValidateChecksumsOperation.ValidateChecksums(imageToCheck, statusMessage, out areCorrect, out ignoredCount, out incorrect)
+                && areCorrect;
         }
     }
 }

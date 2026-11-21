@@ -497,17 +497,17 @@ namespace Communication
                         }
                         else
                         {
-                            DisplayStatusMessage("Failed to setup communication device.", StatusMessageType.USER);
+                            DisplayStatusMessage("Failed to setup communication device.", StatusMessageType.ERROR);
                         }
                     }
                     else
                     {
-                        DisplayStatusMessage("Failed to create communication device instance.", StatusMessageType.USER);
+                        DisplayStatusMessage("Failed to create communication device instance.", StatusMessageType.ERROR);
                     }
                 }
                 else
                 {
-                    DisplayStatusMessage("Could not open communication device.", StatusMessageType.USER);
+                    DisplayStatusMessage("Could not open communication device.", StatusMessageType.ERROR);
                 }
             }
 
@@ -680,7 +680,7 @@ namespace Communication
 
             deviceID = 0;
 
-            DisplayStatusMessage("Starting bootstrap loader upload.", StatusMessageType.USER);
+            DisplayStatusMessage("Starting bootstrap loader upload.", StatusMessageType.PROGRESS);
 
             uint connectionCount = 0;
             byte[] deviceIDData = null;
@@ -690,11 +690,11 @@ namespace Communication
                 byte[] zeroByte = { 0 };
                 if (SendBytes(zeroByte))
                 {
-                    DisplayStatusMessage("Sent bootstrap init zero byte.", StatusMessageType.USER);
+                    DisplayStatusMessage("Sent bootstrap init zero byte.", StatusMessageType.LOG);
                 }
                 else
                 {
-                    DisplayStatusMessage("Bootstrap loader upload failed. Failed to send init zero byte.", StatusMessageType.USER);
+                    DisplayStatusMessage("Bootstrap loader upload failed. Failed to send init zero byte.", StatusMessageType.ERROR);
                     return false;
                 }
 
@@ -714,11 +714,11 @@ namespace Communication
 
             if (deviceIDData != null)
             {
-                DisplayStatusMessage("Received device ID response for init zero byte.", StatusMessageType.USER);
+                DisplayStatusMessage("Received device ID response for init zero byte.", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Bootstrap loader upload failed. Failed to receive device ID response for init zero byte.", StatusMessageType.USER);
+                DisplayStatusMessage("Bootstrap loader upload failed. Failed to receive device ID response for init zero byte.", StatusMessageType.ERROR);
                 return false;
             }
 
@@ -726,11 +726,11 @@ namespace Communication
 
             if (SendBytes(loaderProgram))
             {
-                DisplayStatusMessage("Successfully uploaded bootstrap loader.", StatusMessageType.USER);
+                DisplayStatusMessage("Successfully uploaded bootstrap loader.", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Bootstrap loader upload failed. Failed to send bootstrap loader data.", StatusMessageType.USER);
+                DisplayStatusMessage("Bootstrap loader upload failed. Failed to send bootstrap loader data.", StatusMessageType.ERROR);
                 return false;
             }
 
@@ -744,13 +744,13 @@ namespace Communication
                 byte[] loaderResult;
                 if (ReceiveBytes(1, out loaderResult) && (loaderResult[0] == (byte)CommunicationConstants.I_LOADER_STARTED))
                 {
-                    DisplayStatusMessage("Received bootstrap loader started status message.", StatusMessageType.USER);
+                    DisplayStatusMessage("Received bootstrap loader started status message.", StatusMessageType.LOG);
 
                     return true;
                 }
                 else
                 {
-                    DisplayStatusMessage("Failed to receive bootstrap loader started status message.", StatusMessageType.USER);
+                    DisplayStatusMessage("Failed to receive bootstrap loader started status message.", StatusMessageType.ERROR);
                 }
             }
 
@@ -760,52 +760,52 @@ namespace Communication
 
         bool UploadMiniMonProgram(byte[] miniMonProgram)
         {
-            DisplayStatusMessage("Starting upload of bootmode runtime.", StatusMessageType.USER);
+            DisplayStatusMessage("Starting upload of bootmode runtime.", StatusMessageType.PROGRESS);
 
             if (SendBytes(miniMonProgram))
             {
-                DisplayStatusMessage("Uploaded bootmode runtime data.", StatusMessageType.USER);
+                DisplayStatusMessage("Uploaded bootmode runtime data.", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Bootmode runtime upload failed. Failed to send bootmode runtime data.", StatusMessageType.USER);
+                DisplayStatusMessage("Bootmode runtime upload failed. Failed to send bootmode runtime data.", StatusMessageType.ERROR);
                 return false;
             }
 
             byte[] autoBaudPattern = { 0x55 };
             if (SendBytes(autoBaudPattern))
             {
-                DisplayStatusMessage("Sent baud rate detection byte.", StatusMessageType.USER);
+                DisplayStatusMessage("Sent baud rate detection byte.", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Bootmode runtime upload failed. Failed to send baud rate detection byte.", StatusMessageType.USER);
+                DisplayStatusMessage("Bootmode runtime upload failed. Failed to send baud rate detection byte.", StatusMessageType.ERROR);
                 return false;
             }
 
             byte[] autoBaudAck;
             if (ReceiveBytes(1, out autoBaudAck) && (autoBaudAck[0] == (byte)CommunicationConstants.I_AUTOBAUD_ACKNOWLEDGE))
             {
-                DisplayStatusMessage("Received baud rate detection response message.", StatusMessageType.USER);
+                DisplayStatusMessage("Received baud rate detection response message.", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Bootmode runtime upload failed. Failed to receive baud rate detection response message.", StatusMessageType.USER);
+                DisplayStatusMessage("Bootmode runtime upload failed. Failed to receive baud rate detection response message.", StatusMessageType.ERROR);
                 return false;
             }
 
             byte[] programStatus;
             if (ReceiveBytes(1, out programStatus) && (programStatus[0] == (byte)CommunicationConstants.I_APPLICATION_STARTED))
             {
-                DisplayStatusMessage("Received bootmode runtime started status message.", StatusMessageType.USER);
+                DisplayStatusMessage("Received bootmode runtime started status message.", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Bootmode runtime upload failed. Failed to receive bootmode runtime started status message.", StatusMessageType.USER);
+                DisplayStatusMessage("Bootmode runtime upload failed. Failed to receive bootmode runtime started status message.", StatusMessageType.ERROR);
                 return false;
             }
 
-            DisplayStatusMessage("Successfully uploaded bootmode runtime.", StatusMessageType.USER);
+            DisplayStatusMessage("Successfully uploaded bootmode runtime.", StatusMessageType.LOG);
             return true;
         }
 
@@ -818,37 +818,37 @@ namespace Communication
 
             if (miniMonLoader == null || miniMonLoader.Length == 0)
             {
-                DisplayStatusMessage("Failed to load bootmode loader from resources.", StatusMessageType.USER);
+                DisplayStatusMessage("Failed to load bootmode loader from resources.", StatusMessageType.ERROR);
                 return false;
             }
 
             if (miniMonProgram == null || miniMonProgram.Length == 0)
             {
-                DisplayStatusMessage("Failed to load bootmode runtime from resources.", StatusMessageType.USER);
+                DisplayStatusMessage("Failed to load bootmode runtime from resources.", StatusMessageType.ERROR);
                 return false;
             }
 
-            DisplayStatusMessage("Initializing bootmode connection...", StatusMessageType.USER);
+            DisplayStatusMessage("Initializing bootmode connection...", StatusMessageType.PROGRESS);
 
             // Send init byte to check device status (say hello)
             byte[] zeroByte = { 0 };
             if (!SendBytes(zeroByte))
             {
-                DisplayStatusMessage("Failed to send bootstrap init zero byte.", StatusMessageType.USER);
+                DisplayStatusMessage("Failed to send bootstrap init zero byte.", StatusMessageType.ERROR);
                 return false;
             }
 
             byte[] deviceIDData;
             if (!ReceiveBytes(1, out deviceIDData))
             {
-                DisplayStatusMessage("Failed to receive device ID response. Make sure device is in bootmode.", StatusMessageType.USER);
+                DisplayStatusMessage("Failed to receive device ID response. Make sure device is in bootmode.", StatusMessageType.ERROR);
                 return false;
             }
 
             byte deviceID = deviceIDData[0];
             DeviceID = deviceID;
 
-            DisplayStatusMessage($"Received device ID: 0x{deviceID:X2}", StatusMessageType.USER);
+            DisplayStatusMessage($"Received device ID: 0x{deviceID:X2}", StatusMessageType.LOG);
 
             // 0xAA means core is already running, skip loader/core upload
             const byte CORE_ALREADY_RUNNING = 0xAA;
@@ -858,13 +858,13 @@ namespace Communication
             }
             else
             {
-                DisplayStatusMessage("Uploading bootmode loader and runtime...", StatusMessageType.USER);
+                DisplayStatusMessage("Uploading bootmode loader and runtime...", StatusMessageType.PROGRESS);
 
                 // Upload loader (32 bytes)
-                DisplayStatusMessage($"Uploading loader ({miniMonLoader.Length} bytes)...", StatusMessageType.USER);
+                DisplayStatusMessage($"Uploading loader ({miniMonLoader.Length} bytes)...", StatusMessageType.LOG);
                 if (!SendBytes(miniMonLoader))
                 {
-                    DisplayStatusMessage("Failed to send bootstrap loader data.", StatusMessageType.USER);
+                    DisplayStatusMessage("Failed to send bootstrap loader data.", StatusMessageType.ERROR);
                     return false;
                 }
 
@@ -872,16 +872,16 @@ namespace Communication
                 byte[] loaderResult;
                 if (!ReceiveBytes(1, out loaderResult) || (loaderResult[0] != (byte)CommunicationConstants.I_LOADER_STARTED))
                 {
-                    DisplayStatusMessage($"Failed to receive loader started confirmation. Expected 0x{(byte)CommunicationConstants.I_LOADER_STARTED:X2}, got 0x{(loaderResult != null && loaderResult.Length > 0 ? loaderResult[0] : 0):X2}", StatusMessageType.USER);
+                    DisplayStatusMessage($"Failed to receive loader started confirmation. Expected 0x{(byte)CommunicationConstants.I_LOADER_STARTED:X2}, got 0x{(loaderResult != null && loaderResult.Length > 0 ? loaderResult[0] : 0):X2}", StatusMessageType.ERROR);
                     return false;
                 }
-                DisplayStatusMessage("Loader started successfully.", StatusMessageType.USER);
+                DisplayStatusMessage("Loader started successfully.", StatusMessageType.LOG);
 
                 // Upload core runtime
-                DisplayStatusMessage($"Uploading bootmode runtime ({miniMonProgram.Length} bytes)...", StatusMessageType.USER);
+                DisplayStatusMessage($"Uploading bootmode runtime ({miniMonProgram.Length} bytes)...", StatusMessageType.LOG);
                 if (!SendBytes(miniMonProgram))
                 {
-                    DisplayStatusMessage("Failed to send bootmode runtime data.", StatusMessageType.USER);
+                    DisplayStatusMessage("Failed to send bootmode runtime data.", StatusMessageType.ERROR);
                     return false;
                 }
 
@@ -889,27 +889,27 @@ namespace Communication
                 byte[] programStatus;
                 if (!ReceiveBytes(1, out programStatus))
                 {
-                    DisplayStatusMessage("Failed to receive application started confirmation.", StatusMessageType.USER);
+                    DisplayStatusMessage("Failed to receive application started confirmation.", StatusMessageType.ERROR);
                     return false;
                 }
 
                 if (programStatus[0] != (byte)CommunicationConstants.I_APPLICATION_STARTED)
                 {
-                    DisplayStatusMessage($"Unexpected response after core upload. Expected 0x{(byte)CommunicationConstants.I_APPLICATION_STARTED:X2} (I_APPLICATION_STARTED), got 0x{programStatus[0]:X2}", StatusMessageType.USER);
+                    DisplayStatusMessage($"Unexpected response after core upload. Expected 0x{(byte)CommunicationConstants.I_APPLICATION_STARTED:X2} (I_APPLICATION_STARTED), got 0x{programStatus[0]:X2}", StatusMessageType.ERROR);
                     return false;
                 }
-                DisplayStatusMessage("Bootmode runtime started successfully.", StatusMessageType.USER);
+                DisplayStatusMessage("Bootmode runtime started successfully.", StatusMessageType.LOG);
             }
 
             // Test communication to verify connection
-            DisplayStatusMessage("Testing communication...", StatusMessageType.USER);
+            DisplayStatusMessage("Testing communication...", StatusMessageType.LOG);
             if (!MiniMon_TestCommunication())
             {
-                DisplayStatusMessage("Communication test failed.", StatusMessageType.USER);
+                DisplayStatusMessage("Communication test failed.", StatusMessageType.ERROR);
                 return false;
             }
 
-            DisplayStatusMessage("Communication test successful. Bootmode connection established.", StatusMessageType.USER);
+            DisplayStatusMessage("Communication test successful. Bootmode connection established.", StatusMessageType.PROGRESS);
             return true;
         }
 
@@ -919,18 +919,18 @@ namespace Communication
         /// </summary>
         public bool TestReadRegisters()
         {
-            DisplayStatusMessage("Testing register read operations...", StatusMessageType.USER);
+            DisplayStatusMessage("Testing register read operations...", StatusMessageType.LOG);
 
             // Test 1: Read SYSCON register (0x00FF12) - always accessible
             const uint SYSCON_Address = 0x00FF12;
             uint sysconValue;
             if (MiniMon_ReadWord(SYSCON_Address, out sysconValue))
             {
-                DisplayStatusMessage($"SYSCON register (0x{SYSCON_Address:X6}) = 0x{sysconValue:X4}", StatusMessageType.USER);
+                DisplayStatusMessage($"SYSCON register (0x{SYSCON_Address:X6}) = 0x{sysconValue:X4}", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Failed to read SYSCON register.", StatusMessageType.USER);
+                DisplayStatusMessage("Failed to read SYSCON register.", StatusMessageType.ERROR);
                 return false;
             }
 
@@ -939,11 +939,11 @@ namespace Communication
             uint port2Value;
             if (MiniMon_ReadWord(Port2_Address, out port2Value))
             {
-                DisplayStatusMessage($"Port 2 register (0x{Port2_Address:X6}) = 0x{port2Value:X4}", StatusMessageType.USER);
+                DisplayStatusMessage($"Port 2 register (0x{Port2_Address:X6}) = 0x{port2Value:X4}", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Failed to read Port 2 register.", StatusMessageType.USER);
+                DisplayStatusMessage("Failed to read Port 2 register.", StatusMessageType.ERROR);
                 return false;
             }
 
@@ -953,15 +953,15 @@ namespace Communication
             if (MiniMon_ReadBlock(InternalRAM_Address, 16, out ramData))
             {
                 string hexData = BitConverter.ToString(ramData).Replace("-", " ");
-                DisplayStatusMessage($"Internal RAM (0x{InternalRAM_Address:X6}, 16 bytes) = {hexData}", StatusMessageType.USER);
+                DisplayStatusMessage($"Internal RAM (0x{InternalRAM_Address:X6}, 16 bytes) = {hexData}", StatusMessageType.LOG);
             }
             else
             {
-                DisplayStatusMessage("Failed to read internal RAM block.", StatusMessageType.USER);
+                DisplayStatusMessage("Failed to read internal RAM block.", StatusMessageType.ERROR);
                 return false;
             }
 
-            DisplayStatusMessage("All register read tests passed successfully.", StatusMessageType.USER);
+            DisplayStatusMessage("All register read tests passed successfully.", StatusMessageType.PROGRESS);
             return true;
         }
 

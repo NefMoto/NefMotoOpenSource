@@ -978,13 +978,15 @@ namespace ECUFlasher
                 return;
             }
 
-            App.CurrentOperation = new Checksum.ValidateChecksumsOperation(FlashMemoryImage.RawData);
+            var validateChecksums = new Checksum.ValidateChecksumsOperation(FlashMemoryImage.RawData);
+            validateChecksums.DisplayStatusMessageHandler = App.DisplayStatusMessage;
+            App.CurrentOperation = validateChecksums;
             App.CurrentOperation.CompletedOperationEvent += this.OnVerifyChecksumsCompleted;
 
             App.OperationInProgress = true;
             App.PercentOperationComplete = -1.0f;
 
-            App.DisplayStatusMessage("Verifying checksums are correct.", StatusMessageType.USER);
+            App.DisplayStatusMessage("Verifying checksums are correct.", StatusMessageType.PROGRESS);
 
             App.CurrentOperation.Start();
         }

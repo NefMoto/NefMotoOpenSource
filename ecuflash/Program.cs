@@ -36,6 +36,8 @@ namespace Ecuflash
         static readonly object LogLock = new object();
         static readonly uint[] KnownBaudRates = { 9600, 10400, 38400, 52800, 124800 };
         static bool Force;
+        static int Verbosity;
+        static bool DebugTrace;
 
         static readonly (int Bytes, string Name, string Word)[] SizeLayouts =
         {
@@ -71,14 +73,16 @@ namespace Ecuflash
             {
                 if (!string.IsNullOrEmpty(error))
                 {
-                    Console.Error.WriteLine("ecuflash: " + error);
+                    Error("ecuflash: " + error);
                 }
 
-                Console.Error.WriteLine("Try 'ecuflash -h' for usage.");
+                Error("Try 'ecuflash -h' for usage.");
                 return 2;
             }
 
-            if (request!.UsbList)
+            Verbosity = request!.Verbosity;
+            DebugTrace = request.Debug;
+            if (request.UsbList)
             {
                 return ListUsb();
             }
@@ -119,7 +123,7 @@ namespace Ecuflash
             {
                 if (!File.Exists(request.InputPath))
                 {
-                    Log("Image file was not found: " + request.InputPath);
+                    Error("Image file was not found: " + request.InputPath);
                     return 2;
                 }
 
@@ -137,7 +141,7 @@ namespace Ecuflash
 
             if (!request.Verify && !Confirm(request))
             {
-                Log("Cancelled. Nothing was sent.");
+                Error("Cancelled. Nothing was sent.");
                 return 1;
             }
 
@@ -183,12 +187,12 @@ namespace Ecuflash
             {
                 if (!boot.TrySoftwareReset())
                 {
-                    Log("Software reset was not sent.");
+                    Error("Software reset was not sent.");
                     return 1;
                 }
 
-                Log("Software reset sent. The port is closed. The boot pin chooses what starts.");
-                Log("Pin held: the chip waits for the loader. Pin released: the chip starts from flash.");
+                Progress("Software reset sent. The port is closed. The boot pin chooses what starts.");
+                Progress("Pin held: the chip waits for the loader. Pin released: the chip starts from flash.");
                 return 0;
             });
         }
@@ -197,7 +201,7 @@ namespace Ecuflash
         {
             if (Process.GetProcessesByName("ECUFlasher").Length > 0)
             {
-                Log("ECUFlasher is running. Close it. It owns the USB serial device.");
+                Error("ECUFlasher is running. Close it. It owns the USB serial device.");
                 status = 1;
                 return null;
             }
@@ -224,8 +228,8 @@ namespace Ecuflash
         static int WithKwp(Request request, DeviceInfo device, Func<KWP2000Interface, ManualResetEvent, int> body)
         {
             string initName = request.Slow ? "Slow" : "Fast";
-            Log("Opening " + OpenLabel(device) + ". " + initName + " init.");
-            Log("Session baud list: " + string.Join(", ", SessionBaudRates(request.Baud)) + ".");
+            Log(1, "Opening " + OpenLabel(device) + ". " + initName + " init.");
+            Log(1, "Session baud list: " + string.Join(", ", SessionBaudRates(request.Baud)) + ".");
 
             var kwp = new KWP2000Interface(LogStatus);
             HookPrompts(kwp);
@@ -241,14 +245,14 @@ namespace Ecuflash
                 : kwp.ConnectToECUFastInit(KWP2000AddressMode.Physical, connectAddress);
             if (!started)
             {
-                Log(initName + " init did not start.");
+                Error(initName + " init did not start.");
                 return 1;
             }
 
             int connectSeconds = request.Slow ? 120 : 60;
             if (WaitHandle.WaitAny(new WaitHandle[] { connected, terminated }, TimeSpan.FromSeconds(connectSeconds)) != 0)
             {
-                Log(initName + " init was not answered.");
+                Error(initName + " init was not answered.");
                 ReleaseKwp(kwp, terminated);
                 return 1;
             }
@@ -266,8 +270,8 @@ namespace Ecuflash
         static int WithBoot(Request request, DeviceInfo device, Func<BootstrapInterface, int> body)
         {
             uint baud = request.HasBaud ? request.Baud : DefaultBootmodeBaud;
-            Log("Opening " + OpenLabel(device) + " at " + baud + ".");
-            Log("The ECU must already be in boot mode.");
+            Log(1, "Opening " + OpenLabel(device) + " at " + baud + ".");
+            Log(1, "The ECU must already be in boot mode.");
 
             var boot = new BootstrapInterface(LogStatus);
             HookPrompts(boot);
@@ -277,13 +281,13 @@ namespace Ecuflash
             boot.SelectedDeviceInfo = device;
             if (!boot.OpenConnection(baud))
             {
-                Log("Boot mode connection did not start.");
+                Error("Boot mode connection did not start.");
                 return 1;
             }
 
             if (WaitHandle.WaitAny(new WaitHandle[] { connected, terminated }, TimeSpan.FromSeconds(30)) != 0)
             {
-                Log("Boot mode did not answer.");
+                Error("Boot mode did not answer.");
                 CloseBoot(boot);
                 return 1;
             }
@@ -306,7 +310,7 @@ namespace Ecuflash
                 bool success = WaitForOperation(operation, "Reading all ECU info.", () => ReleaseKwp(kwp, terminated));
                 if (!success)
                 {
-                    Log("Reading all ECU info failed.");
+                    Error("Reading all ECU info failed.");
                     return 1;
                 }
 
@@ -316,47 +320,51 @@ namespace Ecuflash
 
         static int PrintKwpInfo(KWP2000IdentificationInfo identInfo, string? outputPath)
         {
-            List<string> lines;
             if (identInfo.IdentOptionData.Count == 0)
             {
-                Log("No ECU info read.");
-                lines = new List<string>();
+                Progress("No ECU info read.");
+                return FinishProductLines(new List<string>(), outputPath, "ECU info entries");
             }
-            else
+
+            List<string> lines = identInfo.OptionLines(out bool ramProgram);
+            int status = FinishProductLines(lines, outputPath, "ECU info entries");
+            if (ramProgram)
             {
-                Log("Read " + identInfo.IdentOptionData.Count + " ECU info entries:");
-                lines = identInfo.OptionLines(out bool ramProgram);
-                foreach (string line in lines)
-                {
-                    Log(line);
-                }
-
-                if (ramProgram)
-                {
-                    Log(KWP2000RamProgramIdent.UserStatusMessage);
-                }
+                Progress(KWP2000RamProgramIdent.UserStatusMessage);
             }
 
-            return (outputPath != null) && !SaveLines(outputPath, lines, "ECU info entries") ? 1 : 0;
+            return status;
         }
 
         static int RunBootmodeInfo(Request request, DeviceInfo device)
         {
             return WithBoot(request, device, boot =>
             {
-                Log("Reading bootmode ECU information...");
+                Progress("Reading bootmode ECU information...");
                 var entries = BootmodeEcuInfo.Read(boot);
                 var lines = new List<string>();
                 foreach (BootmodeEcuInfo.Entry entry in entries)
                 {
-                    string line = entry.Name + ": " + entry.Value;
-                    lines.Add(line);
-                    Log(line);
+                    lines.Add(entry.Name + ": " + entry.Value);
                 }
 
-                Log("Read " + entries.Count + " bootmode ECU info entries.");
-                return (request.OutputPath != null) && !SaveLines(request.OutputPath, lines, "bootmode ECU info entries") ? 1 : 0;
+                return FinishProductLines(lines, request.OutputPath, "bootmode ECU info entries");
             });
+        }
+
+        static int FinishProductLines(IReadOnlyList<string> lines, string? outputPath, string label)
+        {
+            if (outputPath != null)
+            {
+                return SaveLines(outputPath, lines, label) ? 0 : 1;
+            }
+
+            foreach (string line in lines)
+            {
+                Result(line);
+            }
+
+            return 0;
         }
 
         static int RunDtc(Request request)
@@ -370,7 +378,7 @@ namespace Ecuflash
 
                 if (kwp.CurrentDiagnosticSessionType == KWP2000DiagnosticSessionType.ProgrammingSession)
                 {
-                    Log("ECU is in a programming session. Turn the ignition off first.");
+                    Error("ECU is in a programming session. Turn the ignition off first.");
                     return 1;
                 }
 
@@ -379,9 +387,10 @@ namespace Ecuflash
                 {
                     var clear = new ClearDiagnosticInformationOperation(kwp, baudRates);
                     bool cleared = WaitForOperation(clear, "Clearing ECU diagnostic information.", () => ReleaseKwp(kwp, terminated));
-                    Log(cleared
-                        ? "Clearing ECU diagnostic information succeeded."
-                        : "Clearing ECU diagnostic information failed.");
+                    EmitOutcome(cleared,
+                        cleared
+                            ? "Clearing ECU diagnostic information succeeded."
+                            : "Clearing ECU diagnostic information failed.");
                     return cleared ? 0 : 1;
                 }
 
@@ -389,7 +398,7 @@ namespace Ecuflash
                 bool success = WaitForOperation(read, "Reading all ECU DTCs.", () => ReleaseKwp(kwp, terminated));
                 if (!success)
                 {
-                    Log("Reading all ECU DTCs failed.");
+                    Error("Reading all ECU DTCs failed.");
                     return 1;
                 }
 
@@ -399,7 +408,7 @@ namespace Ecuflash
 
         static int FinishHeldDtcs(KWP2000Interface kwp, bool clear, string? outputPath)
         {
-            Log(clear ? "Clearing ECU DTCs." : "Reading ECU DTCs.");
+            Progress(clear ? "Clearing ECU DTCs." : "Reading ECU DTCs.");
             using var done = new ManualResetEvent(false);
             bool ok = false;
             string report = "";
@@ -418,14 +427,20 @@ namespace Ecuflash
 
             if (!done.WaitOne(TimeSpan.FromMinutes(OperationWaitMinutes)))
             {
-                Log("The operation did not finish within " + OperationWaitMinutes + " minutes.");
+                Error("The operation did not finish within " + OperationWaitMinutes + " minutes.");
                 return 1;
             }
 
-            Log(ok ? report : ("DTC request failed. " + report));
-            if (!ok || clear)
+            if (!ok)
             {
-                return ok ? 0 : 1;
+                Error("DTC request failed. " + report);
+                return 1;
+            }
+
+            if (clear)
+            {
+                Progress(string.IsNullOrEmpty(report) ? "Clearing ECU DTCs succeeded." : report);
+                return 0;
             }
 
             var held = KWP1281CalibrationRead.ParseFaultReport(report);
@@ -440,24 +455,12 @@ namespace Ecuflash
                 lines.Add(dtc.DisplayLine());
             }
 
-            Log("Read " + lines.Count + " of " + expected + " DTCs.");
             if (lines.Count == 0)
             {
-                Log("No DTCs.");
+                Progress("No DTCs.");
             }
 
-            foreach (string line in lines)
-            {
-                Log(line);
-            }
-
-            if ((outputPath != null) && !SaveLines(outputPath, lines, "DTCs"))
-            {
-                return 1;
-            }
-
-            Log("Reading all ECU DTCs succeeded.");
-            return 0;
+            return FinishProductLines(lines, outputPath, "DTCs");
         }
 
         static bool SaveLines(string path, IReadOnlyList<string> lines, string label)
@@ -469,11 +472,11 @@ namespace Ecuflash
             }
             catch (Exception ex)
             {
-                Log("The read finished, but the file was not saved: " + ex.Message);
+                Error("The read finished, but the file was not saved: " + ex.Message);
                 return false;
             }
 
-            Log("Wrote " + lines.Count + " " + label + " to " + Path.GetFullPath(path) + ".");
+            Progress("Wrote " + lines.Count + " " + label + " to " + Path.GetFullPath(path) + ".");
             return true;
         }
 
@@ -491,19 +494,19 @@ namespace Ecuflash
         static int FinishImmoOff(Request request, BootstrapInterface boot)
         {
             BootstrapInterface.BootmodeEepromSettings settings = ImmoSettings(request);
-            Log("Preset: " + ImmoPreset(request) + ".");
+            Log(1, "Preset: " + ImmoPreset(request) + ".");
             var read = new BootmodeReadEepromOperation(boot, settings);
             bool readOk = WaitForOperation(read, "Reading EEPROM.", () => CloseBoot(boot));
             if (!readOk || (read.ReadMemory == null) || (read.ReadMemory.RawData == null))
             {
-                Log("Reading EEPROM failed. Chip was not written.");
+                Error("Reading EEPROM failed. Chip was not written.");
                 return 1;
             }
 
             byte[] original = (byte[])read.ReadMemory.RawData.Clone();
             if ((uint)original.Length != settings.Size)
             {
-                Log("EEPROM read is " + original.Length + " bytes. Preset is " + settings.Size + " bytes. Chip was not written.");
+                Error("EEPROM read is " + original.Length + " bytes. Preset is " + settings.Size + " bytes. Chip was not written.");
                 return 1;
             }
 
@@ -514,7 +517,10 @@ namespace Ecuflash
             if (result != Me7Eeprom95040Immo.Result.Applied)
             {
                 bool already = result == Me7Eeprom95040Immo.Result.AlreadyOff;
-                Log(already ? "Immo is already off. Chip was not written." : "Immo bytes do not match. Chip was not written.");
+                EmitOutcome(already,
+                    already
+                        ? "Immo is already off. Chip was not written."
+                        : "Immo bytes do not match. Chip was not written.");
                 if ((request.OutputPath != null) && !SaveImmoBytes(request.OutputPath, original))
                 {
                     return 1;
@@ -526,7 +532,7 @@ namespace Ecuflash
             string backupPath = request.OutputPath ?? DefaultImmoBackupName(request);
             if (!SaveImmoBytes(backupPath, original))
             {
-                Log("Chip was not written.");
+                Error("Chip was not written.");
                 return 1;
             }
 
@@ -535,11 +541,11 @@ namespace Ecuflash
             bool wrote = WaitForOperation(write, "Writing EEPROM.", () => CloseBoot(boot));
             if (!wrote)
             {
-                Log("Writing EEPROM failed. The backup from before the edit is " + Path.GetFullPath(backupPath) + ".");
+                Error("Writing EEPROM failed. The backup from before the edit is " + Path.GetFullPath(backupPath) + ".");
                 return 1;
             }
 
-            Log(verify ? "Immo off. Written and verified." : "Immo off. Written (not verified).");
+            Progress(verify ? "Immo off. Written and verified." : "Immo off. Written (not verified).");
             return 0;
         }
 
@@ -547,7 +553,7 @@ namespace Ecuflash
         {
             if (File.Exists(path))
             {
-                Log("File already exists: " + Path.GetFullPath(path) + ". Pass -o with a new name.");
+                Error("File already exists: " + Path.GetFullPath(path) + ". Pass -o with a new name.");
                 return false;
             }
 
@@ -557,11 +563,11 @@ namespace Ecuflash
             }
             catch (Exception ex)
             {
-                Log("The file was not saved: " + ex.Message);
+                Error("The file was not saved: " + ex.Message);
                 return false;
             }
 
-            Log("Wrote " + data.Length + " bytes to " + Path.GetFullPath(path) + ".");
+            Progress("Wrote " + data.Length + " bytes to " + Path.GetFullPath(path) + ".");
             return true;
         }
 
@@ -599,11 +605,11 @@ namespace Ecuflash
             var devices = ListedDevices();
             if (devices.Count == 0)
             {
-                Log("No USB serial device.");
+                Error("No USB serial device.");
                 return 1;
             }
 
-            PrintDevices(devices);
+            PrintDevices(devices, true);
             return 0;
         }
 
@@ -612,7 +618,7 @@ namespace Ecuflash
             string dir = MemoryLayout.GetLayoutsDirectory();
             if (string.IsNullOrEmpty(dir))
             {
-                Log("No layouts.");
+                Error("No layouts.");
                 return 1;
             }
 
@@ -623,7 +629,7 @@ namespace Ecuflash
             }
             catch
             {
-                Log("No layouts.");
+                Error("No layouts.");
                 return 1;
             }
 
@@ -639,14 +645,14 @@ namespace Ecuflash
 
             if (names.Count == 0)
             {
-                Log("No layouts.");
+                Error("No layouts.");
                 return 1;
             }
 
             names.Sort(StringComparer.OrdinalIgnoreCase);
             foreach (string name in names)
             {
-                Log(name);
+                Result(name);
             }
 
             return 0;
@@ -661,40 +667,40 @@ namespace Ecuflash
                 name = LayoutNameForLength(image.Length);
                 if (name == null)
                 {
-                    Log("Image is " + image.Length + " bytes. Pass --layout.");
+                    Error("Image is " + image.Length + " bytes. Pass --layout.");
                     return false;
                 }
 
-                Log("Image is " + image.Length + " bytes. Using layout " + name + ".");
+                Log(1, "Image is " + image.Length + " bytes. Using layout " + name + ".");
             }
 
             if (string.IsNullOrEmpty(name))
             {
-                Log("Pass --layout.");
+                Error("Pass --layout.");
                 return false;
             }
 
             string resolved = ResolveLayoutName(name);
             if (!resolved.Equals(LayoutBasename(name), StringComparison.OrdinalIgnoreCase))
             {
-                Log(name + " selects layout " + resolved + ".");
+                Log(1, name + " selects layout " + resolved + ".");
             }
 
             name = resolved;
             layout = LoadLayout(name, out string? error);
             if (layout == null)
             {
-                Log(error ?? "Layout was not loaded.");
+                Error(error ?? "Layout was not loaded.");
                 return false;
             }
 
             if ((image != null) && ((uint)image.Length != layout.Size))
             {
-                Log("Image is " + image.Length + " bytes. Layout " + name + " is " + layout.Size + " bytes.");
+                Error("Image is " + image.Length + " bytes. Layout " + name + " is " + layout.Size + " bytes.");
                 return false;
             }
 
-            Log("Layout " + name + ", " + layout.Size + " bytes, base 0x" + layout.BaseAddress.ToString("X6") + ".");
+            Log(1, "Layout " + name + ", " + layout.Size + " bytes, base 0x" + layout.BaseAddress.ToString("X6") + ".");
             return true;
         }
 
@@ -708,21 +714,21 @@ namespace Ecuflash
                     {
                         if (!string.IsNullOrEmpty(request.LayoutName))
                         {
-                            Log("Layout is not used on this session.");
+                            Log(1, "Layout is not used on this session.");
                         }
 
                         return FinishCalibrationRead(kwp, terminated, request.OutputPath!);
                     }
 
-                    Log("This is the M5.9.2 read session. It copies 0x0000-0xBFFF."
+                    Error("This is the M5.9.2 read session. It copies 0x0000-0xBFFF."
                         + (request.Read ? " Diff read is not available." : " It does not write."));
                     return 1;
                 }
 
                 if (layout == null)
                 {
-                    Log("This is not the M5.9.2 read session. Pass --layout.");
-                    Log(SizeLayoutText());
+                    Error("This is not the M5.9.2 read session. Pass --layout.");
+                    Error(SizeLayoutText());
                     int listed = ListLayouts();
                     return listed == 0 ? 2 : listed;
                 }
@@ -738,7 +744,7 @@ namespace Ecuflash
                     return FinishKwpRead(operation, success, layout, request.OutputPath!);
                 }
 
-                Log(KwpWriteResult((WriteExternalFlashOperation)operation, success));
+                EmitOutcome(success, KwpWriteResult((WriteExternalFlashOperation)operation, success));
                 return success ? 0 : 1;
             });
         }
@@ -784,7 +790,7 @@ namespace Ecuflash
                 () => ReleaseKwp(kwp, terminated));
             if (!success || (operation.Calibration == null))
             {
-                Log("Calibration read failed.");
+                Error("Calibration read failed.");
                 return 1;
             }
 
@@ -798,7 +804,7 @@ namespace Ecuflash
         {
             if (!success)
             {
-                Log("Reading ECU flash memory failed.");
+                Error("Reading ECU flash memory failed.");
                 return 1;
             }
 
@@ -811,7 +817,7 @@ namespace Ecuflash
 
             if (!MemoryUtils.CombineMemorySectorsIntoImage(sectorData, layout, out MemoryImage combined))
             {
-                Log("Failed to combine memory sectors into one memory image.");
+                Error("Failed to combine memory sectors into one memory image.");
                 return 1;
             }
 
@@ -824,17 +830,17 @@ namespace Ecuflash
             {
                 if (!boot.GetBootmodeFlashLayout(out MemoryLayout layout, out string error) || (layout == null))
                 {
-                    Log(string.IsNullOrEmpty(error) ? "Flash layout was not read." : error);
+                    Error(string.IsNullOrEmpty(error) ? "Flash layout was not read." : error);
                     return 1;
                 }
 
                 if ((layout.SectorSizes == null) || (layout.SectorSizes.Count == 0) || (layout.Size == 0))
                 {
-                    Log("The flash layout has no sectors.");
+                    Error("The flash layout has no sectors.");
                     return 1;
                 }
 
-                Log("Chip layout is " + layout.Size + " bytes, base 0x" + layout.BaseAddress.ToString("X6") + ".");
+                Log(1, "Chip layout is " + layout.Size + " bytes, base 0x" + layout.BaseAddress.ToString("X6") + ".");
                 if (request.Verify)
                 {
                     return FinishBootmodeVerify(boot, layout, image);
@@ -863,7 +869,7 @@ namespace Ecuflash
                 var sectors = new List<MemoryImage>(MemoryUtils.SplitMemoryImageIntoSectors(image!, layout));
                 var operation = new BootmodeWriteExternalFlashOperation(boot, settings, sectors);
                 bool success = WaitForOperation(operation, "Writing ECU flash memory (bootmode).", () => CloseBoot(boot));
-                Log(BootmodeWriteResult(operation, success));
+                EmitOutcome(success, BootmodeWriteResult(operation, success));
                 return success ? 0 : 1;
             });
         }
@@ -882,7 +888,7 @@ namespace Ecuflash
             bool success = WaitForOperation(operation, "Reading ECU flash memory via BootMode.", () => CloseBoot(boot));
             if (!success || (operation.mReadFlashMemory == null))
             {
-                Log("Reading ECU flash memory failed.");
+                Error("Reading ECU flash memory failed.");
                 return 1;
             }
 
@@ -898,7 +904,7 @@ namespace Ecuflash
 
             var operation = new BootmodeVerifyFlashOperation(boot, layout, image!);
             bool success = WaitForOperation(operation, BootmodeVerifyFlashOperation.UserStatus, () => CloseBoot(boot));
-            Log(BootmodeVerifyFlashOperation.ResultMessage(success));
+            EmitOutcome(success, BootmodeVerifyFlashOperation.ResultMessage(success));
             return success ? 0 : 1;
         }
 
@@ -909,7 +915,7 @@ namespace Ecuflash
                 return true;
             }
 
-            Log(BootmodeVerifyFlashOperation.LengthMessage(layout.Size, image!));
+            Error(BootmodeVerifyFlashOperation.LengthMessage(layout.Size, image!));
             return false;
         }
 
@@ -917,20 +923,31 @@ namespace Ecuflash
         {
             if (!image.SaveToFile(outputPath))
             {
-                Log("The read finished, but the file was not saved: " + outputPath);
+                Error("The read finished, but the file was not saved: " + outputPath);
                 return 1;
             }
 
-            Log(succeeded ?? "Reading ECU flash memory succeeded.");
-            Log("Wrote " + image.Size + " bytes to " + Path.GetFullPath(outputPath) + ".");
+            Progress(succeeded ?? "Reading ECU flash memory succeeded.");
+            Progress("Wrote " + image.Size + " bytes to " + Path.GetFullPath(outputPath) + ".");
             return 0;
         }
 
         static bool WaitForOperation(Operation operation, string status, Action release)
         {
-            Log(status);
+            Progress(status);
             using var done = new ManualResetEvent(false);
             bool operationSucceeded = false;
+            float lastPercentFloor = -1.0f;
+            Operation.PercentCompleteDelegate percentHandler = percentComplete =>
+            {
+                float floor = (float)Math.Floor(percentComplete);
+                if (floor > lastPercentFloor)
+                {
+                    lastPercentFloor = floor;
+                    Progress(floor.ToString("f0") + "%");
+                }
+            };
+            operation.PercentCompletedEvent += percentHandler;
             operation.CompletedOperationEvent += (op, success) =>
             {
                 operationSucceeded = success;
@@ -946,13 +963,15 @@ namespace Ecuflash
             operation.Start();
             if (!done.WaitOne(TimeSpan.FromMinutes(OperationWaitMinutes)))
             {
-                Log("The operation did not finish within " + OperationWaitMinutes + " minutes.");
+                Error("The operation did not finish within " + OperationWaitMinutes + " minutes.");
                 operation.Abort();
                 done.WaitOne(TimeSpan.FromSeconds(5));
+                operation.PercentCompletedEvent -= percentHandler;
                 release();
                 return false;
             }
 
+            operation.PercentCompletedEvent -= percentHandler;
             return operationSucceeded;
         }
 
@@ -1137,12 +1156,12 @@ namespace Ecuflash
         {
             foreach (string line in Checklist(request))
             {
-                Log(line);
+                Prompt(line);
             }
 
             if (request.Force)
             {
-                Log("Continuing because --force was passed.");
+                Prompt("Continuing because --force was passed.");
                 return true;
             }
 
@@ -1220,7 +1239,7 @@ namespace Ecuflash
                 }
                 catch (Exception ex)
                 {
-                    Log(ex.Message);
+                    Error(ex.Message);
                     result = UserPromptResult.CANCEL;
                 }
 
@@ -1238,13 +1257,13 @@ namespace Ecuflash
                 LogPrompt(title, message);
                 if (TryForcedAnswer(promptType, out UserPromptResult forced))
                 {
-                    Log(forced == UserPromptResult.CHECK
+                    Prompt(forced == UserPromptResult.CHECK
                         ? "Checking the layout mirror because --force was passed."
                         : "Continuing because --force was passed.");
                     return forced;
                 }
 
-                Log("Stopping. --force does not erase the entire flash.");
+                Error("Stopping. --force does not erase the entire flash.");
                 return UserPromptResult.CANCEL;
             }
 
@@ -1256,7 +1275,7 @@ namespace Ecuflash
         {
             while (true)
             {
-                Log(PromptHint(promptType));
+                Prompt(PromptHint(promptType));
                 string? line = Console.ReadLine();
                 if ((line != null) && TryMapAnswer(line.Trim(), promptType, out UserPromptResult result))
                 {
@@ -1272,10 +1291,10 @@ namespace Ecuflash
 
         static void LogPrompt(string title, string message)
         {
-            Log(title);
+            Prompt(title);
             if (!string.IsNullOrEmpty(message))
             {
-                Log(message);
+                Prompt(message);
             }
         }
 
@@ -1430,11 +1449,12 @@ namespace Ecuflash
             return device.Type + " " + device.Description + " " + device.SerialNumber;
         }
 
-        static void PrintDevices(IReadOnlyList<DeviceInfo> devices)
+        static void PrintDevices(IReadOnlyList<DeviceInfo> devices, bool toStdout)
         {
+            Action<string> emit = toStdout ? Result : Error;
             for (int i = 0; i < devices.Count; i++)
             {
-                Log(i + "  " + devices[i].Type + "  " + devices[i].Description + "  " + devices[i].SerialNumber);
+                emit(i + "  " + devices[i].Type + "  " + devices[i].Description + "  " + devices[i].SerialNumber);
             }
         }
 
@@ -1443,7 +1463,7 @@ namespace Ecuflash
             var devices = ListedDevices();
             if (devices.Count == 0)
             {
-                Log("No USB serial device.");
+                Error("No USB serial device.");
                 status = 1;
                 return null;
             }
@@ -1452,8 +1472,8 @@ namespace Ecuflash
             {
                 if ((index.Value < 0) || (index.Value >= devices.Count))
                 {
-                    Log("USB index " + index.Value + " is not in the list.");
-                    PrintDevices(devices);
+                    Error("USB index " + index.Value + " is not in the list.");
+                    PrintDevices(devices, false);
                     status = 2;
                     return null;
                 }
@@ -1468,8 +1488,8 @@ namespace Ecuflash
                 return devices[0];
             }
 
-            Log("More than one USB serial device. Pass --usb N.");
-            PrintDevices(devices);
+            Error("More than one USB serial device. Pass --usb N.");
+            PrintDevices(devices, false);
             status = 2;
             return null;
         }
@@ -1605,6 +1625,30 @@ namespace Ecuflash
                     }
 
                     request.Eeprom95P08 = true;
+                    continue;
+                }
+
+                if ((arg == "-v") || (arg == "--verbose"))
+                {
+                    request.Verbosity = Math.Min(3, request.Verbosity + 1);
+                    continue;
+                }
+
+                if ((arg.Length >= 2) && (arg[0] == '-') && arg.Skip(1).All(c => c == 'v'))
+                {
+                    request.Verbosity = Math.Min(3, request.Verbosity + (arg.Length - 1));
+                    continue;
+                }
+
+                if ((arg == "-d") || (arg == "--debug"))
+                {
+                    if (request.Debug)
+                    {
+                        error = "-d/--debug was given twice.";
+                        return false;
+                    }
+
+                    request.Debug = true;
                     continue;
                 }
 
@@ -1981,6 +2025,7 @@ namespace Ecuflash
         static void Usage(TextWriter writer)
         {
             writer.WriteLine("Usage: ecuflash [-h|-?] [--help] [-V|--version]");
+            writer.WriteLine("       ecuflash [-v...] [-d|--debug] <command>...");
             writer.WriteLine("       ecuflash usb");
             writer.WriteLine("       ecuflash layouts");
             writer.WriteLine("       ecuflash --layout");
@@ -1991,15 +2036,12 @@ namespace Ecuflash
             writer.WriteLine("       ecuflash bootmode immo off");
             writer.WriteLine("       ecuflash bootmode verify -i FILE");
             writer.WriteLine("       ecuflash bootmode reset");
-            writer.WriteLine("       ecuflash kwp read full --layout NAME -o FILE");
-            writer.WriteLine("       ecuflash kwp read full -o FILE");
+            writer.WriteLine("       ecuflash kwp read full [--layout NAME] -o FILE");
             writer.WriteLine("       ecuflash kwp read diff -i FILE -o FILE");
-            writer.WriteLine("       ecuflash kwp write full -i FILE");
-            writer.WriteLine("       ecuflash kwp write diff -i FILE");
+            writer.WriteLine("       ecuflash kwp write <full|diff> -i FILE");
             writer.WriteLine("       ecuflash bootmode read full -o FILE");
             writer.WriteLine("       ecuflash bootmode read diff -i FILE -o FILE");
-            writer.WriteLine("       ecuflash bootmode write full -i FILE");
-            writer.WriteLine("       ecuflash bootmode write diff -i FILE");
+            writer.WriteLine("       ecuflash bootmode write <full|diff> -i FILE");
         }
 
         static void Help(TextWriter writer)
@@ -2031,6 +2073,8 @@ namespace Ecuflash
             Option(writer, "-h, -?", "print the usage and exit");
             Option(writer, "--help", "print this help and exit");
             Option(writer, "-V, --version", "print the build version and exit");
+            Option(writer, "-v..., --verbose", "more stderr detail (USER, LOG, DEV)");
+            Option(writer, "-d, --debug", "print TRACE protocol detail on stderr");
             Option(writer, "-i FILE", "image to write, or the file a diff read or verify compares");
             Option(writer, "-o FILE", "file a read saves, or the info, DTC, or immo-off lines");
             Option(writer, "--layout [NAME]", "layout basename or 1m, 512k, 256k; no NAME lists them");
@@ -2040,6 +2084,10 @@ namespace Ecuflash
             Option(writer, "--no-verify", "match clearing Verify Read or Verify Write");
             Option(writer, "--95p08", "ME7.1.1 95P08 on P6.3; immo off defaults to 95040 on P4.7");
             Option(writer, "-f, --force", "answer confirmation prompts and do not wait");
+            writer.WriteLine();
+            writer.WriteLine("Output: command product lines go to stdout (or -o). Errors, progress, prompts,");
+            writer.WriteLine("and -v/-d detail go to stderr. Default stderr is quiet except errors and progress.");
+            writer.WriteLine("-v shows USER status; -vv adds LOG; -vvv adds DEV; -d adds TRACE.");
             writer.WriteLine();
             writer.WriteLine(SizeLayoutText());
             writer.WriteLine("A full KWP read with no --layout reads 0x0000-0xBFFF on a held M5.9.2 session.");
@@ -2081,17 +2129,81 @@ namespace Ecuflash
 
         static void LogStatus(string message, StatusMessageType messageType)
         {
-            if ((messageType == StatusMessageType.USER) || (messageType == StatusMessageType.LOG))
+            if (messageType == StatusMessageType.TRACE)
             {
-                Log(message);
+                if (DebugTrace)
+                {
+                    Err(message);
+                }
+
+                return;
+            }
+
+            int need;
+            switch (messageType)
+            {
+                case StatusMessageType.ERROR:
+                case StatusMessageType.PROGRESS:
+                    need = 0;
+                    break;
+                case StatusMessageType.USER:
+                    need = 1;
+                    break;
+                case StatusMessageType.LOG:
+                    need = 2;
+                    break;
+                case StatusMessageType.DEV:
+                case StatusMessageType.DEV_USER:
+                    need = 3;
+                    break;
+                default:
+                    need = 2;
+                    break;
+            }
+
+            Log(need, message);
+        }
+
+        static void Result(string message)
+        {
+            lock (LogLock)
+            {
+                Console.Out.WriteLine(message);
             }
         }
 
-        static void Log(string message)
+        static void Err(string message)
         {
             lock (LogLock)
             {
                 Console.Error.WriteLine(message);
+            }
+        }
+
+        static void Error(string message) => Err(message);
+        static void Progress(string message) => Err(message);
+        static void Prompt(string message) => Err(message);
+
+        static void ErrLines(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
+            {
+                Err(line);
+            }
+        }
+
+        static void EmitOutcome(bool success, string text) => ErrLines(text);
+
+        static void Log(int minLevel, string message)
+        {
+            if (Verbosity >= minLevel)
+            {
+                Err(message);
             }
         }
 
@@ -2118,6 +2230,8 @@ namespace Ecuflash
             public bool ImmoOff;
             public bool Eeprom95P08;
             public bool Reset;
+            public int Verbosity;
+            public bool Debug;
         }
     }
 }
