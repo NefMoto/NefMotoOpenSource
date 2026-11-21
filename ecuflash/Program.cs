@@ -103,6 +103,11 @@ namespace Ecuflash
                 return RunImmoOff(request);
             }
 
+            if (request.Reset)
+            {
+                return RunBootmodeReset(request);
+            }
+
             byte[]? image = null;
             if (request.InputPath != null)
             {
@@ -158,6 +163,28 @@ namespace Ecuflash
             }
 
             return RunBootmodeInfo(request, device);
+        }
+
+        static int RunBootmodeReset(Request request)
+        {
+            DeviceInfo? device = ClaimDevice(request, out int selectStatus);
+            if (device == null)
+            {
+                return selectStatus;
+            }
+
+            return WithBoot(request, device, boot =>
+            {
+                if (!boot.TrySoftwareReset())
+                {
+                    Log("Software reset was not sent.");
+                    return 1;
+                }
+
+                Log("Software reset sent. The port is closed. The boot pin chooses what starts.");
+                Log("Pin held: the chip waits for the loader. Pin released: the chip starts from flash.");
+                return 0;
+            });
         }
 
         static DeviceInfo? ClaimDevice(Request request, out int status)
@@ -1620,6 +1647,11 @@ namespace Ecuflash
                     return ParseVerify(positionals, request, out error);
                 }
 
+                if (positionals[1].Equals("reset", StringComparison.OrdinalIgnoreCase))
+                {
+                    return ParseReset(positionals, request, out error);
+                }
+
                 return ParseInfo(positionals, request, out error);
             }
 
@@ -1821,14 +1853,14 @@ namespace Ecuflash
 
         static string CommandError()
         {
-            return "Pass usb, layouts, or kwp or bootmode, then info, verify, read, write, dtc, or immo.";
+            return "Pass usb, layouts, or kwp or bootmode, then info, verify, reset, read, write, dtc, or immo.";
         }
 
-        static bool ParseVerify(List<string> positionals, Request request, out string? error)
+        static bool BeginBootmode(List<string> positionals, Request request, string kwpError, out string? error)
         {
             if (positionals[0].Equals("kwp", StringComparison.OrdinalIgnoreCase))
             {
-                error = "Full-chip verify is a bootmode command.";
+                error = kwpError;
                 return false;
             }
 
@@ -1838,8 +1870,35 @@ namespace Ecuflash
                 return false;
             }
 
-            error = BootmodeOptionError(request)
-                ?? (request.NoVerify ? "verify does not take --no-verify." : null)
+            error = BootmodeOptionError(request);
+            return error == null;
+        }
+
+        static bool ParseReset(List<string> positionals, Request request, out string? error)
+        {
+            if (!BeginBootmode(positionals, request, "Reset is a bootmode command.", out error))
+            {
+                return false;
+            }
+
+            if ((request.InputPath != null) || (request.OutputPath != null) || request.NoVerify || request.Eeprom95P08)
+            {
+                error = "reset does not take -i, -o, --no-verify, or --95p08.";
+                return false;
+            }
+
+            request.Reset = true;
+            return Accept(request, out error);
+        }
+
+        static bool ParseVerify(List<string> positionals, Request request, out string? error)
+        {
+            if (!BeginBootmode(positionals, request, "Full-chip verify is a bootmode command.", out error))
+            {
+                return false;
+            }
+
+            error = request.NoVerify ? "verify does not take --no-verify." : null
                 ?? (request.OutputPath != null ? "verify does not take -o." : null)
                 ?? (request.InputPath == null ? "verify needs -i image.bin." : null);
             if (error != null)
@@ -1925,6 +1984,7 @@ namespace Ecuflash
             writer.WriteLine("       ecuflash bootmode info [-o FILE]");
             writer.WriteLine("       ecuflash bootmode immo off");
             writer.WriteLine("       ecuflash bootmode verify -i FILE");
+            writer.WriteLine("       ecuflash bootmode reset");
             writer.WriteLine("       ecuflash kwp read full --layout NAME -o FILE");
             writer.WriteLine("       ecuflash kwp read full -o FILE");
             writer.WriteLine("       ecuflash kwp read diff -i FILE -o FILE");
@@ -1947,6 +2007,7 @@ namespace Ecuflash
             Command(writer, "bootmode info", "Read boot-mode device, bus, and flash layout information. -o writes the same lines to a file.");
             Command(writer, "bootmode immo off", "Read the EEPROM, set immo off, save a backup, and write it back.");
             Command(writer, "bootmode verify", "Checksum each sector of -i on the ECU. Does not read or write the chip.");
+            Command(writer, "bootmode reset", "Software reset. The port closes. The boot pin chooses the loader or flash.");
             Command(writer, "kwp read full", "Read the layout, or the M5.9.2 calibration. Requires -o.");
             Command(writer, "kwp read diff", "Read sectors that differ from -i. Requires -i and -o.");
             Command(writer, "kwp write full", "Write every sector from -i.");
@@ -2076,6 +2137,7 @@ namespace Ecuflash
             public bool DtcClear;
             public bool ImmoOff;
             public bool Eeprom95P08;
+            public bool Reset;
         }
     }
 }

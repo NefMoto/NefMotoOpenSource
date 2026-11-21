@@ -1047,15 +1047,26 @@ namespace Communication
             return true;
         }
 
-        bool MiniMon_SoftwareReset()
+        /// <summary>
+        /// MiniMon command 0x32. The CPU samples the boot pin and leaves this session.
+        /// A missing finish byte after the command is accepted still counts as sent.
+        /// </summary>
+        public bool TrySoftwareReset()
         {
             if (!MiniMon_RequestFunction((byte)CommunicationConstants.C_SWRESET))
             {
                 return false;
             }
 
-            if (!MiniMon_WasFunctionRequestSuccessful())
+            if (!MiniMon_GetFunctionRequestAck(out byte result))
             {
+                DisplayStatusMessage("Software reset was accepted. No finish byte followed.", StatusMessageType.LOG);
+                return true;
+            }
+
+            if (result != (byte)CommunicationConstants.A_ACK2)
+            {
+                DisplayStatusMessage($"Software reset was refused, ack 0x{result:X2}.", StatusMessageType.USER);
                 return false;
             }
 

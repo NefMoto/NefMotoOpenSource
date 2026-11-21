@@ -74,6 +74,31 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
+        public void Bootmode_reset_closes_without_an_image()
+        {
+            Program.Request request = Parse("bootmode", "reset", "--baud", "57600", "--usb", "0", "-f");
+            Assert.True(request.Reset);
+            Assert.False(request.Kwp);
+            Assert.False(request.Read);
+            Assert.False(request.Verify);
+            Assert.Equal(57600u, request.Baud);
+            Assert.Equal(0, request.UsbIndex);
+            Assert.True(request.Force);
+        }
+
+        [Theory]
+        [InlineData("bootmode reset -i image.bin", "reset does not take -i, -o, --no-verify, or --95p08.")]
+        [InlineData("bootmode reset -o out.bin", "reset does not take -i, -o, --no-verify, or --95p08.")]
+        [InlineData("bootmode reset --layout 29F800BB", "Boot mode reads the chip id. Do not pass --layout.")]
+        [InlineData("bootmode reset --slow", "--slow applies to KWP.")]
+        [InlineData("kwp reset", "Reset is a bootmode command.")]
+        public void Bootmode_reset_rejects_a_bad_command(string command, string expected)
+        {
+            Assert.False(Program.TryParse(command.Split(' '), out _, out string? error));
+            Assert.Equal(expected, error);
+        }
+
+        [Fact]
         public void Bootmode_verify_takes_an_image()
         {
             Program.Request request = Parse("bootmode", "verify", "-i", "image.bin", "-f");

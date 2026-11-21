@@ -32,8 +32,8 @@ BT is rarely seen on Bosch ECUs.
 
 ## Read
 
-- **Full Read Flash** — whole layout, checksummed as **Verify Read** sets (below), then saved. Bootmode and layouts whose sector 0 is not 16 KB at `0x800000` upload with no checksum.
-- **Diff Read Flash** — sectors that differ from the loaded file. The first sector is always uploaded. Later matching sectors are checksum skips.
+- **Full Read Flash** — whole layout, checksummed as **Verify Read** sets (below), then saved. A boot-mode read sends no `0xC5`. A KWP read whose sector 0 is not 16 KB at `0x800000` also sends no checksum.
+- **Diff Read Flash** — sectors that differ from the loaded file. On KWP the first sector is always uploaded and later matches are checksum skips. Boot mode skips every matching sector, including the first.
 
 A KWP read opens a development session from the default session, then logs in again. A refused login stays in that session and the upload probe is still sent. Programming opens once if the development session does not start, or if the probe returns `0x11`, `0x90`, or `0x33`. A general reject stays out of the programming kernel. Family exceptions are in [KWP2000](../KWP2000.md).
 
@@ -92,7 +92,7 @@ Do not use entire-flash erase to “fix” a BT/BB mismatch.
 
 ## Command line
 
-Flash read and write use the same operations as this tab and print the same confirmation before connecting. `kwp info`, `kwp dtc read`, `kwp dtc clear`, `bootmode info`, and `bootmode immo off` connect without that prompt. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
+Flash read and write use the same operations as this tab and print the same confirmation before connecting. `kwp info`, `kwp dtc read`, `kwp dtc clear`, `bootmode info`, `bootmode verify`, `bootmode reset`, and `bootmode immo off` connect without that prompt. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
 
 ```text
 ecuflash -h
@@ -108,6 +108,7 @@ ecuflash bootmode info -o boot.txt
 ecuflash bootmode immo off
 ecuflash bootmode immo off --95p08 -o backup.bin
 ecuflash bootmode verify -i image.bin
+ecuflash bootmode reset
 ecuflash kwp read full --layout 29F800BB -o out.bin
 ecuflash kwp read full --layout 512k -o out.bin
 ecuflash kwp read full -o calibration.bin
@@ -130,7 +131,7 @@ ecuflash bootmode write diff -i image.bin
 - `-i` is the image to write, or the file a diff read or `bootmode verify` compares. `-o` is the file a read saves, the info or DTC lines, or the immo-off backup.
 - `--layout` is a basename from [Layout](#layout), or `1m`/`1mb` (`29F800BB`), `512k`/`512kb` (`29F400BB`), or `256k`/`256kb` (`29F200`). Case does not matter. When `-i` is present and `--layout` is omitted, those same three sizes are selected from the file length. Any other length asks for `--layout`. A full KWP read with no `--layout` copies `0x0000`-`0xBFFF` on a held M5.9.2 session (pin 43 off +12 V). That is the calibration, not the whole flash. Any other ECU still needs `--layout`. `29F800BB` is not assumed. The image length must match the layout before a write starts.
 - KWP uses fast init. `--slow` uses slow init. `--baud` sets the session baud. The default list is 124800, 52800, 38400, 10400, 9600.
-- Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write checksum each sector on the ECU. Boot mode reads the chip id and builds the layout. A boot-mode write checksums each programmed sector unless `--no-verify` is set. `bootmode verify -i` checksums each sector against that file.
+- Boot mode defaults to 57600. The ECU must already be in boot mode. See [Bootmode](bootmode.md). Diff read and diff write checksum each sector on the ECU. Boot mode reads the chip id and builds the layout. A boot-mode write checksums each programmed sector unless `--no-verify` is set. `bootmode verify -i` checksums each sector against that file. `bootmode reset` sends command `0x32` and closes the port. See [Bootmode](bootmode.md#flash).
 - `--no-verify` matches clearing **Verify Read** or **Verify Write**. On a full KWP read of a bottom-boot layout whose first sector is 16 KB at `0x800000`, that checksums the first four sectors instead of every sector.
 - Press Enter to continue. Ctrl-C aborts. `-f` and `--force` answer the confirmation prompts and do not wait. On **Sector Erase Failed** they stop the write. They do not erase the entire flash. A mirror question runs the sample check. A cancelled write does not connect.
 - There is no erase command. A write erases sectors as part of the write.
