@@ -37,7 +37,7 @@ BT is rarely seen on Bosch ECUs.
 
 A KWP read opens a development session from the default session, then logs in again. A refused login stays in that session and the upload probe is still sent. Programming opens once if the development session does not start, or if the probe returns `0x11`, `0x90`, or `0x33`. A general reject stays out of the programming kernel. Family exceptions are in [KWP2000](../KWP2000.md).
 
-If the ECU does not serve the flash checksum in the session, a dialog asks before the transfer changes. **OK** reads every sector. **Cancel** stops the read.
+If a diff read's development checksum is not served, programming opens and that checksum is tried again. A match skips the sector. A full read also opens programming, then checks the layout again. If that session does not serve upload, the full read stops and three matching checksums close the programming flag. A programming-session checksum that is not served, or a subfunction-not-supported reply, asks before the transfer changes. **OK** reads every sector. **Cancel** stops the read.
 
 **Cancel Current Operation** during a KWP read waits for the current request, then clears the EEPROM bit behind `P0602` before it stops, and reports "Reading ECU flash memory cancelled." Cancel again to stop at once; that leaves the bit set, as does a cancel before the first sector finishes.
 

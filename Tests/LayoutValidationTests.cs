@@ -129,31 +129,31 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal(step, ValidateFlashChecksumAction.ChecksumReadStepFor(session, (byte)nrc, mayOpenProgramming));
         }
 
+        [Theory]
+        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported, true)]
+        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected, true)]
+        [InlineData(false, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported, false)]
+        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid, false)]
+        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest, false)]
+        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted, false)]
+        public void Read_stops_when_programming_upload_unserved(bool openedForChecksum, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool stops)
+        {
+            Assert.Equal(stops, LayoutValidationText.ReadStopsWhenProgrammingUploadUnserved(openedForChecksum, result));
+        }
+
         [Fact]
         public void Read_switches_on_ChecksumReadStepFor()
         {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
-            {
-                dir = dir.Parent;
-            }
-
-            Assert.NotNull(dir);
-            string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
+            string text = OperationsSource();
             Assert.Contains("ChecksumReadStepFor", text);
+            Assert.Contains("Retry this checksum. A layout RequestUpload here is NoProgram", text);
+            Assert.Contains("ReadStopsWhenProgrammingUploadUnserved(mOpenedProgrammingForChecksum", text);
         }
 
         [Fact]
         public void Write_keeps_checksum_and_skips_flag_upload_after_NoProgram()
         {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
-            {
-                dir = dir.Parent;
-            }
-
-            Assert.NotNull(dir);
-            string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
+            string text = OperationsSource();
             Assert.Contains("ContinueWriteWithoutLayoutValidation", text);
             Assert.Contains("Sector checksums will still be tried", text);
             Assert.Contains("Flash checksum got no reply", text);
@@ -178,6 +178,18 @@ namespace NefMotoOpenSource.Tests
         public void MustAbort_leaves_an_address_reject_on_the_probe(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
             Assert.False(LayoutValidationText.MustAbort(result));
+        }
+
+        private static string OperationsSource()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
+            {
+                dir = dir.Parent;
+            }
+
+            Assert.NotNull(dir);
+            return File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
         }
     }
 }

@@ -927,13 +927,25 @@ namespace Communication
                 || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted);
         }
 
+        // NoProgram and a general reject. Security and address rejects are not this pair.
+        private static bool ProgrammingUploadUnserved(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            return (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected);
+        }
+
         // Write-only. Programming NoProgram/reject skips layout validation but still tries 0xC5.
         // No-reply on 0xC5 asks before erase. MustAbort still stops the read.
         public static bool ContinueWriteWithoutLayoutValidation(KWP2000DiagnosticSessionType session, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
-            return (session == KWP2000DiagnosticSessionType.ProgrammingSession)
-                && ((result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-                    || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected));
+            return (session == KWP2000DiagnosticSessionType.ProgrammingSession) && ProgrammingUploadUnserved(result);
+        }
+
+        // Diff read only, after a development checksum 0x22 opened programming.
+        // The upload-probe fallback leaves openedForChecksum false and does not send 0xC5.
+        public static bool ReadStopsWhenProgrammingUploadUnserved(bool openedForChecksum, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            return openedForChecksum && ProgrammingUploadUnserved(result);
         }
 
         public static void ContinuePrompt(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool writing, out string title, out string body)
@@ -1601,11 +1613,15 @@ namespace Communication
                             {
                                 case ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming:
                                 {
-                                    // Layout validation in the programming session runs before any 0xC5.
-                                    // RequestUpload 0x11 or 0x90 stops the read and does not send checksum.
+                                    // Retry this checksum. A layout RequestUpload here is NoProgram and stops the read.
+                                    if (!OnlyReadRequiredSectors)
+                                    {
+                                        mOpenedProgrammingForChecksum = true;
+                                        mHasVerfiedRequestUploadSupported = false;
+                                        mState = ReadingState.ValidateMemoryLayout;
+                                    }
+
                                     OpenProgrammingSessionAfterDevelopment("Flash checksum is not served in the development session. Opening a programming session.");
-                                    mHasVerfiedRequestUploadSupported = false;
-                                    mState = ReadingState.ValidateMemoryLayout;
                                     FinishReadAction(action, true);
                                     return;
                                 }
@@ -1755,6 +1771,15 @@ namespace Communication
                         mState = ReadingState.ValidateMemoryLayout;
                         success = true;
                         FinishReadAction(action, success);
+                        return;
+                    }
+
+                    if (LayoutValidationText.ReadStopsWhenProgrammingUploadUnserved(mOpenedProgrammingForChecksum, validationResult))
+                    {
+                        CommInterface.DisplayStatusMessage("The programming session does not serve RequestUpload, so the diff read stops.", StatusMessageType.USER);
+                        mClearFlag = new ProgrammingFlagCloser(KWP2000CommInterface, mFlashBlockList.First().StartAddress, mCurrentBlock.Current, false);
+                        mState = ReadingState.ClearFlagAfterFailure;
+                        FinishReadAction(action, true);
                         return;
                     }
 
@@ -1945,6 +1970,7 @@ namespace Communication
         private IEnumerator<MemoryImage> mCurrentBlock;
         private byte mMaxBlockSize;
         private bool mHasVerfiedRequestUploadSupported;
+        private bool mOpenedProgrammingForChecksum;
         private readonly int mChecksumSectorCount;
         private MemoryImage mFirstFinishedBlock;
         private ProgrammingFlagCloser mClearFlag;
