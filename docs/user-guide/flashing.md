@@ -33,11 +33,11 @@ BT is rarely seen on Bosch ECUs.
 ## Read
 
 - **Full Read Flash** — whole layout, checksummed as **Verify Read** sets (below), then saved. A boot-mode read sends no `0xC5`. A KWP read whose sector 0 is not 16 KB at `0x800000` also sends no checksum.
-- **Diff Read Flash** — sectors that differ from the loaded file. On KWP the first sector is always uploaded and later matches are checksum skips. Boot mode skips every matching sector, including the first.
+- **Diff Read Flash** — sectors that differ from the loaded file. On KWP the first sector is always uploaded. Later sectors are checksum skips when that checksum is served. A development checksum `0x22` uploads the remaining sectors in that session. Boot mode skips every matching sector, including the first.
 
 A KWP read opens a development session from the default session, then logs in again. A refused login stays in that session and the upload probe is still sent. Programming opens once if the development session does not start, or if the probe returns `0x11`, `0x90`, or `0x33`. A general reject stays out of the programming kernel. Family exceptions are in [KWP2000](../KWP2000.md).
 
-If a diff read's development checksum is not served, programming opens and that checksum is tried again. A match skips the sector. A full read also opens programming, then checks the layout again. If that session does not serve upload, the full read stops and three matching checksums close the programming flag. A programming-session checksum that is not served, or a subfunction-not-supported reply, asks before the transfer changes. **OK** reads every sector. **Cancel** stops the read.
+If the development checksum is not served, the read stays in that session and uploads every sector. It does not open programming, so it does not set the programming flag. A programming-session checksum that is not served, or a subfunction-not-supported reply, asks before the transfer changes. **OK** reads every sector. **Cancel** stops the read.
 
 **Cancel Current Operation** during a KWP read waits for the current request, then clears the EEPROM bit behind `P0602` before it stops, and reports "Reading ECU flash memory cancelled." Cancel again to stop at once; that leaves the bit set, as does a cancel before the first sector finishes.
 

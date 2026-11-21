@@ -1289,22 +1289,23 @@ namespace Communication
 
         public enum ChecksumReadStep
         {
-            OpenProgramming,
+            ContinueUploadInDevelopment,
             UnavailablePrompt,
             ContinueWithoutChecksum
         }
 
-        // The read's checksum-failure branch. mayOpenProgramming is the one-shot fallback.
+        // The read's checksum-failure branch.
         // 0x12 means this handler has no checksum local id.
-        // 0x22 in the development session is the address gate. One programming session.
+        // 0x22 in the development session stays there. A diff read and a full read upload every sector.
+        // mayOpenProgramming does not open programming for that reply.
         // 0x22 in the programming session means the kernel was asked and refused.
         public static ChecksumReadStep ChecksumReadStepFor(KWP2000DiagnosticSessionType session, byte nrc, bool mayOpenProgramming)
         {
             switch ((KWP2000ResponseCode)nrc)
             {
-                case KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError when (session == KWP2000DiagnosticSessionType.DevelopmentSession) && mayOpenProgramming:
+                case KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError when session == KWP2000DiagnosticSessionType.DevelopmentSession:
                 {
-                    return ChecksumReadStep.OpenProgramming;
+                    return ChecksumReadStep.ContinueUploadInDevelopment;
                 }
                 case KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError when session == KWP2000DiagnosticSessionType.ProgrammingSession:
                 case KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat:

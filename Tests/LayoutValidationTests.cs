@@ -113,9 +113,10 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Theory]
-        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming)]
-        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, false, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueUploadInDevelopment)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, false, ValidateFlashChecksumAction.ChecksumReadStep.ContinueUploadInDevelopment)]
         [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
+        [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, false, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
         [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
         [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
         [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.NoProgram, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
@@ -129,25 +130,20 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal(step, ValidateFlashChecksumAction.ChecksumReadStepFor(session, (byte)nrc, mayOpenProgramming));
         }
 
-        [Theory]
-        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported, true)]
-        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected, true)]
-        [InlineData(false, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported, false)]
-        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.Valid, false)]
-        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.StartIsntLowest, false)]
-        [InlineData(true, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted, false)]
-        public void Read_stops_when_programming_upload_unserved(bool openedForChecksum, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool stops)
-        {
-            Assert.Equal(stops, LayoutValidationText.ReadStopsWhenProgrammingUploadUnserved(openedForChecksum, result));
-        }
-
         [Fact]
-        public void Read_switches_on_ChecksumReadStepFor()
+        public void Read_stays_in_development_on_checksum_0x22()
         {
             string text = OperationsSource();
-            Assert.Contains("ChecksumReadStepFor", text);
-            Assert.Contains("Retry this checksum. A layout RequestUpload here is NoProgram", text);
-            Assert.Contains("ReadStopsWhenProgrammingUploadUnserved(mOpenedProgrammingForChecksum", text);
+            int start = text.IndexOf("switch (ValidateFlashChecksumAction.ChecksumReadStepFor(");
+            int end = text.IndexOf("if (mState == ReadingState.CheckIfReadRequired)", start);
+            Assert.True(start >= 0);
+            Assert.True(end > start);
+            string checksumSwitch = text.Substring(start, end - start);
+            Assert.Contains("ContinueUploadInDevelopment", checksumSwitch);
+            Assert.Contains("mChecksumRoutineUnavailable = true", checksumSwitch);
+            Assert.DoesNotContain("OpenProgrammingSessionAfterDevelopment", checksumSwitch);
+            Assert.DoesNotContain("mOpenedProgrammingForChecksum", text);
+            Assert.DoesNotContain("ReadStopsWhenProgrammingUploadUnserved", text);
         }
 
         [Fact]
