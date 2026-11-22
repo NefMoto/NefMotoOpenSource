@@ -1499,301 +1499,352 @@ namespace Communication
             //only pay attention to actions this code started
             if (action == mMyLastStartedAction)
             {
+                bool finished = false;
                 if (mState == ReadingState.ClearFlagAfterFailure)
                 {
-                    if (mClearFlag.OnActionCompleted(action, success))
-                    {
-                        success = false;//to ensure this is recognized as a failure
-                        OperationCompleted(false);
-                    }
-                    else
-                    {
-                        success = true;
-                    }
+                    finished = OnClearFlagCompleted(action, ref success);
                 }
                 else if (action is ValidateFlashChecksumAction)
                 {
-                    switch (mState)
-                    {
-                        case ReadingState.CheckIfReadRequired:
-                        {
-                            ElapsedTimeCheckingIfSectorsRequireReading += action.ActionElapsedTime;
-
-                            if (!mCurrentSectorRequiresRead)
-                            {
-                                ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-                            }
-
-                            break;
-                        }
-                        case ReadingState.ValidateReadData:
-                        {
-                            ElapsedTimeVerifyingReadSectors += action.ActionElapsedTime;
-
-                            break;
-                        }
-                    }
-
-                    bool currentBlockFinished = false;
-
-                    if (mState == ReadingState.ValidateReadData)
-                    {
-                        mNumAttemptsForCurrentBlock++;
-                    }
-
-                    if (success)
-                    {
-                        if (((ValidateFlashChecksumAction)action).IsFlashChecksumCorrect)
-                        {
-                            if (mState == ReadingState.CheckIfReadRequired)
-                            {
-                                mCurrentSectorRequiresRead = false;
-
-                                if (OnlyReadRequiredSectors)
-                                {
-                                    CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, skipping read.", StatusMessageType.USER);
-                                    currentBlockFinished = true;
-                                }
-                                else
-                                {
-                                    CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, but reading anyway.", StatusMessageType.USER);
-                                }
-                            }
-                            else
-                            {
-                                Debug.Assert(mState == ReadingState.ValidateReadData);
-
-                                currentBlockFinished = true;
-                                CommInterface.DisplayStatusMessage("Flash checksum matches read data, reading was successful.", StatusMessageType.USER);
-                            }
-                        }
-                        else
-                        {
-                            if (mState == ReadingState.CheckIfReadRequired)
-                            {
-                                CommInterface.DisplayStatusMessage("Flash checksum does not match, reading flash data is necessary.", StatusMessageType.USER);
-                            }
-                            else
-                            {
-                                Debug.Assert(mState == ReadingState.ValidateReadData);
-
-                                if (mNumAttemptsForCurrentBlock <= 3)
-                                {
-                                    CommInterface.DisplayStatusMessage("Flash checksum does not match, trying to read flash data again.", StatusMessageType.USER);
-                                }
-                                else
-                                {
-                                    CommInterface.DisplayStatusMessage("Flash checksum still does not match after 3 attempts, giving up and skipping.", StatusMessageType.USER);
-                                    currentBlockFinished = true;
-                                }
-                            }
-                        }
-                    }
-                    else if (action.CompletedWithoutCommunicationError)
-                    {
-                        var checksum = (ValidateFlashChecksumAction)action;
-                        if (checksum.HasChecksumResponse)
-                        {
-                            switch (ValidateFlashChecksumAction.ChecksumReadStepFor(
-                                KWP2000CommInterface.CurrentDiagnosticSessionType,
-                                checksum.ChecksumResponseCode,
-                                MayOpenProgrammingSessionForChecksum))
-                            {
-                                case ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming:
-                                {
-                                    // Layout validation in the programming session runs before any 0xC5.
-                                    // RequestUpload 0x11 or 0x90 stops the read and does not send checksum.
-                                    OpenProgrammingSessionAfterDevelopment("Flash checksum is not served in the development session. Opening a programming session.");
-                                    mHasVerfiedRequestUploadSupported = false;
-                                    mState = ReadingState.ValidateMemoryLayout;
-                                    FinishReadAction(action, true);
-                                    return;
-                                }
-                                case ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt:
-                                {
-                                    AskChecksumUnavailableReadPrompt(action);
-                                    return;
-                                }
-                            }
-                        }
-
-                        if (mState == ReadingState.CheckIfReadRequired)
-                        {
-                            CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches, reading anyways.", StatusMessageType.USER);
-                        }
-                        else
-                        {
-                            Debug.Assert(mState == ReadingState.ValidateReadData);
-
-                            CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches, assuming read was successful.", StatusMessageType.USER);
-                            currentBlockFinished = true;
-                        }
-
-                        success = true;
-                    }
-
-                    if (success)
-                    {
-                        if (currentBlockFinished)
-                        {
-                            mState = ReadingState.FinishedBlock;
-                        }
-                        else
-                        {
-                            mState = ReadingState.RequestUpload;
-                        }
-                    }
+                    finished = OnChecksumCompleted((ValidateFlashChecksumAction)action, ref success);
                 }
                 else if (action is RequestUploadFromECUAction)
                 {
-                    if (!mCurrentSectorRequiresRead)
-                    {
-                        ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-                    }
-
-                    mCurrentBlockBytesRead = 0;
-
-                    if (success)
-                    {
-                        mHasVerfiedRequestUploadSupported = true;
-
-                        mMaxBlockSize = ((RequestUploadFromECUAction)action).GetMaxBlockSize();
-
-                        if (mState == ReadingState.MirrorCheckRequestPrimary)
-                        {
-                            mState = ReadingState.MirrorCheckTransferPrimary;
-                        }
-                        else if (mState == ReadingState.MirrorCheckRequestMirror)
-                        {
-                            mState = ReadingState.MirrorCheckTransferMirror;
-                        }
-                        else
-                        {
-                            mState = ReadingState.TransferData;
-                        }
-                    }
+                    finished = OnUploadCompleted((RequestUploadFromECUAction)action, success);
                 }
                 else if (action is TransferDataAction)
                 {
-                    if (!mCurrentSectorRequiresRead)
-                    {
-                        ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-                    }
-
-                    if (success)
-                    {
-                        if (mState == ReadingState.MirrorCheckTransferPrimary)
-                        {
-                            mState = ReadingState.MirrorCheckExitPrimary;
-                        }
-                        else if (mState == ReadingState.MirrorCheckTransferMirror)
-                        {
-                            mState = ReadingState.MirrorCheckExitMirror;
-                        }
-                        else
-                        {
-                            mState = ReadingState.ExitTransfer;
-                        }
-                    }
+                    finished = OnTransferCompleted(action, success);
                 }
                 else if (action is RequestTransferExitAction)
                 {
-                    if (!mCurrentSectorRequiresRead)
-                    {
-                        ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
-                    }
-
-                    mCurrentBlockBytesRead = 0;
-
-                    if (success)
-                    {
-                        if (mState == ReadingState.MirrorCheckExitPrimary)
-                        {
-                            mState = ReadingState.MirrorCheckRequestMirror;
-                        }
-                        else if (mState == ReadingState.MirrorCheckExitMirror)
-                        {
-                            if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
-                            {
-                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.PassedStatus(mMirrorCheckOffset), StatusMessageType.USER);
-                                mState = ReadingState.Start;
-                            }
-                            else
-                            {
-                                CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.FailedStatus, StatusMessageType.USER);
-                                AskReadPrompt(action, MirroredFlashLayoutHelper.ContinueTitle, MirroredFlashLayoutHelper.ContinueBody, UserPromptType.OK_CANCEL, true);
-                                return;
-                            }
-                        }
-                        else if (ShouldVerifyReadSectors && ShouldChecksumSector(mCurrentBlock.Current) && !mChecksumRoutineUnavailable)
-                        {
-                            mState = ReadingState.ValidateReadData;
-                        }
-                        else
-                        {
-                            if (ShouldVerifyReadSectors && !mChecksumRoutineUnavailable)
-                            {
-                                MemoryImage uploaded = mCurrentBlock.Current;
-                                CommInterface.DisplayStatusMessage("Uploaded " + RangeText(uploaded.StartAddress, uploaded.Size) + ". No checksum.", StatusMessageType.USER);
-                            }
-
-                            mState = ReadingState.FinishedBlock;
-                        }
-                    }
+                    finished = OnTransferExitCompleted(action, success);
                 }
                 else if (action is ValidateStartAndEndAddressesWithRequestUploadDownloadAction)
                 {
-                    bool validationCompleted = true;
-                    bool layoutIsValid = false;
-                    bool possiblyMirrored = false;
+                    finished = OnLayoutValidationCompleted((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action, ref success);
+                }
 
-                    string validationMesage = null;
-
-                    var validationResult = ((ValidateStartAndEndAddressesWithRequestUploadDownloadAction)action).ValidationResult;
-                    if (FallBackToProgrammingSessionForUpload(validationResult))
-                    {
-                        mState = ReadingState.ValidateMemoryLayout;
-                        success = true;
-                        FinishReadAction(action, success);
-                        return;
-                    }
-
-                    LayoutValidationText.Apply(validationResult, success, action.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
-
-                    if (validationMesage != null)
-                    {
-                        CommInterface.DisplayStatusMessage(validationMesage, StatusMessageType.USER);
-                    }
-
-                    success = validationCompleted && layoutIsValid;
-
-                    if (possiblyMirrored)
-                    {
-                        PostUserPrompt(
-                            "Memory layout may be ambiguous",
-                            MirroredFlashLayoutHelper.PromptMessage(false),
-                            UserPromptType.CONTINUE_CHECK_CANCEL,
-                            result => ApplyReadMirrorLayoutPrompt(action, result));
-                        return;
-                    }
-
-                    string promptTitle;
-                    string promptBody;
-                    UserPromptType promptType;
-                    bool continueOnOk;
-                    if (!success && LayoutValidationText.TryFailurePrompt(validationResult, validationCompleted, layoutIsValid, false, out promptTitle, out promptBody, out promptType, out continueOnOk))
-                    {
-                        AskReadPrompt(action, promptTitle, promptBody, promptType, continueOnOk);
-                        return;
-                    }
-                    else if (success)
-                    {
-                        mState = ReadingState.Start;
-                    }
+                if (finished)
+                {
+                    return;
                 }
             }
 
             FinishReadAction(action, success);
+        }
+
+        // Returns true when this step already finished the action, so the dispatcher must not.
+        private bool OnClearFlagCompleted(CommunicationAction action, ref bool success)
+        {
+            if (mClearFlag.OnActionCompleted(action, success))
+            {
+                success = false;//to ensure this is recognized as a failure
+                OperationCompleted(false);
+            }
+            else
+            {
+                success = true;
+            }
+
+            return false;
+        }
+
+        // Returns true when a prompt will finish the action.
+        private bool OnChecksumCompleted(ValidateFlashChecksumAction checksum, ref bool success)
+        {
+            switch (mState)
+            {
+                case ReadingState.CheckIfReadRequired:
+                {
+                    ElapsedTimeCheckingIfSectorsRequireReading += checksum.ActionElapsedTime;
+
+                    if (!mCurrentSectorRequiresRead)
+                    {
+                        ElapsedTimeReadingUnrequiredSectors += checksum.ActionElapsedTime;
+                    }
+
+                    break;
+                }
+                case ReadingState.ValidateReadData:
+                {
+                    ElapsedTimeVerifyingReadSectors += checksum.ActionElapsedTime;
+
+                    break;
+                }
+            }
+
+            bool currentBlockFinished = false;
+
+            if (mState == ReadingState.ValidateReadData)
+            {
+                mNumAttemptsForCurrentBlock++;
+            }
+
+            if (success)
+            {
+                if (checksum.IsFlashChecksumCorrect)
+                {
+                    if (mState == ReadingState.CheckIfReadRequired)
+                    {
+                        mCurrentSectorRequiresRead = false;
+
+                        if (OnlyReadRequiredSectors)
+                        {
+                            CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, skipping read.", StatusMessageType.USER);
+                            currentBlockFinished = true;
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Flash checksum matches, reading flash data is unnecessary, but reading anyway.", StatusMessageType.USER);
+                        }
+                    }
+                    else
+                    {
+                        Debug.Assert(mState == ReadingState.ValidateReadData);
+
+                        currentBlockFinished = true;
+                        CommInterface.DisplayStatusMessage("Flash checksum matches read data, reading was successful.", StatusMessageType.USER);
+                    }
+                }
+                else
+                {
+                    if (mState == ReadingState.CheckIfReadRequired)
+                    {
+                        CommInterface.DisplayStatusMessage("Flash checksum does not match, reading flash data is necessary.", StatusMessageType.USER);
+                    }
+                    else
+                    {
+                        Debug.Assert(mState == ReadingState.ValidateReadData);
+
+                        if (mNumAttemptsForCurrentBlock <= 3)
+                        {
+                            CommInterface.DisplayStatusMessage("Flash checksum does not match, trying to read flash data again.", StatusMessageType.USER);
+                        }
+                        else
+                        {
+                            CommInterface.DisplayStatusMessage("Flash checksum still does not match after 3 attempts, giving up and skipping.", StatusMessageType.USER);
+                            currentBlockFinished = true;
+                        }
+                    }
+                }
+            }
+            else if (checksum.CompletedWithoutCommunicationError)
+            {
+                if (checksum.HasChecksumResponse)
+                {
+                    switch (ValidateFlashChecksumAction.ChecksumReadStepFor(
+                        KWP2000CommInterface.CurrentDiagnosticSessionType,
+                        checksum.ChecksumResponseCode,
+                        MayOpenProgrammingSessionForChecksum))
+                    {
+                        case ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming:
+                        {
+                            // Layout validation in the programming session runs before any 0xC5.
+                            // RequestUpload 0x11 or 0x90 stops the read and does not send checksum.
+                            OpenProgrammingSessionAfterDevelopment("Flash checksum is not served in the development session. Opening a programming session.");
+                            mHasVerfiedRequestUploadSupported = false;
+                            mState = ReadingState.ValidateMemoryLayout;
+                            FinishReadAction(checksum, true);
+                            return true;
+                        }
+                        case ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt:
+                        {
+                            AskChecksumUnavailableReadPrompt(checksum);
+                            return true;
+                        }
+                    }
+                }
+
+                if (mState == ReadingState.CheckIfReadRequired)
+                {
+                    CommInterface.DisplayStatusMessage("Failed to check if existing flash checksum matches, reading anyways.", StatusMessageType.USER);
+                }
+                else
+                {
+                    Debug.Assert(mState == ReadingState.ValidateReadData);
+
+                    CommInterface.DisplayStatusMessage("Failed to check if flash checksum matches, assuming read was successful.", StatusMessageType.USER);
+                    currentBlockFinished = true;
+                }
+
+                success = true;
+            }
+
+            if (success)
+            {
+                if (currentBlockFinished)
+                {
+                    mState = ReadingState.FinishedBlock;
+                }
+                else
+                {
+                    mState = ReadingState.RequestUpload;
+                }
+            }
+
+            return false;
+        }
+
+        private bool OnUploadCompleted(RequestUploadFromECUAction upload, bool success)
+        {
+            if (!mCurrentSectorRequiresRead)
+            {
+                ElapsedTimeReadingUnrequiredSectors += upload.ActionElapsedTime;
+            }
+
+            mCurrentBlockBytesRead = 0;
+
+            if (success)
+            {
+                mHasVerfiedRequestUploadSupported = true;
+
+                mMaxBlockSize = upload.GetMaxBlockSize();
+
+                if (mState == ReadingState.MirrorCheckRequestPrimary)
+                {
+                    mState = ReadingState.MirrorCheckTransferPrimary;
+                }
+                else if (mState == ReadingState.MirrorCheckRequestMirror)
+                {
+                    mState = ReadingState.MirrorCheckTransferMirror;
+                }
+                else
+                {
+                    mState = ReadingState.TransferData;
+                }
+            }
+
+            return false;
+        }
+
+        private bool OnTransferCompleted(CommunicationAction action, bool success)
+        {
+            if (!mCurrentSectorRequiresRead)
+            {
+                ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
+            }
+
+            if (success)
+            {
+                if (mState == ReadingState.MirrorCheckTransferPrimary)
+                {
+                    mState = ReadingState.MirrorCheckExitPrimary;
+                }
+                else if (mState == ReadingState.MirrorCheckTransferMirror)
+                {
+                    mState = ReadingState.MirrorCheckExitMirror;
+                }
+                else
+                {
+                    mState = ReadingState.ExitTransfer;
+                }
+            }
+
+            return false;
+        }
+
+        // Returns true when a prompt will finish the action.
+        private bool OnTransferExitCompleted(CommunicationAction action, bool success)
+        {
+            if (!mCurrentSectorRequiresRead)
+            {
+                ElapsedTimeReadingUnrequiredSectors += action.ActionElapsedTime;
+            }
+
+            mCurrentBlockBytesRead = 0;
+
+            if (success)
+            {
+                if (mState == ReadingState.MirrorCheckExitPrimary)
+                {
+                    mState = ReadingState.MirrorCheckRequestMirror;
+                }
+                else if (mState == ReadingState.MirrorCheckExitMirror)
+                {
+                    if (MirroredFlashLayoutHelper.SamplesMatch(mMirrorCheckPrimaryData, mMirrorCheckMirrorData))
+                    {
+                        CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.PassedStatus(mMirrorCheckOffset), StatusMessageType.USER);
+                        mState = ReadingState.Start;
+                    }
+                    else
+                    {
+                        CommInterface.DisplayStatusMessage(MirroredFlashLayoutHelper.FailedStatus, StatusMessageType.USER);
+                        AskReadPrompt(action, MirroredFlashLayoutHelper.ContinueTitle, MirroredFlashLayoutHelper.ContinueBody, UserPromptType.OK_CANCEL, true);
+                        return true;
+                    }
+                }
+                else if (ShouldVerifyReadSectors && ShouldChecksumSector(mCurrentBlock.Current) && !mChecksumRoutineUnavailable)
+                {
+                    mState = ReadingState.ValidateReadData;
+                }
+                else
+                {
+                    if (ShouldVerifyReadSectors && !mChecksumRoutineUnavailable)
+                    {
+                        MemoryImage uploaded = mCurrentBlock.Current;
+                        CommInterface.DisplayStatusMessage("Uploaded " + RangeText(uploaded.StartAddress, uploaded.Size) + ". No checksum.", StatusMessageType.USER);
+                    }
+
+                    mState = ReadingState.FinishedBlock;
+                }
+            }
+
+            return false;
+        }
+
+        // Returns true when a prompt will finish the action, or this step already did.
+        private bool OnLayoutValidationCompleted(ValidateStartAndEndAddressesWithRequestUploadDownloadAction validation, ref bool success)
+        {
+            bool validationCompleted = true;
+            bool layoutIsValid = false;
+            bool possiblyMirrored = false;
+
+            string validationMesage = null;
+
+            var validationResult = validation.ValidationResult;
+            if (FallBackToProgrammingSessionForUpload(validationResult))
+            {
+                mState = ReadingState.ValidateMemoryLayout;
+                success = true;
+                FinishReadAction(validation, success);
+                return true;
+            }
+
+            LayoutValidationText.Apply(validationResult, success, validation.CompletedWithoutCommunicationError, out validationCompleted, out layoutIsValid, out possiblyMirrored, out validationMesage);
+
+            if (validationMesage != null)
+            {
+                CommInterface.DisplayStatusMessage(validationMesage, StatusMessageType.USER);
+            }
+
+            success = validationCompleted && layoutIsValid;
+
+            if (possiblyMirrored)
+            {
+                PostUserPrompt(
+                    "Memory layout may be ambiguous",
+                    MirroredFlashLayoutHelper.PromptMessage(false),
+                    UserPromptType.CONTINUE_CHECK_CANCEL,
+                    result => ApplyReadMirrorLayoutPrompt(validation, result));
+                return true;
+            }
+
+            string promptTitle;
+            string promptBody;
+            UserPromptType promptType;
+            bool continueOnOk;
+            if (!success && LayoutValidationText.TryFailurePrompt(validationResult, validationCompleted, layoutIsValid, false, out promptTitle, out promptBody, out promptType, out continueOnOk))
+            {
+                AskReadPrompt(validation, promptTitle, promptBody, promptType, continueOnOk);
+                return true;
+            }
+            else if (success)
+            {
+                mState = ReadingState.Start;
+            }
+
+            return false;
         }
 
         private void ApplyReadMirrorLayoutPrompt(CommunicationAction action, UserPromptResult promptResult)
