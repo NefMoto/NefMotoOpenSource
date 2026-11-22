@@ -1638,15 +1638,11 @@ namespace Communication
                         checksum.ChecksumResponseCode,
                         MayOpenProgrammingSessionForChecksum))
                     {
-                        case ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming:
+                        case ValidateFlashChecksumAction.ChecksumReadStep.ContinueUploadInDevelopment:
                         {
-                            // Layout validation in the programming session runs before any 0xC5.
-                            // RequestUpload 0x11 or 0x90 stops the read and does not send checksum.
-                            OpenProgrammingSessionAfterDevelopment("Flash checksum is not served in the development session. Opening a programming session.");
-                            mHasVerfiedRequestUploadSupported = false;
-                            mState = ReadingState.ValidateMemoryLayout;
-                            FinishReadAction(checksum, true);
-                            return true;
+                            // Checksum is not served here. Upload the remaining sectors in this session.
+                            mChecksumRoutineUnavailable = true;
+                            break;
                         }
                         case ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt:
                         {

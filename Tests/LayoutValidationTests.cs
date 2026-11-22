@@ -113,9 +113,10 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Theory]
-        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.OpenProgramming)]
-        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, false, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueUploadInDevelopment)]
+        [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, false, ValidateFlashChecksumAction.ChecksumReadStep.ContinueUploadInDevelopment)]
         [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
+        [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.ConditionsNotCorrectOrRequestSequenceError, false, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
         [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
         [InlineData(KWP2000DiagnosticSessionType.ProgrammingSession, KWP2000ResponseCode.SubFunctionNotSupported_InvalidFormat, true, ValidateFlashChecksumAction.ChecksumReadStep.UnavailablePrompt)]
         [InlineData(KWP2000DiagnosticSessionType.DevelopmentSession, KWP2000ResponseCode.NoProgram, true, ValidateFlashChecksumAction.ChecksumReadStep.ContinueWithoutChecksum)]
@@ -130,30 +131,25 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
-        public void Read_switches_on_ChecksumReadStepFor()
+        public void Read_stays_in_development_on_checksum_0x22()
         {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
-            {
-                dir = dir.Parent;
-            }
-
-            Assert.NotNull(dir);
-            string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
-            Assert.Contains("ChecksumReadStepFor", text);
+            string text = OperationsSource();
+            int start = text.IndexOf("switch (ValidateFlashChecksumAction.ChecksumReadStepFor(");
+            int end = text.IndexOf("if (mState == ReadingState.CheckIfReadRequired)", start);
+            Assert.True(start >= 0);
+            Assert.True(end > start);
+            string checksumSwitch = text.Substring(start, end - start);
+            Assert.Contains("ContinueUploadInDevelopment", checksumSwitch);
+            Assert.Contains("mChecksumRoutineUnavailable = true", checksumSwitch);
+            Assert.DoesNotContain("OpenProgrammingSessionAfterDevelopment", checksumSwitch);
+            Assert.DoesNotContain("mOpenedProgrammingForChecksum", text);
+            Assert.DoesNotContain("ReadStopsWhenProgrammingUploadUnserved", text);
         }
 
         [Fact]
         public void Write_keeps_checksum_and_skips_flag_upload_after_NoProgram()
         {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
-            {
-                dir = dir.Parent;
-            }
-
-            Assert.NotNull(dir);
-            string text = File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
+            string text = OperationsSource();
             Assert.Contains("ContinueWriteWithoutLayoutValidation", text);
             Assert.Contains("Sector checksums will still be tried", text);
             Assert.Contains("Flash checksum got no reply", text);
@@ -178,6 +174,18 @@ namespace NefMotoOpenSource.Tests
         public void MustAbort_leaves_an_address_reject_on_the_probe(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
             Assert.False(LayoutValidationText.MustAbort(result));
+        }
+
+        private static string OperationsSource()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while ((dir != null) && !File.Exists(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs")))
+            {
+                dir = dir.Parent;
+            }
+
+            Assert.NotNull(dir);
+            return File.ReadAllText(Path.Combine(dir.FullName, "Communication", "KWP2000Operations.cs"));
         }
     }
 }
