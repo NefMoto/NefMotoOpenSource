@@ -927,13 +927,18 @@ namespace Communication
                 || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.SecurityAccessNotGranted);
         }
 
+        // NoProgram and a general reject. Security and address rejects are not this pair.
+        private static bool ProgrammingUploadUnserved(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
+        {
+            return (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
+                || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected);
+        }
+
         // Write-only. Programming NoProgram/reject skips layout validation but still tries 0xC5.
         // No-reply on 0xC5 asks before erase. MustAbort still stops the read.
         public static bool ContinueWriteWithoutLayoutValidation(KWP2000DiagnosticSessionType session, ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result)
         {
-            return (session == KWP2000DiagnosticSessionType.ProgrammingSession)
-                && ((result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadNotSupported)
-                    || (result == ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result.RequestUploadRejected));
+            return (session == KWP2000DiagnosticSessionType.ProgrammingSession) && ProgrammingUploadUnserved(result);
         }
 
         public static void ContinuePrompt(ValidateStartAndEndAddressesWithRequestUploadDownloadAction.Result result, bool writing, out string title, out string body)
