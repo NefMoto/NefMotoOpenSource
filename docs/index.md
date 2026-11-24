@@ -18,6 +18,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 - [KWP2000.md](KWP2000.md) — connect, RAM kernel after write, settings persistence, ECU family exceptions
 - [M5.9.2.md](M5.9.2.md) — M5.9.2 first-wake KWP: pin 43, speed byte, security, erase, and download
 - [ME7-K-line-addresses.md](ME7-K-line-addresses.md) — slow-init and fast-init addresses in the application firmware
+- [ME7-eeprom-checksum.md](ME7-eeprom-checksum.md) — 95040 / 95P08 page sum, ME7.1, ME7.5, and ME7.1.1 window at byte 0 or byte 1
 - [P1681-P0602.md](P1681-P0602.md) — `P0602` / `P1681`: the EEPROM flag, what clears it, and the one-byte edit
 - [BUILDING.md](BUILDING.md) — build from source
 - [RELEASE.md](RELEASE.md) — how releases are tagged and published

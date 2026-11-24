@@ -239,6 +239,172 @@ namespace NefMotoOpenSource.Tests
             Assert.Null(Me7Eeprom95040Checksum.OversizedReadStatus(image, device));
         }
 
+        [Fact]
+        public void OversizedReadStatus_scores_a_95P08_on_the_first_512()
+        {
+            const string device = "95P08 SSC 1024 B";
+            ushort[] table = ShippedTable();
+            table[20] = 0x0C37;
+            var image = new byte[Me7Eeprom95P08Immo.EepromSize];
+            BuildImageWithValidChecksums(table).CopyTo(image, 0);
+            image[600] = 0xA5;
+
+            var ok = Me7Eeprom95040Checksum.Validate(image, 0, table);
+            Assert.True(ok.AllChecksumPagesValid);
+            Assert.Equal(ok.FormatStatusMessage(chip: "95P08"), Me7Eeprom95040Checksum.OversizedReadStatus(image, device, table));
+
+            image[20 * 16 + 14] ^= 0xFF;
+            var failed = Me7Eeprom95040Checksum.Validate(image, 0, table);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Bad, failed.PageChecksumKinds[20]);
+            Assert.Equal(failed.FormatStatusMessage(chip: "95P08"), Me7Eeprom95040Checksum.OversizedReadStatus(image, device, table));
+
+            Assert.Equal(1, Me7Eeprom95040Checksum.CorrectChecksums(image, 0, table));
+            Assert.Equal(0xA5, image[600]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, Me7Eeprom95040Checksum.Validate(image, 0, table).PageChecksumKinds[20]);
+        }
+
+        [Fact]
+        public void P63SizeAdvice_only_when_every_page_fails_on_port_6_pin_3()
+        {
+            var blank = new byte[Me7Eeprom95040Checksum.EepromSize];
+            Array.Fill(blank, (byte)0xFF);
+            var failed = Me7Eeprom95040Checksum.Validate(blank);
+            var p63 = Pin(6, 3);
+
+            Assert.Equal("Try 95P08, 1024 bytes.", Me7Eeprom95040Checksum.P63SizeAdvice(p63, failed));
+            Assert.Null(Me7Eeprom95040Checksum.P63SizeAdvice(Pin(4, 7), failed));
+
+            byte[] almost = BuildImageWithValidChecksums();
+            Assert.Null(Me7Eeprom95040Checksum.P63SizeAdvice(p63, Me7Eeprom95040Checksum.Validate(almost)));
+            almost[1 * 16 + 14] ^= 0xFF;
+            Assert.Null(Me7Eeprom95040Checksum.P63SizeAdvice(p63, Me7Eeprom95040Checksum.Validate(almost)));
+        }
+
+        [Fact]
+        public void MapOffset_stays_at_byte_0_when_any_shipped_page_matches()
+        {
+            byte[] image = BuildImageWithValidChecksums();
+
+            Assert.Equal(0, Me7Eeprom95040Checksum.MapOffset(image));
+            Assert.Null(Me7Eeprom95040Checksum.ShiftedMatchStatus(image, "95040"));
+
+            image[1 * 16 + 14] ^= 0xFF;
+            Assert.Equal(0, Me7Eeprom95040Checksum.MapOffset(image));
+            Assert.Null(Me7Eeprom95040Checksum.ShiftedMatchStatus(image, "95040"));
+        }
+
+        [Fact]
+        public void MapOffset_uses_byte_1_only_after_eight_formula_matches()
+        {
+            byte[] eight = ShiftedImage(1024, 8);
+            Assert.Equal(0, Me7Eeprom95040Checksum.CountFormulaMatches(eight, 0));
+            Assert.Equal(8, Me7Eeprom95040Checksum.CountFormulaMatches(eight, 1));
+            Assert.Equal(1, Me7Eeprom95040Checksum.MapOffset(eight));
+            Assert.Equal(
+                "ME7 95P08 page checksums match (8 pages).",
+                Me7Eeprom95040Checksum.OversizedReadStatus(eight, "95P08 SSC 1024 B"));
+
+            byte[] seven = ShiftedImage(1024, 7);
+            Assert.Equal(0, Me7Eeprom95040Checksum.CountFormulaMatches(seven, 0));
+            Assert.Equal(7, Me7Eeprom95040Checksum.CountFormulaMatches(seven, 1));
+            Assert.Equal(0, Me7Eeprom95040Checksum.MapOffset(seven));
+            Assert.Null(Me7Eeprom95040Checksum.ShiftedMatchStatus(seven, "95P08"));
+        }
+
+        [Fact]
+        public void CorrectEditedPages_rewrites_only_a_page_that_already_matched()
+        {
+            byte[] image = ShiftedImage(Me7Eeprom95P08Immo.EepromSize, 8);
+            image[1 + Me7Eeprom95P08Immo.ImmoOffset1] = Me7Eeprom95P08Immo.ImmoOn;
+            image[1 + Me7Eeprom95P08Immo.ImmoOffset2] = Me7Eeprom95P08Immo.ImmoOn;
+            StoreFormula(image, 1, 1);
+            StoreFormula(image, 1, 2);
+            int unmatched = 1 + (10 * Me7Eeprom95040Checksum.PageSize);
+            image[unmatched + 14] = 0x12;
+            image[unmatched + 15] = 0x34;
+            Assert.False(Me7Eeprom95040Checksum.TryMatchBit6(image, 10, 1, out _));
+            Assert.True(Me7Eeprom95040Checksum.TryMatchBit6(image, 0, 1, out bool bit6));
+
+            byte[] edited = (byte[])image.Clone();
+            edited[1] ^= 0x01;
+            Assert.Equal(1, Me7Eeprom95040Checksum.CorrectEditedPages(edited, image, 1));
+            Assert.Equal(0x12, edited[unmatched + 14]);
+            Assert.Equal(0x34, edited[unmatched + 15]);
+            ushort stored = (ushort)(edited[1 + 14] | (edited[1 + 15] << 8));
+            Assert.Equal(Formula(edited, 1, 0, bit6), stored);
+            Assert.NotEqual(Formula(edited, 1, 0, !bit6), stored);
+        }
+
+        [Fact]
+        public void A_512_byte_window_does_not_score_or_rewrite_an_incomplete_last_page()
+        {
+            byte[] full = ShiftedImage(Me7Eeprom95P08Immo.EepromSize, 8);
+            StoreFormula(full, 1, 31);
+            Assert.Equal(9, Me7Eeprom95040Checksum.CountFormulaMatches(full, 1));
+
+            var image = new byte[Me7Eeprom95040Checksum.EepromSize];
+            Array.Copy(full, image, image.Length);
+            Assert.Equal(8, Me7Eeprom95040Checksum.CountFormulaMatches(image, 1));
+            Assert.Equal(1, Me7Eeprom95040Checksum.MapOffset(image));
+            Assert.False(Me7Eeprom95040Checksum.TryMatchBit6(image, 31, 1, out _));
+
+            byte[] edited = (byte[])image.Clone();
+            edited[1] ^= 0x01;
+            byte tail = edited[edited.Length - 1];
+            Assert.Equal(1, Me7Eeprom95040Checksum.CorrectEditedPages(edited, image, 1));
+            Assert.Equal(tail, edited[edited.Length - 1]);
+
+            var shipped = Me7Eeprom95040Checksum.Validate(image);
+            Assert.True(shipped.PagesChecked > 0);
+            Assert.Equal(shipped.PagesChecked, shipped.PagesInvalid);
+            Assert.Equal(
+                "Try 95P08, 1024 bytes.",
+                Me7Eeprom95040Checksum.P63SizeAdvice(Pin(6, 3), shipped));
+            Assert.Equal(
+                "ME7 95040 page checksums match (8 pages).",
+                Me7Eeprom95040Checksum.ShiftedMatchStatus(image, "95040"));
+        }
+
+        private static byte[] ShiftedImage(int length, int matches)
+        {
+            var data = new byte[length];
+            Array.Fill(data, (byte)0xA5);
+            for (int page = 0; page < matches; page++)
+            {
+                StoreFormula(data, 1, page);
+            }
+
+            return data;
+        }
+
+        private static void StoreFormula(byte[] data, int dataOffset, int page)
+        {
+            int at = dataOffset + (page * Me7Eeprom95040Checksum.PageSize);
+            data[at] = (byte)(0x30 + page);
+            data[at + 3] = 0x5A;
+            ushort cs = Formula(data, dataOffset, page, page % 2 == 0);
+            data[at + 14] = (byte)(cs & 0xFF);
+            data[at + 15] = (byte)(cs >> 8);
+        }
+
+        private static ushort Formula(byte[] data, int dataOffset, int page, bool bit6)
+        {
+            int at = dataOffset + (page * Me7Eeprom95040Checksum.PageSize);
+            ushort descriptor = bit6 ? (ushort)0x0041 : ChecksumPresentMask;
+            return Me7Eeprom95040Checksum.CalculatePageChecksum(data, at, (ushort)page, descriptor);
+        }
+
+        private static BootstrapInterface.BootmodeEepromSettings Pin(byte port, byte pin)
+        {
+            return new BootstrapInterface.BootmodeEepromSettings
+            {
+                PortNumber = port,
+                PinNumber = pin,
+                EepromType = BootstrapInterface.BootmodeEepromType.Type95040,
+                Size = Me7Eeprom95040Checksum.EepromSize
+            };
+        }
+
         private static byte[] BuildImageWithValidChecksums(ushort[]? table = null)
         {
             var data = new byte[Me7Eeprom95040Checksum.EepromSize];
