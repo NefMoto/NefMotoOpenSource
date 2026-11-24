@@ -837,7 +837,8 @@ namespace Communication
             {
                 string verdict = Me7Eeprom95040Checksum.OversizedReadStatus(
                     data,
-                    BootmodeEepromCatalog.DisplayNameFor(mSettings));
+                    BootmodeEepromCatalog.DisplayNameFor(mSettings),
+                    mImageTable);
                 CommInterface.DisplayStatusMessage(
                     verdict ?? ReadOkMessage(data.Length, driverState),
                     StatusMessageType.USER);
@@ -976,7 +977,12 @@ namespace Communication
             }
 
             var checksum = Me7Eeprom95040Checksum.Validate(data, 0, imageTable);
-            if (checksum.AllChecksumPagesValid)
+            string shifted = Me7Eeprom95040Checksum.ShiftedMatchStatus(data, "95040", imageTable);
+            if (shifted != null)
+            {
+                commInterface.DisplayStatusMessage(shifted, StatusMessageType.USER);
+            }
+            else if (checksum.AllChecksumPagesValid)
             {
                 if (!warnOnly)
                 {
@@ -984,12 +990,19 @@ namespace Communication
                         checksum.FormatStatusMessage(warnOnly: false),
                         StatusMessageType.USER);
                 }
-                return;
+            }
+            else
+            {
+                commInterface.DisplayStatusMessage(
+                    checksum.FormatStatusMessage(warnOnly),
+                    StatusMessageType.USER);
             }
 
-            commInterface.DisplayStatusMessage(
-                checksum.FormatStatusMessage(warnOnly),
-                StatusMessageType.USER);
+            string advice = Me7Eeprom95040Checksum.P63SizeAdvice(settings, checksum);
+            if (advice != null)
+            {
+                commInterface.DisplayStatusMessage(advice, StatusMessageType.USER);
+            }
         }
     }
 }

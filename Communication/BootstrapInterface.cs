@@ -247,6 +247,9 @@ namespace Communication
         private const ushort EepromCmdReadSpi = 0x0036;
         private const ushort EepromCmdWriteSpi = 0x0037;
 
+        /// <summary>Driver r15 when BP0, BP1, or SRWD stays set. No data byte was programmed.</summary>
+        private const ushort EepromStatusProtected = 0x0001;
+
         private const ushort XPERCON_Data_XSSC = 0x0500;
         private const ushort SYSCON_Data_XSSC = 0xE204;
 
@@ -2847,6 +2850,13 @@ namespace Communication
             if (!CallEepromDriver(registers, out results))
             {
                 DisplayStatusMessage($"WriteEepromBlock: call failed at offset 0x{offset:X4}.", StatusMessageType.LOG);
+                LogEepromRegisters("WriteEepromBlock", results);
+                return false;
+            }
+
+            if (results[7] == EepromStatusProtected)
+            {
+                DisplayStatusMessage("EEPROM is write-protected and was not modified.", StatusMessageType.USER);
                 LogEepromRegisters("WriteEepromBlock", results);
                 return false;
             }

@@ -1,0 +1,357 @@
+; SSC EEPROM driver uploaded at 0xF600. Chip select is patched at 0xF600-0xF60C.
+; Source for Communication/Resources/gremlindriver.bin.
+; Assemble with scripts/assemble-eeprom-driver.py. make does not assemble this.
+; The checked-in .bin is the image the host uploads.
+; Started from C167BootTool gremlinDriver.a66. The write path clears block protect once.
+
+; My driver to work with SPI EEPROM in ECUs
+; 512-byte EEPROM sampling line - P4.7
+; The driver is written rather carelessly, it is
+; a rewritten version of the driver from the MiniMon kit, in which
+; I added a group write function to EEPROM from RAM, using
+; script-and this will be done much faster than rather curves
+; operations of working with flash by means of the Minimon itself (by byte it works
+; extremely slowly).
+
+$SEGMENTED
+$MOD167
+$NoPaging
+           assume  DPP3:system
+
+; Driver function codes
+
+_ReadSPI   equ     36h     ; read block
+_WriteSPI  equ     37h     ; block record
+_GetState  equ     06h     ; read state
+
+; SPI EEPROM Commands
+
+_EEWrite			equ     02h     ; Write
+_EERead				equ     03h     ; Read
+_EEState			equ     05h     ; Read Status Register
+_EEWREN				equ     06h     ; Enable Write
+_EEWRSR				equ     01h     ; Write status register
+_EEREAD_ID_PAGE		equ		83h		; Read identification page
+
+; MCU registers
+
+P3         defr    0FFC4h          ; port P3
+DP3        defr    0FFC6h          ; its direction lines
+P4         defr    0FFC8h          ; port P4
+DP4        defr    0FFCAh          ; its direction lines
+P6         defr    0FFCCh          ; port P6
+DP6        defr    0FFCEh          ; its direction lines
+SSCRIC     defr    0FF74h			; SSC receive interrupt control reg
+SSCCON     defr    0FFB2h          ; SSC configuration register
+SSCTB      defr    0F0B0h          ; SSC transmit register
+SSCRB      defr    0F0B2h          ; SSC receive register
+SSCBR      defr    0F0B4h          ; SSC baudrate
+SSCRIR     equ     SSCRIC.7        ; exchange completion flag
+;SPI_CS     equ     P4.7            ; CS line
+;SPI_CS_PD  equ     DP4.7           ; port direction control
+SPI_CS     equ     P6.3            ; CS line
+SPI_CS_PD  equ     DP6.3           ; port direction control
+
+CallCS		section code at 0F600h	;; Chip select call funcs
+
+SetCsDirection	proc	near
+			bset	SPI_CS_PD       ;switch the line to output
+			ret
+SetCsDirection	endp
+
+ClearCsDirection	proc	near
+			bclr	SPI_CS_PD       ; and switch the line back to input
+			ret
+ClearCsDirection	endp
+
+ClearCs	proc	near
+			bclr	SPI_CS          ; -CS=1
+			ret
+ClearCs	endp
+
+SetCs	proc	near
+			bset	SPI_CS          ; -CS
+			ret
+SetCs	endp
+
+; CALLA returns with RET. The patched chip-select words return with RET.
+FarClearCs	proc	near
+			callr	ClearCs
+			ret
+FarClearCs	endp
+
+FarSetCs	proc	near
+			callr	SetCs
+			ret
+FarSetCs	endp
+
+CallCS		ends
+
+DriverC		section code at 0F640h
+
+; ------------------------------------------------- ---------------------
+; The beginning of the driver itself - initializing ports
+; r8 - operation code;
+; r9 - block length in bytes;
+; r10 - low bytes of the RAM address;
+; r13 - low bytes of the EEPROM address;
+; r15 - return code on exit
+; ------------------------------------------------- ---------------------
+
+DriverP		proc	far
+; save r0-7
+;			push	r0
+;			push	r1
+;			push	r2
+			push	r3
+			push	r4
+;			push	r5
+;			push	r6
+;			push	r7
+
+; Deselect EEPROM
+			callr	SetCs          ; -CS=1
+			nop
+			callr	SetCsDirection       ; and switch the line to output
+
+; SPI init
+
+           extr    #1
+           mov     SSCBR,#000Bh    ; baudrate speed in the ECU firmware
+           mov     SSCCON,#0C037h  ; configuration
+           bfldh   P3,#023h,#23h   ; Set MRST=1, MTSR=1, SCLK=1
+           bfldh   DP3,#023h,#22h  ; Set MRST=input, MTSR=output, SCLK=output
+           callr   Delay
+
+; ------------------------------------------------- ---------------------
+; Writing a block from RAM to EEPROM
+; r8 - operation code;
+; r9 - block length in bytes (for programming - 1, byte!);
+; r10 - EEPROM address
+; R11 - Type of eeprom : 0 -> 16 bit addres (95080, 95160, 95320); 1-> 8bit Address + A8,A9 & A10 in Instruction(A8 95040, A8&A9 only for 95P08)
+; r13 - RAM address
+; r15 - return code on exit
+; ------------------------------------------------- ---------------------
+
+Cmd1:
+           cmp     r8,#_WriteSPI   ; block recording?
+           jmp     cc_ne,Cmd2      ; no
+           callr   ClearProtect
+           cmp     r15,#1          ; protect bits stayed set
+           jmp     cc_eq,RestoreRegs
+Block:
+           callr	ClearCs          ; -CS
+
+           mov     r3,#_EEState
+           callr   SendRecSSC      ; status register read command
+
+           callr   SendRecSSC      ; send dummy byte, receive data byte
+           callr	SetCs          ; remove the sample
+           and     r4,#01h         ; WIP control
+           jmp     cc_nz,Block     ; busy ?
+
+
+			callr	ClearCs          ; EEPROM selection
+			mov     r3,#_EEWREN     ; recording enable
+			callr   SendRecSSC
+			callr	SetCs          ; switch off EEPROM selection
+
+			callr   Delay
+
+			callr	ClearCs          ; EEPROM selection
+
+			mov		r3,#_EEWrite
+			callr	SendCommandAndAddress	; send command in r3 and address in r10 depending on type in r11
+
+			exts    #0,#1
+			movb    RL3,[r13]       ; byte of data from RAM
+			callr   SendRecSSC      ;
+			callr	SetCs          ; switch off EEPROM selection
+
+			add     r13,#1          ; next byte in RAM
+			add     r10,#1          ; next EEPROM address
+			sub     r9,#1
+			jmp     cc_nz,Block
+			mov     r15,#0          ; completion code
+;exit
+			jmp     cc_uc,RestoreRegs      ; no
+
+; ------------------------------------------------- ---------------------
+; Reading SPI EEPROM to buffer
+; r8 - operation code;
+; r9 is the length of the read block;
+; r10 - address in EEPROM;
+; R11 - Type of eeprom : 0 -> 16 bit addres (95080, 95160, 95320); 1-> 8bit Address + A8&A9 in Instruction(A8 95040, A8&A9 only for 95P08)
+; r13 - buffer address;
+; r15 - return code on exit
+; ------------------------------------------------- ---------------------
+
+Cmd2:		cmp     r8,#_ReadSPI    ; reading a block?
+			jmp     cc_ne,Cmd3      ; no
+
+			callr	ClearCs          ; -CS
+
+			mov		r3,#_EERead
+			callr	SendCommandAndAddress	; send command in r3 and address in r10 depending on type in r11
+
+;			mov		r5,r13			; Buffer address
+			sub		r9,#1
+
+ReadLoop:
+			callr   SendRecSSC      ; read byte
+			exts    #0,#1
+			movb    [r13],RL4        ; store byte in buffer
+			add     r13,#1           ; next address
+			cmpd1   r9,#0
+			jmpr    cc_ugt,ReadLoop ; until r9 > 0
+
+			callr	SetCs          ; switch off EEPROM selection
+			mov     r15,#0          ; completion code
+;exit
+			jmp     cc_uc,RestoreRegs      ; no
+
+; ------------------------------------------------- ---------------------
+; Reading EEPROM status, r9 returns status value
+; ------------------------------------------------- ---------------------
+
+Cmd3:
+;      cmp     r8,#_GetState
+;           jmp     cc_ne,CmdC
+;
+Read_S:
+			callr	ClearCs          ; -CS
+			mov		R3,#_EEState
+			callr	SendRecSSC      ; status register read command
+
+			callr	SendRecSSC      ; send dummy byte, receive data byte
+			mov		r9,r4           ; in r9
+
+			callr	SetCs          ; switch off EEPROM selection
+			mov		r15,#0          ; completion code
+;exit
+			jmp		cc_uc,RestoreRegs      ; no
+
+; ------------------------------------------------- ---------------------
+; Unrecognized command, exit c r15 = 1
+; ------------------------------------------------- ---------------------
+CmdC:      mov     r15,#1
+
+
+RestoreRegs:
+			call	ClearCsDirection
+; save r0-7
+;			pop		r7
+;			pop		r6
+;			pop		r5
+			pop		r4
+			pop		r3
+;			pop		r2
+;			pop		r1
+;			pop		r0
+			rets
+
+DriverP    endp
+
+;----------------------------------------------------------------------
+; Small delay ...
+;----------------------------------------------------------------------
+
+Delay      proc    near
+           nop
+           nop
+           nop
+           nop
+           ret
+Delay      endp
+
+; ------------------------------------------------- ---------------------
+; SSC work program - data reception and transmission
+; r3 - transmitted value; r4 - received value
+; ------------------------------------------------- ---------------------
+
+SendRecSSC	proc	near
+
+			bclr	SSCRIR          ; reset flag
+			mov		SSCTB,r3        ; transmission start
+			mov		r14, #0x80
+SSCWait:
+			cmpd1	r14,#1
+			jmpr    cc_z,TimeoutSRSSC		; timeout occurred
+			jnb		SSCRIR,SSCWait  ; waiting for completion
+TimeoutSRSSC:
+			mov		r4,SSCRB        ; received data
+			ret
+
+SendRecSSC	endp
+
+SendCommandAndAddress	proc	near	;command in r3 (address if needed is added), r10.. address, r11.. is type
+
+			cmp		r11,#0
+			jmp     cc_eq,NoAddrInInstr
+			; A8 , A9 & A10 in instruction
+			mov		r4, r10
+			ror		r4,#5
+			and		r4,#0x0038
+			or		r3, r4
+			callr   SendRecSSC      ; read command
+			jmp     cc_uc,OneByteAddr
+
+NoAddrInInstr:
+			callr   SendRecSSC      ; read command
+
+			mov     r3,r10          ; MSB of byte address
+			ror		r3,#8
+			callr   SendRecSSC
+
+OneByteAddr:
+			mov     r3,r10          ; LSB of byte address
+			callr   SendRecSSC
+			ret
+
+SendCommandAndAddress	endp
+
+; Read the status register once. When BP0, BP1, or SRWD is set, clear the
+; register and read it again. r15=1 if a protect bit stays set, and the caller
+; writes no data byte. r15 is unchanged when the array may be programmed.
+; r9-r13 stay.
+ClearProtect	proc	near
+			calla	cc_uc,FarClearCs
+			mov		r3,#_EEState
+			callr	SendRecSSC
+			callr	SendRecSSC
+			calla	cc_uc,FarSetCs
+			and		r4,#08Ch        ; SRWD, BP1, BP0
+			jmp		cc_z,ProtectDone
+			calla	cc_uc,FarClearCs
+			mov		r3,#_EEWREN
+			callr	SendRecSSC
+			calla	cc_uc,FarSetCs
+			callr	Delay
+			calla	cc_uc,FarClearCs
+			mov		r3,#_EEWRSR
+			callr	SendRecSSC
+			mov		r3,#0           ; status 0x00
+			callr	SendRecSSC
+			calla	cc_uc,FarSetCs
+ProtectWait:
+			calla	cc_uc,FarClearCs
+			mov		r3,#_EEState
+			callr	SendRecSSC
+			callr	SendRecSSC
+			calla	cc_uc,FarSetCs
+			mov		r14,r4
+			and		r14,#01h        ; WIP
+			jmp		cc_nz,ProtectWait
+			and		r4,#08Ch        ; still protected
+			jmp		cc_nz,ProtectFail
+ProtectDone:
+			ret
+ProtectFail:
+			mov		r15,#1
+			ret
+ClearProtect	endp
+;----------------------------------------------------------------------
+
+DriverC    ends
+
+           end

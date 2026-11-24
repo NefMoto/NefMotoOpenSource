@@ -31,6 +31,7 @@
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
 *.sh text eol=lf
+*.a66 text eol=lf
 
 # Denote all files that are truly binary and should not be modified.
 *.png binary
@@ -70,8 +71,7 @@
 *.ppt binary
 *.pptx binary
 
-# Assembly files
-*.a66 binary
+# Assembly listing data
 *.equ binary
 
 # Driver and firmware binary files
