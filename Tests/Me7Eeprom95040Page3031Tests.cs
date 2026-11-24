@@ -150,6 +150,24 @@ namespace NefMotoOpenSource.Tests
             }
         }
 
+        [Fact]
+        public void TryClearP0602_on_a_95P08_leaves_bytes_past_512()
+        {
+            byte[] image = new byte[Me7Eeprom95P08Immo.EepromSize];
+            ValidImage().CopyTo(image, 0);
+            image[0x1E8] = 0x80;
+            image[0x1F8] = 0x80;
+            Me7Eeprom95040Checksum.WritePageChecksum(image, 30);
+            Me7Eeprom95040Checksum.WritePageChecksum(image, 31);
+            image[600] = 0x5A;
+
+            Assert.Equal(Me7Eeprom95040Page3031.Result.Applied, Me7Eeprom95040Page3031.TryClearP0602(image));
+            Assert.Equal(0x00, image[0x1E8]);
+            Assert.Equal(0x00, image[0x1F8]);
+            Assert.Equal(0x5A, image[600]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, Me7Eeprom95040Checksum.Validate(image).PageChecksumKinds[30]);
+        }
+
         private static byte[] ValidImage()
         {
             var image = new byte[Me7Eeprom95040Checksum.EepromSize];

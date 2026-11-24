@@ -63,14 +63,54 @@ namespace Communication
             private byte _element0;
         }
 
-        public static Image Read(byte[] image)
+        public static Image Read(byte[] image, int dataOffset = 0)
         {
-            return MemoryMarshal.Read<Image>(image.AsSpan(0, Me7Eeprom95040Checksum.EepromSize));
+            if (dataOffset == 0)
+            {
+                return MemoryMarshal.Read<Image>(image.AsSpan(0, Me7Eeprom95040Checksum.EepromSize));
+            }
+
+            var window = new byte[Me7Eeprom95040Checksum.EepromSize];
+            CopyWindow(image, dataOffset, window, 0);
+            return MemoryMarshal.Read<Image>(window);
         }
 
-        public static void Write(byte[] image, in Image value)
+        public static void Write(byte[] image, in Image value, int dataOffset = 0)
         {
-            MemoryMarshal.Write(image.AsSpan(0, Me7Eeprom95040Checksum.EepromSize), in value);
+            if (dataOffset == 0)
+            {
+                MemoryMarshal.Write(image.AsSpan(0, Me7Eeprom95040Checksum.EepromSize), in value);
+                return;
+            }
+
+            var window = new byte[Me7Eeprom95040Checksum.EepromSize];
+            MemoryMarshal.Write(window, in value);
+            CopyWindow(window, 0, image, dataOffset);
+        }
+
+        public static Image ReadMapped(byte[] image)
+        {
+            return Read(image, Me7Eeprom95040Checksum.MapOffset(image));
+        }
+
+        private static void CopyWindow(byte[] source, int sourceAt, byte[] dest, int destAt)
+        {
+            int count = source.Length - sourceAt;
+            int room = dest.Length - destAt;
+            if (count > room)
+            {
+                count = room;
+            }
+
+            if (count > Me7Eeprom95040Checksum.EepromSize)
+            {
+                count = Me7Eeprom95040Checksum.EepromSize;
+            }
+
+            if (count > 0)
+            {
+                Array.Copy(source, sourceAt, dest, destAt, count);
+            }
         }
 
         [StructLayout(LayoutKind.Explicit, Pack = 1, Size = Me7Eeprom95040Checksum.EepromSize)]

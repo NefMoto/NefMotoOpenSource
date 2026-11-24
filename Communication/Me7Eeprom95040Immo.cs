@@ -24,6 +24,7 @@ namespace Communication
     /// Immobilizer status patch for a ME7 95040 image. Off sets the mirrored
     /// bytes at 0x012 and 0x022 to 0x02 when they match. On sets that pair back
     /// to 0x01 when both are 0x02. Either change refreshes those two page checksums.
+    /// A map at byte 1 is edited only when those pages already match.
     /// </summary>
     public static class Me7Eeprom95040Immo
     {
@@ -42,7 +43,7 @@ namespace Communication
                 return false;
             }
 
-            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
+            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.ReadMapped(image);
             return ee.Immo1 == Me7Eeprom95040Fields.ImmoOff && ee.Immo2 == Me7Eeprom95040Fields.ImmoOff;
         }
 
@@ -53,7 +54,8 @@ namespace Communication
                 return Result.Refused;
             }
 
-            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
+            int offset = Me7Eeprom95040Checksum.MapOffset(image);
+            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image, offset);
             if (ee.Immo1 == Me7Eeprom95040Fields.ImmoOff && ee.Immo2 == Me7Eeprom95040Fields.ImmoOff)
             {
                 return Result.AlreadyOff;
@@ -66,10 +68,7 @@ namespace Communication
 
             ee.Immo1 = Me7Eeprom95040Fields.ImmoOff;
             ee.Immo2 = Me7Eeprom95040Fields.ImmoOff;
-            Me7Eeprom95040Fields.Write(image, ee);
-            Me7Eeprom95040Checksum.WritePageChecksum(image, Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo1)));
-            Me7Eeprom95040Checksum.WritePageChecksum(image, Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo2)));
-            return Result.Applied;
+            return Store(image, offset, ee) ? Result.Applied : Result.Refused;
         }
 
         public static Result TryEnable(byte[] image)
@@ -79,7 +78,8 @@ namespace Communication
                 return Result.Refused;
             }
 
-            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
+            int offset = Me7Eeprom95040Checksum.MapOffset(image);
+            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image, offset);
             if (ee.Immo1 == Me7Eeprom95040Fields.ImmoOn && ee.Immo2 == Me7Eeprom95040Fields.ImmoOn)
             {
                 return Result.AlreadyOn;
@@ -92,10 +92,19 @@ namespace Communication
 
             ee.Immo1 = Me7Eeprom95040Fields.ImmoOn;
             ee.Immo2 = Me7Eeprom95040Fields.ImmoOn;
-            Me7Eeprom95040Fields.Write(image, ee);
-            Me7Eeprom95040Checksum.WritePageChecksum(image, Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo1)));
-            Me7Eeprom95040Checksum.WritePageChecksum(image, Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo2)));
-            return Result.Applied;
+            return Store(image, offset, ee) ? Result.Applied : Result.Refused;
+        }
+
+        private static bool Store(byte[] image, int offset, Me7Eeprom95040Fields.Image ee)
+        {
+            if (!Me7Eeprom95040Checksum.ImmoPagesMatch(image, offset, out bool bit1, out bool bit2))
+            {
+                return false;
+            }
+
+            Me7Eeprom95040Fields.Write(image, ee, offset);
+            Me7Eeprom95040Checksum.WriteImmoChecksums(image, offset, bit1, bit2);
+            return true;
         }
     }
 }

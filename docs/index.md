@@ -9,7 +9,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 - [Getting started](user-guide/getting-started.md) — install, cable, first connect, bench vs in-car, DTCs, logs
 - [Flashing](user-guide/flashing.md) — KWP read/write, layouts, checksums, and the `ecuflash` command line
 - [P0602](user-guide/clearing-P0602.md) — same fault as `P1681`: the stored flag, and what clears it
-- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM (95040 immo, lockout, `P0602` flag; 95P08 immo), `ecuflash bootmode info`, `ecuflash bootmode reset`, and `ecuflash bootmode immo off`. M5.9.2 write: pin 43 at +12 V; power-cycle the ECU if a write fails
+- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM (95040 and 95P08 immo, lockout, `P0602` flag), `ecuflash bootmode info`, `ecuflash bootmode reset`, and `ecuflash bootmode immo off`. M5.9.2 write: pin 43 at +12 V; power-cycle the ECU if a write fails
 - [Troubleshooting](user-guide/troubleshooting.md) — symptom index, FAQ, what to attach on a bug report
 
 ## Developer / maintainer

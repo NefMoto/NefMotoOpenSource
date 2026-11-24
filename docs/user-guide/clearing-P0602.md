@@ -29,7 +29,7 @@ Logging in to a programming session sets the flag. Three matching checksums in a
 
 A tester clear by itself leaves the flag set, and `P0602` returns on the next key cycle. `ecuflash kwp dtc clear` sends only that tester clear. It does not run the checksums above. [Flashing — Command line](flashing.md#command-line).
 
-**EEPROM** → **Clear P0602** clears bit 7 on the loaded image at `0x1E8` and `0x1F8`. When that bit is already clear, the button reads **Set P0602** and sets it. **Write EEPROM** programs that image. That edits the chip directly. It is separate from the KWP checksum clear above. [Bootmode](bootmode.md#bootmode-eeprom).
+**EEPROM** → **Clear P0602** clears bit 7 on the loaded image at `0x1E8` and `0x1F8`. When that bit is already clear, the button reads **Set P0602** and sets it. The button stays off when the map starts at byte 1. **Write EEPROM** programs that image. That edits the chip directly. It is separate from the KWP checksum clear above. [Bootmode](bootmode.md#bootmode-eeprom).
 
 ## Skipping the store in the flash file
 

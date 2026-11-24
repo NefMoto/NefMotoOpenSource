@@ -336,6 +336,44 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
+        public void Byte_1_immo_off_rewrites_pages_that_already_matched()
+        {
+            byte[] image = ShiftedImage(Me7Eeprom95P08Immo.EepromSize, 8);
+            Assert.Equal(Me7Eeprom95040Immo.Result.Applied, Me7Eeprom95P08Immo.TryDisable(image));
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[1 + Me7Eeprom95P08Immo.ImmoOffset1]);
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[1 + Me7Eeprom95P08Immo.ImmoOffset2]);
+            Assert.True(Me7Eeprom95040Checksum.TryMatchBit6(image, 1, 1, out _));
+            Assert.True(Me7Eeprom95040Checksum.TryMatchBit6(image, 2, 1, out _));
+            Assert.Equal(0xA5, image[0]);
+
+            byte[] afterImmo = (byte[])image.Clone();
+            Assert.Equal(Me7Eeprom95040Page3031.Result.Refused, Me7Eeprom95040Page3031.TryClearP0602(image));
+            Assert.Equal(Me7Eeprom95040Page3031.Result.Refused, Me7Eeprom95040Page3031.TryResetLockout(image));
+            Assert.Equal(afterImmo, image);
+
+            byte[] half = ShiftedImage(Me7Eeprom95040Checksum.EepromSize, 8);
+            Assert.Equal(Me7Eeprom95040Immo.Result.Applied, Me7Eeprom95040Immo.TryDisable(half));
+            Assert.Equal(Me7Eeprom95040Fields.ImmoOff, half[1 + Me7Eeprom95P08Immo.ImmoOffset1]);
+            Assert.Equal(0xA5, half[0]);
+        }
+
+        [Fact]
+        public void Byte_1_immo_off_refuses_when_a_page_does_not_match()
+        {
+            byte[] image = ShiftedImage(Me7Eeprom95P08Immo.EepromSize, 0);
+            foreach (int page in new[] { 0, 2, 3, 4, 5, 6, 7, 8 })
+            {
+                StoreFormula(image, 1, page);
+            }
+
+            Assert.Equal(1, Me7Eeprom95040Checksum.MapOffset(image));
+            Assert.False(Me7Eeprom95040Checksum.TryMatchBit6(image, 1, 1, out _));
+            byte[] before = (byte[])image.Clone();
+            Assert.Equal(Me7Eeprom95040Immo.Result.Refused, Me7Eeprom95P08Immo.TryDisable(image));
+            Assert.Equal(before, image);
+        }
+
+        [Fact]
         public void A_512_byte_window_does_not_score_or_rewrite_an_incomplete_last_page()
         {
             byte[] full = ShiftedImage(Me7Eeprom95P08Immo.EepromSize, 8);

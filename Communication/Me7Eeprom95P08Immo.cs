@@ -24,7 +24,8 @@ namespace Communication
     /// Immobilizer status patch for a 95P08 image (1024 bytes, C167BootTool type 1).
     /// Off sets the mirrored bytes at 0x012 and 0x022 to 0x02 when they match.
     /// On sets that pair back to 0x01 when both are 0x02.
-    /// The page checksum for this image is not known, so those bytes stay as they are.
+    /// Pages 1 and 2 use the 95040 checksum. A map at byte 1 is edited only when
+    /// those pages already match. Bytes past 512 are left unchanged.
     /// </summary>
     public static class Me7Eeprom95P08Immo
     {
@@ -36,7 +37,13 @@ namespace Communication
 
         public static bool IsOff(byte[] image)
         {
-            return Fits(image) && image[ImmoOffset1] == ImmoOff && image[ImmoOffset2] == ImmoOff;
+            if (!Fits(image))
+            {
+                return false;
+            }
+
+            int offset = Me7Eeprom95040Checksum.MapOffset(image);
+            return image[offset + ImmoOffset1] == ImmoOff && image[offset + ImmoOffset2] == ImmoOff;
         }
 
         public static Me7Eeprom95040Immo.Result TryDisable(byte[] image)
@@ -61,8 +68,11 @@ namespace Communication
                 return Me7Eeprom95040Immo.Result.Refused;
             }
 
-            byte first = image[ImmoOffset1];
-            byte second = image[ImmoOffset2];
+            int offset = Me7Eeprom95040Checksum.MapOffset(image);
+            int at1 = offset + ImmoOffset1;
+            int at2 = offset + ImmoOffset2;
+            byte first = image[at1];
+            byte second = image[at2];
             if (enable)
             {
                 if (first == ImmoOn && second == ImmoOn)
@@ -84,8 +94,14 @@ namespace Communication
                 return Me7Eeprom95040Immo.Result.Refused;
             }
 
-            image[ImmoOffset1] = value;
-            image[ImmoOffset2] = value;
+            if (!Me7Eeprom95040Checksum.ImmoPagesMatch(image, offset, out bool bit1, out bool bit2))
+            {
+                return Me7Eeprom95040Immo.Result.Refused;
+            }
+
+            image[at1] = value;
+            image[at2] = value;
+            Me7Eeprom95040Checksum.WriteImmoChecksums(image, offset, bit1, bit2);
             return Me7Eeprom95040Immo.Result.Applied;
         }
     }

@@ -45,6 +45,27 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
+        public void Immo_off_on_the_07K_1024_keeps_the_matched_pages()
+        {
+            byte[]? image = ReadDump("eeprom 95P08 SSC 1024 B.bin");
+            if (image == null)
+            {
+                return;
+            }
+
+            int page31 = 1 + (31 * Me7Eeprom95040Checksum.PageSize) + 14;
+            byte low = image[page31];
+            byte high = image[page31 + 1];
+            Assert.Equal(Me7Eeprom95040Immo.Result.Applied, Me7Eeprom95P08Immo.TryDisable(image));
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[1 + Me7Eeprom95P08Immo.ImmoOffset1]);
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[1 + Me7Eeprom95P08Immo.ImmoOffset2]);
+            Assert.Equal(21, Me7Eeprom95040Checksum.CountFormulaMatches(image, 1));
+            Assert.Equal(low, image[page31]);
+            Assert.Equal(high, image[page31 + 1]);
+            Assert.Equal(0xFF, image[600]);
+        }
+
+        [Fact]
         public void The_07K_512_read_still_suggests_a_95P08()
         {
             byte[]? image = ReadDump("eeprom-95040-OG.bin");

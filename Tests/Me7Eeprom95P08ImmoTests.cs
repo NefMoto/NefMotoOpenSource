@@ -37,9 +37,10 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
-        public void TryDisable_sets_both_status_bytes_and_nothing_else()
+        public void TryDisable_sets_both_status_bytes_and_those_checksums_only()
         {
             byte[] image = Image(0x01, 0x01);
+            image[600] = 0x5A;
             byte[] before = (byte[])image.Clone();
 
             Me7Eeprom95040Immo.Result result = Me7Eeprom95P08Immo.TryDisable(image);
@@ -47,9 +48,13 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal(Me7Eeprom95040Immo.Result.Applied, result);
             Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[Me7Eeprom95P08Immo.ImmoOffset1]);
             Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[Me7Eeprom95P08Immo.ImmoOffset2]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, Me7Eeprom95040Checksum.Validate(image).PageChecksumKinds[1]);
+            Assert.Equal(Me7Eeprom95040Checksum.PageChecksumKind.Ok, Me7Eeprom95040Checksum.Validate(image).PageChecksumKinds[2]);
+            Assert.Equal(0x5A, image[600]);
             for (int i = 0; i < image.Length; i++)
             {
-                if (i == Me7Eeprom95P08Immo.ImmoOffset1 || i == Me7Eeprom95P08Immo.ImmoOffset2)
+                if (i == Me7Eeprom95P08Immo.ImmoOffset1 || i == Me7Eeprom95P08Immo.ImmoOffset2
+                    || i == 0x1E || i == 0x1F || i == 0x2E || i == 0x2F)
                 {
                     continue;
                 }
