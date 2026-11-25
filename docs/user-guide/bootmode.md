@@ -12,7 +12,7 @@ Flash read/write uses the **Flashing** tab. The protocol combo at the top of the
 - Entire-flash erase left the ECU unable to boot
 - Physical EEPROM dump or write (not the KWP EEPROM mirror)
 
-Simos 3.x and EDC15 flash layout is auto-detected. EEPROM chip select on the **EEPROM** tab includes ME7.1, ME7.5, ME7.1.1, Simos 3.2, and EDC15 I2C.
+Simos 3.x and EDC15 flash layout is auto-detected. EEPROM chip select on the **EEPROM** tab includes ME7.1 and ME7.5 together on P4.7, plus ME7.1.1, Simos 3.2, and EDC15 I2C.
 
 ## M5.9.2
 
@@ -110,32 +110,33 @@ Pages that still can't be read stay `FF` and the status log names them. **Save E
 
 Chip select:
 
-- `ME7.1 P4.7`
-- `ME7.5 P4.7`
+- `ME7.1 / ME7.5 P4.7` — one entry. Both use port 4 pin 7
 - `ME7.1.1 P6.3`
 - `Simos 3.2 P6.4`
 - `EDC15 I2C` (no pin)
 
-Device, for a SPI chip select. The default is `95040 SSC 512 B`.
+Part, for a SPI chip select. Each part has one size. The default is `95040`, 512 bytes, SSC.
 
-- `95040` SSC or XSSC, 256 B or 512 B
-- `95P08` SSC or XSSC, 1024 B. Same driver family as `95040`. Chip select is `ME7.1.1 P6.3`
-- `95080` SSC or XSSC, 1024 B
-- `95160` SSC or XSSC, 2048 B
-- `95320` SSC or XSSC, 4096 B
-- `93S46` SSC, 128 B
-- `93S56` SSC, 256 B
-- `93S66` SSC, 512 B
-- `93S76` SSC, 1024 B
-- `93S86` SSC, 2048 B
+- `95040` — 512 bytes. Driver type 1
+- `95P08` — 1024 bytes. Same driver type as `95040`. Often used with `ME7.1.1 P6.3`
+- `95080` — 1024 bytes. Driver type 0
+- `95160` — 2048 bytes
+- `95320` — 4096 bytes
+- `93S46` — 128 bytes. SSC only
+- `93S56` — 256 bytes. SSC only
+- `93S66` — 512 bytes. SSC only
+- `93S76` — 1024 bytes. SSC only
+- `93S86` — 2048 bytes. SSC only
 
-EDC15 replaces that list with `24C04 I2C 512 B` (the default) and `24C02 I2C 256 B`.
+A Debug build adds an `SSC` / `XSSC` dropdown for `95040`, `95P08`, `95080`, `95160`, and `95320`. A Release build does not. Those parts use SSC. EDC15 replaces the part list with `24C04` (512 bytes, the default) and `24C02` (256 bytes) and forces I2C.
 
-The grid is read-only, 16 bytes per row. With no image loaded it stays on screen as grey `00`s for the selected device size, and the legend stays grey. A `95040` 512-byte image shows 32 rows. The legend then shows the Immo, SKC, `P0602`, and Lockout values, then Checksum **ok** in green or **not ok** in red. The SKC is page 3 bytes 2-3 (`0x032`, copy at `0x042`), little-endian, shown as 5 decimal digits, or **unset** when the bytes are `FF FF`. The word at `0x014`/`0x024` next to the immo flag is an immobiliser state word the ECU writes itself, not the SKC. The ASCII column highlights the ECU part number at `0x1C2` (11 characters), both tool ID copies at `0x1E2` and `0x1F2` (6 characters), both VIN copies (`0xB5`–`0xB9` plus `0xD0`–`0xDB`, and `0xC5`–`0xC9` plus `0xE0`–`0xEB`), and both immobilizer IDs (`0xDC` plus `0xF0`–`0xFC`, and `0xEC` plus `0x100`–`0x10C`). Hover a highlighted character for the field name. A non-printable byte is `.`. Any other device size, including a `95P08` 1024-byte image, is plain hex, with a grey legend.
+The chip select, peripheral, and part are remembered in `preferences.json`. The size is not stored. It comes from the part.
 
-**Load EEPROM File** displays a file of the selected device size. **Read EEPROM** dumps the chip and shows it. It does not ask for confirmation. A bootmode read whose selected size is over 512 bytes checks the first 512 as a 95040. When those page checksums match, the status says the chip looks like a 95040 and names the selected device. When they do not match and page 0 byte 15 is not `0x5A`, the status says the size is unverified. **Save EEPROM File** writes the image on screen to a `.bin`. None of those program the chip.
+The grid is read-only, 16 bytes per row. With no image loaded it stays on screen as grey `00`s for the selected part size, and the legend stays grey. A `95040` 512-byte image shows 32 rows. The legend then shows the Immo, SKC, `P0602`, and Lockout values, then Checksum **ok** in green or **not ok** in red. The SKC is page 3 bytes 2-3 (`0x032`, copy at `0x042`), little-endian, shown as 5 decimal digits, or **unset** when the bytes are `FF FF`. The word at `0x014`/`0x024` next to the immo flag is an immobiliser state word the ECU writes itself, not the SKC. The ASCII column highlights the ECU part number at `0x1C2` (11 characters), both tool ID copies at `0x1E2` and `0x1F2` (6 characters), both VIN copies (`0xB5`–`0xB9` plus `0xD0`–`0xDB`, and `0xC5`–`0xC9` plus `0xE0`–`0xEB`), and both immobilizer IDs (`0xDC` plus `0xF0`–`0xFC`, and `0xEC` plus `0x100`–`0x10C`). Hover a highlighted character for the field name. A non-printable byte is `.`. Any other device size, including a `95P08` 1024-byte image, is plain hex, with a grey legend.
 
-**Write EEPROM** programs that image. It stays disabled until the image length matches the selected device. Immobilizer / VIN / adaptations can change. If data-page checksums are invalid on a `95040` 512-byte image:
+**Load EEPROM File** displays a file of the selected part size. **Read EEPROM** dumps the chip and shows it. It does not ask for confirmation. A bootmode read whose selected size is over 512 bytes checks the first 512 as a 95040. When those page checksums match, the status says the chip looks like a 95040 and names the selected part. When they do not match and page 0 byte 15 is not `0x5A`, the status says the size is unverified. **Save EEPROM File** writes the image on screen to a `.bin`. None of those program the chip.
+
+**Write EEPROM** programs that image. It stays disabled until the image length matches the selected part. Immobilizer / VIN / adaptations can change. If data-page checksums are invalid on a `95040` 512-byte image:
 
 - **Yes** — correct data-page checksums, then continue (pages 28–29 are left unchanged)
 - **No** — write the image as-is

@@ -92,6 +92,7 @@ Saved in `preferences.json` next to the log file:
 
 - Protocol, KWP baud, **Slow Init** / **Fast Init**, **Slow init timing log**
 - Bootmode EEPROM **Backup before write**
+- Bootmode EEPROM chip select, peripheral, and part. The size comes from the part
 - **Check for Updates at Startup** and the time of the last startup check
 
 Not saved (reset when you restart the app):

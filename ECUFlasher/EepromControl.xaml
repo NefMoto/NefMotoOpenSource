@@ -190,31 +190,53 @@ Contact by Email: nyet@nyet.org
             <RowDefinition Height="5"/>
             <RowDefinition Height="100" MinHeight="100"/>
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0">
-            <DockPanel Margin="4,4,4,0" LastChildFill="False">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <ComboBox MinWidth="140" Margin="8,4,4,4" VerticalAlignment="Center"
-                        Style="{StaticResource ValidationComboBoxStyle}"
-                        ItemsSource="{Binding Path=AvailableChipSelects}"
-                        SelectedItem="{Binding Path=SelectedChipSelect, Mode=TwoWay}"
-                        DisplayMemberPath="DisplayName"
-                        ToolTip="EEPROM chip select. EDC15 uses I2C and has no pin."/>
-                    <ComboBox MinWidth="180" Margin="4,4,4,4" VerticalAlignment="Center"
-                        Style="{StaticResource ValidationComboBoxStyle}"
-                        ItemsSource="{Binding Path=AvailableDevices}"
-                        SelectedItem="{Binding Path=SelectedDevice, Mode=TwoWay}"
-                        DisplayMemberPath="DisplayName"
-                        ToolTip="EEPROM type, peripheral, and size"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <Button Command="{Binding Path=OpenEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
-                    <Button Command="{Binding Path=ReadEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
-                    <Button Command="{Binding Path=ImmoOffCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
-                    <Button Command="{Binding Path=ResetLockoutCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
-                    <Button Command="{Binding Path=ClearP0602Command}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
-                </StackPanel>
-            </DockPanel>
-            <StackPanel Orientation="Horizontal" Margin="4,0,4,0">
+        <Grid Grid.Row="0" Margin="4,4,4,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Command="{Binding Path=OpenEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                <Button Command="{Binding Path=ReadEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                <Button Command="{Binding Path=ImmoOffCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                <Button Command="{Binding Path=ResetLockoutCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+                <Button Command="{Binding Path=ClearP0602Command}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
+            </StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ComboBox Margin="0,4,8,4" VerticalAlignment="Center"
+                    Style="{StaticResource ValidationComboBoxStyle}"
+                    ItemsSource="{Binding Path=AvailableChipSelects}"
+                    SelectedItem="{Binding Path=SelectedChipSelect, Mode=TwoWay}"
+                    DisplayMemberPath="DisplayName"
+                    ToolTip="EEPROM chip select. EDC15 uses I2C and has no pin."/>
+                <ComboBox Margin="0,4,0,4" VerticalAlignment="Center"
+                    Style="{StaticResource ValidationComboBoxStyle}"
+                    ItemsSource="{Binding Path=AvailableParts}"
+                    SelectedItem="{Binding Path=SelectedPart, Mode=TwoWay}"
+                    DisplayMemberPath="DisplayName"
+                    ToolTip="EEPROM part. Each part has one size."/>
+                <ComboBox Margin="8,4,0,4" VerticalAlignment="Center"
+                    ItemsSource="{Binding Path=AvailablePeripherals}"
+                    SelectedItem="{Binding Path=SelectedPeripheral, Mode=TwoWay}"
+                    DisplayMemberPath="DisplayName"
+                    ToolTip="SSC or XSSC. Shown in a Debug build for parts that allow XSSC.">
+                    <ComboBox.Style>
+                        <Style TargetType="ComboBox" BasedOn="{StaticResource ValidationComboBoxStyle}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Path=ShowPeripheral}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ComboBox.Style>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Command="{Binding Path=SaveEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
                 <Button Command="{Binding Path=WriteBootmodeEepromCommand}" Style="{StaticResource ReactiveCommandButtonStyle}" Margin="4"/>
                 <CheckBox x:Name="chkBackupBeforeWrite" VerticalAlignment="Center" Margin="8,0,0,0"
@@ -223,7 +245,10 @@ Contact by Email: nyet@nyet.org
                 <CheckBox x:Name="chkVerifyWrite" VerticalAlignment="Center" Margin="8,0,0,0" IsChecked="True"/>
                 <Label VerticalAlignment="Center">Verify Write</Label>
             </StackPanel>
-        </StackPanel>
+            <Label Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="0"
+                Content="{Binding Path=PartSizeText}"
+                ToolTip="Size is fixed for the selected part."/>
+        </Grid>
         <DockPanel Grid.Row="1">
         <TextBlock DockPanel.Dock="Bottom" Margin="8,0,8,4" Text="{Binding Path=WritePendingText}"
             Foreground="#FFE082" FontWeight="Bold" TextWrapping="Wrap">

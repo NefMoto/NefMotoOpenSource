@@ -76,77 +76,97 @@ namespace NefMotoOpenSource.Tests
         [Fact]
         public void Catalog_defaults_match_me71_and_me75()
         {
-            Assert.Equal("ME7.1 P4.7", BootmodeEepromCatalog.ChipSelects[0].DisplayName);
-            Assert.Equal("ME7.5 P4.7", BootmodeEepromCatalog.ChipSelects[1].DisplayName);
+            Assert.Equal(4, BootmodeEepromCatalog.ChipSelects.Count);
+            Assert.Equal("ME7.1 / ME7.5 P4.7", BootmodeEepromCatalog.ChipSelects[0].DisplayName);
             Assert.Equal(4, BootmodeEepromCatalog.ChipSelects[0].PortNumber);
             Assert.Equal(7, BootmodeEepromCatalog.ChipSelects[0].PinNumber);
-            Assert.Equal(BootmodeEepromCatalog.ChipSelects[0].PortNumber, BootmodeEepromCatalog.ChipSelects[1].PortNumber);
-            Assert.Equal(BootmodeEepromCatalog.ChipSelects[0].PinNumber, BootmodeEepromCatalog.ChipSelects[1].PinNumber);
             Assert.False(BootmodeEepromCatalog.ChipSelects[0].I2c);
+            Assert.Null(BootmodeEepromCatalog.FindChipSelect("ME7.5 P4.7"));
 
-            Assert.Equal("ME7.1.1 P6.3", BootmodeEepromCatalog.ChipSelects[2].DisplayName);
+            Assert.Equal("ME7.1.1 P6.3", BootmodeEepromCatalog.ChipSelects[1].DisplayName);
+            Assert.Equal(6, BootmodeEepromCatalog.ChipSelects[1].PortNumber);
+            Assert.Equal(3, BootmodeEepromCatalog.ChipSelects[1].PinNumber);
+
+            Assert.Equal("Simos 3.2 P6.4", BootmodeEepromCatalog.ChipSelects[2].DisplayName);
             Assert.Equal(6, BootmodeEepromCatalog.ChipSelects[2].PortNumber);
-            Assert.Equal(3, BootmodeEepromCatalog.ChipSelects[2].PinNumber);
+            Assert.Equal(4, BootmodeEepromCatalog.ChipSelects[2].PinNumber);
+            Assert.False(BootmodeEepromCatalog.ChipSelects[2].I2c);
 
-            Assert.Equal("Simos 3.2 P6.4", BootmodeEepromCatalog.ChipSelects[3].DisplayName);
-            Assert.Equal(6, BootmodeEepromCatalog.ChipSelects[3].PortNumber);
-            Assert.Equal(4, BootmodeEepromCatalog.ChipSelects[3].PinNumber);
-            Assert.False(BootmodeEepromCatalog.ChipSelects[3].I2c);
+            Assert.True(BootmodeEepromCatalog.ChipSelects[3].I2c);
+            Assert.Equal("EDC15 I2C", BootmodeEepromCatalog.ChipSelects[3].DisplayName);
 
-            Assert.True(BootmodeEepromCatalog.ChipSelects[4].I2c);
-            Assert.Equal("EDC15 I2C", BootmodeEepromCatalog.ChipSelects[4].DisplayName);
-
-            var me71 = BootmodeEepromCatalog.ToSettings(
+            var shared = BootmodeEepromCatalog.ToSettings(
                 BootmodeEepromCatalog.ChipSelects[0],
-                BootmodeEepromCatalog.DefaultSpiDevice);
+                BootstrapInterface.BootmodeEepromPeriph.SSC,
+                BootmodeEepromCatalog.DefaultSpiPart);
             var stock = BootstrapInterface.BootmodeEepromSettings.ForMe71();
-            Assert.Equal(stock.Periph, me71.Periph);
-            Assert.Equal(stock.EepromType, me71.EepromType);
-            Assert.Equal(stock.PortNumber, me71.PortNumber);
-            Assert.Equal(stock.PinNumber, me71.PinNumber);
-            Assert.Equal(stock.Size, me71.Size);
-
-            var me75 = BootmodeEepromCatalog.ToSettings(
-                BootmodeEepromCatalog.ChipSelects[1],
-                BootmodeEepromCatalog.DefaultSpiDevice);
             var stock75 = BootstrapInterface.BootmodeEepromSettings.ForMe75();
-            Assert.Equal(stock75.Periph, me75.Periph);
-            Assert.Equal(stock75.PortNumber, me75.PortNumber);
-            Assert.Equal(stock75.PinNumber, me75.PinNumber);
-            Assert.Equal(stock75.Size, me75.Size);
-            int p08 = 0;
-            foreach (BootmodeEepromCatalog.Device device in BootmodeEepromCatalog.SpiDevices)
-            {
-                if (device.DisplayName.StartsWith("95P08"))
-                {
-                    p08++;
-                    Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95040, device.EepromType);
-                    Assert.Equal(1024u, device.Size);
-                }
-            }
+            Assert.Equal(stock.Periph, shared.Periph);
+            Assert.Equal(stock.EepromType, shared.EepromType);
+            Assert.Equal(stock.PortNumber, shared.PortNumber);
+            Assert.Equal(stock.PinNumber, shared.PinNumber);
+            Assert.Equal(stock.Size, shared.Size);
+            Assert.Equal(stock75.Periph, shared.Periph);
+            Assert.Equal(stock75.PortNumber, shared.PortNumber);
+            Assert.Equal(stock75.PinNumber, shared.PinNumber);
+            Assert.Equal(stock75.Size, shared.Size);
 
-            Assert.Equal(2, p08);
-            Assert.Equal(512u, BootmodeEepromCatalog.DefaultSpiDevice.Size);
-            Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromCatalog.DefaultSpiDevice.EepromType);
-            Assert.Equal(512u, BootmodeEepromCatalog.DefaultI2cDevice.Size);
-            Assert.Equal(BootstrapInterface.BootmodeEepromType.Type24C04_9Bit, BootmodeEepromCatalog.DefaultI2cDevice.EepromType);
+            Assert.Equal(512u, BootmodeEepromCatalog.DefaultSpiPart.Size);
+            Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromCatalog.DefaultSpiPart.EepromType);
+            Assert.Equal("95040", BootmodeEepromCatalog.DefaultSpiPart.DisplayName);
+            Assert.Null(BootmodeEepromCatalog.FindPart(false, "95040 256"));
+            Assert.Equal(512u, BootmodeEepromCatalog.DefaultI2cPart.Size);
+            Assert.Equal(BootstrapInterface.BootmodeEepromType.Type24C04_9Bit, BootmodeEepromCatalog.DefaultI2cPart.EepromType);
+
+            var p08 = BootmodeEepromCatalog.FindPart(false, "95P08");
+            Assert.NotNull(p08);
+            Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95040, p08.EepromType);
+            Assert.Equal(1024u, p08.Size);
+            string p08Name = BootmodeEepromCatalog.DisplayNameFor(BootmodeEepromCatalog.ToSettings(
+                BootmodeEepromCatalog.ChipSelects[0],
+                BootstrapInterface.BootmodeEepromPeriph.SSC,
+                p08));
+            Assert.StartsWith("95P08", p08Name);
         }
 
         [Fact]
-        public void Catalog_devices_are_legal_pairs()
+        public void Catalog_parts_are_legal_pairs()
         {
-            foreach (BootmodeEepromCatalog.Device device in BootmodeEepromCatalog.SpiDevices)
+            int xssc = 0;
+            foreach (BootmodeEepromCatalog.Part part in BootmodeEepromCatalog.SpiParts)
             {
                 BootmodeEepromTransfer.Choice choice;
-                Assert.True(BootmodeEepromTransfer.TryChoose(device.Periph, device.EepromType, out choice));
-                Assert.NotEqual(BootstrapInterface.BootmodeEepromPeriph.I2C, device.Periph);
+                Assert.True(BootmodeEepromTransfer.TryChoose(
+                    BootstrapInterface.BootmodeEepromPeriph.SSC,
+                    part.EepromType,
+                    out choice));
+                if (part.AllowsXssc)
+                {
+                    xssc++;
+                    Assert.True(BootmodeEepromTransfer.TryChoose(
+                        BootstrapInterface.BootmodeEepromPeriph.XSSC,
+                        part.EepromType,
+                        out choice));
+                }
+                else
+                {
+                    Assert.False(BootmodeEepromTransfer.TryChoose(
+                        BootstrapInterface.BootmodeEepromPeriph.XSSC,
+                        part.EepromType,
+                        out choice));
+                }
             }
 
-            foreach (BootmodeEepromCatalog.Device device in BootmodeEepromCatalog.I2cDevices)
+            Assert.Equal(5, xssc);
+
+            foreach (BootmodeEepromCatalog.Part part in BootmodeEepromCatalog.I2cParts)
             {
                 BootmodeEepromTransfer.Choice choice;
-                Assert.True(BootmodeEepromTransfer.TryChoose(device.Periph, device.EepromType, out choice));
-                Assert.Equal(BootstrapInterface.BootmodeEepromPeriph.I2C, device.Periph);
+                Assert.False(part.AllowsXssc);
+                Assert.True(BootmodeEepromTransfer.TryChoose(
+                    BootstrapInterface.BootmodeEepromPeriph.I2C,
+                    part.EepromType,
+                    out choice));
                 Assert.False(choice.PatchChipSelect);
                 Assert.Equal(BootmodeEepromTransfer.I2cWriteBlockLength, choice.WriteBlockLength);
             }

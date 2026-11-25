@@ -37,10 +37,17 @@ namespace ECUFlasher
             Pages = new ObservableCollection<EepromPageRow>();
             Legend = new ObservableCollection<EepromLegendItem>();
             AvailableChipSelects = new ObservableCollection<BootmodeEepromCatalog.ChipSelect>(BootmodeEepromCatalog.ChipSelects);
-            AvailableDevices = new ObservableCollection<BootmodeEepromCatalog.Device>(BootmodeEepromCatalog.SpiDevices);
-            _SelectedChipSelect = AvailableChipSelects[0];
-            _SelectedDevice = BootmodeEepromCatalog.DefaultSpiDevice;
-            _devicesAreI2c = false;
+            AvailableParts = new ObservableCollection<BootmodeEepromCatalog.Part>();
+            _SscPeripheral = new EepromPeripheralOption(BootstrapInterface.BootmodeEepromPeriph.SSC);
+            AvailablePeripherals = new ObservableCollection<EepromPeripheralOption>();
+            AvailablePeripherals.Add(_SscPeripheral);
+#if DEBUG
+            _XsscPeripheral = new EepromPeripheralOption(BootstrapInterface.BootmodeEepromPeriph.XSSC);
+            AvailablePeripherals.Add(_XsscPeripheral);
+#endif
+            _loadingSelection = true;
+            ApplySavedSelection();
+            _loadingSelection = false;
             if (App?.Preferences != null)
             {
                 _BackupBeforeWrite = App.Preferences.BackupBeforeWrite;
@@ -60,7 +67,29 @@ namespace ECUFlasher
 
         public ObservableCollection<BootmodeEepromCatalog.ChipSelect> AvailableChipSelects { get; private set; }
 
-        public ObservableCollection<BootmodeEepromCatalog.Device> AvailableDevices { get; private set; }
+        public ObservableCollection<BootmodeEepromCatalog.Part> AvailableParts { get; private set; }
+
+        public ObservableCollection<EepromPeripheralOption> AvailablePeripherals { get; private set; }
+
+        public string PartSizeText
+        {
+            get { return _SelectedPart == null ? "" : _SelectedPart.Size + " B"; }
+        }
+
+        public bool ShowPeripheral
+        {
+            get
+            {
+#if DEBUG
+                return _SelectedChipSelect != null
+                    && !_SelectedChipSelect.I2c
+                    && _SelectedPart != null
+                    && _SelectedPart.AllowsXssc;
+#else
+                return false;
+#endif
+            }
+        }
 
         public bool BackupBeforeWrite
         {
@@ -113,79 +142,165 @@ namespace ECUFlasher
                     return;
                 }
 
+                bool wasI2c = _SelectedChipSelect != null && _SelectedChipSelect.I2c;
                 _SelectedChipSelect = value;
                 OnPropertyChanged(new PropertyChangedEventArgs("SelectedChipSelect"));
-                SyncDeviceList();
+                if (wasI2c != value.I2c)
+                {
+                    FillPartList(value.I2c);
+                    SelectedPart = value.I2c
+                        ? BootmodeEepromCatalog.DefaultI2cPart
+                        : BootmodeEepromCatalog.DefaultSpiPart;
+                    return;
+                }
+
+                PersistSelection();
             }
         }
         private BootmodeEepromCatalog.ChipSelect _SelectedChipSelect;
-        private bool _devicesAreI2c;
+        private bool _loadingSelection;
+        private EepromPeripheralOption _SscPeripheral;
+#if DEBUG
+        private EepromPeripheralOption _XsscPeripheral;
+#endif
 
-        public BootmodeEepromCatalog.Device SelectedDevice
+        public BootmodeEepromCatalog.Part SelectedPart
         {
-            get { return _SelectedDevice; }
+            get { return _SelectedPart; }
             set
             {
-                if (value == null || ReferenceEquals(_SelectedDevice, value))
+                if (value == null || ReferenceEquals(_SelectedPart, value))
                 {
                     return;
                 }
 
-                _SelectedDevice = value;
-                OnPropertyChanged(new PropertyChangedEventArgs("SelectedDevice"));
+                _SelectedPart = value;
+                OnPropertyChanged(new PropertyChangedEventArgs("SelectedPart"));
+                OnPropertyChanged(new PropertyChangedEventArgs("PartSizeText"));
+                SnapPeripheral();
+                OnPropertyChanged(new PropertyChangedEventArgs("ShowPeripheral"));
+                PersistSelection();
                 RefreshGrid();
             }
         }
-        private BootmodeEepromCatalog.Device _SelectedDevice;
+        private BootmodeEepromCatalog.Part _SelectedPart;
 
-        private void SyncDeviceList()
+        public EepromPeripheralOption SelectedPeripheral
         {
-            bool wantI2c = _SelectedChipSelect != null && _SelectedChipSelect.I2c;
-            if (_devicesAreI2c == wantI2c)
+            get { return _SelectedPeripheral; }
+            set
+            {
+                if (value == null || ReferenceEquals(_SelectedPeripheral, value))
+                {
+                    return;
+                }
+
+                _SelectedPeripheral = value;
+                OnPropertyChanged(new PropertyChangedEventArgs("SelectedPeripheral"));
+                PersistSelection();
+            }
+        }
+        private EepromPeripheralOption _SelectedPeripheral;
+
+        private void ApplySavedSelection()
+        {
+            var prefs = App?.Preferences;
+            BootmodeEepromCatalog.ChipSelect chip = BootmodeEepromCatalog.FindChipSelect(prefs?.EepromChipSelect)
+                ?? BootmodeEepromCatalog.ChipSelects[0];
+            bool i2c = chip.I2c;
+            BootmodeEepromCatalog.Part part = BootmodeEepromCatalog.FindPart(i2c, prefs?.EepromPart)
+                ?? (i2c ? BootmodeEepromCatalog.DefaultI2cPart : BootmodeEepromCatalog.DefaultSpiPart);
+            FillPartList(i2c);
+            _SelectedChipSelect = chip;
+            _SelectedPart = part;
+            _SelectedPeripheral = _SscPeripheral;
+#if DEBUG
+            if (!i2c
+                && part.AllowsXssc
+                && prefs != null
+                && prefs.EepromPeriph == BootstrapInterface.BootmodeEepromPeriph.XSSC)
+            {
+                _SelectedPeripheral = _XsscPeripheral;
+            }
+#endif
+        }
+
+        private void FillPartList(bool i2c)
+        {
+            AvailableParts.Clear();
+            foreach (BootmodeEepromCatalog.Part part in i2c
+                ? BootmodeEepromCatalog.I2cParts
+                : BootmodeEepromCatalog.SpiParts)
+            {
+                AvailableParts.Add(part);
+            }
+        }
+
+        private void SnapPeripheral()
+        {
+            if (_SelectedPeripheral != null
+                && _SelectedPeripheral.Periph == BootstrapInterface.BootmodeEepromPeriph.XSSC
+                && !ShowPeripheral)
+            {
+                SelectedPeripheral = _SscPeripheral;
+            }
+        }
+
+        private BootstrapInterface.BootmodeEepromPeriph CurrentPeriph()
+        {
+            if (_SelectedChipSelect != null && _SelectedChipSelect.I2c)
+            {
+                return BootstrapInterface.BootmodeEepromPeriph.I2C;
+            }
+
+            if (ShowPeripheral
+                && _SelectedPeripheral != null
+                && _SelectedPeripheral.Periph == BootstrapInterface.BootmodeEepromPeriph.XSSC)
+            {
+                return BootstrapInterface.BootmodeEepromPeriph.XSSC;
+            }
+
+            return BootstrapInterface.BootmodeEepromPeriph.SSC;
+        }
+
+        private void PersistSelection()
+        {
+            if (_loadingSelection || App?.Preferences == null || _SelectedChipSelect == null || _SelectedPart == null)
             {
                 return;
             }
 
-            _devicesAreI2c = wantI2c;
-            AvailableDevices.Clear();
-            foreach (BootmodeEepromCatalog.Device device in wantI2c
-                ? BootmodeEepromCatalog.I2cDevices
-                : BootmodeEepromCatalog.SpiDevices)
-            {
-                AvailableDevices.Add(device);
-            }
-
-            SelectedDevice = wantI2c
-                ? BootmodeEepromCatalog.DefaultI2cDevice
-                : BootmodeEepromCatalog.DefaultSpiDevice;
+            App.Preferences.EepromChipSelect = _SelectedChipSelect.DisplayName;
+            App.Preferences.EepromPeriph = CurrentPeriph();
+            App.Preferences.EepromPart = _SelectedPart.DisplayName;
         }
 
         private BootstrapInterface.BootmodeEepromSettings CurrentSettings()
         {
-            if (SelectedChipSelect == null || SelectedDevice == null)
+            if (SelectedChipSelect == null || SelectedPart == null)
             {
                 return null;
             }
 
-            return BootmodeEepromCatalog.ToSettings(SelectedChipSelect, SelectedDevice);
+            return BootmodeEepromCatalog.ToSettings(SelectedChipSelect, CurrentPeriph(), SelectedPart);
         }
 
         private bool Is95040Layout(byte[] image)
         {
-            return SelectedDevice != null
-                && SelectedDevice.EepromType == BootstrapInterface.BootmodeEepromType.Type95040
-                && SelectedDevice.Size == Me7Eeprom95040Checksum.EepromSize
-                && image != null
-                && image.Length == Me7Eeprom95040Checksum.EepromSize;
+            return IsNamedPart(image, "95040");
         }
 
         private bool Is95P08Layout(byte[] image)
         {
-            return SelectedDevice != null
-                && SelectedDevice.EepromType == BootstrapInterface.BootmodeEepromType.Type95040
-                && SelectedDevice.Size == Me7Eeprom95P08Immo.EepromSize
+            return IsNamedPart(image, "95P08");
+        }
+
+        private bool IsNamedPart(byte[] image, string name)
+        {
+            return SelectedPart != null
+                && SelectedPart.DisplayName == name
                 && image != null
-                && image.Length == Me7Eeprom95P08Immo.EepromSize;
+                && image.Length == (int)SelectedPart.Size;
         }
 
         private bool ImmoIsOff(byte[] image)
@@ -206,7 +321,7 @@ namespace ECUFlasher
                 {
                     _OpenEepromCommand = new ReactiveCommand(this.OnOpenEeprom);
                     _OpenEepromCommand.Name = "Load EEPROM File";
-                    _OpenEepromCommand.Description = "Load an EEPROM image of the selected device size. Does not write the chip.";
+                    _OpenEepromCommand.Description = "Load an EEPROM image of the selected part size. Does not write the chip.";
 
                     if (App != null)
                     {
@@ -375,7 +490,7 @@ namespace ECUFlasher
                 command.WatchConnection(App);
                 command.AddWatchedProperty(App, "OperationInProgress");
                 command.AddWatchedProperty(this, "SelectedChipSelect");
-                command.AddWatchedProperty(this, "SelectedDevice");
+                command.AddWatchedProperty(this, "SelectedPart");
             }
 
             command.CanExecuteMethod = CanExecuteBootmodeEepromCommand;
@@ -397,7 +512,7 @@ namespace ECUFlasher
                 command.WatchConnection(App);
                 command.AddWatchedProperty(App, "OperationInProgress");
                 command.AddWatchedProperty(this, "HasEepromImage");
-                command.AddWatchedProperty(this, "SelectedDevice");
+                command.AddWatchedProperty(this, "SelectedPart");
             }
 
             command.CanExecuteMethod = canExecute;
@@ -570,9 +685,9 @@ namespace ECUFlasher
         {
             bool result = CanExecuteOnProtocol(reasonsDisabled, CommunicationInterface.Protocol.BootMode);
 
-            if (SelectedChipSelect == null || SelectedDevice == null)
+            if (SelectedChipSelect == null || SelectedPart == null)
             {
-                reasonsDisabled.Add("No EEPROM device selected");
+                reasonsDisabled.Add("No EEPROM part selected");
                 result = false;
             }
 
@@ -640,9 +755,9 @@ namespace ECUFlasher
                 reasonsDisabled.Add("Image is missing page(s) " + string.Join(", ", mMissingPages) + " from the KWP read. Read the chip in bootmode to write it");
                 result = false;
             }
-            else if (SelectedDevice == null || mDisplayedImage.Length != SelectedDevice.Size)
+            else if (SelectedPart == null || mDisplayedImage.Length != SelectedPart.Size)
             {
-                reasonsDisabled.Add("EEPROM image size does not match the selected device");
+                reasonsDisabled.Add("EEPROM image size does not match the selected part");
                 result = false;
             }
 
@@ -993,7 +1108,7 @@ namespace ECUFlasher
                 "WRITE physical SPI EEPROM (not KWP mirror).\n\n"
                 + "Source: " + sourceName + "\n"
                 + "Size: " + dataToWrite.Length + " bytes\n"
-                + "Preset: " + SelectedChipSelect.DisplayName + ", " + SelectedDevice.DisplayName + "\n"
+                + "Preset: " + SelectedChipSelect.DisplayName + ", " + CurrentPeriph() + ", " + SelectedPart.DisplayName + "\n"
                 + "Verify after write: " + (verify ? "yes" : "no") + "\n\n"
                 + "This can affect immobilizer / VIN / adaptations.\n"
                 + (chkBackupBeforeWrite.IsChecked == true
@@ -1139,7 +1254,7 @@ namespace ECUFlasher
         private void ShowPlaceholder()
         {
             Pages.Clear();
-            int size = SelectedDevice != null ? (int)SelectedDevice.Size : Me7Eeprom95040Checksum.EepromSize;
+            int size = SelectedPart != null ? (int)SelectedPart.Size : Me7Eeprom95040Checksum.EepromSize;
             AddByteRows(size, true, null);
         }
 
@@ -1588,6 +1703,18 @@ namespace ECUFlasher
         public string Hex { get; set; }
         public string Kind { get; set; }
         public string ToolTip { get; set; }
+    }
+
+    public sealed class EepromPeripheralOption
+    {
+        public EepromPeripheralOption(BootstrapInterface.BootmodeEepromPeriph periph)
+        {
+            Periph = periph;
+            DisplayName = periph.ToString();
+        }
+
+        public BootstrapInterface.BootmodeEepromPeriph Periph { get; private set; }
+        public string DisplayName { get; private set; }
     }
 }
 

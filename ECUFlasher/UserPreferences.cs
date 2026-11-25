@@ -57,6 +57,9 @@ namespace ECUFlasher
         public bool EnableSlowInitTimingLog { get; set; }
         public uint DesiredBootModeBaudRate { get; set; }
         public bool BackupBeforeWrite { get; set; } = true;
+        public string EepromChipSelect { get; set; } = "";
+        public BootstrapInterface.BootmodeEepromPeriph EepromPeriph { get; set; } = BootstrapInterface.BootmodeEepromPeriph.SSC;
+        public string EepromPart { get; set; } = "";
         public bool CheckForUpdatesAtStartup { get; set; } = true;
         public DateTime? LastUpdateCheckUtc { get; set; }
 
@@ -79,6 +82,8 @@ namespace ECUFlasher
                     loaded.FlashFile ??= "";
                     loaded.MemoryLayoutFile ??= "";
                     loaded.LastBrowseDirectory ??= "";
+                    loaded.EepromChipSelect ??= "";
+                    loaded.EepromPart ??= "";
                     loaded.InheritBrowseDirectoryFromFlashFile();
                     return loaded;
                 }
@@ -192,6 +197,8 @@ namespace ECUFlasher
             prefs.LastBrowseDirectory ??= "";
             prefs.FlashFile ??= "";
             prefs.MemoryLayoutFile ??= "";
+            prefs.EepromChipSelect ??= "";
+            prefs.EepromPart ??= "";
 
             var directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory))

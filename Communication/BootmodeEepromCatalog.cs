@@ -18,14 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Contact by Email: nyet@nyet.org
 */
 
+using System;
 using System.Collections.Generic;
 
 namespace Communication
 {
     /// <summary>
-    /// Chip-select labels and device rows from C167BootTool. Size, type, and
-    /// peripheral stay on the device. The chip select is only the port and pin,
-    /// or I2C with no pin.
+    /// Chip-select labels and EEPROM parts from C167BootTool. Each part has one
+    /// size. The driver type code does not fix that size: 95040 and 95P08 share
+    /// type 1. Peripheral is chosen separately. ME7.1 and ME7.5 share P4.7.
     /// </summary>
     public static class BootmodeEepromCatalog
     {
@@ -45,89 +46,90 @@ namespace Communication
             public byte PinNumber { get; private set; }
         }
 
-        public sealed class Device
+        public sealed class Part
         {
-            public Device(
+            public Part(
                 string displayName,
-                BootstrapInterface.BootmodeEepromPeriph periph,
                 BootstrapInterface.BootmodeEepromType eepromType,
-                uint size)
+                uint size,
+                bool allowsXssc)
             {
                 DisplayName = displayName;
-                Periph = periph;
                 EepromType = eepromType;
                 Size = size;
+                AllowsXssc = allowsXssc;
             }
 
             public string DisplayName { get; private set; }
-            public BootstrapInterface.BootmodeEepromPeriph Periph { get; private set; }
             public BootstrapInterface.BootmodeEepromType EepromType { get; private set; }
             public uint Size { get; private set; }
+            public bool AllowsXssc { get; private set; }
         }
 
         public static IReadOnlyList<ChipSelect> ChipSelects { get; } = new List<ChipSelect>
         {
-            new ChipSelect("ME7.1 P4.7", false, 4, 7),
-            new ChipSelect("ME7.5 P4.7", false, 4, 7),
+            new ChipSelect("ME7.1 / ME7.5 P4.7", false, 4, 7),
             new ChipSelect("ME7.1.1 P6.3", false, 6, 3),
             new ChipSelect("Simos 3.2 P6.4", false, 6, 4),
             new ChipSelect("EDC15 I2C", true, 0, 0),
         };
 
-        public static IReadOnlyList<Device> SpiDevices { get; } = new List<Device>
+        public static IReadOnlyList<Part> SpiParts { get; } = new List<Part>
         {
-            Spi("95040", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, 512),
-            Spi("95040", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, 512),
-            Spi("95040", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, 256),
-            Spi("95040", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, 256),
-            Spi("95P08", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, 1024),
-            Spi("95P08", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, 1024),
-            Spi("95080", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 1024),
-            Spi("95080", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 1024),
-            Spi("95160", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 2048),
-            Spi("95160", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 2048),
-            Spi("95320", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 4096),
-            Spi("95320", BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, 4096),
-            Spi("93S46", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S46_6Bit, 128),
-            Spi("93S56", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S56_8Bit, 256),
-            Spi("93S66", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S56_8Bit, 512),
-            Spi("93S76", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S76_10Bit, 1024),
-            Spi("93S86", BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S76_10Bit, 2048),
+            new Part("95040", BootstrapInterface.BootmodeEepromType.Type95040, 512, true),
+            new Part("95P08", BootstrapInterface.BootmodeEepromType.Type95040, 1024, true),
+            new Part("95080", BootstrapInterface.BootmodeEepromType.Type95080To95320, 1024, true),
+            new Part("95160", BootstrapInterface.BootmodeEepromType.Type95080To95320, 2048, true),
+            new Part("95320", BootstrapInterface.BootmodeEepromType.Type95080To95320, 4096, true),
+            new Part("93S46", BootstrapInterface.BootmodeEepromType.Type93S46_6Bit, 128, false),
+            new Part("93S56", BootstrapInterface.BootmodeEepromType.Type93S56_8Bit, 256, false),
+            new Part("93S66", BootstrapInterface.BootmodeEepromType.Type93S56_8Bit, 512, false),
+            new Part("93S76", BootstrapInterface.BootmodeEepromType.Type93S76_10Bit, 1024, false),
+            new Part("93S86", BootstrapInterface.BootmodeEepromType.Type93S76_10Bit, 2048, false),
         };
 
-        public static IReadOnlyList<Device> I2cDevices { get; } = new List<Device>
+        public static IReadOnlyList<Part> I2cParts { get; } = new List<Part>
         {
-            new Device(
-                "24C04 I2C 512 B",
-                BootstrapInterface.BootmodeEepromPeriph.I2C,
-                BootstrapInterface.BootmodeEepromType.Type24C04_9Bit,
-                512),
-            new Device(
-                "24C02 I2C 256 B",
-                BootstrapInterface.BootmodeEepromPeriph.I2C,
-                BootstrapInterface.BootmodeEepromType.Type24C02_8Bit,
-                256),
+            new Part("24C04", BootstrapInterface.BootmodeEepromType.Type24C04_9Bit, 512, false),
+            new Part("24C02", BootstrapInterface.BootmodeEepromType.Type24C02_8Bit, 256, false),
         };
 
-        public static Device DefaultSpiDevice
+        public static Part DefaultSpiPart
         {
-            get { return SpiDevices[0]; }
+            get { return SpiParts[0]; }
         }
 
-        public static Device DefaultI2cDevice
+        public static Part DefaultI2cPart
         {
-            get { return I2cDevices[0]; }
+            get { return I2cParts[0]; }
         }
 
-        public static BootstrapInterface.BootmodeEepromSettings ToSettings(ChipSelect chip, Device device)
+        public static ChipSelect FindChipSelect(string displayName)
+        {
+            return string.IsNullOrEmpty(displayName)
+                ? null
+                : First(ChipSelects, chip => chip.DisplayName == displayName);
+        }
+
+        public static Part FindPart(bool i2c, string displayName)
+        {
+            return string.IsNullOrEmpty(displayName)
+                ? null
+                : First(i2c ? I2cParts : SpiParts, part => part.DisplayName == displayName);
+        }
+
+        public static BootstrapInterface.BootmodeEepromSettings ToSettings(
+            ChipSelect chip,
+            BootstrapInterface.BootmodeEepromPeriph periph,
+            Part part)
         {
             return new BootstrapInterface.BootmodeEepromSettings
             {
-                Periph = device.Periph,
-                EepromType = device.EepromType,
+                Periph = periph,
+                EepromType = part.EepromType,
                 PortNumber = chip.PortNumber,
                 PinNumber = chip.PinNumber,
-                Size = device.Size
+                Size = part.Size
             };
         }
 
@@ -138,36 +140,28 @@ namespace Communication
                 return "";
             }
 
-            foreach (Device device in SpiDevices)
-            {
-                if (device.Periph == settings.Periph
-                    && device.EepromType == settings.EepromType
-                    && device.Size == settings.Size)
-                {
-                    return device.DisplayName;
-                }
-            }
-
-            foreach (Device device in I2cDevices)
-            {
-                if (device.Periph == settings.Periph
-                    && device.EepromType == settings.EepromType
-                    && device.Size == settings.Size)
-                {
-                    return device.DisplayName;
-                }
-            }
-
-            return settings.Periph + " " + settings.Size + " B";
+            Part part = First(SpiParts, item => SamePart(item, settings))
+                ?? First(I2cParts, item => SamePart(item, settings));
+            string name = part == null ? settings.Periph.ToString() : part.DisplayName + " " + settings.Periph;
+            return name + " " + settings.Size + " B";
         }
 
-        private static Device Spi(
-            string name,
-            BootstrapInterface.BootmodeEepromPeriph periph,
-            BootstrapInterface.BootmodeEepromType eepromType,
-            uint size)
+        private static bool SamePart(Part part, BootstrapInterface.BootmodeEepromSettings settings)
         {
-            return new Device(name + " " + periph + " " + size + " B", periph, eepromType, size);
+            return part.EepromType == settings.EepromType && part.Size == settings.Size;
+        }
+
+        private static T First<T>(IEnumerable<T> items, Func<T, bool> match) where T : class
+        {
+            foreach (T item in items)
+            {
+                if (match(item))
+                {
+                    return item;
+                }
+            }
+
+            return null;
         }
     }
 }
