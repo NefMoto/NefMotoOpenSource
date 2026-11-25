@@ -121,7 +121,7 @@ namespace Communication.Properties {
         }
 
         /// <summary>
-        ///   SPI EEPROM driver for C16x/ST10 SSC (ME7.1/7.5 95040). From C167BootTool gremlindriver.bin.
+        ///   SPI EEPROM driver for C16x/ST10 SSC (ME7.1/7.5 95040). Image is SscEepromDriver.bin.
         /// </summary>
         internal static byte[] BootmodeEepromDriverSSC {
             get {

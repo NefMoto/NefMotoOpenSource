@@ -247,8 +247,11 @@ namespace Communication
         private const ushort EepromCmdReadSpi = 0x0036;
         private const ushort EepromCmdWriteSpi = 0x0037;
 
-        /// <summary>Driver r15 when BP0, BP1, or SRWD stays set. No data byte was programmed.</summary>
+        /// <summary>Driver r15 when BP0 or BP1 stays set. No data byte was programmed.</summary>
         private const ushort EepromStatusProtected = 0x0001;
+
+        /// <summary>Driver r15 when the byte did not go busy and the read-back differed.</summary>
+        private const ushort EepromStatusNoCycle = 0x0002;
 
         private const ushort XPERCON_Data_XSSC = 0x0500;
         private const ushort SYSCON_Data_XSSC = 0xE204;
@@ -2688,7 +2691,7 @@ namespace Communication
 
         /// <summary>
         /// Load the driver for this type and peripheral, optional XSSC setup, optional CS patch,
-        /// and for 95040/95080 verify driver state (0xF0 or 0x80).
+        /// and for 95040/95080 verify driver state (0xF0, 0x80, or 0x00).
         /// </summary>
         public bool PrepareEepromDriver(BootmodeEepromSettings settings, out ushort driverState)
         {
@@ -2735,7 +2738,10 @@ namespace Communication
                 return false;
             }
 
-            bool ok = (driverState == 0x00F0) || (driverState == 0x0080);
+            // 0x00F0 and 0x0080 are the status values these chips ship with.
+            // 0x0000 is that register after a status write cleared bit 7. A wrong
+            // chip select reads 0x00FF, which stays a failure.
+            bool ok = (driverState == 0x00F0) || (driverState == 0x0080) || (driverState == 0x0000);
             DisplayStatusMessage(
                 $"EEPROM driver state: 0x{driverState:X4} ({(ok ? "OK" : "unexpected - check CS/periph")})",
                 ok ? StatusMessageType.LOG : StatusMessageType.USER);
@@ -2857,6 +2863,15 @@ namespace Communication
             if (results[7] == EepromStatusProtected)
             {
                 DisplayStatusMessage("EEPROM is write-protected and was not modified.", StatusMessageType.USER);
+                LogEepromRegisters("WriteEepromBlock", results);
+                return false;
+            }
+
+            if (results[7] == EepromStatusNoCycle)
+            {
+                DisplayStatusMessage(
+                    $"EEPROM program cycle did not start at offset 0x{results[2]:X4}.",
+                    StatusMessageType.USER);
                 LogEepromRegisters("WriteEepromBlock", results);
                 return false;
             }

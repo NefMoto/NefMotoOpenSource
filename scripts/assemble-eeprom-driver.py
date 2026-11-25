@@ -2,11 +2,11 @@
 """Assemble the Keil SSC and XSSC EEPROM drivers.
 
 Keil A166 is not installed here. This covers the instructions in
-gremlinDriver.a66 and ST10XDriver.a66, and it is only trusted when the
+SscEepromDriver.a66 and ST10XDriver.a66, and it is only trusted when the
 unmodified source reproduces the checked-in driver image. It is not a
 general C166 assembler.
 
-  python3 scripts/assemble-eeprom-driver.py Communication/Resources/gremlinDriver.a66 --check Communication/Resources/gremlindriver.bin
+  python3 scripts/assemble-eeprom-driver.py Communication/Resources/SscEepromDriver.a66 --check Communication/Resources/SscEepromDriver.bin
   python3 scripts/assemble-eeprom-driver.py Communication/Resources/ST10XDriver.a66 --check Communication/Resources/ST10XDriver.bin
 """
 

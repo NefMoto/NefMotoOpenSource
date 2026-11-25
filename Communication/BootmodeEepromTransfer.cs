@@ -61,6 +61,7 @@ namespace Communication
         }
 
         public const ushort ReadBlockLengthValue = 0x200;
+        public const ushort SpiWriteBlockLength = 32;
         public const ushort I2cWriteBlockLength = 0x40;
 
         public static bool TryChoose(
@@ -113,7 +114,7 @@ namespace Communication
                     patchChipSelect: true,
                     requireDriverState: true,
                     ReadBlockLengthValue,
-                    ReadBlockLengthValue);
+                    SpiWriteBlockLength);
                 return true;
             }
 
@@ -140,7 +141,7 @@ namespace Communication
                 patchChipSelect: true,
                 requireDriverState: true,
                 ReadBlockLengthValue,
-                ReadBlockLengthValue);
+                SpiWriteBlockLength);
             return true;
         }
     }

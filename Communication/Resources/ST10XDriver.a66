@@ -179,21 +179,12 @@ DriverP		proc	far
 Cmd1:
 			cmp     r8,#_WriteSPI   ; block recording?
 			jmp     cc_ne,Cmd2      ; no
-			call    ClearProtect
+			calla   cc_uc,ClearProtect
 			cmp     r15,#1          ; protect bits stayed set
 			jmp     cc_eq,RestoreRegs
+			cmp     r15,#2          ; program cycle did not start
+			jmp     cc_eq,RestoreRegs
 Block:
-			call	ClearCs          ; -CS
-
-			mov     r3,#_EEState
-			call   SendRecSSC      ; status register read command
-
-			call   SendRecSSC      ; send dummy byte, receive data byte
-			call	SetCs          ; remove the sample
-			and     r4,#01h         ; WIP control
-			jmp     cc_nz,Block     ; busy ?
-
-
 			call	ClearCs          ; EEPROM selection
 			mov     r3,#_EEWREN     ; recording enable
 			call   SendRecSSC
@@ -210,6 +201,14 @@ Block:
 			movb    RL3,[r13]       ; byte of data from RAM
 			call   SendRecSSC      ;
 			call	SetCs          ; switch off EEPROM selection
+
+			calla	cc_uc,WaitProgram
+			cmp     r15,#2
+			jmp     cc_ne,ByteNext
+			calla	cc_uc,SameByte
+			cmp     r15,#2
+			jmp     cc_eq,RestoreRegs
+ByteNext:
 
 			add     r13,#1          ; next byte in RAM
 			add     r10,#1          ; next EEPROM address
@@ -281,7 +280,7 @@ CmdC:      mov     r15,#1
 
 
 RestoreRegs:
-			call	ClearCsDirection
+			calla	cc_uc,ClearCsDirection
 ; save r0-7
 ;			pop		r7
 ;			pop		r6
@@ -366,17 +365,68 @@ OneByteAddr:
 
 SendCommandAndAddress	endp
 
-; Read the status register once. When BP0, BP1, or SRWD is set, clear the
-; register and read it again. r15=1 if a protect bit stays set, and the caller
-; writes no data byte. r15 is unchanged when the array may be programmed.
-; r9-r13 stay.
+; CS is high and a program cycle was started. Poll until WIP sets, then
+; until it clears. r15=2 if WIP never sets. The poll count is in r5.
+; SendRecSSC uses r14. r9-r13 stay. r4 is the idle status.
+WaitProgram	proc	near
+			mov		r5,#8
+WipArm:
+			calla	cc_uc,FarClearCs
+			mov		r3,#_EEState
+			call	SendRecSSC
+			call	SendRecSSC
+			calla	cc_uc,FarSetCs
+			mov		r3,r4
+			and		r3,#01h
+			jmp		cc_nz,WipHold
+			cmpd1	r5,#1
+			jmp		cc_nz,WipArm
+			mov		r15,#2
+			ret
+WipHold:
+			calla	cc_uc,FarClearCs
+			mov		r3,#_EEState
+			call	SendRecSSC
+			call	SendRecSSC
+			calla	cc_uc,FarSetCs
+			mov		r3,r4
+			and		r3,#01h
+			jmp		cc_nz,WipHold
+			ret
+WaitProgram	endp
+
+; r15=2 and CS is high. Read r10 and compare it with the RAM byte.
+; A match clears r15. A mismatch leaves r15=2 and r10 on that byte.
+; r9, r11, and r13 stay.
+SameByte	proc	near
+			calla	cc_uc,FarClearCs
+			mov		r3,#_EERead
+			calla	cc_uc,SendCommandAndAddress
+			calla	cc_uc,SendRecSSC
+			calla	cc_uc,FarSetCs
+			mov		r5,#0
+			exts	#0,#1
+			movb	RL5,[r13]
+			and		r4,#00FFh
+			cmp		r5,r4
+			jmp		cc_ne,SameMiss
+			mov		r15,#0
+SameMiss:
+			ret
+SameByte	endp
+
+; Read the status register once. When BP0 or BP1 is set, clear the register
+; and wait for that write. r15=1 if a block-protect bit stays set, and the
+; caller writes no data byte. r15=2 if that write never starts. r15 is
+; unchanged when the array may be programmed. Bit 7 in a normal 0xF0 or
+; 0x80 status is not block protect. r9-r13 stay.
 ClearProtect	proc	near
 			calla	cc_uc,FarClearCs
 			mov		r3,#_EEState
 			call	SendRecSSC
 			call	SendRecSSC
 			calla	cc_uc,FarSetCs
-			and		r4,#08Ch        ; SRWD, BP1, BP0
+			and		r4,#00Ch        ; BP1, BP0
 			jmp		cc_z,ProtectDone
 			calla	cc_uc,FarClearCs
 			mov		r3,#_EEWREN
@@ -389,16 +439,10 @@ ClearProtect	proc	near
 			mov		r3,#0           ; status 0x00
 			call	SendRecSSC
 			calla	cc_uc,FarSetCs
-ProtectWait:
-			calla	cc_uc,FarClearCs
-			mov		r3,#_EEState
-			call	SendRecSSC
-			call	SendRecSSC
-			calla	cc_uc,FarSetCs
-			mov		r14,r4
-			and		r14,#01h        ; WIP
-			jmp		cc_nz,ProtectWait
-			and		r4,#08Ch        ; still protected
+			call	WaitProgram
+			cmp		r15,#2
+			jmp		cc_eq,ProtectDone
+			and		r4,#00Ch        ; BP1, BP0 still set
 			jmp		cc_nz,ProtectFail
 ProtectDone:
 			ret

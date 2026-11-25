@@ -26,10 +26,10 @@ namespace NefMotoOpenSource.Tests
     public class BootmodeEepromTransferTests
     {
         [Theory]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 0x200)]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 0x200)]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 0x200)]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 0x200)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 32)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 32)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 32)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 32)]
         [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S46_6Bit, BootmodeEepromTransfer.DriverId.Ssc93, false, true, false, 0x200)]
         [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S56_8Bit, BootmodeEepromTransfer.DriverId.Ssc93, false, true, false, 0x200)]
         [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S76_10Bit, BootmodeEepromTransfer.DriverId.Ssc93, false, true, false, 0x200)]
