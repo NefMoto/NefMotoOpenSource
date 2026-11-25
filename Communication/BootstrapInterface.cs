@@ -160,6 +160,7 @@ namespace Communication
             public byte PortNumber { get; set; } = 4;
             public byte PinNumber { get; set; } = 7;
             public uint Size { get; set; } = 512;
+            public string PartName { get; set; }
 
             public static BootmodeEepromSettings ForMe75()
             {
@@ -250,8 +251,13 @@ namespace Communication
         /// <summary>Driver r15 when BP0 or BP1 stays set. No data byte was programmed.</summary>
         private const ushort EepromStatusProtected = 0x0001;
 
-        /// <summary>Driver r15 when the byte did not go busy and the read-back differed.</summary>
+        /// <summary>Driver r15 when WEL is still set after the program hold, or WIP stays set.</summary>
         private const ushort EepromStatusNoCycle = 0x0002;
+
+        // ME7.1.1 drives P6.4 low for the whole P6.3 EEPROM session, then high again.
+        private const uint EepromPort6Address = 0x00FFCC;
+        private const uint EepromPort6DirectionAddress = 0x00FFCE;
+        private const ushort EepromSessionPinMask = 0x0010;
 
         private const ushort XPERCON_Data_XSSC = 0x0500;
         private const ushort SYSCON_Data_XSSC = 0xE204;
@@ -2739,9 +2745,10 @@ namespace Communication
             }
 
             // 0x00F0 and 0x0080 are the status values these chips ship with.
-            // 0x0000 is that register after a status write cleared bit 7. A wrong
-            // chip select reads 0x00FF, which stays a failure.
-            bool ok = (driverState == 0x00F0) || (driverState == 0x0080) || (driverState == 0x0000);
+            // 0x0000 is that register after a status write cleared bit 7.
+            // 0x0002 is the write-enable latch left set when a cycle does not
+            // finish. A wrong chip select reads 0x00FF, which stays a failure.
+            bool ok = (driverState == 0x00F0) || (driverState == 0x0080) || (driverState == 0x0000) || (driverState == 0x0002);
             DisplayStatusMessage(
                 $"EEPROM driver state: 0x{driverState:X4} ({(ok ? "OK" : "unexpected - check CS/periph")})",
                 ok ? StatusMessageType.LOG : StatusMessageType.USER);
@@ -2899,28 +2906,44 @@ namespace Communication
                 return false;
             }
 
-            uint size = settings.Size;
-            if (size == 0)
+            bool sessionPin = false;
+            try
             {
-                DisplayStatusMessage("ReadEeprom: size is zero.", StatusMessageType.USER);
-                return false;
-            }
+                if (!BeginEepromSessionPin(settings, out sessionPin))
+                {
+                    return false;
+                }
 
-            data = new byte[size];
-            BootmodeEepromTransfer.Choice choice;
-            if (!BootmodeEepromTransfer.TryChoose(settings.Periph, settings.EepromType, out choice))
+                uint size = settings.Size;
+                if (size == 0)
+                {
+                    DisplayStatusMessage("ReadEeprom: size is zero.", StatusMessageType.USER);
+                    return false;
+                }
+
+                data = new byte[size];
+                BootmodeEepromTransfer.Choice choice;
+                if (!BootmodeEepromTransfer.TryChoose(settings.Periph, settings.EepromType, out choice))
+                {
+                    data = null;
+                    return false;
+                }
+
+                if (!TransferEepromBlocks(settings.EepromType, data, size, writing: false, choice.ReadBlockLength, progress))
+                {
+                    data = null;
+                    return false;
+                }
+
+                return true;
+            }
+            finally
             {
-                data = null;
-                return false;
+                if (sessionPin)
+                {
+                    EndEepromSessionPin();
+                }
             }
-
-            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: false, choice.ReadBlockLength, progress))
-            {
-                data = null;
-                return false;
-            }
-
-            return true;
         }
 
         /// <summary>
@@ -2946,41 +2969,122 @@ namespace Communication
                 return false;
             }
 
-            uint size = (uint)data.Length;
-            BootmodeEepromTransfer.Choice choice;
-            if (!BootmodeEepromTransfer.TryChoose(settings.Periph, settings.EepromType, out choice))
+            bool sessionPin = false;
+            try
             {
-                return false;
-            }
-
-            if (!TransferEepromBlocks(settings.EepromType, data, size, writing: true, choice.WriteBlockLength, progress))
-            {
-                return false;
-            }
-
-            if (verify)
-            {
-                DisplayStatusMessage("Verifying EEPROM write...", StatusMessageType.USER);
-                // Driver already prepared; read blocks directly without re-Prepare
-                byte[] readBack = new byte[size];
-                if (!TransferEepromBlocks(settings.EepromType, readBack, size, writing: false, choice.ReadBlockLength, progress: null))
+                if (!BeginEepromSessionPin(settings, out sessionPin))
                 {
                     return false;
                 }
 
-                for (int i = 0; i < data.Length; i++)
+                uint size = (uint)data.Length;
+                BootmodeEepromTransfer.Choice choice;
+                if (!BootmodeEepromTransfer.TryChoose(settings.Periph, settings.EepromType, out choice))
                 {
-                    if (data[i] != readBack[i])
-                    {
-                        DisplayStatusMessage($"EEPROM verify failed at offset 0x{i:X4}: wrote 0x{data[i]:X2}, read 0x{readBack[i]:X2}.", StatusMessageType.USER);
-                        return false;
-                    }
+                    return false;
                 }
 
-                DisplayStatusMessage("EEPROM write verified OK.", StatusMessageType.USER);
+                if (!TransferEepromBlocks(settings.EepromType, data, size, writing: true, choice.WriteBlockLength, progress))
+                {
+                    return false;
+                }
+
+                if (verify)
+                {
+                    DisplayStatusMessage("Verifying EEPROM write...", StatusMessageType.USER);
+                    // Driver already prepared; read blocks directly without re-Prepare
+                    byte[] readBack = new byte[size];
+                    if (!TransferEepromBlocks(settings.EepromType, readBack, size, writing: false, choice.ReadBlockLength, progress: null))
+                    {
+                        return false;
+                    }
+
+                    int mismatches = 0;
+                    for (int i = 0; i < data.Length; i++)
+                    {
+                        if (data[i] == readBack[i])
+                        {
+                            continue;
+                        }
+
+                        mismatches++;
+                        DisplayStatusMessage(
+                            $"EEPROM verify failed at offset 0x{i:X4}: wrote 0x{data[i]:X2}, read 0x{readBack[i]:X2}.",
+                            StatusMessageType.USER);
+                    }
+
+                    if (mismatches > 0)
+                    {
+                        string bytes = mismatches == 1 ? "byte differs" : "bytes differ";
+                        DisplayStatusMessage($"EEPROM verify failed: {mismatches} {bytes}.", StatusMessageType.USER);
+                        return false;
+                    }
+
+                    DisplayStatusMessage("EEPROM write verified OK.", StatusMessageType.USER);
+                }
+
+                DisplayStatusMessage("Write EEPROM OK: " + size + " bytes" + EepromStateNote(choice, state) + ".", StatusMessageType.USER);
+                return true;
+            }
+            finally
+            {
+                if (sessionPin)
+                {
+                    EndEepromSessionPin();
+                }
+            }
+        }
+
+        /// <summary>
+        /// A P6.3 chip select also holds P6.4 low until <see cref="EndEepromSessionPin"/>.
+        /// P4.7 and P6.4 chip selects do not change P6.4.
+        /// </summary>
+        private bool BeginEepromSessionPin(BootmodeEepromSettings settings, out bool held)
+        {
+            held = false;
+            if (settings.PortNumber != 6 || settings.PinNumber != 3)
+            {
+                return true;
             }
 
-            DisplayStatusMessage("Write EEPROM OK: " + size + " bytes" + EepromStateNote(choice, state) + ".", StatusMessageType.USER);
+            if (!WriteEepromPortBit(EepromPort6DirectionAddress, EepromSessionPinMask, set: true))
+            {
+                return false;
+            }
+
+            if (!WriteEepromPortBit(EepromPort6Address, EepromSessionPinMask, set: false))
+            {
+                WriteEepromPortBit(EepromPort6Address, EepromSessionPinMask, set: true);
+                return false;
+            }
+
+            held = true;
+            DisplayStatusMessage("EEPROM session pin P6.4 held low.", StatusMessageType.LOG);
+            return true;
+        }
+
+        /// <summary>Drive P6.4 high. The direction bit stays an output.</summary>
+        private void EndEepromSessionPin()
+        {
+            WriteEepromPortBit(EepromPort6Address, EepromSessionPinMask, set: true);
+        }
+
+        private bool WriteEepromPortBit(uint address, ushort mask, bool set)
+        {
+            uint word;
+            if (!MiniMon_ReadWord(address, out word))
+            {
+                DisplayStatusMessage($"EEPROM session pin read failed at 0x{address:X4}.", StatusMessageType.LOG);
+                return false;
+            }
+
+            ushort next = set ? (ushort)(word | mask) : (ushort)(word & ~mask);
+            if (!MiniMon_WriteWord(address, next))
+            {
+                DisplayStatusMessage($"EEPROM session pin write failed at 0x{address:X4}.", StatusMessageType.LOG);
+                return false;
+            }
+
             return true;
         }
 
@@ -3013,6 +3117,7 @@ namespace Communication
             }
 
             uint offset = 0;
+            int writeProgressBucket = 0;
             while (offset < size)
             {
                 ushort blockLen = (ushort)Math.Min(blockLength, size - offset);
@@ -3037,9 +3142,32 @@ namespace Communication
                 }
 
                 offset += blockLen;
-                progress?.Invoke(offset, size);
+                if (progress != null && EepromProgressDue(writing, offset, size, ref writeProgressBucket))
+                {
+                    progress(offset, size);
+                }
             }
 
+            return true;
+        }
+
+        // A 16-byte page is about one percent of a 1024-byte chip. Report tens only.
+        private const int EepromWriteProgressPercent = 10;
+
+        internal static bool EepromProgressDue(bool writing, uint offset, uint size, ref int lastBucket)
+        {
+            if (!writing || size == 0)
+            {
+                return true;
+            }
+
+            int bucket = (int)(offset * 100u / size) / EepromWriteProgressPercent;
+            if (offset < size && bucket <= lastBucket)
+            {
+                return false;
+            }
+
+            lastBucket = bucket;
             return true;
         }
 

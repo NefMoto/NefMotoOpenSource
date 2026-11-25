@@ -590,14 +590,10 @@ namespace Ecuflash
                 return BootstrapInterface.BootmodeEepromSettings.ForMe75();
             }
 
-            return new BootstrapInterface.BootmodeEepromSettings
-            {
-                Periph = BootstrapInterface.BootmodeEepromPeriph.SSC,
-                EepromType = BootstrapInterface.BootmodeEepromType.Type95040,
-                PortNumber = 6,
-                PinNumber = 3,
-                Size = (uint)Me7Eeprom95P08Immo.EepromSize
-            };
+            return BootmodeEepromCatalog.ToSettings(
+                BootmodeEepromCatalog.FindChipSelect("ME7.1.1 P6.3"),
+                BootstrapInterface.BootmodeEepromPeriph.SSC,
+                BootmodeEepromCatalog.FindPart(false, "95P08"));
         }
 
         static int ListUsb()

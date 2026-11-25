@@ -25,8 +25,9 @@ namespace Communication
 {
     /// <summary>
     /// Chip-select labels and EEPROM parts from C167BootTool. Each part has one
-    /// size. The driver type code does not fix that size: 95040 and 95P08 share
-    /// type 1. Peripheral is chosen separately. ME7.1 and ME7.5 share P4.7.
+    /// size. 95040 is type 1, with address bits in the opcode. 95P08 is type 0,
+    /// a 16-bit address, the same code as 95080. Peripheral is chosen separately.
+    /// ME7.1 and ME7.5 share P4.7.
     /// </summary>
     public static class BootmodeEepromCatalog
     {
@@ -77,7 +78,7 @@ namespace Communication
         public static IReadOnlyList<Part> SpiParts { get; } = new List<Part>
         {
             new Part("95040", BootstrapInterface.BootmodeEepromType.Type95040, 512, true),
-            new Part("95P08", BootstrapInterface.BootmodeEepromType.Type95040, 1024, true),
+            new Part("95P08", BootstrapInterface.BootmodeEepromType.Type95080To95320, 1024, true),
             new Part("95080", BootstrapInterface.BootmodeEepromType.Type95080To95320, 1024, true),
             new Part("95160", BootstrapInterface.BootmodeEepromType.Type95080To95320, 2048, true),
             new Part("95320", BootstrapInterface.BootmodeEepromType.Type95080To95320, 4096, true),
@@ -129,7 +130,8 @@ namespace Communication
                 EepromType = part.EepromType,
                 PortNumber = chip.PortNumber,
                 PinNumber = chip.PinNumber,
-                Size = part.Size
+                Size = part.Size,
+                PartName = part.DisplayName
             };
         }
 
@@ -142,7 +144,10 @@ namespace Communication
 
             Part part = First(SpiParts, item => SamePart(item, settings))
                 ?? First(I2cParts, item => SamePart(item, settings));
-            string name = part == null ? settings.Periph.ToString() : part.DisplayName + " " + settings.Periph;
+            string label = string.IsNullOrEmpty(settings.PartName)
+                ? (part == null ? null : part.DisplayName)
+                : settings.PartName;
+            string name = label == null ? settings.Periph.ToString() : label + " " + settings.Periph;
             return name + " " + settings.Size + " B";
         }
 

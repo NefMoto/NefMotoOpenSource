@@ -26,10 +26,10 @@ namespace NefMotoOpenSource.Tests
     public class BootmodeEepromTransferTests
     {
         [Theory]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 32)]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 32)]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 32)]
-        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 32)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 16)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Ssc25, false, true, true, 16)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95040, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 16)]
+        [InlineData(BootstrapInterface.BootmodeEepromPeriph.XSSC, BootstrapInterface.BootmodeEepromType.Type95080To95320, BootmodeEepromTransfer.DriverId.Xssc25, true, true, true, 16)]
         [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S46_6Bit, BootmodeEepromTransfer.DriverId.Ssc93, false, true, false, 0x200)]
         [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S56_8Bit, BootmodeEepromTransfer.DriverId.Ssc93, false, true, false, 0x200)]
         [InlineData(BootstrapInterface.BootmodeEepromPeriph.SSC, BootstrapInterface.BootmodeEepromType.Type93S76_10Bit, BootmodeEepromTransfer.DriverId.Ssc93, false, true, false, 0x200)]
@@ -120,13 +120,20 @@ namespace NefMotoOpenSource.Tests
 
             var p08 = BootmodeEepromCatalog.FindPart(false, "95P08");
             Assert.NotNull(p08);
-            Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95040, p08.EepromType);
+            Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95080To95320, p08.EepromType);
             Assert.Equal(1024u, p08.Size);
             string p08Name = BootmodeEepromCatalog.DisplayNameFor(BootmodeEepromCatalog.ToSettings(
                 BootmodeEepromCatalog.ChipSelects[0],
                 BootstrapInterface.BootmodeEepromPeriph.SSC,
                 p08));
             Assert.StartsWith("95P08", p08Name);
+
+            var p80 = BootmodeEepromCatalog.FindPart(false, "95080");
+            string p80Name = BootmodeEepromCatalog.DisplayNameFor(BootmodeEepromCatalog.ToSettings(
+                BootmodeEepromCatalog.ChipSelects[0],
+                BootstrapInterface.BootmodeEepromPeriph.SSC,
+                p80));
+            Assert.StartsWith("95080", p80Name);
         }
 
         [Fact]
@@ -170,6 +177,30 @@ namespace NefMotoOpenSource.Tests
                 Assert.False(choice.PatchChipSelect);
                 Assert.Equal(BootmodeEepromTransfer.I2cWriteBlockLength, choice.WriteBlockLength);
             }
+        }
+
+        [Fact]
+        public void Write_progress_reports_every_ten_percent()
+        {
+            int bucket = 0;
+            var reported = new System.Collections.Generic.List<uint>();
+            for (uint offset = 16; offset <= 1024; offset += 16)
+            {
+                if (BootstrapInterface.EepromProgressDue(true, offset, 1024, ref bucket))
+                {
+                    reported.Add(offset);
+                }
+            }
+
+            Assert.Equal(new uint[] { 112, 208, 320, 416, 512, 624, 720, 832, 928, 1024 }, reported);
+        }
+
+        [Fact]
+        public void Read_progress_reports_every_block()
+        {
+            int bucket = 0;
+            Assert.True(BootstrapInterface.EepromProgressDue(false, 512, 1024, ref bucket));
+            Assert.True(BootstrapInterface.EepromProgressDue(false, 1024, 1024, ref bucket));
         }
     }
 }

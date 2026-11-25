@@ -21,7 +21,7 @@ Contact by Email: nyet@nyet.org
 namespace Communication
 {
     /// <summary>
-    /// Immobilizer status patch for a 95P08 image (1024 bytes, C167BootTool type 1).
+    /// Immobilizer status patch for a 95P08 image (1024 bytes, 16-bit address).
     /// Off sets the mirrored bytes at 0x012 and 0x022 to 0x02 when they match.
     /// On sets that pair back to 0x01 when both are 0x02.
     /// Pages 1 and 2 use the 95040 checksum. A map at byte 1 is edited only when

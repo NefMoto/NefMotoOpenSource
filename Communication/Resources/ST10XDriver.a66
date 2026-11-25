@@ -119,7 +119,7 @@ DriverC		section code at 0F640h
 ; r8 - operation code;
 ; r9 - block length in bytes;
 ; r10 - low bytes of the RAM address;
-; R11 - Type of eeprom : 0 -> 16 bit addres (95080, 95160, 95320); 1-> 8bit Address + A8,A9 & A10 in Instruction(A8 95040, A8&A9 only for 95P08)
+; R11 - Type of eeprom : 0 -> 16 bit addres (95P08, 95080, 95160, 95320); 1-> 8bit Address + A8,A9 & A10 in Instruction (95040)
 ; r13 - low bytes of the EEPROM address;
 
 ; r15 - return code on exit
@@ -144,11 +144,11 @@ DriverP		proc	far
 ; SPI init
 
 		   mov		R3, #XSSCBR_Address
-		   mov		R4, #0x000B    ; baudrate speed in the ECU firmware
+		   mov		R4, #0x000B    ; SSC baud divider
 		   exts    	#0,#1
-           mov		[R3],R4    ; baudrate speed in the ECU firmware
+           mov		[R3],R4
 		   mov		R3, #XSSCCON_Address
-		   mov		R4, #0xC037    ; configuration
+		   mov		R4, #0xC037    ; master, 8 data bits, clock phase set
 		   exts    	#0,#1
            mov		[R3],R4    ; configuration
            bfldl	P6,#0Eh,#0Eh   ; Set MRST=1, MTSR=1, SCLK=1
@@ -169,9 +169,9 @@ DriverP		proc	far
 ; ------------------------------------------------- ---------------------
 ; Writing a block from RAM to EEPROM
 ; r8 - operation code;
-; r9 - block length in bytes (for programming - 1, byte!);
+; r9 - byte count. One chip select covers the whole count.
 ; r10 - EEPROM address
-; R11 - Type of eeprom : 0 -> 16 bit addres (95080, 95160, 95320); 1-> 8bit Address + A8,A9 & A10 in Instruction(A8 95040, A8&A9 only for 95P08)
+; R11 - Type of eeprom : 0 -> 16 bit addres (95P08, 95080, 95160, 95320); 1-> 8bit Address + A8,A9 & A10 in Instruction (95040)
 ; r13 - RAM address
 ; r15 - return code on exit
 ; ------------------------------------------------- ---------------------
@@ -184,7 +184,6 @@ Cmd1:
 			jmp     cc_eq,RestoreRegs
 			cmp     r15,#2          ; program cycle did not start
 			jmp     cc_eq,RestoreRegs
-Block:
 			call	ClearCs          ; EEPROM selection
 			mov     r3,#_EEWREN     ; recording enable
 			call   SendRecSSC
@@ -197,23 +196,17 @@ Block:
 			mov		r3,#_EEWrite
 			call	SendCommandAndAddress	; send command in r3 and address in r10 depending on type in r11
 
+PageBytes:
 			exts    #0,#1
 			movb    RL3,[r13]       ; byte of data from RAM
-			call   SendRecSSC      ;
-			call	SetCs          ; switch off EEPROM selection
-
-			calla	cc_uc,WaitProgram
-			cmp     r15,#2
-			jmp     cc_ne,ByteNext
-			calla	cc_uc,SameByte
-			cmp     r15,#2
-			jmp     cc_eq,RestoreRegs
-ByteNext:
-
+			call   SendRecSSC
 			add     r13,#1          ; next byte in RAM
-			add     r10,#1          ; next EEPROM address
 			sub     r9,#1
-			jmp     cc_nz,Block
+			jmp     cc_nz,PageBytes
+			call	SetCs          ; switch off EEPROM selection
+			calla	cc_uc,WaitProgram
+			cmp     r15,#2          ; cycle did not finish
+			jmp     cc_eq,RestoreRegs
 			mov     r15,#0          ; completion code
 ;exit
 			jmp     cc_uc,RestoreRegs      ; no
@@ -223,7 +216,7 @@ ByteNext:
 ; r8 - operation code;
 ; r9 is the length of the read block;
 ; r10 - address in EEPROM;
-; R11 - Type of eeprom : 0 -> 16 bit addres (95080, 95160, 95320); 1-> 8bit Address + A8&A9 in Instruction(A8 95040, A8&A9 only for 95P08)
+; R11 - Type of eeprom : 0 -> 16 bit addres (95P08, 95080, 95160, 95320); 1-> 8bit Address + A8&A9 in Instruction (95040)
 ; r13 - buffer address;
 ; r15 - return code on exit
 ; ------------------------------------------------- ---------------------
@@ -365,25 +358,36 @@ OneByteAddr:
 
 SendCommandAndAddress	endp
 
-; CS is high and a program cycle was started. Poll until WIP sets, then
-; until it clears. r15=2 if WIP never sets. The poll count is in r5.
-; SendRecSSC uses r14. r9-r13 stay. r4 is the idle status.
+; CS is high after a program frame. Leave it high through the program
+; cycle, then read status once. A status read before the cycle latches
+; leaves WEL set and the page unchanged. WEL still set and WIP clear means
+; the write was not accepted: r15=2. WIP set: poll until it clears. Stuck
+; busy is also r15=2. SendRecSSC uses r14. The hold uses r5 and r14.
+; r9-r13 stay. r4 is the status.
 WaitProgram	proc	near
-			mov		r5,#8
-WipArm:
+			mov		r5,#4
+HoldOuter:
+			mov		r14,#0FFFFh
+HoldInner:
+			cmpd1	r14,#1
+			jmp		cc_nz,HoldInner
+			cmpd1	r5,#1
+			jmp		cc_nz,HoldOuter
 			calla	cc_uc,FarClearCs
 			mov		r3,#_EEState
 			call	SendRecSSC
 			call	SendRecSSC
 			calla	cc_uc,FarSetCs
 			mov		r3,r4
-			and		r3,#01h
+			and		r3,#01h		; WIP
 			jmp		cc_nz,WipHold
-			cmpd1	r5,#1
-			jmp		cc_nz,WipArm
+			and		r4,#02h		; WEL
+			jmp		cc_z,WipDone
 			mov		r15,#2
 			ret
 WipHold:
+			mov		r5,#4096
+WipClear:
 			calla	cc_uc,FarClearCs
 			mov		r3,#_EEState
 			call	SendRecSSC
@@ -391,35 +395,18 @@ WipHold:
 			calla	cc_uc,FarSetCs
 			mov		r3,r4
 			and		r3,#01h
-			jmp		cc_nz,WipHold
+			jmp		cc_z,WipDone
+			cmpd1	r5,#1
+			jmp		cc_nz,WipClear
+			mov		r15,#2
+WipDone:
 			ret
 WaitProgram	endp
 
-; r15=2 and CS is high. Read r10 and compare it with the RAM byte.
-; A match clears r15. A mismatch leaves r15=2 and r10 on that byte.
-; r9, r11, and r13 stay.
-SameByte	proc	near
-			calla	cc_uc,FarClearCs
-			mov		r3,#_EERead
-			calla	cc_uc,SendCommandAndAddress
-			calla	cc_uc,SendRecSSC
-			calla	cc_uc,FarSetCs
-			mov		r5,#0
-			exts	#0,#1
-			movb	RL5,[r13]
-			and		r4,#00FFh
-			cmp		r5,r4
-			jmp		cc_ne,SameMiss
-			mov		r15,#0
-SameMiss:
-			ret
-SameByte	endp
-
 ; Read the status register once. When BP0 or BP1 is set, clear the register
-; and wait for that write. r15=1 if a block-protect bit stays set, and the
-; caller writes no data byte. r15=2 if that write never starts. r15 is
-; unchanged when the array may be programmed. Bit 7 in a normal 0xF0 or
-; 0x80 status is not block protect. r9-r13 stay.
+; and wait for that write. r15=1 if a block-protect bit stays set. A status
+; write that leaves WEL set returns r15=2. Either failure writes no data
+; byte. r9-r13 stay.
 ClearProtect	proc	near
 			calla	cc_uc,FarClearCs
 			mov		r3,#_EEState
