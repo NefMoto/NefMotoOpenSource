@@ -19,6 +19,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 - [M5.9.2.md](M5.9.2.md) — M5.9.2 first-wake KWP: pin 43, speed byte, security, erase, and download
 - [ME7-K-line-addresses.md](ME7-K-line-addresses.md) — slow-init and fast-init addresses in the application firmware
 - [ME7-eeprom-checksum.md](ME7-eeprom-checksum.md) — 95040, 95P08, and 95160 page sum for ME7.1, ME7.5, and ME7.1.1
+- [ME7-eeprom-immo.md](ME7-eeprom-immo.md) — ME7.1, ME7.5, and ME7.1.1 immobilizer bytes, which copy the flag selects, and the compare with `0x02`. Most ME7.1 images use the ME7.5 compare.
 - [P1681-P0602.md](P1681-P0602.md) — `P0602` / `P1681`: the EEPROM flag, what clears it, and the one-byte edit
 - [BUILDING.md](BUILDING.md) — build from source
 - [RELEASE.md](RELEASE.md) — how releases are tagged and published

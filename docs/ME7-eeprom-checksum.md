@@ -23,11 +23,13 @@ The shipped descriptor list is the ME7.1 and ME7.5 map. `TryCopyImageTable` repl
 - **ME7.1.1, 95P08.** SPI type `Type95080To95320` (type 0), a 16-bit address, 1024 bytes, P6.3 select. The map occupies the first 512 bytes. Bytes past 512 are not checksummed and are not rewritten. On the images that match the shipped list, the read reports ok or how many shipped pages failed.
 - **95080 and larger.** SPI type `Type95080To95320`. `95P08` and `95160` use this same SPI type. A `95160` is 2048 bytes and is scored on the first 512 bytes. A `95080` read of a 95040-sized map is a different part. Do not score it as a `95P08` or a `95160`. When the first 512 pass the shipped list, the status says the chip looks like a 95040. When they do not, and page 0 byte 15 is not `0x5A`, the size is unverified.
 
-## 07K906032B length
+## ME7.1.1 95160
 
-The descriptor table at file `0x16D1E` has 128 slots. The highest page is 54, which ends at byte 879. The chip on this ECU is a `95160`: 2048 bytes, 16-bit address, chip select P6.3. EEPROM init sets bit `0x52.6`, so the write is `0x8CD75A`: opcode `0x02`, then both address bytes. `0x8CD7CA` runs only when that bit is clear. Immo Off uses the same bytes as a `95P08`. Bytes outside that window stay.
+The chip is 2048 bytes, a 16-bit address, chip select P6.3. EEPROM init selects that 16-bit address write. Immo Off uses the same map window as a `95P08`. Bytes outside that window stay.
 
-Nefmoto topic 20757 `eeprom-orig.bin` and `eeprom-immo-off.bin` are 2048 bytes from another `07K906032B`. The edit is `0x12` and `0x22` from `0x01` to `0x02`, and the checksum bytes `0x1E` and `0x2E`. `0x410` through `0x6AF` is not empty. Those files differ from this bench dump in 595 of the first 1024 bytes. The bench file was read with type 1, so it is not a chip image.
+One image's descriptor table has 128 slots. The highest page is 54, which ends at byte 879.
+
+A type 1 read of a 16-bit chip is not a chip image.
 
 ## Edits
 
