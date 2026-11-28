@@ -95,30 +95,21 @@ Do not use entire-flash erase to “fix” a BT/BB mismatch.
 Flash read and write use the same operations as this tab and print the same confirmation before connecting. `kwp info`, `kwp dtc read`, `kwp dtc clear`, `bootmode info`, `bootmode verify`, `bootmode reset`, and `bootmode immo off` connect without that prompt. The installer places `ecuflash.exe` in `C:\Program Files\NefMotoECUFlasher`, next to the memory layouts.
 
 ```text
-ecuflash -h
-ecuflash --help
 ecuflash --version
-ecuflash usb
-ecuflash layouts
-ecuflash --layout
-ecuflash kwp info -o info.txt
+ecuflash <layouts|usb>
+ecuflash <kwp|bootmode> info -o boot.txt
 ecuflash kwp dtc read -o dtcs.txt
 ecuflash kwp dtc clear
-ecuflash bootmode info -o boot.txt
-ecuflash bootmode immo off
-ecuflash bootmode immo off --95p08 -o backup.bin
+ecuflash bootmode immo off [--95040|--95P08|--95080|--95160] [-o backup.bin]
+ecuflash bootmode eeprom read [--95040|--95P08|--95080|--95160] -o eeprom.bin
+ecuflash bootmode eeprom write [--95040|--95P08|--95080|--95160] -i eeprom.bin
 ecuflash bootmode verify -i image.bin
 ecuflash bootmode reset
-ecuflash kwp read full --layout 29F800BB -o out.bin
-ecuflash kwp read full --layout 512k -o out.bin
-ecuflash kwp read full -o calibration.bin
-ecuflash kwp read diff -i base.bin -o out.bin
-ecuflash kwp write full -i image.bin
-ecuflash kwp write diff -i image.bin
-ecuflash bootmode read full -o out.bin
-ecuflash bootmode read diff -i base.bin -o out.bin
-ecuflash bootmode write full -i image.bin
-ecuflash bootmode write diff -i image.bin
+ecuflash kwp read full --layout <29F800BB|29F400BB|29F200|...> -o out.bin
+ecuflash kwp read full --layout <1M|512k|256k|...> -o out.bin
+ecuflash <kwp|bootmode> read full -o out.bin
+ecuflash <kwp|bootmode> read diff -i base.bin -o out.bin
+ecuflash <kwp|bootmode> write <full|diff> -i image.bin
 ```
 
 - No arguments, `-h`, and `-?` print the usage and exit. `--help` prints the command descriptions and options. `--version` prints the build version and exits. None of them connect.

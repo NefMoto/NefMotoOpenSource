@@ -87,8 +87,8 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Theory]
-        [InlineData("bootmode reset -i image.bin", "reset does not take -i, -o, --no-verify, or --95p08.")]
-        [InlineData("bootmode reset -o out.bin", "reset does not take -i, -o, --no-verify, or --95p08.")]
+        [InlineData("bootmode reset -i image.bin", "reset does not take -i, -o, --no-verify, or an EEPROM part.")]
+        [InlineData("bootmode reset -o out.bin", "reset does not take -i, -o, --no-verify, or an EEPROM part.")]
         [InlineData("bootmode reset --layout 29F800BB", "Boot mode reads the chip id. Do not pass --layout.")]
         [InlineData("bootmode reset --slow", "--slow applies to KWP.")]
         [InlineData("kwp reset", "Reset is a bootmode command.")]
@@ -169,7 +169,11 @@ namespace NefMotoOpenSource.Tests
             Program.Request request = Parse("bootmode", "immo", "off", "--95p08", "-o", "backup.bin", "--no-verify");
             Assert.True(request.ImmoOff);
             Assert.False(request.Kwp);
-            Assert.True(request.Eeprom95P08);
+            Assert.Equal("95P08", request.EepromPart);
+            Assert.Equal("95P08", Parse("bootmode", "immo", "off", "--95P08").EepromPart);
+            Assert.Equal("95160", Parse("bootmode", "immo", "off", "--95160").EepromPart);
+            Assert.Equal("95080", Parse("bootmode", "immo", "off", "--95080").EepromPart);
+            Assert.Null(Parse("bootmode", "immo", "off").EepromPart);
             Assert.Equal("backup.bin", request.OutputPath);
             Assert.True(request.NoVerify);
             Assert.False(request.Force);
@@ -178,17 +182,55 @@ namespace NefMotoOpenSource.Tests
         [Theory]
         [InlineData("bootmode dtc read", "DTC read and clear are KWP commands.")]
         [InlineData("kwp dtc write", "DTC command must be read or clear.")]
-        [InlineData("kwp dtc read -i image.bin", "dtc does not take -i, --layout, --no-verify, or --95p08.")]
+        [InlineData("kwp dtc read -i image.bin", "dtc does not take -i, --layout, --no-verify, or an EEPROM part.")]
         [InlineData("kwp dtc clear -o dtcs.txt", "dtc clear does not take -o.")]
         [InlineData("kwp immo off", "Immo off is a bootmode command.")]
         [InlineData("bootmode immo on", "Immo command must be off.")]
         [InlineData("bootmode immo off -i image.bin", "immo off does not take -i.")]
         [InlineData("bootmode immo off --layout 29F800BB", "immo off does not take --layout.")]
         [InlineData("bootmode immo off --slow", "--slow applies to KWP.")]
-        [InlineData("kwp info --95p08", "--95p08 applies to bootmode immo off.")]
+        [InlineData("kwp info --95p08", "An EEPROM part applies to bootmode immo off, eeprom read, or eeprom write.")]
         [InlineData("kwp read dtc", "Pass kwp dtc read, kwp dtc clear, or bootmode immo off.")]
-        [InlineData("bootmode immo off --95p08 --95p08", "--95p08 was given twice.")]
+        [InlineData("bootmode immo off --95p08 --95p08", "EEPROM part was given twice.")]
+        [InlineData("bootmode immo off --95p08 --95160", "EEPROM part was given twice.")]
         public void Dtc_and_immo_reject_a_bad_command(string command, string expected)
+        {
+            Assert.False(Program.TryParse(command.Split(' '), out _, out string? error));
+            Assert.Equal(expected, error);
+        }
+
+        [Fact]
+        public void Bootmode_eeprom_read_and_write_keep_the_part()
+        {
+            Program.Request read = Parse("bootmode", "eeprom", "read", "--95160", "-o", "eeprom.bin");
+            Assert.True(read.EepromRead);
+            Assert.False(read.EepromWrite);
+            Assert.False(read.Kwp);
+            Assert.Equal("95160", read.EepromPart);
+            Assert.Equal("eeprom.bin", read.OutputPath);
+
+            Program.Request write = Parse("bootmode", "EEPROM", "WRITE", "--95p08", "-i", "eeprom.bin", "--no-verify", "-f");
+            Assert.True(write.EepromWrite);
+            Assert.False(write.EepromRead);
+            Assert.Equal("95P08", write.EepromPart);
+            Assert.Equal("eeprom.bin", write.InputPath);
+            Assert.True(write.NoVerify);
+            Assert.True(write.Force);
+            Assert.Null(Parse("bootmode", "eeprom", "read", "-o", "eeprom.bin").EepromPart);
+        }
+
+        [Theory]
+        [InlineData("bootmode eeprom", "Pass bootmode eeprom read -o FILE or bootmode eeprom write -i FILE.")]
+        [InlineData("kwp eeprom read -o eeprom.bin", "EEPROM read and write are bootmode commands.")]
+        [InlineData("bootmode eeprom dump -o eeprom.bin", "EEPROM command must be read or write.")]
+        [InlineData("bootmode eeprom read", "An EEPROM read needs -o eeprom.bin.")]
+        [InlineData("bootmode eeprom read -i eeprom.bin -o eeprom.bin", "An EEPROM read does not take -i.")]
+        [InlineData("bootmode eeprom read -o eeprom.bin --no-verify", "An EEPROM read does not take --no-verify.")]
+        [InlineData("bootmode eeprom write", "An EEPROM write needs -i eeprom.bin.")]
+        [InlineData("bootmode eeprom write -i eeprom.bin -o eeprom.bin", "An EEPROM write does not take -o.")]
+        [InlineData("bootmode eeprom read -o eeprom.bin --layout 29F800BB", "Boot mode reads the chip id. Do not pass --layout.")]
+        [InlineData("bootmode eeprom write -i eeprom.bin --slow", "--slow applies to KWP.")]
+        public void Bootmode_eeprom_rejects_a_bad_command(string command, string expected)
         {
             Assert.False(Program.TryParse(command.Split(' '), out _, out string? error));
             Assert.Equal(expected, error);

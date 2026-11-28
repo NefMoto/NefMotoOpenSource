@@ -113,6 +113,11 @@ namespace Ecuflash
                 return RunImmoOff(request);
             }
 
+            if (request.EepromRead || request.EepromWrite)
+            {
+                return RunEeprom(request);
+            }
+
             if (request.Reset)
             {
                 return RunBootmodeReset(request);
@@ -493,8 +498,8 @@ namespace Ecuflash
 
         static int FinishImmoOff(Request request, BootstrapInterface boot)
         {
-            BootstrapInterface.BootmodeEepromSettings settings = ImmoSettings(request);
-            Log(1, "Preset: " + ImmoPreset(request) + ".");
+            BootstrapInterface.BootmodeEepromSettings settings = EepromSettings(request);
+            Log(1, "Preset: " + EepromPreset(request) + ".");
             var read = new BootmodeReadEepromOperation(boot, settings);
             bool readOk = WaitForOperation(read, "Reading EEPROM.", () => CloseBoot(boot));
             if (!readOk || (read.ReadMemory == null) || (read.ReadMemory.RawData == null))
@@ -511,7 +516,7 @@ namespace Ecuflash
             }
 
             byte[] image = (byte[])original.Clone();
-            Me7Eeprom95040Immo.Result result = request.Eeprom95P08
+            Me7Eeprom95040Immo.Result result = WideImmo(request)
                 ? Me7Eeprom95P08Immo.TryDisable(image)
                 : Me7Eeprom95040Immo.TryDisable(image);
             if (result != Me7Eeprom95040Immo.Result.Applied)
@@ -573,19 +578,107 @@ namespace Ecuflash
 
         static string DefaultImmoBackupName(Request request)
         {
-            return request.Eeprom95P08 ? "eeprom-95p08-before-immo.bin" : "eeprom-95040-before-immo.bin";
+            return "eeprom-" + ImmoPart(request).ToLowerInvariant() + "-before-immo.bin";
         }
 
-        static string ImmoPreset(Request request)
+        static int RunEeprom(Request request)
         {
-            return request.Eeprom95P08
-                ? "ME7.1.1 P6.3, 95P08 SSC 1024 B"
-                : "ME7.5 P4.7, 95040 SSC 512 B";
+            byte[]? image = null;
+            if (request.EepromWrite)
+            {
+                if (!File.Exists(request.InputPath))
+                {
+                    Error("Image file was not found: " + request.InputPath);
+                    return 2;
+                }
+
+                image = File.ReadAllBytes(request.InputPath!);
+                BootstrapInterface.BootmodeEepromSettings settings = EepromSettings(request);
+                if ((uint)image.Length != settings.Size)
+                {
+                    Error("EEPROM file is " + image.Length + " bytes. Preset is " + settings.Size + " bytes. Chip was not written.");
+                    return 2;
+                }
+
+                if (!ConfirmEepromWrite(request))
+                {
+                    Error("Cancelled. Nothing was sent.");
+                    return 1;
+                }
+            }
+
+            return RunOnDevice(request, device => WithBoot(request, device, boot => FinishEeprom(request, boot, image)));
         }
 
-        static BootstrapInterface.BootmodeEepromSettings ImmoSettings(Request request)
+        static int FinishEeprom(Request request, BootstrapInterface boot, byte[]? image)
         {
-            if (!request.Eeprom95P08)
+            BootstrapInterface.BootmodeEepromSettings settings = EepromSettings(request);
+            Log(1, "Preset: " + EepromPreset(request) + ".");
+            if (request.EepromRead)
+            {
+                var read = new BootmodeReadEepromOperation(boot, settings);
+                bool readOk = WaitForOperation(read, "Reading EEPROM.", () => CloseBoot(boot));
+                if (!readOk || (read.ReadMemory == null) || (read.ReadMemory.RawData == null))
+                {
+                    Error("Reading EEPROM failed.");
+                    return 1;
+                }
+
+                byte[] data = read.ReadMemory.RawData;
+                if ((uint)data.Length != settings.Size)
+                {
+                    Error("EEPROM read is " + data.Length + " bytes. Preset is " + settings.Size + " bytes. File was not saved.");
+                    return 1;
+                }
+
+                return SaveImmoBytes(request.OutputPath!, data) ? 0 : 1;
+            }
+
+            bool verify = !request.NoVerify;
+            var write = new BootmodeWriteEepromOperation(boot, settings, image!, verify);
+            bool wrote = WaitForOperation(write, "Writing EEPROM.", () => CloseBoot(boot));
+            if (!wrote)
+            {
+                Error("Writing EEPROM failed.");
+                return 1;
+            }
+
+            Progress(verify ? "EEPROM written and verified." : "EEPROM written (not verified).");
+            return 0;
+        }
+
+        static bool ConfirmEepromWrite(Request request)
+        {
+            Prompt("This writes the physical EEPROM (" + EepromPreset(request) + ").");
+            Prompt("Immobilizer, VIN, and adaptations can change. The ECU must already be in boot mode.");
+            if (request.Force)
+            {
+                Prompt("Continuing because --force was passed.");
+                return true;
+            }
+
+            return ReadChoice(UserPromptType.OK_CANCEL) == UserPromptResult.OK;
+        }
+
+        static string EepromPreset(Request request)
+        {
+            string chip = WideImmo(request) ? "ME7.1.1 P6.3" : "ME7.5 P4.7";
+            return chip + ", " + BootmodeEepromCatalog.DisplayNameFor(EepromSettings(request));
+        }
+
+        static string ImmoPart(Request request)
+        {
+            return request.EepromPart ?? "95040";
+        }
+
+        static bool WideImmo(Request request)
+        {
+            return ImmoPart(request) != "95040";
+        }
+
+        static BootstrapInterface.BootmodeEepromSettings EepromSettings(Request request)
+        {
+            if (!WideImmo(request))
             {
                 return BootstrapInterface.BootmodeEepromSettings.ForMe75();
             }
@@ -593,7 +686,28 @@ namespace Ecuflash
             return BootmodeEepromCatalog.ToSettings(
                 BootmodeEepromCatalog.FindChipSelect("ME7.1.1 P6.3"),
                 BootstrapInterface.BootmodeEepromPeriph.SSC,
-                BootmodeEepromCatalog.FindPart(false, "95P08"));
+                BootmodeEepromCatalog.FindPart(false, ImmoPart(request)));
+        }
+
+        static bool TryEepromPart(string arg, out string? part)
+        {
+            part = null;
+            if ((arg.Length < 3) || !arg.StartsWith("--", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string name = arg.Substring(2);
+            foreach (string candidate in new[] { "95040", "95P08", "95080", "95160" })
+            {
+                if (candidate.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    part = candidate;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         static int ListUsb()
@@ -1612,15 +1726,15 @@ namespace Ecuflash
                     continue;
                 }
 
-                if (arg == "--95p08")
+                if (TryEepromPart(arg, out string? eepromPart))
                 {
-                    if (request.Eeprom95P08)
+                    if (request.EepromPart != null)
                     {
-                        error = "--95p08 was given twice.";
+                        error = "EEPROM part was given twice.";
                         return false;
                     }
 
-                    request.Eeprom95P08 = true;
+                    request.EepromPart = eepromPart;
                     continue;
                 }
 
@@ -1688,6 +1802,14 @@ namespace Ecuflash
 
             if (positionals.Count == 2)
             {
+                if (positionals[1].Equals("eeprom", StringComparison.OrdinalIgnoreCase))
+                {
+                    error = positionals[0].Equals("bootmode", StringComparison.OrdinalIgnoreCase)
+                        ? "Pass bootmode eeprom read -o FILE or bootmode eeprom write -i FILE."
+                        : "EEPROM read and write are bootmode commands.";
+                    return false;
+                }
+
                 if (positionals[1].Equals("verify", StringComparison.OrdinalIgnoreCase))
                 {
                     return ParseVerify(positionals, request, out error);
@@ -1701,10 +1823,25 @@ namespace Ecuflash
                 return ParseInfo(positionals, request, out error);
             }
 
+            if ((positionals.Count >= 2)
+                && positionals[1].Equals("eeprom", StringComparison.OrdinalIgnoreCase)
+                && (positionals.Count != 3))
+            {
+                error = positionals[0].Equals("bootmode", StringComparison.OrdinalIgnoreCase)
+                    ? "Pass bootmode eeprom read -o FILE or bootmode eeprom write -i FILE."
+                    : "EEPROM read and write are bootmode commands.";
+                return false;
+            }
+
             if (positionals.Count != 3)
             {
                 error = CommandError();
                 return false;
+            }
+
+            if (positionals[1].Equals("eeprom", StringComparison.OrdinalIgnoreCase))
+            {
+                return ParseEeprom(positionals, request, out error);
             }
 
             if (positionals[1].Equals("dtc", StringComparison.OrdinalIgnoreCase))
@@ -1829,9 +1966,9 @@ namespace Ecuflash
                 return false;
             }
 
-            if ((request.InputPath != null) || (request.LayoutName != null) || request.NoVerify || request.Eeprom95P08)
+            if ((request.InputPath != null) || (request.LayoutName != null) || request.NoVerify || (request.EepromPart != null))
             {
-                error = "dtc does not take -i, --layout, --no-verify, or --95p08.";
+                error = "dtc does not take -i, --layout, --no-verify, or an EEPROM part.";
                 return false;
             }
 
@@ -1885,11 +2022,69 @@ namespace Ecuflash
             return true;
         }
 
+        static bool ParseEeprom(List<string> positionals, Request request, out string? error)
+        {
+            if (!BeginBootmode(positionals, request, "EEPROM read and write are bootmode commands.", out error))
+            {
+                return false;
+            }
+
+            bool read = positionals[2].Equals("read", StringComparison.OrdinalIgnoreCase);
+            bool write = positionals[2].Equals("write", StringComparison.OrdinalIgnoreCase);
+            if (!read && !write)
+            {
+                error = "EEPROM command must be read or write.";
+                return false;
+            }
+
+            if (read)
+            {
+                if (request.NoVerify)
+                {
+                    error = "An EEPROM read does not take --no-verify.";
+                    return false;
+                }
+
+                if (request.InputPath != null)
+                {
+                    error = "An EEPROM read does not take -i.";
+                    return false;
+                }
+
+                if (request.OutputPath == null)
+                {
+                    error = "An EEPROM read needs -o eeprom.bin.";
+                    return false;
+                }
+
+                request.EepromRead = true;
+            }
+            else
+            {
+                if (request.OutputPath != null)
+                {
+                    error = "An EEPROM write does not take -o.";
+                    return false;
+                }
+
+                if (request.InputPath == null)
+                {
+                    error = "An EEPROM write needs -i eeprom.bin.";
+                    return false;
+                }
+
+                request.EepromWrite = true;
+            }
+
+            return Accept(request, out error);
+        }
+
         static bool Accept(Request request, out string? error)
         {
-            if (request.Eeprom95P08 && !request.ImmoOff)
+            bool eepromCommand = request.ImmoOff || request.EepromRead || request.EepromWrite;
+            if ((request.EepromPart != null) && !eepromCommand)
             {
-                error = "--95p08 applies to bootmode immo off.";
+                error = "An EEPROM part applies to bootmode immo off, eeprom read, or eeprom write.";
                 return false;
             }
 
@@ -1927,9 +2122,9 @@ namespace Ecuflash
                 return false;
             }
 
-            if ((request.InputPath != null) || (request.OutputPath != null) || request.NoVerify || request.Eeprom95P08)
+            if ((request.InputPath != null) || (request.OutputPath != null) || request.NoVerify || (request.EepromPart != null))
             {
-                error = "reset does not take -i, -o, --no-verify, or --95p08.";
+                error = "reset does not take -i, -o, --no-verify, or an EEPROM part.";
                 return false;
             }
 
@@ -2029,7 +2224,9 @@ namespace Ecuflash
             writer.WriteLine("       ecuflash kwp dtc read [-o FILE]");
             writer.WriteLine("       ecuflash kwp dtc clear");
             writer.WriteLine("       ecuflash bootmode info [-o FILE]");
-            writer.WriteLine("       ecuflash bootmode immo off");
+            writer.WriteLine("       ecuflash bootmode immo off [--95040|--95P08|--95080|--95160] [-o FILE]");
+            writer.WriteLine("       ecuflash bootmode eeprom read [--95040|--95P08|--95080|--95160] -o FILE");
+            writer.WriteLine("       ecuflash bootmode eeprom write [--95040|--95P08|--95080|--95160] -i FILE");
             writer.WriteLine("       ecuflash bootmode verify -i FILE");
             writer.WriteLine("       ecuflash bootmode reset");
             writer.WriteLine("       ecuflash kwp read full [--layout NAME] -o FILE");
@@ -2055,6 +2252,8 @@ namespace Ecuflash
             Command(writer, "kwp dtc clear", "Clear diagnostic information.");
             Command(writer, "bootmode info", "Read device, bus, and flash layout. -o writes the same lines to a file.");
             Command(writer, "bootmode immo off", "Read the EEPROM, set immo off, save a backup, and write it back.");
+            Command(writer, "bootmode eeprom read", "Read the physical EEPROM. Requires -o. Does not write the chip.");
+            Command(writer, "bootmode eeprom write", "Write -i to the physical EEPROM. Asks before connecting.");
             Command(writer, "bootmode verify", "Checksum each sector of -i. Does not read or write the chip.");
             Command(writer, "bootmode reset", "Software reset, then close the port. The boot pin chooses what starts.");
             Command(writer, "kwp read full", "Read the layout, or the M5.9.2 calibration. Requires -o.");
@@ -2071,14 +2270,14 @@ namespace Ecuflash
             Option(writer, "-V, --version", "print the build version and exit");
             Option(writer, "-v..., --verbose", "more stderr detail (USER, LOG, DEV)");
             Option(writer, "-d, --debug", "print TRACE protocol detail on stderr");
-            Option(writer, "-i FILE", "image to write, or the file a diff read or verify compares");
-            Option(writer, "-o FILE", "file a read saves, or the info, DTC, or immo-off lines");
+            Option(writer, "-i FILE", "flash or EEPROM image to write, or the file a diff read or verify compares");
+            Option(writer, "-o FILE", "file a flash or EEPROM read saves, or the info, DTC, or immo-off lines");
             Option(writer, "--layout [NAME]", "layout basename or 1m, 512k, 256k; no NAME lists them");
             Option(writer, "--usb N", "device index from usb; one device is used if omitted");
             Option(writer, "--baud RATE", "KWP session baud, or the boot-mode baud");
             Option(writer, "--slow", "KWP slow init; fast init is the default");
             Option(writer, "--no-verify", "match clearing Verify Read or Verify Write");
-            Option(writer, "--95p08", "ME7.1.1 95P08 on P6.3; immo off defaults to 95040 on P4.7");
+            Option(writer, "--95040, --95P08, --95080, --95160", "EEPROM part; default 95040 on P4.7, others on P6.3");
             Option(writer, "-f, --force", "answer confirmation prompts and do not wait");
             writer.WriteLine();
             writer.WriteLine("Output: command product lines go to stdout (or -o). Errors, progress, prompts,");
@@ -2224,7 +2423,9 @@ namespace Ecuflash
             public bool DtcRead;
             public bool DtcClear;
             public bool ImmoOff;
-            public bool Eeprom95P08;
+            public bool EepromRead;
+            public bool EepromWrite;
+            public string? EepromPart;
             public bool Reset;
             public int Verbosity;
             public bool Debug;
