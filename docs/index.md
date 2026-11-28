@@ -9,7 +9,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 - [Getting started](user-guide/getting-started.md) — install, cable, first connect, bench vs in-car, DTCs, logs
 - [Flashing](user-guide/flashing.md) — KWP read/write, layouts, checksums, and the `ecuflash` command line
 - [P0602](user-guide/clearing-P0602.md) — same fault as `P1681`: the stored flag, and what clears it
-- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM (95040 and 95P08 immo, lockout, `P0602` flag), `ecuflash bootmode info`, `ecuflash bootmode reset`, and `ecuflash bootmode immo off`. M5.9.2 write: pin 43 at +12 V; power-cycle the ECU if a write fails
+- [Bootmode](user-guide/bootmode.md) — bootstrap connect, flash auto-detect, physical EEPROM (95040, 95P08, and 95160 immo, lockout, `P0602` flag), `ecuflash bootmode info`, `ecuflash bootmode reset`, and `ecuflash bootmode immo off`. M5.9.2 write: pin 43 at +12 V; power-cycle the ECU if a write fails
 - [Troubleshooting](user-guide/troubleshooting.md) — symptom index, FAQ, what to attach on a bug report
 
 ## Developer / maintainer
@@ -18,7 +18,7 @@ Project overview, features, and requirements: [README.md](../README.md).
 - [KWP2000.md](KWP2000.md) — connect, RAM kernel after write, settings persistence, ECU family exceptions
 - [M5.9.2.md](M5.9.2.md) — M5.9.2 first-wake KWP: pin 43, speed byte, security, erase, and download
 - [ME7-K-line-addresses.md](ME7-K-line-addresses.md) — slow-init and fast-init addresses in the application firmware
-- [ME7-eeprom-checksum.md](ME7-eeprom-checksum.md) — 95040 / 95P08 page sum, ME7.1, ME7.5, and ME7.1.1 window at byte 0 or byte 1
+- [ME7-eeprom-checksum.md](ME7-eeprom-checksum.md) — 95040, 95P08, and 95160 page sum for ME7.1, ME7.5, and ME7.1.1
 - [P1681-P0602.md](P1681-P0602.md) — `P0602` / `P1681`: the EEPROM flag, what clears it, and the one-byte edit
 - [BUILDING.md](BUILDING.md) — build from source
 - [RELEASE.md](RELEASE.md) — how releases are tagged and published

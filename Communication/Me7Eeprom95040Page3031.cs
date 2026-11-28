@@ -39,7 +39,7 @@ namespace Communication
                 return false;
             }
 
-            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.ReadMapped(image);
+            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
             return (ee.P0602Page30 & 0x80) == 0 && (ee.P0602Page31 & 0x80) == 0;
         }
 
@@ -50,7 +50,7 @@ namespace Communication
                 return Result.Refused;
             }
 
-            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.ReadMapped(image);
+            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
             bool page30 = (ee.P0602Page30 & 0x80) != 0;
             bool page31 = (ee.P0602Page31 & 0x80) != 0;
             if (page30)
@@ -79,7 +79,7 @@ namespace Communication
                 return Result.Refused;
             }
 
-            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.ReadMapped(image);
+            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
             bool page30 = (ee.P0602Page30 & 0x80) == 0;
             bool page31 = (ee.P0602Page31 & 0x80) == 0;
             if (page30)
@@ -108,7 +108,7 @@ namespace Communication
                 return Result.Refused;
             }
 
-            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.ReadMapped(image);
+            Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
             bool page30 = ee.LockoutPage30 != 0;
             bool page31 = ee.LockoutPage31 != 0;
             if (page30)
@@ -134,7 +134,8 @@ namespace Communication
         {
             return image != null
                 && (image.Length == Me7Eeprom95040Checksum.EepromSize
-                    || image.Length == Me7Eeprom95P08Immo.EepromSize);
+                    || image.Length == Me7Eeprom95P08Immo.EepromSize
+                    || image.Length == Me7Eeprom95P08Immo.LargeEepromSize);
         }
 
         private static Result Commit(
@@ -148,12 +149,6 @@ namespace Communication
             if (!page30 && !page31)
             {
                 return Result.AlreadyDone;
-            }
-
-            int offset = Me7Eeprom95040Checksum.MapOffset(image);
-            if (offset != 0)
-            {
-                return Result.Refused;
             }
 
             Me7Eeprom95040Fields.Write(image, ee);

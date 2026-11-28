@@ -86,6 +86,31 @@ namespace NefMotoOpenSource.Tests
             Assert.Equal(Me7Eeprom95040Immo.Result.AlreadyOff, Me7Eeprom95P08Immo.TryDisable(Image(0x02, 0x02)));
             Assert.Equal(Me7Eeprom95040Immo.Result.AlreadyOn, Me7Eeprom95P08Immo.TryEnable(Image(0x01, 0x01)));
         }
+
+        [Fact]
+        public void TryDisable_on_a_95160_leaves_the_second_half()
+        {
+            byte[] image = new byte[Me7Eeprom95P08Immo.LargeEepromSize];
+            image[Me7Eeprom95P08Immo.ImmoOffset1] = 0x01;
+            image[Me7Eeprom95P08Immo.ImmoOffset2] = 0x01;
+            image[512] = 0x5A;
+            image[0x410] = 0x3C;
+            image[image.Length - 1] = 0x77;
+            byte[] before = (byte[])image.Clone();
+
+            Assert.Equal(Me7Eeprom95040Immo.Result.Applied, Me7Eeprom95P08Immo.TryDisable(image));
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[Me7Eeprom95P08Immo.ImmoOffset1]);
+            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[Me7Eeprom95P08Immo.ImmoOffset2]);
+            Assert.NotEqual(before[0x1E], image[0x1E]);
+            Assert.NotEqual(before[0x2E], image[0x2E]);
+            Assert.Equal(0x5A, image[512]);
+            Assert.Equal(0x3C, image[0x410]);
+            Assert.Equal(0x77, image[image.Length - 1]);
+            for (int i = 512; i < image.Length; i++)
+            {
+                Assert.Equal(before[i], image[i]);
+            }
+        }
     }
 }
 

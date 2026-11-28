@@ -31,12 +31,6 @@ namespace Communication
         public const int PageSize = 16;
         public const int PageCount = 32;
 
-        /// <summary>
-        /// Byte-1 window is used only when at least this many pages match the formula.
-        /// One page has 2 chances in 65536, so a smaller count is an accident.
-        /// </summary>
-        public const int FormulaMatchMinimum = 8;
-
         public enum PageChecksumKind
         {
             None,
@@ -187,8 +181,8 @@ namespace Communication
         }
 
         /// <summary>
-        /// Status for a bootmode read longer than 512 bytes. A 95P08 uses the 32-page sum.
-        /// Null means the plain OK line still applies.
+        /// Status for a bootmode read longer than 512 bytes. A 95P08 or a 95160
+        /// uses the 32-page sum. Null means the plain OK line still applies.
         /// </summary>
         public static string OversizedReadStatus(byte[] data, string deviceName, ushort[] imageTable = null)
         {
@@ -197,15 +191,10 @@ namespace Communication
                 return null;
             }
 
-            if (deviceName.StartsWith("95P08"))
+            string chip = MapChip(deviceName);
+            if (chip != null)
             {
-                string shifted = ShiftedMatchStatus(data, "95P08", imageTable);
-                if (shifted != null)
-                {
-                    return shifted;
-                }
-
-                return Validate(data, 0, imageTable).FormatStatusMessage(chip: "95P08");
+                return Validate(data, imageTable).FormatStatusMessage(chip: chip);
             }
 
             if (Validate(data).AllChecksumPagesValid)
@@ -242,19 +231,34 @@ namespace Communication
             return "Try 95P08, 1024 bytes.";
         }
 
-        public static ValidationResult Validate(byte[] data, int dataOffset = 0, ushort[] imageTable = null)
+        private static string MapChip(string deviceName)
+        {
+            if (deviceName.StartsWith("95160"))
+            {
+                return "95160";
+            }
+
+            if (deviceName.StartsWith("95P08"))
+            {
+                return "95P08";
+            }
+
+            return null;
+        }
+
+        public static ValidationResult Validate(byte[] data, ushort[] imageTable = null)
         {
             var result = new ValidationResult();
             result.PageChecksumKinds = new PageChecksumKind[PageCount];
 
-            if (data == null || data.Length < dataOffset + EepromSize)
+            if (data == null || data.Length < EepromSize)
             {
                 return result;
             }
 
             for (int page = 0; page < PageCount; page++)
             {
-                int pageOffset = dataOffset + (page * PageSize);
+                int pageOffset = page * PageSize;
                 ushort descriptor = ActiveDescriptor(page, data, pageOffset, imageTable);
                 if ((descriptor & ChecksumPresentMask) == 0)
                 {
@@ -297,182 +301,16 @@ namespace Communication
         }
 
         /// <summary>
-        /// True when the stored word equals the 14-byte formula with bit 6 clear or set.
-        /// <paramref name="bit6"/> is the variant that matched. No descriptor list is used.
-        /// </summary>
-        public static bool TryMatchBit6(byte[] data, int page, int dataOffset, out bool bit6)
-        {
-            bit6 = false;
-            if (!PageComplete(data, page, dataOffset))
-            {
-                return false;
-            }
-
-            int pageOffset = dataOffset + (page * PageSize);
-            ushort stored = (ushort)(data[pageOffset + 14] | (data[pageOffset + 15] << 8));
-            if (stored == CalculatePageChecksum(data, pageOffset, (ushort)page, FormulaDescriptor(false)))
-            {
-                return true;
-            }
-
-            bit6 = true;
-            return stored == CalculatePageChecksum(data, pageOffset, (ushort)page, FormulaDescriptor(true));
-        }
-
-        /// <summary>Complete pages whose stored word matches either bit-6 variant.</summary>
-        public static int CountFormulaMatches(byte[] data, int dataOffset)
-        {
-            int count = 0;
-            for (int page = 0; page < PageCount; page++)
-            {
-                if (TryMatchBit6(data, page, dataOffset, out _))
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        /// <summary>
-        /// 0 when the shipped or loaded table accepts any page at byte 0, or the formula matches
-        /// any page there. 1 when byte 0 matches nothing and byte 1 matches at least
-        /// <see cref="FormulaMatchMinimum"/> pages.
-        /// </summary>
-        public static int MapOffset(byte[] data, ushort[] imageTable = null)
-        {
-            return ShiftedMatchCount(data, imageTable) == 0 ? 0 : 1;
-        }
-
-        /// <summary>
-        /// Status for a map that matches at byte 1. Null when <see cref="MapOffset"/> stays 0.
-        /// </summary>
-        public static string ShiftedMatchStatus(byte[] data, string chip, ushort[] imageTable = null)
-        {
-            int matches = ShiftedMatchCount(data, imageTable);
-            if (matches == 0)
-            {
-                return null;
-            }
-
-            return "ME7 " + chip + " page checksums match (" + matches + " pages).";
-        }
-
-        /// <summary>
-        /// Writes one page checksum with an already chosen bit 6. Returns false when the page is
-        /// incomplete or the stored word is already that value.
-        /// </summary>
-        public static bool WriteFormulaChecksum(byte[] data, int page, int dataOffset, bool bit6)
-        {
-            if (!PageComplete(data, page, dataOffset))
-            {
-                return false;
-            }
-
-            int pageOffset = dataOffset + (page * PageSize);
-            ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, FormulaDescriptor(bit6));
-            byte low = (byte)(expected & 0xFF);
-            byte high = (byte)(expected >> 8);
-            if (data[pageOffset + 14] == low && data[pageOffset + 15] == high)
-            {
-                return false;
-            }
-
-            data[pageOffset + 14] = low;
-            data[pageOffset + 15] = high;
-            return true;
-        }
-
-        /// <summary>
-        /// At offset 0, writes the shipped checksum. Otherwise writes <paramref name="bit6"/> when
-        /// that page matched before the edit.
-        /// </summary>
-        public static void WriteKeptChecksum(byte[] data, int page, int dataOffset, bool matched, bool bit6)
-        {
-            if (dataOffset == 0)
-            {
-                WritePageChecksum(data, page);
-                return;
-            }
-
-            if (matched)
-            {
-                WriteFormulaChecksum(data, page, dataOffset, bit6);
-            }
-        }
-
-        /// <summary>
-        /// Rewrites checksums for pages that differ from <paramref name="original"/> and that matched
-        /// a bit-6 variant there. A page that matched neither variant is left alone.
-        /// </summary>
-        public static int CorrectEditedPages(byte[] data, byte[] original, int dataOffset)
-        {
-            if (data == null || original == null || dataOffset <= 0)
-            {
-                return 0;
-            }
-
-            int updated = 0;
-            for (int page = 0; page < PageCount; page++)
-            {
-                if (!PageComplete(data, page, dataOffset) || !PageComplete(original, page, dataOffset))
-                {
-                    continue;
-                }
-
-                if (!TryMatchBit6(original, page, dataOffset, out bool bit6))
-                {
-                    continue;
-                }
-
-                if (WriteFormulaChecksum(data, page, dataOffset, bit6))
-                {
-                    updated++;
-                }
-            }
-
-            return updated;
-        }
-
-        private static int ShiftedMatchCount(byte[] data, ushort[] imageTable)
-        {
-            ValidationResult shipped = Validate(data, 0, imageTable);
-            if (shipped.PagesChecked > shipped.PagesInvalid || CountFormulaMatches(data, 0) > 0)
-            {
-                return 0;
-            }
-
-            int matches = CountFormulaMatches(data, 1);
-            return matches >= FormulaMatchMinimum ? matches : 0;
-        }
-
-        private static ushort FormulaDescriptor(bool bit6)
-        {
-            return (ushort)(ChecksumPresentMask | (bit6 ? ChecksumBitMask : 0));
-        }
-
-        private static bool PageComplete(byte[] data, int page, int dataOffset)
-        {
-            if (data == null || page < 0 || page >= PageCount || dataOffset < 0)
-            {
-                return false;
-            }
-
-            long end = (long)dataOffset + ((long)page + 1) * PageSize;
-            return end <= data.Length;
-        }
-
-        /// <summary>
         /// Writes the Bosch checksum for one page. Pages 28-29 and pages with no checksum bit are left unchanged.
         /// </summary>
-        public static void WritePageChecksum(byte[] data, int page, int dataOffset = 0)
+        public static void WritePageChecksum(byte[] data, int page)
         {
             if (data == null || page < 0 || page >= PageCount || IsChecksumExemptPage(page))
             {
                 return;
             }
 
-            if (data.Length < dataOffset + EepromSize)
+            if (data.Length < EepromSize)
             {
                 return;
             }
@@ -483,41 +321,16 @@ namespace Communication
                 return;
             }
 
-            int pageOffset = dataOffset + (page * PageSize);
+            int pageOffset = page * PageSize;
             ushort expected = CalculatePageChecksum(data, pageOffset, (ushort)page, descriptor);
             data[pageOffset + 14] = (byte)(expected & 0xFF);
             data[pageOffset + 15] = (byte)(expected >> 8);
         }
 
-        /// <summary>
-        /// True when a byte-1 map already matches on pages 1 and 2. A byte-0 map is accepted here.
-        /// </summary>
-        public static bool ImmoPagesMatch(byte[] data, int dataOffset, out bool bit1, out bool bit2)
+        public static void WriteImmoPageChecksums(byte[] image)
         {
-            bit1 = false;
-            bit2 = false;
-            if (dataOffset == 0)
-            {
-                return true;
-            }
-
-            int page1 = Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo1));
-            int page2 = Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo2));
-            return TryMatchBit6(data, page1, dataOffset, out bit1)
-                && TryMatchBit6(data, page2, dataOffset, out bit2);
-        }
-
-        /// <summary>
-        /// Writes the page 1 and page 2 checksums after the immo bytes have changed.
-        /// Offset 0 uses the shipped checksum. Any other offset keeps the bits that matched.
-        /// </summary>
-        public static void WriteImmoChecksums(byte[] image, int dataOffset, bool bit1, bool bit2)
-        {
-            int page1 = Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo1));
-            int page2 = Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo2));
-            bool matched = dataOffset != 0;
-            WriteKeptChecksum(image, page1, dataOffset, matched, bit1);
-            WriteKeptChecksum(image, page2, dataOffset, matched, bit2);
+            WritePageChecksum(image, Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo1)));
+            WritePageChecksum(image, Me7Eeprom95040Fields.PageOf(nameof(Me7Eeprom95040Fields.Image.Immo2)));
         }
 
         /// <summary>
@@ -525,11 +338,11 @@ namespace Communication
         /// Pages 28-29 are never modified. With no image table, page 20 is not written.
         /// Returns how many pages were updated.
         /// </summary>
-        public static int CorrectChecksums(byte[] data, int dataOffset = 0, ushort[] imageTable = null)
+        public static int CorrectChecksums(byte[] data, ushort[] imageTable = null)
         {
             int pagesUpdated = 0;
 
-            if (data == null || data.Length < dataOffset + EepromSize)
+            if (data == null || data.Length < EepromSize)
             {
                 return 0;
             }
@@ -541,7 +354,7 @@ namespace Communication
                     continue;
                 }
 
-                int pageOffset = dataOffset + (page * PageSize);
+                int pageOffset = page * PageSize;
                 ushort descriptor = ActiveDescriptor(page, data, pageOffset, imageTable);
                 if ((descriptor & ChecksumPresentMask) == 0)
                 {

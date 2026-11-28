@@ -976,13 +976,8 @@ namespace Communication
                 return;
             }
 
-            var checksum = Me7Eeprom95040Checksum.Validate(data, 0, imageTable);
-            string shifted = Me7Eeprom95040Checksum.ShiftedMatchStatus(data, "95040", imageTable);
-            if (shifted != null)
-            {
-                commInterface.DisplayStatusMessage(shifted, StatusMessageType.USER);
-            }
-            else if (checksum.AllChecksumPagesValid)
+            var checksum = Me7Eeprom95040Checksum.Validate(data, imageTable);
+            if (checksum.AllChecksumPagesValid)
             {
                 if (!warnOnly)
                 {

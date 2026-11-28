@@ -38,34 +38,6 @@ namespace NefMotoOpenSource.Tests
         }
 
         [Fact]
-        public void The_07K_reads_match_21_pages_at_byte_1()
-        {
-            CheckShifted("eeprom 95P08 SSC 1024 B.bin");
-            CheckShifted("eeprom-95040-OG.bin");
-        }
-
-        [Fact]
-        public void Immo_off_on_the_07K_1024_keeps_the_matched_pages()
-        {
-            byte[]? image = ReadDump("eeprom 95P08 SSC 1024 B.bin");
-            if (image == null)
-            {
-                return;
-            }
-
-            int page31 = 1 + (31 * Me7Eeprom95040Checksum.PageSize) + 14;
-            byte low = image[page31];
-            byte high = image[page31 + 1];
-            Assert.Equal(Me7Eeprom95040Immo.Result.Applied, Me7Eeprom95P08Immo.TryDisable(image));
-            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[1 + Me7Eeprom95P08Immo.ImmoOffset1]);
-            Assert.Equal(Me7Eeprom95P08Immo.ImmoOff, image[1 + Me7Eeprom95P08Immo.ImmoOffset2]);
-            Assert.Equal(21, Me7Eeprom95040Checksum.CountFormulaMatches(image, 1));
-            Assert.Equal(low, image[page31]);
-            Assert.Equal(high, image[page31 + 1]);
-            Assert.Equal(0xFF, image[600]);
-        }
-
-        [Fact]
         public void The_07K_512_read_still_suggests_a_95P08()
         {
             byte[]? image = ReadDump("eeprom-95040-OG.bin");
@@ -74,9 +46,6 @@ namespace NefMotoOpenSource.Tests
                 return;
             }
 
-            Assert.Equal(
-                "ME7 95040 page checksums match (21 pages).",
-                Me7Eeprom95040Checksum.ShiftedMatchStatus(image, "95040"));
             var shipped = Me7Eeprom95040Checksum.Validate(image);
             var settings = new BootstrapInterface.BootmodeEepromSettings
             {
@@ -96,22 +65,7 @@ namespace NefMotoOpenSource.Tests
                 return;
             }
 
-            Assert.Equal(0, Me7Eeprom95040Checksum.MapOffset(image));
             Assert.True(Me7Eeprom95040Checksum.Validate(image).AllChecksumPagesValid);
-            Assert.Null(Me7Eeprom95040Checksum.ShiftedMatchStatus(image, "95040"));
-        }
-
-        private static void CheckShifted(string name)
-        {
-            byte[]? image = ReadDump(name);
-            if (image == null)
-            {
-                return;
-            }
-
-            Assert.Equal(0, Me7Eeprom95040Checksum.CountFormulaMatches(image, 0));
-            Assert.Equal(21, Me7Eeprom95040Checksum.CountFormulaMatches(image, 1));
-            Assert.Equal(1, Me7Eeprom95040Checksum.MapOffset(image));
         }
 
         private static byte[]? ReadDump(string name)

@@ -55,7 +55,7 @@ Tabs after you are connected:
 
 - **KWP2000 Info** — ident and DTCs (**Read ECU Info**, **Read DTCs**, **Read EEPROM Mirror**, **Clear DTCs**)
 - **Flashing** — KWP2000 and bootmode read/write ([Flashing](flashing.md))
-- **EEPROM** — physical EEPROM read/write. Immo off on a 95040 or 95P08 image. Lockout reset and clear `P0602` on a 95040 image, or a 95P08 whose map starts at byte 0 ([Bootmode](bootmode.md)). Over KWP2000, **Read EEPROM** reads the chip through the mirror at `0x600000` ([Read EEPROM over KWP2000](bootmode.md#read-eeprom-over-kwp2000)).
+- **EEPROM** — physical EEPROM read/write. Immo off, lockout reset, and clear `P0602` on a 95040, 95P08, or 95160 image ([Bootmode](bootmode.md)). Over KWP2000, **Read EEPROM** reads the chip through the mirror at `0x600000` ([Read EEPROM over KWP2000](bootmode.md#read-eeprom-over-kwp2000)).
 - **KWP2000 Logging** — live variables. It is not [ME7Logger](https://nefariousmotorsports.com/forum/). Hidden when the protocol combo is **Boot Mode**.
 
 ### Options if you have issues or are a developer

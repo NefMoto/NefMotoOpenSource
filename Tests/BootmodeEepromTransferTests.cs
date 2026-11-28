@@ -121,7 +121,26 @@ namespace NefMotoOpenSource.Tests
             var p08 = BootmodeEepromCatalog.FindPart(false, "95P08");
             Assert.NotNull(p08);
             Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95080To95320, p08.EepromType);
+            Assert.Equal((ushort)0, (ushort)p08.EepromType);
             Assert.Equal(1024u, p08.Size);
+            var p63 = BootmodeEepromCatalog.ToSettings(
+                BootmodeEepromCatalog.ChipSelects[1],
+                BootstrapInterface.BootmodeEepromPeriph.SSC,
+                p08);
+            Assert.Equal(6, p63.PortNumber);
+            Assert.Equal(3, p63.PinNumber);
+            Assert.Equal((ushort)0, (ushort)p63.EepromType);
+            Assert.Equal(1024u, p63.Size);
+            foreach (string name in new[] { "95080", "95160", "95320" })
+            {
+                var wide = BootmodeEepromCatalog.FindPart(false, name);
+                Assert.NotNull(wide);
+                Assert.Equal(BootstrapInterface.BootmodeEepromType.Type95080To95320, wide.EepromType);
+            }
+
+            Assert.Equal(
+                BootstrapInterface.BootmodeEepromType.Type95040,
+                BootmodeEepromCatalog.FindPart(false, "95040").EepromType);
             string p08Name = BootmodeEepromCatalog.DisplayNameFor(BootmodeEepromCatalog.ToSettings(
                 BootmodeEepromCatalog.ChipSelects[0],
                 BootstrapInterface.BootmodeEepromPeriph.SSC,

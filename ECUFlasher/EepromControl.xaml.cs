@@ -295,9 +295,34 @@ namespace ECUFlasher
             return IsNamedPart(image, "95P08");
         }
 
+        private bool Is95160Layout(byte[] image)
+        {
+            return IsNamedPart(image, "95160");
+        }
+
+        private bool IsLongMap(byte[] image)
+        {
+            return Is95P08Layout(image) || Is95160Layout(image);
+        }
+
         private bool HasPageChecksum(byte[] image)
         {
-            return Is95040Layout(image) || Is95P08Layout(image);
+            return Is95040Layout(image) || IsLongMap(image);
+        }
+
+        private string MapChipName(byte[] image)
+        {
+            if (Is95160Layout(image))
+            {
+                return "95160";
+            }
+
+            if (Is95P08Layout(image))
+            {
+                return "95P08";
+            }
+
+            return "95040";
         }
 
         private bool IsNamedPart(byte[] image, string name)
@@ -310,7 +335,7 @@ namespace ECUFlasher
 
         private bool ImmoIsOff(byte[] image)
         {
-            if (Is95P08Layout(image))
+            if (IsLongMap(image))
             {
                 return Me7Eeprom95P08Immo.IsOff(image);
             }
@@ -563,13 +588,7 @@ namespace ECUFlasher
 
             if (!HasPageChecksum(mDisplayedImage))
             {
-                reasonsDisabled.Add("Lockout and P0602 apply to a 95040 or the first 512 bytes of a 95P08");
-                return false;
-            }
-
-            if (Me7Eeprom95040Checksum.MapOffset(mDisplayedImage) != 0)
-            {
-                reasonsDisabled.Add("Lockout and P0602 stay off when the map starts at byte 1.");
+                reasonsDisabled.Add("Lockout and P0602 apply to a 95040 or the first 512 bytes of a 95P08 or 95160");
                 return false;
             }
 
@@ -598,21 +617,14 @@ namespace ECUFlasher
                 turnOn = Me7Eeprom95040Immo.IsOff(mDisplayedImage);
                 offsetDescription = "0x012 and 0x022";
             }
-            else if (Is95P08Layout(mDisplayedImage))
+            else if (IsLongMap(mDisplayedImage))
             {
                 turnOn = Me7Eeprom95P08Immo.IsOff(mDisplayedImage);
                 offsetDescription = "0x012 and 0x022";
             }
             else
             {
-                reasonsDisabled.Add("Immo applies to a 95040 512-byte image or a 95P08 1024-byte image");
-                return false;
-            }
-
-            int mapOffset = Me7Eeprom95040Checksum.MapOffset(mDisplayedImage);
-            if (mapOffset != 0 && !Me7Eeprom95040Checksum.ImmoPagesMatch(mDisplayedImage, mapOffset, out _, out _))
-            {
-                reasonsDisabled.Add("Immo stays off when page 1 or page 2 does not match.");
+                reasonsDisabled.Add("Immo applies to a 95040, a 95P08, or a 95160");
                 return false;
             }
 
@@ -887,7 +899,7 @@ namespace ECUFlasher
 
         private string EditImmo(byte[] image)
         {
-            if (Is95P08Layout(image))
+            if (IsLongMap(image))
             {
                 return ImmoEdit(
                     Me7Eeprom95P08Immo.IsOff(image),
@@ -1090,15 +1102,7 @@ namespace ECUFlasher
             if (HasPageChecksum(dataToWrite))
             {
                 imageTable = CurrentImageTable();
-                int mapOffset = Me7Eeprom95040Checksum.MapOffset(dataToWrite, imageTable);
-                if (mapOffset != 0)
-                {
-                    if (!ConfirmByte1Checksums(dataToWrite, mapOffset))
-                    {
-                        return;
-                    }
-                }
-                else if (!ConfirmShippedChecksums(dataToWrite, imageTable))
+                if (!ConfirmShippedChecksums(dataToWrite, imageTable))
                 {
                     return;
                 }
@@ -1138,13 +1142,13 @@ namespace ECUFlasher
 
         private bool ConfirmShippedChecksums(byte[] dataToWrite, ushort[] imageTable)
         {
-            var checksum = Me7Eeprom95040Checksum.Validate(dataToWrite, 0, imageTable);
+            var checksum = Me7Eeprom95040Checksum.Validate(dataToWrite, imageTable);
             if (checksum.AllChecksumPagesValid)
             {
                 return true;
             }
 
-            string device = Is95P08Layout(dataToWrite) ? "95P08" : "95040";
+            string device = MapChipName(dataToWrite);
             string csPrompt =
                 "ME7 " + device + " data-page checksums are invalid (" + checksum.PagesInvalid + " bad / " + checksum.PagesChecked + " checked).\n"
                 + "Pages 28-29 (HW/SW ID) are ignored and will not be changed.\n\n"
@@ -1164,46 +1168,9 @@ namespace ECUFlasher
 
             if (csResult == UserPromptResult.YES)
             {
-                int pagesUpdated = Me7Eeprom95040Checksum.CorrectChecksums(dataToWrite, 0, imageTable);
+                int pagesUpdated = Me7Eeprom95040Checksum.CorrectChecksums(dataToWrite, imageTable);
                 App.DisplayStatusMessage(
                     "Corrected " + pagesUpdated + " EEPROM data-page checksum(s); pages 28-29 left unchanged.",
-                    StatusMessageType.USER);
-            }
-
-            return true;
-        }
-
-        private bool ConfirmByte1Checksums(byte[] dataToWrite, int mapOffset)
-        {
-            if (mPendingOriginal == null)
-            {
-                return true;
-            }
-
-            string device = Is95P08Layout(dataToWrite) ? "95P08" : "95040";
-            int matches = Me7Eeprom95040Checksum.CountFormulaMatches(dataToWrite, mapOffset);
-            string csPrompt =
-                "ME7 " + device + " page checksums match (" + matches + " pages) starting at byte 1.\n"
-                + "Pages that did not match are left unchanged.\n\n"
-                + "Yes = correct checksums on pages this edit changed, then continue\n"
-                + "No = write the file as-is\n"
-                + "Cancel = abort";
-
-            UserPromptResult csResult = App.DisplayUserPrompt(
-                "EEPROM Checksums",
-                csPrompt,
-                UserPromptType.YES_NO_CANCEL);
-
-            if (csResult == UserPromptResult.CANCEL || csResult == UserPromptResult.NONE)
-            {
-                return false;
-            }
-
-            if (csResult == UserPromptResult.YES)
-            {
-                int pagesUpdated = Me7Eeprom95040Checksum.CorrectEditedPages(dataToWrite, mPendingOriginal, mapOffset);
-                App.DisplayStatusMessage(
-                    "Corrected " + pagesUpdated + " EEPROM data-page checksum(s); unmatched pages left unchanged.",
                     StatusMessageType.USER);
             }
 
@@ -1268,28 +1235,14 @@ namespace ECUFlasher
             if (HasPageChecksum(mDisplayedImage))
             {
                 ushort[] imageTable = CurrentImageTable();
-                int mapOffset = Me7Eeprom95040Checksum.MapOffset(mDisplayedImage, imageTable);
                 int windowLength = Math.Min(
                     Me7Eeprom95040Checksum.EepromSize,
-                    mDisplayedImage.Length - mapOffset);
+                    mDisplayedImage.Length);
                 var window = new byte[windowLength];
-                Array.Copy(mDisplayedImage, mapOffset, window, 0, windowLength);
-                Me7Eeprom95040Checksum.PageChecksumKind[] kinds;
-                bool checksumsOk;
-                string checksumText;
-                if (mapOffset == 0)
-                {
-                    var validation = Me7Eeprom95040Checksum.Validate(window, 0, imageTable);
-                    kinds = validation.PageChecksumKinds;
-                    checksumsOk = validation.AllChecksumPagesValid;
-                    checksumText = null;
-                }
-                else
-                {
-                    kinds = FormulaKinds(window);
-                    checksumsOk = true;
-                    checksumText = Me7Eeprom95040Checksum.CountFormulaMatches(window, 0) + " pages";
-                }
+                Array.Copy(mDisplayedImage, 0, window, 0, windowLength);
+                var validation = Me7Eeprom95040Checksum.Validate(window, imageTable);
+                Me7Eeprom95040Checksum.PageChecksumKind[] kinds = validation.PageChecksumKinds;
+                bool checksumsOk = validation.AllChecksumPagesValid;
 
                 byte[] legendImage = window;
                 if (window.Length < Me7Eeprom95040Checksum.EepromSize)
@@ -1298,7 +1251,7 @@ namespace ECUFlasher
                     Array.Copy(window, legendImage, window.Length);
                 }
 
-                ShowLegend(legendImage, checksumsOk, checksumText);
+                ShowLegend(legendImage, checksumsOk);
                 int pageSize = Me7Eeprom95040Checksum.PageSize;
                 for (int page = 0; page < Me7Eeprom95040Checksum.PageCount; page++)
                 {
@@ -1314,9 +1267,9 @@ namespace ECUFlasher
                         : BuildPlainRow(window, pageOffset, count));
                 }
 
-                if (Is95P08Layout(mDisplayedImage))
+                if (IsLongMap(mDisplayedImage))
                 {
-                    int tail = mapOffset + window.Length;
+                    int tail = window.Length;
                     while (tail < mDisplayedImage.Length)
                     {
                         int count = Math.Min(pageSize, mDisplayedImage.Length - tail);
@@ -1337,7 +1290,7 @@ namespace ECUFlasher
             SetLegend(false, "--", "--", "--", "--");
         }
 
-        private void ShowLegend(byte[] image, bool checksumsOk, string checksumText = null)
+        private void ShowLegend(byte[] image, bool checksumsOk)
         {
             Me7Eeprom95040Fields.Image ee = Me7Eeprom95040Fields.Read(image);
             SetLegend(
@@ -1346,8 +1299,7 @@ namespace ECUFlasher
                 Me7Eeprom95040Fields.FormatSkcValue(ee),
                 Me7Eeprom95040Fields.FormatP0602Value(ee),
                 Me7Eeprom95040Fields.FormatLockoutValue(ee),
-                checksumsOk,
-                checksumText);
+                checksumsOk);
         }
 
         private void SetLegend(
@@ -1356,8 +1308,7 @@ namespace ECUFlasher
             string skc,
             string p0602,
             string lockout,
-            bool checksumsOk = false,
-            string checksumText = null)
+            bool checksumsOk = false)
         {
             string kind = loaded ? null : "Empty";
             Legend.Clear();
@@ -1367,8 +1318,7 @@ namespace ECUFlasher
             Legend.Add(Item(loaded ? "Lockout" : kind, lockout, "Lockout"));
             if (loaded)
             {
-                string text = checksumText ?? (checksumsOk ? "ok" : "not ok");
-                Legend.Add(Item(checksumsOk ? "ChecksumOk" : "ChecksumBad", text, "Checksum"));
+                Legend.Add(Item(checksumsOk ? "ChecksumOk" : "ChecksumBad", checksumsOk ? "ok" : "not ok", "Checksum"));
             }
             else
             {
@@ -1443,32 +1393,6 @@ namespace ECUFlasher
                 Kind = "Empty",
                 Cells = cells
             };
-        }
-
-        private static Me7Eeprom95040Checksum.PageChecksumKind[] FormulaKinds(byte[] window)
-        {
-            var kinds = new Me7Eeprom95040Checksum.PageChecksumKind[Me7Eeprom95040Checksum.PageCount];
-            int pageSize = Me7Eeprom95040Checksum.PageSize;
-            for (int page = 0; page < kinds.Length; page++)
-            {
-                if (((page + 1) * pageSize) > window.Length)
-                {
-                    continue;
-                }
-
-                if (Me7Eeprom95040Checksum.IsChecksumExemptPage(page))
-                {
-                    kinds[page] = Me7Eeprom95040Checksum.PageChecksumKind.Exempt;
-                    continue;
-                }
-
-                if (Me7Eeprom95040Checksum.TryMatchBit6(window, page, 0, out _))
-                {
-                    kinds[page] = Me7Eeprom95040Checksum.PageChecksumKind.Ok;
-                }
-            }
-
-            return kinds;
         }
 
         private static EepromPageRow BuildPlainRow(byte[] image, int offset, int count)

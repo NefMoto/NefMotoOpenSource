@@ -21,15 +21,15 @@ Contact by Email: nyet@nyet.org
 namespace Communication
 {
     /// <summary>
-    /// Immobilizer status patch for a 95P08 image (1024 bytes, 16-bit address).
-    /// Off sets the mirrored bytes at 0x012 and 0x022 to 0x02 when they match.
-    /// On sets that pair back to 0x01 when both are 0x02.
-    /// Pages 1 and 2 use the 95040 checksum. A map at byte 1 is edited only when
-    /// those pages already match. Bytes past 512 are left unchanged.
+    /// Immobilizer status patch for a 95P08 (1024 bytes) or a 95160 (2048 bytes).
+    /// Both use a 16-bit address. Off sets the mirrored bytes at 0x012 and 0x022
+    /// to 0x02 when they match. On sets that pair back to 0x01 when both are 0x02.
+    /// Pages 1 and 2 use the 95040 checksum. Bytes outside the map window stay.
     /// </summary>
     public static class Me7Eeprom95P08Immo
     {
         public const int EepromSize = 1024;
+        public const int LargeEepromSize = 2048;
         public const byte ImmoOn = 0x01;
         public const byte ImmoOff = 0x02;
         public const int ImmoOffset1 = 0x012;
@@ -42,8 +42,7 @@ namespace Communication
                 return false;
             }
 
-            int offset = Me7Eeprom95040Checksum.MapOffset(image);
-            return image[offset + ImmoOffset1] == ImmoOff && image[offset + ImmoOffset2] == ImmoOff;
+            return image[ImmoOffset1] == ImmoOff && image[ImmoOffset2] == ImmoOff;
         }
 
         public static Me7Eeprom95040Immo.Result TryDisable(byte[] image)
@@ -58,7 +57,8 @@ namespace Communication
 
         private static bool Fits(byte[] image)
         {
-            return image != null && image.Length == EepromSize;
+            return image != null
+                && (image.Length == EepromSize || image.Length == LargeEepromSize);
         }
 
         private static Me7Eeprom95040Immo.Result TrySet(byte[] image, byte value, bool enable)
@@ -68,9 +68,8 @@ namespace Communication
                 return Me7Eeprom95040Immo.Result.Refused;
             }
 
-            int offset = Me7Eeprom95040Checksum.MapOffset(image);
-            int at1 = offset + ImmoOffset1;
-            int at2 = offset + ImmoOffset2;
+            int at1 = ImmoOffset1;
+            int at2 = ImmoOffset2;
             byte first = image[at1];
             byte second = image[at2];
             if (enable)
@@ -94,14 +93,9 @@ namespace Communication
                 return Me7Eeprom95040Immo.Result.Refused;
             }
 
-            if (!Me7Eeprom95040Checksum.ImmoPagesMatch(image, offset, out bool bit1, out bool bit2))
-            {
-                return Me7Eeprom95040Immo.Result.Refused;
-            }
-
             image[at1] = value;
             image[at2] = value;
-            Me7Eeprom95040Checksum.WriteImmoChecksums(image, offset, bit1, bit2);
+            Me7Eeprom95040Checksum.WriteImmoPageChecksums(image);
             return Me7Eeprom95040Immo.Result.Applied;
         }
     }
